@@ -19,7 +19,13 @@ import Glibc
 #error("Unsupported Platform")
 #endif
 
-public typealias COffT = off_t
+/// Namespace for C types used internally but not present in public API
+public enum _CTypes {
+  public typealias Off = off_t
+
+  public typealias SpawnAttr = posix_spawnattr_t
+}
+
 
 #if os(Windows)
 public typealias CModeT = CInt
@@ -50,4 +56,3 @@ public func system_strerror(_ __errnum: Int32) -> UnsafeMutablePointer<Int8>! {
 public func system_strlen(_ s: UnsafePointer<Int8>) -> Int {
   strlen(s)
 }
-

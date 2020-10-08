@@ -7,6 +7,15 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
+// If `errorCode` is zero, returns `value` as success.
+// If `errorCode` is non-zero, it is interpreted as an Errno and returned as failure.
+internal func valueOrErrorCode<T>(
+  _ value: T, errorCode: CInt
+) -> Result<T, Errno> {
+  if errorCode == 0 { return .success(value) }
+  return .failure(Errno(rawValue: errorCode))
+}
+
 // Results in errno if i == -1
 // @available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
 internal func valueOrErrno<I: FixedWidthInteger>(
@@ -92,5 +101,56 @@ extension OptionSet {
     }
     result += "]"
     return result
+  }
+}
+
+extension UnsafePointer where Pointee == UInt8 {
+  internal var _asCChar: UnsafePointer<CChar> {
+    UnsafeRawPointer(self).assumingMemoryBound(to: CChar.self)
+  }
+}
+extension UnsafePointer where Pointee == CChar {
+  internal var _asUInt8: UnsafePointer<UInt8> {
+    UnsafeRawPointer(self).assumingMemoryBound(to: UInt8.self)
+  }
+}
+extension UnsafeBufferPointer where Element == UInt8 {
+  internal var _asCChar: UnsafeBufferPointer<CChar> {
+    let base = baseAddress?._asCChar
+    return UnsafeBufferPointer<CChar>(start: base, count: self.count)
+  }
+}
+extension UnsafeBufferPointer where Element == CChar {
+  internal var _asUInt8: UnsafeBufferPointer<UInt8> {
+    let base = baseAddress?._asUInt8
+    return UnsafeBufferPointer<UInt8>(start: base, count: self.count)
+  }
+}
+
+extension Array where Element == String {
+  internal func _asArgList<R>(
+      _ body: (UnsafePointer<UnsafeMutablePointer<CChar>?>) throws -> R
+  ) rethrows -> R {
+      let argvlength = self.reduce(0) { $0 + $1.utf8.count + 1 }
+      let argvBuffer = UnsafeMutableBufferPointer<CChar>.allocate(capacity: argvlength)
+      defer { argvBuffer.deallocate() }
+      var target = argvBuffer.baseAddress!
+      var argv: [UnsafeMutablePointer<CChar>?] = []
+      argv.reserveCapacity(self.count + 1)
+      for var argument in self {
+          argument.withUTF8 { source in
+              source.withMemoryRebound(to: CChar.self) { source in
+                  precondition(target + source.count <= argvBuffer.baseAddress! + argvBuffer.count)
+                  target.initialize(from: source.baseAddress!, count: source.count)
+                  (target + source.count).pointee = 0
+                  argv.append(target)
+                  target += source.count + 1
+              }
+          }
+      }
+      argv.append(nil)
+      return try argv.withUnsafeBufferPointer { argv in
+          return try body(argv.baseAddress!)
+      }
   }
 }

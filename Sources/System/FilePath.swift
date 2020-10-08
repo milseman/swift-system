@@ -7,29 +7,6 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-extension UnsafePointer where Pointee == UInt8 {
-  internal var _asCChar: UnsafePointer<CChar> {
-    UnsafeRawPointer(self).assumingMemoryBound(to: CChar.self)
-  }
-}
-extension UnsafePointer where Pointee == CChar {
-  internal var _asUInt8: UnsafePointer<UInt8> {
-    UnsafeRawPointer(self).assumingMemoryBound(to: UInt8.self)
-  }
-}
-extension UnsafeBufferPointer where Element == UInt8 {
-  internal var _asCChar: UnsafeBufferPointer<CChar> {
-    let base = baseAddress?._asCChar
-    return UnsafeBufferPointer<CChar>(start: base, count: self.count)
-  }
-}
-extension UnsafeBufferPointer where Element == CChar {
-  internal var _asUInt8: UnsafeBufferPointer<UInt8> {
-    let base = baseAddress?._asUInt8
-    return UnsafeBufferPointer<UInt8>(start: base, count: self.count)
-  }
-}
-
 // NOTE: FilePath not frozen for ABI flexibility
 
 /// A null-terminated sequence of bytes
@@ -59,7 +36,12 @@ extension UnsafeBufferPointer where Element == CChar {
 /// like case insensitivity, Unicode normalization, and symbolic links.
 // @available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
 public struct FilePath {
+#if os(windows)
+  internal typealias Storage = [UInt16]
+#else
   internal typealias Storage = [CChar]
+#endif
+
   internal var bytes: Storage
 
   /// Creates an empty, null-terminated path.
@@ -93,6 +75,9 @@ extension FilePath {
 }
 
 @_implementationOnly import SystemInternals
+
+// TODO: What should Windows have for the below? They seem to have APIs for C-strings
+// (LSTR) as well as wchat_t* (LPWSTR)
 
 //
 // MARK: - CString interfaces
@@ -129,6 +114,11 @@ extension FilePath {
   // type constraints, we want to provide a RAC for terminated
   // byte contents and unterminated byte contents.
 }
+
+#if os(windows)
+  // TODO: wchar_t* initializers, interfaces, etc.
+  // TODO: Consider eventually doing OSString
+#endif
 
 //
 // MARK: - String interfaces

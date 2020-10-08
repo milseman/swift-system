@@ -122,7 +122,8 @@ extension FileDescriptor {
   internal func _seek(
     offset: Int64, from whence: FileDescriptor.SeekOrigin
   ) -> Result<Int64, Errno> {
-    let newOffset = system_lseek(self.rawValue, COffT(offset), whence.rawValue)
+    let newOffset = system_lseek(
+          self.rawValue, _CTypes.Off(offset), whence.rawValue)
     return valueOrErrno(Int64(newOffset))
   }
 
@@ -210,7 +211,8 @@ extension FileDescriptor {
     retryOnInterrupt: Bool
   ) -> Result<Int, Errno> {
     valueOrErrno(retryOnInterrupt: retryOnInterrupt) {
-      system_pread(self.rawValue, buffer.baseAddress, buffer.count, COffT(offset))
+      system_pread(
+        self.rawValue, buffer.baseAddress, buffer.count, _CTypes.Off(offset))
     }
   }
 
@@ -292,7 +294,8 @@ extension FileDescriptor {
     retryOnInterrupt: Bool
   ) -> Result<Int, Errno> {
     valueOrErrno(retryOnInterrupt: retryOnInterrupt) {
-      system_pwrite(self.rawValue, buffer.baseAddress, buffer.count, COffT(offset))
+      system_pwrite(
+        self.rawValue, buffer.baseAddress, buffer.count, _CTypes.Off(offset))
     }
   }
 

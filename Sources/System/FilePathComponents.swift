@@ -10,17 +10,33 @@
 // @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension FilePath {
   public struct Component: Hashable {
+    public static func == (lhs: FilePath.Component, rhs: FilePath.Component) -> Bool {
+      lhs.slice.elementsEqual(rhs.slice)
+    }
+    public func hash(into hasher: inout Hasher) {
+      hasher.combine(slice.count) // discriminator
+      for element in slice {
+        hasher.combine(element)
+      }
+    }
+
     // NOTE: For now, we store a slice of FilePath's storage representation. We'd like to
     // have a small-slice representation in the future since the majority of path
     // components would easily fit in the 3 words of storage.
     //
-    internal var slice: FilePath.Storage.SubSequence
+    // Arg, can't use Slice<FilePath.Storage> and derive equatable conformance, but
+    // ArraySlice doesn't expose the base Array, so there's no way to check if the
+    // slice's startIndex is the FilePath's...
+    //
+    //   TODO: write hashable/equatable by hand
+    //
+    internal var slice: Slice<FilePath.Storage>
 
     // TODO: It would be nice to have a ComponentKind. Prefix (Windows only)
     // is an important piece of information that has to be parsed from the
     // front of the path.
 
-    internal init(_ slice: FilePath.Storage.SubSequence) {
+    internal init(_ slice: Slice<FilePath.Storage>) {
       self.slice = slice
       self.invariantCheck()
     }
@@ -32,6 +48,25 @@ extension FilePath {
   public var components: ComponentView {
     get { ComponentView(path: self) }
     set { self = newValue.path }
+  }
+}
+
+extension FilePath.Component {
+  public struct WindowsPrefixKind {
+
+    // DOS device path \\?, which skips normalization.
+    // TODO: Should we present like Rust or a closer to Window's docs?
+    public var isVerbatim: Bool { fatalError() }
+
+    // TODO: What about GUID volumes? Should this be a Slice<OSString>?
+    public var drive: Character? { fatalError() }
+    public var driveCChar: CChar? { fatalError() }
+
+
+    enum Kind {
+      case dos
+      case unc
+    }
   }
 }
 
@@ -58,6 +93,25 @@ extension FilePath.Component {
     }
     return false
   }
+
+  public var isPrefix: Bool {
+  #if os(windows)
+    guard slice.startIndex == slice.base.startIndex else { return false }
+    // TODO: the acutal stuff...
+  #else
+    return false
+  #endif
+  }
+
+//  // Is this available to call on Darwin? That means the whole type will be there...
+//  public var windowsPrefix: WindowsPrefix? {
+//  #if os(windows)
+//    guard isPrefix else { return nil }
+//    // TODO: the acutal stuff...
+//  #else
+//    return nil
+//  #endif
+//  }
 
   // TODO: ensure this all gets easily optimized away in release...
   fileprivate func invariantCheck() {
@@ -142,10 +196,22 @@ extension FilePath.Component: ExpressibleByStringLiteral {
 }
 
 
-private var canonicalSeparator: CChar { Int8(bitPattern: UInt8(ascii: "/")) }
+private var canonicalSeparator: CChar {
+#if os(windows)
+  return Int8(bitPattern: UInt8(ascii: "\\"))
+#else
+  return Int8(bitPattern: UInt8(ascii: "/"))
+#endif
+}
 
 // TODO: For Windows, this becomes a little more complicated...
-private func isSeparator(_ c: CChar) -> Bool { c == canonicalSeparator }
+private func isSeparator(_ c: CChar) -> Bool {
+#if os(windows)
+  return c = canonicalSeparator || c == "/"
+#else
+  return c == canonicalSeparator
+#endif
+}
 
 
 // @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
@@ -303,43 +369,6 @@ extension FilePath {
   public init<C: Collection>(_ components: C) where C.Element == Component {
     self.init(byteContents: separatedComponentBytes(components, addLeadingSeparator: components.first?.isRoot ?? false))
   }
-
-  // FIXME: Include `~` as an absolute path first component
-  public var isAbsolute: Bool { components.first?.isRoot ?? false }
-
-  public var isRelative: Bool { !isAbsolute }
-
-  public mutating func append(_ other: FilePath) {
-    // TODO: We can do a faster byte copy operation, after checking
-    // for leading/trailing slashes...
-    self.components.append(contentsOf: other.components)
-  }
-
-  public static func +(_ lhs: FilePath, _ rhs: FilePath) -> FilePath {
-    var result = lhs
-    result.append(rhs)
-    return result
-  }
-
-  /* TODO:
-  public mutating func push(_ component: FilePath.Component) {
-  }
-  public mutating func push(_ path: FilePath) {
-  }
-  public mutating func push<C: Collection>(
-    contentsOf components: C
-  ) where C.Element == FilePath.Component {
-  }
-
-  @discardableResult
-  public mutating func pop() -> FilePath.Component? {
-    ... or should this trap if empty?
-  }
-  @discardableResult
-  public mutating func pop(_ n: Int) -> FilePath.Component? {
-   ... or should this trap if empty?
-  }
- */
-
 }
+
 

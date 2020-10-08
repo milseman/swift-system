@@ -18,3 +18,17 @@ public typealias CModeT =  UInt16
 #else
 public typealias CModeT =  UInt32
 #endif
+
+
+/// A namespace for typealiases for underlying C types
+public enum CTypes {
+  // Compatibility
+  public typealias Mode = CModeT
+
+  public typealias PID = Int32 // TODO: Linux?
+
+  public typealias SigSet = UInt32 // TODO: Linux?
+
+  public typealias Short = UInt16
+}
+
