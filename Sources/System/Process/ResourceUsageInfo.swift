@@ -1,3 +1,10 @@
+// FIXME(DO NOT MERGE): We need to find a way around this. We want to declare
+// a typealias to a struct from a header, but don't want downstream to import
+// Darwin or the whole header just for that.
+//
+import Darwin
+import CSystem
+
 
 extension ProcessID {
   public struct ResourceUsageInfo: RawRepresentable/*, Hashable, Codable*/ {
