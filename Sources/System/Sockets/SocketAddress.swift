@@ -120,6 +120,17 @@ extension SocketAddress {
   }
 }
 
+extension Optional where Wrapped == SocketAddress {
+  internal func _withUnsafeBytes<R>(
+    _ body: (UnsafeRawBufferPointer) throws -> R
+  ) rethrows -> R {
+    guard let address = self else {
+      return try body(UnsafeRawBufferPointer(start: nil, count: 0))
+    }
+    return try address.withUnsafeBytes(body)
+  }
+}
+
 
 // @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress {

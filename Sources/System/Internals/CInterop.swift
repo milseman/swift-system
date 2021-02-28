@@ -74,4 +74,8 @@ public enum CInterop {
 
   public typealias SockAddrIn6 = sockaddr_in6
   public typealias SockAddrUn = sockaddr_un
+
+  public typealias IOVec = iovec
+  public typealias MsgHdr = msghdr
+  public typealias CMsgHdr = cmsghdr  // Note: c is for "control", not "C"
 }

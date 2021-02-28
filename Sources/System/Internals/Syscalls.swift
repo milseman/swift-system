@@ -158,6 +158,29 @@ internal func system_recv(
   return recv(socket, buffer, len, flags)
 }
 
+
+internal func system_sendmsg(
+  _ socket: CInt,
+  _ message: UnsafePointer<CInterop.MsgHdr>,
+  _ flags: CInt
+) -> Int {
+  #if ENABLE_MOCKING
+  if mockingEnabled { return _mockInt(socket, message, flags) }
+  #endif
+  return sendmsg(socket, message, flags)
+}
+
+internal func system_recvmsg(
+  _ socket: CInt,
+  _ message: UnsafeMutablePointer<CInterop.MsgHdr>,
+  _ flags: CInt
+) -> Int {
+  #if ENABLE_MOCKING
+  if mockingEnabled { return _mockInt(socket, message, flags) }
+  #endif
+  return recvmsg(socket, message, flags)
+}
+
 internal func system_getsockopt(
   _ socket: CInt,
   _ level: CInt,
