@@ -7,17 +7,18 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-extension SocketDescriptor {
+extension SocketAddress {
   @frozen
-  public struct IPv4Address: RawRepresentable {
+  public struct IPv4: RawRepresentable {
     public var rawValue: CInterop.SockAddrIn
 
     public init(rawValue: CInterop.SockAddrIn) {
       self.rawValue = rawValue
+      self.rawValue.sin_family = CInterop.SAFamily(Family.ipv4.rawValue)
     }
 
-    public init?(_ address: SocketDescriptor.Address) {
-      guard address.domain == Domain.ipv4 else { return nil }
+    public init?(_ address: SocketAddress) {
+      guard address.family == .ipv4 else { return nil }
       let value: CInterop.SockAddrIn? = address.withUnsafeBytes { buffer in
         guard buffer.count >= MemoryLayout<CInterop.SockAddrIn>.size else {
           return nil
@@ -30,18 +31,17 @@ extension SocketDescriptor {
   }
 }
 
-extension SocketDescriptor.Address {
-  public init(_ address: SocketDescriptor.IPv4Address) {
-    self = Swift.withUnsafeBytes(of: address) { buffer in
-      SocketDescriptor.Address(buffer)
+extension SocketAddress {
+  public init(_ ipv4: IPv4) {
+    self = Swift.withUnsafeBytes(of: ipv4.rawValue) { buffer in
+      SocketAddress(buffer)
     }
   }
 }
 
-extension SocketDescriptor.IPv4Address {
+extension SocketAddress.IPv4 {
   public init(address: Address, port: Port) {
     rawValue = CInterop.SockAddrIn()
-    rawValue.sin_len = 0;
     rawValue.sin_family = CInterop.SAFamily(SocketDescriptor.Domain.ipv4.rawValue);
     rawValue.sin_port = port.rawValue._networkOrder
     rawValue.sin_addr = CInterop.InAddr(s_addr: address.rawValue._networkOrder)
@@ -53,7 +53,7 @@ extension SocketDescriptor.IPv4Address {
   }
 }
 
-extension SocketDescriptor.IPv4Address: Hashable {
+extension SocketAddress.IPv4: Hashable {
   public static func ==(left: Self, right: Self) -> Bool {
     left.address == right.address && left.port == right.port
   }
@@ -64,13 +64,13 @@ extension SocketDescriptor.IPv4Address: Hashable {
   }
 }
 
-extension SocketDescriptor.IPv4Address: CustomStringConvertible {
+extension SocketAddress.IPv4: CustomStringConvertible {
   public var description: String {
     "\(address):\(port)"
   }
 }
 
-extension SocketDescriptor.IPv4Address {
+extension SocketAddress.IPv4 {
   @frozen
   public struct Port: RawRepresentable, ExpressibleByIntegerLiteral, Hashable {
     /// The port number, in host byte order.
@@ -95,13 +95,13 @@ extension SocketDescriptor.IPv4Address {
   }
 }
 
-extension SocketDescriptor.IPv4Address.Port: CustomStringConvertible {
+extension SocketAddress.IPv4.Port: CustomStringConvertible {
   public var description: String {
     "\(rawValue)"
   }
 }
 
-extension SocketDescriptor.IPv4Address {
+extension SocketAddress.IPv4 {
   @frozen
   public struct Address: RawRepresentable, Hashable {
     /// The raw internet address value, in host byte order.
@@ -123,7 +123,7 @@ extension SocketDescriptor.IPv4Address {
   }
 }
 
-extension SocketDescriptor.IPv4Address.Address: CustomStringConvertible {
+extension SocketAddress.IPv4.Address: CustomStringConvertible {
   public var description: String {
     _inet_ntop()
   }
@@ -154,7 +154,7 @@ extension SocketDescriptor.IPv4Address.Address: CustomStringConvertible {
   }
 }
 
-extension SocketDescriptor.IPv4Address.Address: LosslessStringConvertible {
+extension SocketAddress.IPv4.Address: LosslessStringConvertible {
   public init?(_ description: String) {
     guard let value = Self._inet_pton(description) else { return nil }
     self = value

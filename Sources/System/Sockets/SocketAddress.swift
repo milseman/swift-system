@@ -7,43 +7,44 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-extension SocketDescriptor {
-  public struct Address {
-    internal var _variant: _Variant
+public struct SocketAddress {
+  // FIXME Figure out if we need to model this with a standalone struct
+  public typealias Family = SocketDescriptor.Domain
 
-    public init(
-      address: UnsafePointer<CInterop.SockAddr>,
-      length: CInterop.SockLen
-    ) {
-      self.init(UnsafeRawBufferPointer(start: address, count: Int(length)))
-    }
+  internal var _variant: _Variant
 
-    public init(_ buffer: UnsafeRawBufferPointer) {
-      precondition(buffer.count >= MemoryLayout<CInterop.SockAddr>.size)
-      if buffer.count <= MemoryLayout<_InlineStorage>.size {
-        var storage = _InlineStorage()
-        withUnsafeMutableBytes(of: &storage) { bytes in
-          let ptr = UnsafeRawPointer(buffer.baseAddress!)
-          bytes.baseAddress!.copyMemory(from: ptr, byteCount: buffer.count)
-        }
-        self._variant = .small(length: UInt8(buffer.count), bytes: storage)
-      } else {
-        let wordSize = MemoryLayout<_ManagedStorage.Element>.stride
-        let wordCount = (buffer.count + wordSize - 1) / wordSize
-        let storage = _ManagedStorage.create(
-          minimumCapacity: wordCount,
-          makingHeaderWith: { _ in buffer.count }) as! _ManagedStorage
-        storage.withUnsafeMutablePointerToElements { start in
-          let raw = UnsafeMutableRawPointer(start)
-          raw.copyMemory(from: buffer.baseAddress!, byteCount: buffer.count)
-        }
-        self._variant = .large(storage)
+  public init(
+    address: UnsafePointer<CInterop.SockAddr>,
+    length: CInterop.SockLen
+  ) {
+    self.init(UnsafeRawBufferPointer(start: address, count: Int(length)))
+  }
+
+  public init(_ buffer: UnsafeRawBufferPointer) {
+    precondition(buffer.count >= MemoryLayout<CInterop.SockAddr>.size)
+    if buffer.count <= MemoryLayout<_InlineStorage>.size {
+      var storage = _InlineStorage()
+      withUnsafeMutableBytes(of: &storage) { bytes in
+        let ptr = UnsafeRawPointer(buffer.baseAddress!)
+        bytes.baseAddress!.copyMemory(from: ptr, byteCount: buffer.count)
       }
+      self._variant = .small(length: UInt8(buffer.count), bytes: storage)
+    } else {
+      let wordSize = MemoryLayout<_ManagedStorage.Element>.stride
+      let wordCount = (buffer.count + wordSize - 1) / wordSize
+      let storage = _ManagedStorage.create(
+        minimumCapacity: wordCount,
+        makingHeaderWith: { _ in buffer.count }) as! _ManagedStorage
+      storage.withUnsafeMutablePointerToElements { start in
+        let raw = UnsafeMutableRawPointer(start)
+        raw.copyMemory(from: buffer.baseAddress!, byteCount: buffer.count)
+      }
+      self._variant = .large(storage)
     }
   }
 }
 
-extension SocketDescriptor.Address {
+extension SocketAddress {
   internal class _ManagedStorage: ManagedBuffer<Int, UInt64> {
     internal typealias Header = Int // Number of bytes stored
     internal typealias Element = UInt64 // not UInt8 to get 8-byte alignment
@@ -64,7 +65,7 @@ extension SocketDescriptor.Address {
   }
 }
 
-extension SocketDescriptor.Address {
+extension SocketAddress {
   internal enum _Variant {
     case small(length: UInt8, bytes: _InlineStorage)
     case large(_ManagedStorage)
@@ -98,7 +99,7 @@ extension SocketDescriptor.Address {
 }
 
 
-extension SocketDescriptor.Address {
+extension SocketAddress {
   /// Calls `body` with an unsafe raw buffer pointer to the raw bytes of this
   /// address. This is useful when you need to pass an address to a function
   /// that treats socket addresses as untyped raw data.
@@ -122,7 +123,7 @@ extension SocketDescriptor.Address {
     }
   }
 
-  public var domain: SocketDescriptor.Domain {
+  public var family: Family {
     withRawAddress { addr, length in
       .init(rawValue: CInt(addr.pointee.sa_family))
     }

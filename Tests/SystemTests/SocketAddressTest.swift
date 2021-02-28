@@ -22,7 +22,7 @@ final class SocketAddressTest: XCTestCase {
       let range = 0 ..< UInt8(truncatingIfNeeded: length)
       let data = Array<UInt8>(range)
       data.withUnsafeBytes { source in
-        let address = SocketDescriptor.Address(source)
+        let address = SocketAddress(source)
         address.withUnsafeBytes { copy in
           XCTAssertEqual(copy.count, length)
           XCTAssertTrue(range.elementsEqual(copy), "\(length)")
@@ -37,7 +37,7 @@ final class SocketAddressTest: XCTestCase {
       let data = Array<UInt8>(range)
       data.withUnsafeBytes { source in
         let p = source.baseAddress!.assumingMemoryBound(to: CInterop.SockAddr.self)
-        let address = SocketDescriptor.Address(
+        let address = SocketAddress(
           address: p,
           length: CInterop.SockLen(source.count))
         address.withUnsafeBytes { copy in
@@ -48,15 +48,16 @@ final class SocketAddressTest: XCTestCase {
     }
   }
 
+  // MARK: IPv4
+
   func test_addressWithIPv4Address() {
-    let host = SocketDescriptor.IPv4Address.Address("1.2.3.4")!
-    let ipv4 = SocketDescriptor.IPv4Address(address: host, port: 42)
-    let address = SocketDescriptor.Address(ipv4)
+    let ipv4 = SocketAddress.IPv4(address: "1.2.3.4", port: 42)!
+    let address = SocketAddress(ipv4)
     if case .large = address._variant {
       XCTFail("IPv4 address in big representation")
     }
-    XCTAssertEqual(address.domain, .ipv4)
-    if let extracted = SocketDescriptor.IPv4Address(address) {
+    XCTAssertEqual(address.family, .ipv4)
+    if let extracted = SocketAddress.IPv4(address) {
       XCTAssertEqual(extracted, ipv4)
     } else {
       XCTFail("Cannot extract IPv4 address")
@@ -64,7 +65,7 @@ final class SocketAddressTest: XCTestCase {
   }
 
   func test_ipv4_address_string_conversions() {
-    typealias Address = SocketDescriptor.IPv4Address.Address
+    typealias Address = SocketAddress.IPv4.Address
 
     func check(
       _ string: String,
@@ -104,10 +105,10 @@ final class SocketAddressTest: XCTestCase {
   }
 
   func test_ipv4_description() {
-    let a1 = SocketDescriptor.IPv4Address(address: "1.2.3.4", port: 42)!
+    let a1 = SocketAddress.IPv4(address: "1.2.3.4", port: 42)!
     XCTAssertEqual("\(a1)", "1.2.3.4:42")
 
-    let a2 = SocketDescriptor.IPv4Address(address: "192.168.1.1", port: 80)!
+    let a2 = SocketAddress.IPv4(address: "192.168.1.1", port: 80)!
     XCTAssertEqual("\(a2)", "192.168.1.1:80")
   }
 }
