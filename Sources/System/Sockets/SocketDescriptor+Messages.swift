@@ -42,23 +42,43 @@ extension SocketDescriptor {
       type: CInt,
       data: UnsafeRawBufferPointer
     ) {
-      let headerSize = _headerSize
-      let delta = _headerSize + data.count
-      _buffer.ensureUnique(capacity: _endOffset + delta)
-      _buffer.withUnsafeMutableBytes { buffer in
-        assert(buffer.count >= _endOffset + delta)
-        let p = buffer.baseAddress! + _endOffset
-        let header = p.bindMemory(to: CInterop.CMsgHdr.self, capacity: 1)
-        header.pointee.cmsg_len = CInterop.SockLen(headerSize + data.count)
-        header.pointee.cmsg_level = level
-        header.pointee.cmsg_type = type
+      appendMessage(
+        level: level,
+        type: type,
+        unsafeUninitializedCapacity: data.count
+      ) { buffer in
         if data.count > 0 {
-          (p + headerSize).copyMemory(
+          buffer.baseAddress!.copyMemory(
             from: data.baseAddress!,
             byteCount: data.count)
         }
+        return data.count
       }
-      _endOffset += delta
+    }
+
+    public mutating func appendMessage(
+      level: CInt,
+      type: CInt,
+      unsafeUninitializedCapacity capacity: Int,
+      initializingWith body: (UnsafeMutableRawBufferPointer) throws -> Int
+    ) rethrows {
+      precondition(capacity >= 0)
+      let headerSize = _headerSize
+      let delta = _headerSize + capacity
+      _buffer.ensureUnique(capacity: _endOffset + delta)
+      let messageLength: Int = try _buffer.withUnsafeMutableBytes { buffer in
+        assert(buffer.count >= _endOffset + delta)
+        let p = buffer.baseAddress! + _endOffset
+        let header = p.bindMemory(to: CInterop.CMsgHdr.self, capacity: 1)
+        header.pointee.cmsg_level = level
+        header.pointee.cmsg_type = type
+        let length = try body(
+          UnsafeMutableRawBufferPointer(start: p + headerSize, count: capacity))
+        precondition(length > 0 && length <= capacity)
+        header.pointee.cmsg_len = CInterop.SockLen(headerSize + length)
+        return length
+      }
+      _endOffset += messageLength
     }
 
     internal func _withUnsafeBytes<R>(
@@ -125,18 +145,24 @@ extension SocketDescriptor.ControlMessageBuffer: Collection {
   public var endIndex: Index { Index(_offset: _endOffset) }
   public var isEmpty: Bool { _endOffset == 0 }
 
-  public var count: Int {
+  /// Return the length (in bytes) of the message at the specified index, or
+  /// nil if the index isn't valid, or it addresses a corrupt message.
+  internal func _length(at i: Index) -> Int? {
     _withUnsafeBytes { buffer in
-      var count = 0
-      var p = buffer.baseAddress!
-      let end = buffer.baseAddress! + buffer.count
-      while p <= end - _headerSize {
-        count += 1
-        let header = p.assumingMemoryBound(to: CInterop.CMsgHdr.self)
-        let length = Int(header.pointee.cmsg_len)
-        p += length
+      guard i._offset >= 0 && i._offset + _headerSize <= buffer.count else {
+        return nil
       }
-      return count
+      let p = (buffer.baseAddress! + i._offset)
+        .assumingMemoryBound(to: CInterop.CMsgHdr.self)
+      let length = Int(p.pointee.cmsg_len)
+
+      // Cut the list short at the first sign of corrupt data.
+      // Messages must not be shorter than their header, and they must fit
+      // entirely in the buffer.
+      if length < _headerSize || i._offset + length > buffer.count {
+        return nil
+      }
+      return length
     }
   }
 
@@ -144,21 +170,14 @@ extension SocketDescriptor.ControlMessageBuffer: Collection {
     precondition(i._offset != _endOffset, "Can't advance past endIndex")
     precondition(i._offset >= 0 && i._offset + _headerSize <= _endOffset,
                  "Invalid index")
-    let delta: Int = _withUnsafeBytes { buffer in
-      let p = (buffer.baseAddress! + i._offset)
-        .assumingMemoryBound(to: CInterop.CMsgHdr.self)
-      return Int(p.pointee.cmsg_len)
-    }
-    if i._offset + delta + _headerSize > _endOffset {
-      return endIndex
-    }
-    return Index(_offset: i._offset + delta)
+    guard let length = _length(at: i) else { return endIndex }
+    return Index(_offset: i._offset + length)
   }
 
   public subscript(position: Index) -> Message {
-    precondition(
-      position._offset >= 0 && position._offset + _headerSize <= _endOffset,
-      "Invalid index")
+    guard let _ = _length(at: position) else {
+      preconditionFailure("Invalid index")
+    }
     return Element(_base: self, offset: position._offset)
   }
 }
@@ -317,8 +336,10 @@ extension SocketDescriptor {
         }
       }
     }
+    control._endOffset = 0
+    let value = try result.get()
     control._endOffset = Swift.min(controlLength, control._buffer.capacity)
-    return try result.get()
+    return value
   }
 
   internal func _recvmsg(
