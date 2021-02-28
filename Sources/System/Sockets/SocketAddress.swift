@@ -8,9 +8,6 @@
 */
 
 public struct SocketAddress {
-  // FIXME Figure out if we need to model this with a standalone struct
-  public typealias Family = SocketDescriptor.Domain
-
   internal var _variant: _Variant
 
   public init(
@@ -146,25 +143,26 @@ extension SocketAddress {
 
   public var family: Family {
     withRawAddress { addr, length in
-      .init(rawValue: CInt(addr.pointee.sa_family))
+      Family(rawValue: addr.pointee.sa_family)
     }
   }
 }
 
+// @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress: CustomStringConvertible {
   public var description: String {
     switch family {
     case .ipv4:
       let address = IPv4(self)!
-      return "SocketAddress(family: \(family.rawValue)) \(address)"
+      return "SocketAddress(family: \(family)) \(address)"
     case .ipv6:
       let address = IPv6(self)!
-      return "SocketAddress(family: \(family.rawValue)) \(address)"
+      return "SocketAddress(family: \(family)) \(address)"
     case .local:
       let address = Local(self)!
-      return "SocketAddress(family: \(family.rawValue)) \(address)"
+      return "SocketAddress(family: \(family)) \(address)"
     default:
-      return "SocketAddress(family: \(family.rawValue))"
+      return "SocketAddress(family: \(family))"
     }
   }
 }

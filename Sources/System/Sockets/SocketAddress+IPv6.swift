@@ -14,7 +14,7 @@ extension SocketAddress {
 
     public init(rawValue: CInterop.SockAddrIn6) {
       self.rawValue = rawValue
-      self.rawValue.sin6_family = CInterop.SAFamily(Family.ipv6.rawValue)
+      self.rawValue.sin6_family = Family.ipv6.rawValue
     }
 
     public init?(_ address: SocketAddress) {
@@ -44,7 +44,7 @@ extension SocketAddress.IPv6 {
     // FIXME: We aren't modeling flowinfo & scope_id yet.
     // If we need to do that, we can define new initializers/accessors later.
     rawValue = CInterop.SockAddrIn6()
-    rawValue.sin6_family = CInterop.SAFamily(SocketAddress.Family.ipv6.rawValue)
+    rawValue.sin6_family = SocketAddress.Family.ipv6.rawValue
     rawValue.sin6_port = port.rawValue._networkOrder
     rawValue.sin6_flowinfo = 0
     rawValue.sin6_addr = address.rawValue

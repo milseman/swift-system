@@ -14,7 +14,7 @@ extension SocketAddress {
 
     public init(rawValue: CInterop.SockAddrIn) {
       self.rawValue = rawValue
-      self.rawValue.sin_family = CInterop.SAFamily(Family.ipv4.rawValue)
+      self.rawValue.sin_family = Family.ipv4.rawValue
     }
 
     public init?(_ address: SocketAddress) {

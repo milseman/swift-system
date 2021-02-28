@@ -471,6 +471,41 @@ internal var _SEEK_DATA: CInt { SEEK_DATA }
 #endif
 
 @_alwaysEmitIntoClient
+@inline(__always)
+internal var _AF_UNSPEC: CInterop.SAFamily { CInterop.SAFamily(AF_UNSPEC) }
+
+@_alwaysEmitIntoClient
+@inline(__always)
+internal var _AF_LOCAL: CInterop.SAFamily { CInterop.SAFamily(AF_LOCAL) }
+
+@_alwaysEmitIntoClient
+@inline(__always)
+internal var _AF_UNIX: CInterop.SAFamily { CInterop.SAFamily(AF_UNIX) }
+
+@_alwaysEmitIntoClient
+@inline(__always)
+internal var _AF_INET: CInterop.SAFamily { CInterop.SAFamily(AF_INET) }
+
+@_alwaysEmitIntoClient
+@inline(__always)
+internal var _AF_ROUTE: CInterop.SAFamily { CInterop.SAFamily(AF_ROUTE) }
+
+@_alwaysEmitIntoClient
+@inline(__always)
+internal var _AF_INET6: CInterop.SAFamily { CInterop.SAFamily(AF_INET6) }
+
+@_alwaysEmitIntoClient
+@inline(__always)
+internal var _AF_SYSTEM: CInterop.SAFamily { CInterop.SAFamily(AF_SYSTEM) }
+
+@_alwaysEmitIntoClient
+@inline(__always)
+internal var _AF_NDRV: CInterop.SAFamily { CInterop.SAFamily(AF_NDRV) }
+
+@_alwaysEmitIntoClient
+internal var _PF_UNSPEC: CInt { PF_UNSPEC }
+
+@_alwaysEmitIntoClient
 internal var _PF_LOCAL: CInt { PF_LOCAL }
 
 @_alwaysEmitIntoClient

@@ -59,6 +59,12 @@ extension SocketDescriptor {
     @_alwaysEmitIntoClient
     public init(rawValue: CInt) { self.rawValue = rawValue }
 
+    /// Unspecified protocol.
+    ///
+    /// The corresponding C constant is `PF_UNSPEC`
+    @_alwaysEmitIntoClient
+    public static var unspecified: Domain { Domain(rawValue: _PF_UNSPEC) }
+
     /// Host-internal protocols, formerly called PF_UNIX,
     ///
     /// The corresponding C constant is `PF_LOCAL`
