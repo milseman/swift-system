@@ -25,8 +25,9 @@ public struct SocketAddress {
     if buffer.count <= MemoryLayout<_InlineStorage>.size {
       var storage = _InlineStorage()
       withUnsafeMutableBytes(of: &storage) { bytes in
-        let ptr = UnsafeRawPointer(buffer.baseAddress!)
-        bytes.baseAddress!.copyMemory(from: ptr, byteCount: buffer.count)
+        bytes.baseAddress!.copyMemory(
+          from: buffer.baseAddress!,
+          byteCount: buffer.count)
       }
       self._variant = .small(length: UInt8(buffer.count), bytes: storage)
     } else {

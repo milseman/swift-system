@@ -97,7 +97,7 @@ extension SocketAddress.IPv4 {
 
 extension SocketAddress.IPv4.Port: CustomStringConvertible {
   public var description: String {
-    "\(rawValue)"
+    rawValue.description
   }
 }
 
