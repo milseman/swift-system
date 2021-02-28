@@ -29,8 +29,6 @@ import ucrt
 /// A namespace for C and platform types
 // @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public enum CInterop {
-  public typealias Mode = mode_t
-
   /// The C `char` type
   public typealias Char = CChar
 
@@ -59,4 +57,17 @@ public enum CInterop {
   /// on API.
   public typealias PlatformUnicodeEncoding = UTF8
   #endif
+
+  public typealias Mode = mode_t
+
+  public typealias SockAddr = sockaddr
+  public typealias SockLen = socklen_t
+
+  public typealias SockAddrIn = sockaddr_in
+  public typealias InAddr = in_addr
+  public typealias InAddrT = in_addr_t
+  public typealias InPort = in_port_t
+
+  public typealias SockAddrIn6 = sockaddr_in6
+  public typealias SockAddrUn = sockaddr_un
 }

@@ -181,3 +181,28 @@ internal func system_setsockopt(
   return setsockopt(socket, level, option, value, length)
 }
 
+internal func system_inet_ntop(
+  _ af: CInt,
+  _ src: UnsafeRawPointer,
+  _ dst: UnsafeMutablePointer<CChar>,
+  _ size: CInterop.SockLen
+) -> CInt { // Note: returns 0 on success, -1 on failure, unlike the original
+  #if ENABLE_MOCKING
+  if mockingEnabled { return _mock(af, src, dst, size) }
+  #endif
+  let res = inet_ntop(af, src, dst, size)
+  if Int(bitPattern: res) == 0 { return -1 }
+  assert(Int(bitPattern: res) == Int(bitPattern: dst))
+  return 0
+}
+
+internal func system_inet_pton(
+  _ af: CInt,
+  _ src: UnsafePointer<CChar>,
+  _ dst: UnsafeMutableRawPointer
+) -> CInt {
+  #if ENABLE_MOCKING
+  if mockingEnabled { return _mock(af, src, dst) }
+  #endif
+  return inet_pton(af, src, dst)
+}

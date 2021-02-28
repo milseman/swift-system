@@ -722,5 +722,8 @@ internal var _IPPROTO_TCP: CInt { IPPROTO_TCP }
 @_alwaysEmitIntoClient
 internal var _SOL_SOCKET: CInt { SOL_SOCKET }
 
+@_alwaysEmitIntoClient
+internal var _INET_ADDRSTRLEN: CInt { INET_ADDRSTRLEN }
 
-
+@_alwaysEmitIntoClient
+internal var _INET6_ADDRSTRLEN: CInt { INET6_ADDRSTRLEN }
