@@ -39,13 +39,40 @@ extension SocketDescriptor.Address {
 }
 
 extension SocketDescriptor.IPv4Address {
-  public var port: Port {
-    get { Port(CInterop.InPort(_networkOrder: rawValue.sin_port)) }
-    set { rawValue.sin_port = newValue.rawValue._networkOrder }
+  public init(address: Address, port: Port) {
+    rawValue = CInterop.SockAddrIn()
+    rawValue.sin_len = 0;
+    rawValue.sin_family = CInterop.SAFamily(SocketDescriptor.Domain.ipv4.rawValue);
+    rawValue.sin_port = port.rawValue._networkOrder
+    rawValue.sin_addr = CInterop.InAddr(s_addr: address.rawValue._networkOrder)
   }
 
+  public init?(address: String, port: Port) {
+    guard let address = Address(address) else { return nil }
+    self.init(address: address, port: port)
+  }
+}
+
+extension SocketDescriptor.IPv4Address: Hashable {
+  public static func ==(left: Self, right: Self) -> Bool {
+    left.address == right.address && left.port == right.port
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(address)
+    hasher.combine(port)
+  }
+}
+
+extension SocketDescriptor.IPv4Address: CustomStringConvertible {
+  public var description: String {
+    "\(address):\(port)"
+  }
+}
+
+extension SocketDescriptor.IPv4Address {
   @frozen
-  public struct Port: RawRepresentable, ExpressibleByIntegerLiteral {
+  public struct Port: RawRepresentable, ExpressibleByIntegerLiteral, Hashable {
     /// The port number, in host byte order.
     public var rawValue: CInterop.InPort
 
@@ -61,6 +88,11 @@ extension SocketDescriptor.IPv4Address {
       self.init(value)
     }
   }
+
+  public var port: Port {
+    get { Port(CInterop.InPort(_networkOrder: rawValue.sin_port)) }
+    set { rawValue.sin_port = newValue.rawValue._networkOrder }
+  }
 }
 
 extension SocketDescriptor.IPv4Address.Port: CustomStringConvertible {
@@ -70,6 +102,16 @@ extension SocketDescriptor.IPv4Address.Port: CustomStringConvertible {
 }
 
 extension SocketDescriptor.IPv4Address {
+  @frozen
+  public struct Address: RawRepresentable, Hashable {
+    /// The raw internet address value, in host byte order.
+    public var rawValue: CInterop.InAddrT
+
+    public init(rawValue: CInterop.InAddrT) {
+      self.rawValue = rawValue
+    }
+  }
+
   public var address: Address {
     get {
       let value = CInterop.InAddrT(_networkOrder: rawValue.sin_addr.s_addr)
@@ -77,16 +119,6 @@ extension SocketDescriptor.IPv4Address {
     }
     set {
       rawValue.sin_addr.s_addr = newValue.rawValue._networkOrder
-    }
-  }
-
-  @frozen
-  public struct Address: RawRepresentable {
-    /// The raw internet address value, in host byte order.
-    public var rawValue: CInterop.InAddrT
-
-    public init(rawValue: CInterop.InAddrT) {
-      self.rawValue = rawValue
     }
   }
 }

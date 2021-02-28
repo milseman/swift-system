@@ -19,7 +19,7 @@ extension SocketDescriptor {
     }
 
     public init(_ buffer: UnsafeRawBufferPointer) {
-      precondition(buffer.count > MemoryLayout<CInterop.SockAddr>.size)
+      precondition(buffer.count >= MemoryLayout<CInterop.SockAddr>.size)
       if buffer.count <= MemoryLayout<_InlineStorage>.size {
         var storage = _InlineStorage()
         withUnsafeMutableBytes(of: &storage) { bytes in
@@ -28,9 +28,15 @@ extension SocketDescriptor {
         }
         self._variant = .small(length: UInt8(buffer.count), bytes: storage)
       } else {
+        let wordSize = MemoryLayout<_ManagedStorage.Element>.stride
+        let wordCount = (buffer.count + wordSize - 1) / wordSize
         let storage = _ManagedStorage.create(
-          minimumCapacity: buffer.count,
+          minimumCapacity: wordCount,
           makingHeaderWith: { _ in buffer.count }) as! _ManagedStorage
+        storage.withUnsafeMutablePointerToElements { start in
+          let raw = UnsafeMutableRawPointer(start)
+          raw.copyMemory(from: buffer.baseAddress!, byteCount: buffer.count)
+        }
         self._variant = .large(storage)
       }
     }
@@ -38,7 +44,10 @@ extension SocketDescriptor {
 }
 
 extension SocketDescriptor.Address {
-  internal class _ManagedStorage: ManagedBuffer<Int, UInt64> {}
+  internal class _ManagedStorage: ManagedBuffer<Int, UInt64> {
+    internal typealias Header = Int // Number of bytes stored
+    internal typealias Element = UInt64 // not UInt8 to get 8-byte alignment
+  }
 
   @_alignment(8) // This must be large enough to cover any sockaddr variant
   internal struct _InlineStorage {
