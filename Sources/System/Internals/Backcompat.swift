@@ -19,11 +19,11 @@ extension String {
       return
     }
 
-    let start = UnsafeMutablePointer<UInt8>.allocate(capacity: capacity)
-    defer { start.deallocate() }
-    let count = try body(UnsafeMutableBufferPointer(start: start, count: capacity))
-    self = String(
-      decoding: UnsafeBufferPointer(start: start, count: count),
-      as: UTF8.self)
+    let array = try Array<UInt8>(
+      unsafeUninitializedCapacity: capacity
+    ) { buffer, count in
+      count = try body(buffer)
+    }
+    self = String(decoding: array, as: UTF8.self)
   }
 }
