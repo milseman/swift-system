@@ -21,25 +21,36 @@ public struct SocketAddress {
   }
 
   public init(_ buffer: UnsafeRawBufferPointer) {
-    precondition(buffer.count >= MemoryLayout<CInterop.SockAddr>.size)
-    if buffer.count <= MemoryLayout<_InlineStorage>.size {
+    self.init(unsafeUninitializedCapacity: buffer.count) { target in
+      target.baseAddress!.copyMemory(
+        from: buffer.baseAddress!,
+        byteCount: buffer.count)
+      return buffer.count
+    }
+  }
+}
+
+extension SocketAddress {
+  public init(
+    unsafeUninitializedCapacity capacity: Int,
+    initializingWith body: (UnsafeMutableRawBufferPointer) throws -> Int
+  ) rethrows {
+    if capacity <= MemoryLayout<_InlineStorage>.size {
       var storage = _InlineStorage()
-      withUnsafeMutableBytes(of: &storage) { bytes in
-        bytes.baseAddress!.copyMemory(
-          from: buffer.baseAddress!,
-          byteCount: buffer.count)
+      let length: Int = try withUnsafeMutableBytes(of: &storage) { bytes in
+        let buffer = UnsafeMutableRawBufferPointer(rebasing: bytes[..<capacity])
+        return try body(buffer)
       }
-      self._variant = .small(length: UInt8(buffer.count), bytes: storage)
+      precondition(length >= 0 && length <= capacity)
+      self._variant = .small(length: UInt8(length), bytes: storage)
     } else {
-      let wordSize = MemoryLayout<_ManagedStorage.Element>.stride
-      let wordCount = (buffer.count + wordSize - 1) / wordSize
-      let storage = _ManagedStorage.create(
-        minimumCapacity: wordCount,
-        makingHeaderWith: { _ in buffer.count }) as! _ManagedStorage
-      storage.withUnsafeMutablePointerToElements { start in
-        let raw = UnsafeMutableRawPointer(start)
-        raw.copyMemory(from: buffer.baseAddress!, byteCount: buffer.count)
+      let storage = _ManagedStorage.create(capacity: capacity)
+      let length: Int = try storage.withUnsafeMutablePointerToElements { start in
+        let buffer = UnsafeMutableRawBufferPointer(start: start, count: capacity)
+        return try body(buffer)
       }
+      precondition(length >= 0 && length <= capacity)
+      storage.header = length
       self._variant = .large(storage)
     }
   }
@@ -49,6 +60,15 @@ extension SocketAddress {
   internal class _ManagedStorage: ManagedBuffer<Int, UInt64> {
     internal typealias Header = Int // Number of bytes stored
     internal typealias Element = UInt64 // not UInt8 to get 8-byte alignment
+
+    internal static func create(capacity: Int) -> _ManagedStorage {
+      let capacity = Swift.max(capacity, MemoryLayout<CInterop.SockAddr>.size)
+      let wordSize = MemoryLayout<Element>.stride
+      let wordCount = (capacity + wordSize - 1) / wordSize
+      return _ManagedStorage.create(
+        minimumCapacity: wordCount,
+        makingHeaderWith: { _ in capacity }) as! _ManagedStorage
+    }
   }
 
   @_alignment(8) // This must be large enough to cover any sockaddr variant
@@ -139,6 +159,9 @@ extension SocketAddress: CustomStringConvertible {
       return "SocketAddress(family: \(family.rawValue)) \(address)"
     case .ipv6:
       let address = IPv6(self)!
+      return "SocketAddress(family: \(family.rawValue)) \(address)"
+    case .local:
+      let address = Local(self)!
       return "SocketAddress(family: \(family.rawValue)) \(address)"
     default:
       return "SocketAddress(family: \(family.rawValue))"

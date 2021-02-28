@@ -58,6 +58,11 @@ final class SocketAddressTest: XCTestCase {
     let desc6 = "\(ipv6)"
     XCTAssertTrue(desc6.hasPrefix("SocketAddress(family: "), desc6)
     XCTAssertTrue(desc6.hasSuffix(") [1234::ff]:80"), desc6)
+
+    let local = SocketAddress(SocketAddress.Local("/tmp/test.sock"))
+    let descl = "\(local)"
+    XCTAssertTrue(descl.hasPrefix("SocketAddress(family: "), descl)
+    XCTAssertTrue(descl.hasSuffix(") /tmp/test.sock"), descl)
   }
 
   // MARK: IPv4
@@ -189,4 +194,36 @@ final class SocketAddressTest: XCTestCase {
     let a2 = SocketAddress.IPv6(address: "2001::42", port: 80)!
     XCTAssertEqual("\(a2)", "[2001::42]:80")
   }
+
+  // MARK: Local
+
+  func test_addressWithLocalAddress_smol() {
+    let smolLocal = SocketAddress.Local("/tmp/test.sock")
+    let smol = SocketAddress(smolLocal)
+    if case .large = smol._variant {
+      XCTFail("Local address with short path in big representation")
+    }
+    XCTAssertEqual(smol.family, .local)
+    if let extracted = SocketAddress.Local(smol) {
+      XCTAssertEqual(extracted, smolLocal)
+    } else {
+      XCTFail("Cannot extract Local address")
+    }
+  }
+
+  func test_addressWithLocalAddress_large() {
+    let largeLocal = SocketAddress.Local(
+      "This is a really long filename, it almost doesn't fit on one line.sock")
+    let large = SocketAddress(largeLocal)
+    if case .small = large._variant {
+      XCTFail("Local address with long path in small representation")
+    }
+    XCTAssertEqual(large.family, .local)
+    if let extracted = SocketAddress.Local(large) {
+      XCTAssertEqual(extracted, largeLocal)
+    } else {
+      XCTFail("Cannot extract Local address")
+    }
+  }
+
 }
