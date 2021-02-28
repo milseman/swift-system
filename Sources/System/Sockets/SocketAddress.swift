@@ -43,34 +43,22 @@ extension SocketAddress {
       precondition(length >= 0 && length <= capacity)
       self._variant = .small(length: UInt8(length), bytes: storage)
     } else {
-      let storage = _ManagedStorage.create(capacity: capacity)
-      let length: Int = try storage.withUnsafeMutablePointerToElements { start in
-        let buffer = UnsafeMutableRawBufferPointer(start: start, count: capacity)
-        return try body(buffer)
+      var count: Int? = nil
+      let buffer = try _RawBuffer(
+        unsafeUninitializedMinimumCapacity: capacity
+      ) { buffer in
+        let c = try body(buffer)
+        precondition(c >= 0 && c <= capacity)
+        count = c
+        return capacity
       }
-      precondition(length >= 0 && length <= capacity)
-      storage.header = length
-      self._variant = .large(storage)
+      self._variant = .large(length: count!, bytes: buffer)
     }
   }
 }
 
 // @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress {
-  internal class _ManagedStorage: ManagedBuffer<Int, UInt64> {
-    internal typealias Header = Int // Number of bytes stored
-    internal typealias Element = UInt64 // not UInt8 to get 8-byte alignment
-
-    internal static func create(capacity: Int) -> _ManagedStorage {
-      let capacity = Swift.max(capacity, MemoryLayout<CInterop.SockAddr>.size)
-      let wordSize = MemoryLayout<Element>.stride
-      let wordCount = (capacity + wordSize - 1) / wordSize
-      return _ManagedStorage.create(
-        minimumCapacity: wordCount,
-        makingHeaderWith: { _ in capacity }) as! _ManagedStorage
-    }
-  }
-
   @_alignment(8) // This must be large enough to cover any sockaddr variant
   internal struct _InlineStorage {
     /// A chunk of 28 bytes worth of integers, treated as inline storage for
@@ -90,14 +78,14 @@ extension SocketAddress {
 extension SocketAddress {
   internal enum _Variant {
     case small(length: UInt8, bytes: _InlineStorage)
-    case large(_ManagedStorage)
+    case large(length: Int, bytes: _RawBuffer)
 
     internal var length: Int {
       switch self {
       case let .small(length: length, bytes: _):
         return Int(length)
-      case let .large(storage):
-        return storage.header
+      case let .large(length: length, bytes: _):
+        return length
       }
     }
 
@@ -111,9 +99,11 @@ extension SocketAddress {
         return try Swift.withUnsafeBytes(of: bytes) { buffer in
           try body(UnsafeRawBufferPointer(rebasing: buffer[..<length]))
         }
-      case let .large(storage):
-        return try storage.withUnsafeMutablePointers { length, start in
-          try body(UnsafeRawBufferPointer(start: start, count: length.pointee))
+      case let .large(length: length, bytes: bytes):
+        return try bytes.withUnsafeBytes { buffer in
+          precondition(length <= buffer.count)
+          let buffer = UnsafeRawBufferPointer(rebasing: buffer[..<length])
+          return try body(buffer)
         }
       }
     }
