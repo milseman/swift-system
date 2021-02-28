@@ -7,6 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
+// @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public struct SocketAddress {
   internal var _variant: _Variant
 
@@ -27,6 +28,7 @@ public struct SocketAddress {
   }
 }
 
+// @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress {
   public init(
     unsafeUninitializedCapacity capacity: Int,
@@ -53,6 +55,7 @@ extension SocketAddress {
   }
 }
 
+// @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress {
   internal class _ManagedStorage: ManagedBuffer<Int, UInt64> {
     internal typealias Header = Int // Number of bytes stored
@@ -83,6 +86,7 @@ extension SocketAddress {
   }
 }
 
+// @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress {
   internal enum _Variant {
     case small(length: UInt8, bytes: _InlineStorage)
@@ -117,6 +121,7 @@ extension SocketAddress {
 }
 
 
+// @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress {
   /// Calls `body` with an unsafe raw buffer pointer to the raw bytes of this
   /// address. This is useful when you need to pass an address to a function

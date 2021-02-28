@@ -7,6 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
+// @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress {
   @frozen
   public struct IPv4: RawRepresentable {
@@ -31,6 +32,7 @@ extension SocketAddress {
   }
 }
 
+// @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress {
   public init(_ ipv4: IPv4) {
     self = Swift.withUnsafeBytes(of: ipv4.rawValue) { buffer in
@@ -39,6 +41,7 @@ extension SocketAddress {
   }
 }
 
+// @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress.IPv4 {
   public init(address: Address, port: Port) {
     rawValue = CInterop.SockAddrIn()
@@ -53,6 +56,7 @@ extension SocketAddress.IPv4 {
   }
 }
 
+// @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress.IPv4: Hashable {
   public static func ==(left: Self, right: Self) -> Bool {
     left.address == right.address && left.port == right.port
@@ -64,12 +68,14 @@ extension SocketAddress.IPv4: Hashable {
   }
 }
 
+// @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress.IPv4: CustomStringConvertible {
   public var description: String {
     "\(address):\(port)"
   }
 }
 
+// @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress.IPv4 {
   @frozen
   public struct Port: RawRepresentable, ExpressibleByIntegerLiteral, Hashable {
@@ -95,12 +101,14 @@ extension SocketAddress.IPv4 {
   }
 }
 
+// @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress.IPv4.Port: CustomStringConvertible {
   public var description: String {
     rawValue.description
   }
 }
 
+// @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress.IPv4 {
   @frozen
   public struct Address: RawRepresentable, Hashable {
@@ -123,6 +131,7 @@ extension SocketAddress.IPv4 {
   }
 }
 
+// @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress.IPv4.Address: CustomStringConvertible {
   public var description: String {
     _inet_ntop()
@@ -154,6 +163,7 @@ extension SocketAddress.IPv4.Address: CustomStringConvertible {
   }
 }
 
+// @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress.IPv4.Address: LosslessStringConvertible {
   public init?(_ description: String) {
     guard let value = Self._inet_pton(description) else { return nil }

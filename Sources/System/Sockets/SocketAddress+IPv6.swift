@@ -7,6 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
+// @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress {
   @frozen
   public struct IPv6: RawRepresentable {
@@ -31,6 +32,7 @@ extension SocketAddress {
   }
 }
 
+// @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress {
   public init(_ address: IPv6) {
     self = Swift.withUnsafeBytes(of: address.rawValue) { buffer in
@@ -39,6 +41,7 @@ extension SocketAddress {
   }
 }
 
+// @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress.IPv6 {
   public init(address: Address, port: Port) {
     // FIXME: We aren't modeling flowinfo & scope_id yet.
@@ -57,6 +60,7 @@ extension SocketAddress.IPv6 {
   }
 }
 
+// @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress.IPv6: Hashable {
   public static func ==(left: Self, right: Self) -> Bool {
     left.address == right.address
@@ -73,12 +77,14 @@ extension SocketAddress.IPv6: Hashable {
   }
 }
 
+// @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress.IPv6: CustomStringConvertible {
   public var description: String {
     "[\(address)]:\(port)"
   }
 }
 
+// @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress.IPv6 {
   public typealias Port = SocketAddress.IPv4.Port
 
@@ -88,6 +94,7 @@ extension SocketAddress.IPv6 {
   }
 }
 
+// @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress.IPv6 {
   @frozen
   public struct Address: RawRepresentable {
@@ -109,6 +116,7 @@ extension SocketAddress.IPv6 {
   }
 }
 
+// @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress.IPv6.Address {
   public init(bytes: UnsafeRawBufferPointer) {
     precondition(bytes.count == MemoryLayout<CInterop.In6Addr>.size)
@@ -122,6 +130,7 @@ extension SocketAddress.IPv6.Address {
   }
 }
 
+// @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress.IPv6.Address: Hashable {
   public static func ==(left: Self, right: Self) -> Bool {
     let l = left.rawValue.__u6_addr.__u6_addr32
@@ -138,6 +147,7 @@ extension SocketAddress.IPv6.Address: Hashable {
   }
 }
 
+// @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress.IPv6.Address: CustomStringConvertible {
   public var description: String {
     _inet_ntop()
@@ -168,6 +178,7 @@ extension SocketAddress.IPv6.Address: CustomStringConvertible {
   }
 }
 
+// @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress.IPv6.Address: LosslessStringConvertible {
   public init?(_ description: String) {
     guard let value = Self._inet_pton(description) else { return nil }

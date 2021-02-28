@@ -12,6 +12,7 @@ private var _pathOffset: Int {
   MemoryLayout<CInterop.SockAddrUn>.offset(of: \CInterop.SockAddrUn.sun_path)!
 }
 
+// @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress {
   public struct Local {
     internal let _path: FilePath
@@ -37,6 +38,7 @@ extension SocketAddress {
   }
 }
 
+// @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress {
   public init(_ local: Local) {
     let offset = _pathOffset
@@ -58,10 +60,12 @@ extension SocketAddress {
   }
 }
 
+// @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress.Local {
   public var path: FilePath { _path }
 }
 
+// @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress.Local: Hashable {
   public static func ==(left: Self, right: Self) -> Bool {
     left.path == right.path
@@ -72,6 +76,7 @@ extension SocketAddress.Local: Hashable {
   }
 }
 
+// @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress.Local: CustomStringConvertible {
   public var description: String {
     _path.description
