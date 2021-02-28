@@ -48,6 +48,18 @@ final class SocketAddressTest: XCTestCase {
     }
   }
 
+  func test_description() {
+    let ipv4 = SocketAddress(SocketAddress.IPv4(address: "1.2.3.4", port: 80)!)
+    let desc4 = "\(ipv4)"
+    XCTAssertTrue(desc4.hasPrefix("SocketAddress(family: "), desc4)
+    XCTAssertTrue(desc4.hasSuffix(") 1.2.3.4:80"), desc4)
+
+    let ipv6 = SocketAddress(SocketAddress.IPv6(address: "1234::ff", port: 80)!)
+    let desc6 = "\(ipv6)"
+    XCTAssertTrue(desc6.hasPrefix("SocketAddress(family: "), desc6)
+    XCTAssertTrue(desc6.hasSuffix(") [1234::ff]:80"), desc6)
+  }
+
   // MARK: IPv4
 
   func test_addressWithIPv4Address() {
@@ -110,5 +122,71 @@ final class SocketAddressTest: XCTestCase {
 
     let a2 = SocketAddress.IPv4(address: "192.168.1.1", port: 80)!
     XCTAssertEqual("\(a2)", "192.168.1.1:80")
+  }
+
+  // MARK: IPv6
+
+  func test_addressWithIPv6Address() {
+    let ipv6 = SocketAddress.IPv6(address: "2001:db8::", port: 42)!
+    let address = SocketAddress(ipv6)
+    if case .large = address._variant {
+      XCTFail("IPv6 address in big representation")
+    }
+    XCTAssertEqual(address.family, .ipv6)
+    if let extracted = SocketAddress.IPv6(address) {
+      XCTAssertEqual(extracted, ipv6)
+    } else {
+      XCTFail("Cannot extract IPv6 address")
+    }
+  }
+
+  func test_ipv6_address_string_conversions() {
+    typealias Address = SocketAddress.IPv6.Address
+
+    func check(
+      _ string: String,
+      _ value: [UInt8]?,
+      file: StaticString = #file,
+      line: UInt = #line
+    ) {
+      let value = value.map { value in
+        value.withUnsafeBytes { bytes in
+          Address(bytes: bytes)
+        }
+      }
+      switch (Address(string), value) {
+      case let (address?, value?):
+        XCTAssertEqual(address, value, file: file, line: line)
+      case let (address?, nil):
+        XCTFail("Got \(address), expected nil", file: file, line: line)
+      case let (nil, value?):
+        XCTFail("Got nil, expected \(value), file: file, line: line")
+      case (nil, nil):
+        // OK
+        break
+      }
+    }
+    check(
+      "::",
+      [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
+    check(
+      "0011:2233:4455:6677:8899:aabb:ccdd:eeff",
+      [0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
+       0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff])
+    check(
+      "1:203:405:607:809:a0b:c0d:e0f",
+      [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+       0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f])
+    check("1.2.3.4", nil)
+    check("apple.com", nil)
+  }
+
+  func test_ipv6_description() {
+    let a1 = SocketAddress.IPv6(address: "2001:db8:85a3:8d3:1319:8a2e:370:7348", port: 42)!
+    XCTAssertEqual("\(a1)", "[2001:db8:85a3:8d3:1319:8a2e:370:7348]:42")
+
+    let a2 = SocketAddress.IPv6(address: "2001::42", port: 80)!
+    XCTAssertEqual("\(a2)", "[2001::42]:80")
   }
 }

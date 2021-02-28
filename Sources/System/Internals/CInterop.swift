@@ -67,6 +67,9 @@ public enum CInterop {
   public typealias SockAddrIn = sockaddr_in
   public typealias InAddr = in_addr
   public typealias InAddrT = in_addr_t
+
+  public typealias In6Addr = in6_addr
+
   public typealias InPort = in_port_t
 
   public typealias SockAddrIn6 = sockaddr_in6

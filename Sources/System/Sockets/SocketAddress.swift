@@ -129,3 +129,18 @@ extension SocketAddress {
     }
   }
 }
+
+extension SocketAddress: CustomStringConvertible {
+  public var description: String {
+    switch family {
+    case .ipv4:
+      let address = IPv4(self)!
+      return "SocketAddress(family: \(family.rawValue)) \(address)"
+    case .ipv6:
+      let address = IPv6(self)!
+      return "SocketAddress(family: \(family.rawValue)) \(address)"
+    default:
+      return "SocketAddress(family: \(family.rawValue))"
+    }
+  }
+}
