@@ -54,7 +54,7 @@ internal func system_close(_ fd: Int32) -> Int32 {
 
 // read
 internal func system_read(
-  _ fd: Int32, _ buf: UnsafeMutableRawPointer!, _ nbyte: Int
+  _ fd: Int32, _ buf: UnsafeMutableRawPointer?, _ nbyte: Int
 ) -> Int {
 #if ENABLE_MOCKING
   if mockingEnabled { return _mockInt(fd, buf, nbyte) }
@@ -64,7 +64,7 @@ internal func system_read(
 
 // pread
 internal func system_pread(
-  _ fd: Int32, _ buf: UnsafeMutableRawPointer!, _ nbyte: Int, _ offset: off_t
+  _ fd: Int32, _ buf: UnsafeMutableRawPointer?, _ nbyte: Int, _ offset: off_t
 ) -> Int {
 #if ENABLE_MOCKING
   if mockingEnabled { return _mockInt(fd, buf, nbyte, offset) }
@@ -84,7 +84,7 @@ internal func system_lseek(
 
 // write
 internal func system_write(
-  _ fd: Int32, _ buf: UnsafeRawPointer!, _ nbyte: Int
+  _ fd: Int32, _ buf: UnsafeRawPointer?, _ nbyte: Int
 ) -> Int {
 #if ENABLE_MOCKING
   if mockingEnabled { return _mockInt(fd, buf, nbyte) }
@@ -94,7 +94,7 @@ internal func system_write(
 
 // pwrite
 internal func system_pwrite(
-  _ fd: Int32, _ buf: UnsafeRawPointer!, _ nbyte: Int, _ offset: off_t
+  _ fd: Int32, _ buf: UnsafeRawPointer?, _ nbyte: Int, _ offset: off_t
 ) -> Int {
 #if ENABLE_MOCKING
   if mockingEnabled { return _mockInt(fd, buf, nbyte, offset) }
@@ -138,7 +138,7 @@ internal func system_listen(_ socket: CInt, _ backlog: CInt) -> CInt {
 }
 
 internal func system_send(
-  _ socket: Int32, _ buffer: UnsafeRawPointer!, _ len: Int, _ flags: Int32
+  _ socket: Int32, _ buffer: UnsafeRawPointer?, _ len: Int, _ flags: Int32
 ) -> Int {
   #if ENABLE_MOCKING
   if mockingEnabled { return _mockInt(socket, buffer, len, flags) }
@@ -148,7 +148,7 @@ internal func system_send(
 
 internal func system_recv(
   _ socket: Int32,
-  _ buffer: UnsafeMutableRawPointer!,
+  _ buffer: UnsafeMutableRawPointer?,
   _ len: Int,
   _ flags: Int32
 ) -> Int {
@@ -161,7 +161,7 @@ internal func system_recv(
 
 internal func system_sendmsg(
   _ socket: CInt,
-  _ message: UnsafePointer<CInterop.MsgHdr>!,
+  _ message: UnsafePointer<CInterop.MsgHdr>?,
   _ flags: CInt
 ) -> Int {
   #if ENABLE_MOCKING
@@ -172,7 +172,7 @@ internal func system_sendmsg(
 
 internal func system_recvmsg(
   _ socket: CInt,
-  _ message: UnsafeMutablePointer<CInterop.MsgHdr>!,
+  _ message: UnsafeMutablePointer<CInterop.MsgHdr>?,
   _ flags: CInt
 ) -> Int {
   #if ENABLE_MOCKING
@@ -185,8 +185,8 @@ internal func system_getsockopt(
   _ socket: CInt,
   _ level: CInt,
   _ option: CInt,
-  _ value: UnsafeMutableRawPointer!,
-  _ length: UnsafeMutablePointer<socklen_t>!
+  _ value: UnsafeMutableRawPointer?,
+  _ length: UnsafeMutablePointer<socklen_t>?
 ) -> CInt {
   #if ENABLE_MOCKING
   if mockingEnabled { return _mock(socket, level, option, value, length) }
@@ -198,7 +198,7 @@ internal func system_setsockopt(
   _ socket: CInt,
   _ level: CInt,
   _ option: CInt,
-  _ value: UnsafeRawPointer!,
+  _ value: UnsafeRawPointer?,
   _ length: socklen_t
 ) -> CInt {
   #if ENABLE_MOCKING
@@ -232,7 +232,7 @@ internal func system_inet_pton(
 }
 
 internal func system_bind(
-  _ socket: CInt, _ addr: UnsafePointer<sockaddr>!, _ len: socklen_t
+  _ socket: CInt, _ addr: UnsafePointer<sockaddr>?, _ len: socklen_t
 ) -> CInt {
   #if ENABLE_MOCKING
   if mockingEnabled { return _mock(socket, addr, len) }
@@ -241,7 +241,7 @@ internal func system_bind(
 }
 
 internal func system_connect(
-  _ socket: CInt, _ addr: UnsafePointer<sockaddr>!, _ len: socklen_t
+  _ socket: CInt, _ addr: UnsafePointer<sockaddr>?, _ len: socklen_t
 ) -> CInt {
   #if ENABLE_MOCKING
   if mockingEnabled { return _mock(socket, addr, len) }
@@ -251,8 +251,8 @@ internal func system_connect(
 
 internal func system_accept(
   _ socket: CInt,
-  _ addr: UnsafeMutablePointer<sockaddr>!,
-  _ len: UnsafeMutablePointer<socklen_t>!
+  _ addr: UnsafeMutablePointer<sockaddr>?,
+  _ len: UnsafeMutablePointer<socklen_t>?
 ) -> CInt {
   #if ENABLE_MOCKING
   if mockingEnabled { return _mock(socket, addr, len) }
