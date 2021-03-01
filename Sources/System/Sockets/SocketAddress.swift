@@ -30,6 +30,43 @@ public struct SocketAddress {
 
 // @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress {
+  /// Initialize an empty socket address with the specified minimum capacity.
+  /// The default capacity makes enough storage space to fit any IPv4/IPv6 address.
+  ///
+  /// Addresses with storage preallocated this way can be repeatedly passed to
+  /// `SocketDescriptor.receiveMessage`, eliminating the need for a potential
+  /// allocation each time it is called.
+  public init(minimumCapacity: Int = Self.defaultCapacity) {
+    self.init(unsafeUninitializedCapacity: minimumCapacity) { buffer in
+      system_memset(buffer, to: 0)
+      return 0
+    }
+  }
+
+  /// Reserve storage capacity such that `self` is able to store addresses
+  /// of at least `minimumCapacity` bytes without any additional allocation.
+  ///
+  /// Addresses with storage preallocated this way can be repeatedly passed to
+  /// `SocketDescriptor.receiveMessage`, eliminating the need for a potential
+  /// allocation each time it is called.
+  public mutating func reserveCapacity(_ minimumCapacity: Int) {
+    guard minimumCapacity > _capacity else { return }
+    let length = _length
+    var buffer = _RawBuffer(minimumCapacity: minimumCapacity)
+    buffer.withUnsafeMutableBytes { target in
+      self.withUnsafeBytes { source in
+        assert(source.count == length)
+        assert(target.count > source.count)
+        if source.count > 0 {
+          target.baseAddress!.copyMemory(
+            from: source.baseAddress!,
+            byteCount: source.count)
+        }
+      }
+    }
+    self._variant = .large(length: length, bytes: buffer)
+  }
+
   public init(
     unsafeUninitializedCapacity capacity: Int,
     initializingWith body: (UnsafeMutableRawBufferPointer) throws -> Int
@@ -43,22 +80,20 @@ extension SocketAddress {
       precondition(length >= 0 && length <= capacity)
       self._variant = .small(length: UInt8(length), bytes: storage)
     } else {
-      var count: Int? = nil
-      let buffer = try _RawBuffer(
-        unsafeUninitializedMinimumCapacity: capacity
-      ) { buffer in
-        let c = try body(buffer)
-        precondition(c >= 0 && c <= capacity)
-        count = c
-        return capacity
+      var buffer = _RawBuffer(minimumCapacity: capacity)
+      let count = try buffer.withUnsafeMutableBytes { target in
+        try body(target)
       }
-      self._variant = .large(length: count!, bytes: buffer)
+      precondition(count >= 0 && count <= capacity)
+      self._variant = .large(length: count, bytes: buffer)
     }
   }
 }
 
 // @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress {
+  public static var defaultCapacity: Int { MemoryLayout<_InlineStorage>.size }
+
   @_alignment(8) // This must be large enough to cover any sockaddr variant
   internal struct _InlineStorage {
     /// A chunk of 28 bytes worth of integers, treated as inline storage for
@@ -79,33 +114,34 @@ extension SocketAddress {
   internal enum _Variant {
     case small(length: UInt8, bytes: _InlineStorage)
     case large(length: Int, bytes: _RawBuffer)
+  }
 
-    internal var length: Int {
-      switch self {
+  internal var _length: Int {
+    get {
+      switch _variant {
       case let .small(length: length, bytes: _):
         return Int(length)
       case let .large(length: length, bytes: _):
         return length
       }
     }
-
-    internal func withUnsafeBytes<R>(
-      _ body: (UnsafeRawBufferPointer) throws -> R
-    ) rethrows -> R {
-      switch self {
-      case let .small(length: length, bytes: bytes):
-        let length = Int(length)
-        assert(length <= MemoryLayout<_InlineStorage>.size)
-        return try Swift.withUnsafeBytes(of: bytes) { buffer in
-          try body(UnsafeRawBufferPointer(rebasing: buffer[..<length]))
-        }
-      case let .large(length: length, bytes: bytes):
-        return try bytes.withUnsafeBytes { buffer in
-          precondition(length <= buffer.count)
-          let buffer = UnsafeRawBufferPointer(rebasing: buffer[..<length])
-          return try body(buffer)
-        }
+    set {
+      assert(newValue < _capacity)
+      switch _variant {
+      case let .small(length: _, bytes: bytes):
+        self._variant = .small(length: UInt8(newValue), bytes: bytes)
+      case let .large(length: _, bytes: bytes):
+        self._variant = .large(length: newValue, bytes: bytes)
       }
+    }
+  }
+
+  internal var _capacity: Int {
+    switch _variant {
+    case .small(length: _, bytes: _):
+      return MemoryLayout<_InlineStorage>.size
+    case .large(length: _, bytes: let bytes):
+      return bytes.capacity
     }
   }
 }
@@ -130,7 +166,20 @@ extension SocketAddress {
   public func withUnsafeBytes<R>(
     _ body: (UnsafeRawBufferPointer) throws -> R
   ) rethrows -> R {
-    try _variant.withUnsafeBytes(body)
+    switch _variant {
+    case let .small(length: length, bytes: bytes):
+      let length = Int(length)
+      assert(length <= MemoryLayout<_InlineStorage>.size)
+      return try Swift.withUnsafeBytes(of: bytes) { buffer in
+        try body(UnsafeRawBufferPointer(rebasing: buffer[..<length]))
+      }
+    case let .large(length: length, bytes: bytes):
+      return try bytes.withUnsafeBytes { buffer in
+        precondition(length <= buffer.count)
+        let buffer = UnsafeRawBufferPointer(rebasing: buffer[..<length])
+        return try body(buffer)
+      }
+    }
   }
 
   /// Calls `body` with an unsafe raw buffer pointer to the
@@ -140,10 +189,31 @@ extension SocketAddress {
   public func withRawAddress<R>(
     _ body: (UnsafePointer<CInterop.SockAddr>, CInterop.SockLen) throws -> R
   ) rethrows -> R {
-    try _variant.withUnsafeBytes { bytes in
+    try withUnsafeBytes { bytes in
       let start = bytes.baseAddress!.assumingMemoryBound(to: CInterop.SockAddr.self)
       let length = CInterop.SockLen(bytes.count)
       return try body(start, length)
+    }
+  }
+
+  internal mutating func _withUnsafeMutableBytes<R>(
+    _ body: (UnsafeMutableRawBufferPointer) throws -> R
+  ) rethrows -> R {
+    switch _variant {
+    case .small(length: let length, bytes: var bytes):
+      assert(length <= MemoryLayout<_InlineStorage>.size)
+      defer { self._variant = .small(length: length, bytes: bytes) }
+      return try Swift.withUnsafeMutableBytes(of: &bytes) { buffer in
+        try body(UnsafeMutableRawBufferPointer(rebasing: buffer[..<Int(length)]))
+      }
+    case .large(length: let length, bytes: var bytes):
+      self._variant = .small(length: 0, bytes: _InlineStorage()) // Prevent CoW copies
+      defer { self._variant = .large(length: length, bytes: bytes) }
+      return try bytes.withUnsafeMutableBytes { buffer in
+        precondition(length <= buffer.count)
+        let buffer = UnsafeMutableRawBufferPointer(rebasing: buffer[..<length])
+        return try body(buffer)
+      }
     }
   }
 

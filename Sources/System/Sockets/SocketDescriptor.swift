@@ -187,6 +187,21 @@ extension SocketDescriptor {
     @_alwaysEmitIntoClient
     public static var waitForAll: MessageFlags { MessageFlags(_MSG_WAITALL) }
 
+    /// MSG_EOR: End-of-record condition -- the associated data completed a
+    /// full record.
+    @_alwaysEmitIntoClient
+    public static var endOfRecord: MessageFlags { MessageFlags(_MSG_EOR) }
+
+    /// MSG_TRUNC: Datagram was truncated because it didn't fit in the supplied
+    /// buffer.
+    @_alwaysEmitIntoClient
+    public static var dataTruncated: MessageFlags { MessageFlags(_MSG_TRUNC) }
+
+    /// MSG_CTRUNC: Some ancillary data was discarded because it didn't fit
+    /// in the supplied buffer.
+    @_alwaysEmitIntoClient
+    public static var ancillaryTruncated: MessageFlags { MessageFlags(_MSG_CTRUNC) }
+
     // TODO: any of the others? I'm going off of man pagees...
   }
 
