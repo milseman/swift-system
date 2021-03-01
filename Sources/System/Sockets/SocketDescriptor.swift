@@ -54,7 +54,7 @@ extension SocketDescriptor {
   @frozen
   public struct Domain: RawRepresentable, Hashable {
     @_alwaysEmitIntoClient
-    public let rawValue: CInt
+    public var rawValue: CInt
 
     @_alwaysEmitIntoClient
     public init(rawValue: CInt) { self.rawValue = rawValue }
@@ -116,7 +116,7 @@ extension SocketDescriptor {
   @frozen
   public struct ConnectionType: RawRepresentable {
     @_alwaysEmitIntoClient
-    public let rawValue: CInt
+    public var rawValue: CInt
 
     @_alwaysEmitIntoClient
     public init(rawValue: CInt) { self.rawValue = rawValue }
@@ -144,7 +144,7 @@ extension SocketDescriptor {
   @frozen
   public struct ProtocolID: RawRepresentable {
     @_alwaysEmitIntoClient
-    public let rawValue: CInt
+    public var rawValue: CInt
 
     @_alwaysEmitIntoClient
     public init(rawValue: CInt) { self.rawValue = rawValue }
@@ -160,7 +160,7 @@ extension SocketDescriptor {
   @frozen
   public struct MessageFlags: OptionSet {
     @_alwaysEmitIntoClient
-    public let rawValue: CInt
+    public var rawValue: CInt
 
     @_alwaysEmitIntoClient
     public init(rawValue: CInt) { self.rawValue = rawValue }
