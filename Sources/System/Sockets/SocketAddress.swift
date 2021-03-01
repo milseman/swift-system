@@ -72,6 +72,15 @@ extension SocketAddress {
     self._variant = .large(length: length, bytes: buffer)
   }
 
+  /// Reset this address value to an empty address of unspecified family,
+  /// filling the underlying storage with zero bytes.
+  public mutating func clear() {
+    self._withUnsafeMutableBytes(entireCapacity: true) { buffer in
+      system_memset(buffer, to: 0)
+    }
+    self._length = 0
+  }
+
   public init(
     unsafeUninitializedCapacity capacity: Int,
     initializingWith body: (UnsafeMutableRawBufferPointer) throws -> Int

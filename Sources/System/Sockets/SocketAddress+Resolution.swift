@@ -180,7 +180,10 @@ extension SocketAddress {
     }
 
     // Use "hidden" entry points for `NSError` bridging
+    @_alwaysEmitIntoClient
     public var _code: Int { Int(rawValue) }
+
+    @_alwaysEmitIntoClient
     public var _domain: String {
       // FIXME: See if there is an existing domain for these.
       "System.SocketAddress.ResolverError"

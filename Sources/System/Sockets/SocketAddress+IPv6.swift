@@ -9,16 +9,18 @@
 
 // @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress {
-  @frozen
   /// An IPv6 address and port number.
+  @frozen
   public struct IPv6: RawRepresentable {
     public var rawValue: CInterop.SockAddrIn6
 
+    @_alwaysEmitIntoClient
     public init(rawValue: CInterop.SockAddrIn6) {
       self.rawValue = rawValue
       self.rawValue.sin6_family = Family.ipv6.rawValue
     }
 
+    @_alwaysEmitIntoClient
     public init?(_ address: SocketAddress) {
       guard address.family == .ipv6 else { return nil }
       let value: CInterop.SockAddrIn6? = address.withUnsafeBytes { buffer in
@@ -36,6 +38,7 @@ extension SocketAddress {
 // @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress {
   /// Create a SocketAddress from an IPv6 address and port number.
+  @_alwaysEmitIntoClient
   public init(_ address: IPv6) {
     self = Swift.withUnsafeBytes(of: address.rawValue) { buffer in
       SocketAddress(buffer)
@@ -46,9 +49,11 @@ extension SocketAddress {
 // @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress.IPv6 {
   /// Create a socket address from an IPv6 address and port number.
+  @_alwaysEmitIntoClient
   public init(address: Address, port: Port) {
     // FIXME: We aren't modeling flowinfo & scope_id yet.
-    // If we need to do that, we can define new initializers/accessors later.
+    // If we need to do that, we can add new arguments or define new
+    // initializers/accessors later.
     rawValue = CInterop.SockAddrIn6()
     rawValue.sin6_family = SocketAddress.Family.ipv6.rawValue
     rawValue.sin6_port = port.rawValue._networkOrder
@@ -57,6 +62,7 @@ extension SocketAddress.IPv6 {
     rawValue.sin6_scope_id = 0
   }
 
+  @_alwaysEmitIntoClient
   public init?(address: String, port: Port) {
     guard let address = Address(address) else { return nil }
     self.init(address: address, port: port)
@@ -65,6 +71,7 @@ extension SocketAddress.IPv6 {
 
 // @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress.IPv6: Hashable {
+  @_alwaysEmitIntoClient
   public static func ==(left: Self, right: Self) -> Bool {
     left.address == right.address
       && left.port == right.port
@@ -72,6 +79,7 @@ extension SocketAddress.IPv6: Hashable {
       && left.rawValue.sin6_scope_id == right.rawValue.sin6_scope_id
   }
 
+  @_alwaysEmitIntoClient
   public func hash(into hasher: inout Hasher) {
     hasher.combine(port)
     hasher.combine(rawValue.sin6_flowinfo)
@@ -91,6 +99,7 @@ extension SocketAddress.IPv6: CustomStringConvertible {
 extension SocketAddress.IPv6 {
   public typealias Port = SocketAddress.IPv4.Port
 
+  @_alwaysEmitIntoClient
   public var port: Port {
     get { Port(CInterop.InPort(_networkOrder: rawValue.sin6_port)) }
     set { rawValue.sin6_port = newValue.rawValue._networkOrder }
@@ -99,8 +108,8 @@ extension SocketAddress.IPv6 {
 
 // @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress.IPv6 {
+  /// A 128-bit IPv6 address.
   @frozen
-  /// A 128-bit IPv6 address.    
   public struct Address: RawRepresentable {
     /// The raw internet address value, in host byte order.
     public var rawValue: CInterop.In6Addr
@@ -116,6 +125,7 @@ extension SocketAddress.IPv6 {
     }
   }
 
+  @_alwaysEmitIntoClient
   public var address: Address {
     get {
       return Address(rawValue: rawValue.sin6_addr)
@@ -149,6 +159,7 @@ extension SocketAddress.IPv6.Address {
 // @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress.IPv6.Address {
   /// Create a 128-bit IPv6 address from raw bytes in memory.
+  @_alwaysEmitIntoClient
   public init(bytes: UnsafeRawBufferPointer) {
     precondition(bytes.count == MemoryLayout<CInterop.In6Addr>.size)
     var addr = CInterop.In6Addr()
@@ -163,12 +174,14 @@ extension SocketAddress.IPv6.Address {
 
 // @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress.IPv6.Address: Hashable {
+  @_alwaysEmitIntoClient
   public static func ==(left: Self, right: Self) -> Bool {
     let l = left.rawValue.__u6_addr.__u6_addr32
     let r = right.rawValue.__u6_addr.__u6_addr32
     return l.0 == r.0 && l.1 == r.1 && l.2 == r.2 && l.3 == r.3
   }
 
+  @_alwaysEmitIntoClient
   public func hash(into hasher: inout Hasher) {
     let t = rawValue.__u6_addr.__u6_addr32
     hasher.combine(t.0)
@@ -180,10 +193,12 @@ extension SocketAddress.IPv6.Address: Hashable {
 
 // @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress.IPv6.Address: CustomStringConvertible {
+  @_alwaysEmitIntoClient
   public var description: String {
     _inet_ntop()
   }
 
+  @usableFromInline
   internal func _inet_ntop() -> String {
     return withUnsafeBytes(of: rawValue) { src in
       String(_unsafeUninitializedCapacity: Int(_INET6_ADDRSTRLEN)) { dst in
@@ -211,11 +226,13 @@ extension SocketAddress.IPv6.Address: CustomStringConvertible {
 
 // @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress.IPv6.Address: LosslessStringConvertible {
+  @_alwaysEmitIntoClient
   public init?(_ description: String) {
     guard let value = Self._inet_pton(description) else { return nil }
     self = value
   }
 
+  @usableFromInline
   internal static func _inet_pton(_ string: String) -> Self? {
     string.withCString { ptr in
       var addr = CInterop.In6Addr()

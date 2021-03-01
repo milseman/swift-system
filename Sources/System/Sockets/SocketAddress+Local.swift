@@ -21,7 +21,6 @@ extension SocketAddress {
       self._path = path
     }
 
-
     public init?(_ address: SocketAddress) {
       guard address.family == .local else { return nil }
       let path: FilePath? = address.withUnsafeBytes { buffer in

@@ -50,7 +50,7 @@ extension FileDescriptor {
 }
 
 extension SocketDescriptor {
-  /// Communications domain: the protocol family which should be used
+  /// Communications domain, identifying the protocol family that is being used.
   @frozen
   public struct Domain: RawRepresentable, Hashable, CustomStringConvertible {
     @_alwaysEmitIntoClient
@@ -129,7 +129,7 @@ extension SocketDescriptor {
     }
   }
 
-  /// TODO
+  /// The socket type, specifying the semantics of communication.
   @frozen
   public struct ConnectionType: RawRepresentable, Hashable, CustomStringConvertible {
     @_alwaysEmitIntoClient
@@ -187,7 +187,12 @@ extension SocketDescriptor {
     }
   }
 
-  /// TODO
+  /// Identifies a particular protocol to be used for communication.
+  ///
+  /// Note that protocol numbers are particular to the communication domain
+  /// that is being used. Accordingly, some of the symbolic names provided
+  /// here may have the same underlying value -- they are provided merely
+  /// for convenience.
   @frozen
   public struct ProtocolID: RawRepresentable, Hashable, CustomStringConvertible {
     @_alwaysEmitIntoClient
@@ -239,23 +244,22 @@ extension SocketDescriptor {
     @_alwaysEmitIntoClient
     public static var raw: ProtocolID { Self(_IPPROTO_RAW) }
 
+    /// Special protocol value representing socket-level options.
+    ///
+    /// The corresponding C constant is `SOL_SOCKET`.
+    @_alwaysEmitIntoClient
+    public static var socketOption: ProtocolID { Self(_SOL_SOCKET) }
+
     public var description: String {
-      switch self {
-      case .default: return "default"
-      case .ip: return "ip"
-      case .tcp: return "tcp"
-      case .udp: return "udp"
-      case .ipv4: return "ipv4"
-      case .ipv6: return "ipv6"
-      case .raw: return "raw"
-      default: return rawValue.description
-      }
+      // Note: Can't return symbolic names here -- values have multiple
+      // meanings based on the domain.
+      rawValue.description
     }
   }
 
   // TODO: option flags (SO_DEBUG)?
 
-  // TODO:
+  /// Message flags.
   @frozen
   public struct MessageFlags: OptionSet, CustomStringConvertible {
     @_alwaysEmitIntoClient
@@ -270,19 +274,19 @@ extension SocketDescriptor {
     @_alwaysEmitIntoClient
     public static var none: MessageFlags { MessageFlags(0) }
 
-    // MSG_OOB: process out-of-band data
+    /// MSG_OOB: process out-of-band data
     @_alwaysEmitIntoClient
     public static var outOfBand: MessageFlags { MessageFlags(_MSG_OOB) }
 
-    // MSG_DONTROUTE: bypass routing, use direct interface
+    /// MSG_DONTROUTE: bypass routing, use direct interface
     @_alwaysEmitIntoClient
     public static var doNotRoute: MessageFlags { MessageFlags(_MSG_DONTROUTE) }
 
-    // MSG_PEEK: peek at incoming message
+    /// MSG_PEEK: peek at incoming message
     @_alwaysEmitIntoClient
     public static var peek: MessageFlags { MessageFlags(_MSG_PEEK) }
 
-    // MSG_WAITALL: wait for full request or error
+    /// MSG_WAITALL: wait for full request or error
     @_alwaysEmitIntoClient
     public static var waitForAll: MessageFlags { MessageFlags(_MSG_WAITALL) }
 
@@ -301,8 +305,6 @@ extension SocketDescriptor {
     @_alwaysEmitIntoClient
     public static var ancillaryTruncated: MessageFlags { MessageFlags(_MSG_CTRUNC) }
 
-    // TODO: any of the others? I'm going off of man pagees...
-
     public var description: String {
       let descriptions: [(Element, StaticString)] = [
         (.outOfBand, ".outOfBand"),
@@ -315,11 +317,10 @@ extension SocketDescriptor {
       ]
       return _buildDescription(descriptions)
     }
-
   }
 
   @frozen
-  public struct ShutdownKind: RawRepresentable, Hashable, Codable {
+  public struct ShutdownKind: RawRepresentable, Hashable, Codable, CustomStringConvertible {
     @_alwaysEmitIntoClient
     public var rawValue: CInt
 
@@ -343,11 +344,19 @@ extension SocketDescriptor {
     /// The corresponding C constant is `SHUT_RDWR`
     @_alwaysEmitIntoClient
     public static var readWrite: ShutdownKind { ShutdownKind(rawValue: _SHUT_RDWR) }
-  }
 
+    public var description: String {
+      switch self {
+      case .read: return "read"
+      case .write: return "write"
+      case .readWrite: return "readWrite"
+      default: return rawValue.description
+      }
+    }
+  }
 }
 
-extension SocketDescriptor {
+#if false
 /*
 
  int     accept(int, struct sockaddr * __restrict, socklen_t * __restrict)
@@ -387,7 +396,5 @@ extension SocketDescriptor {
  #endif  /* (!_POSIX_C_SOURCE || _DARWIN_C_SOURCE) */
 
  */
-}
-
-// TODO: socket addresses...
+#endif
 

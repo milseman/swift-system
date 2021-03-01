@@ -15,9 +15,9 @@ extension SocketDescriptor {
   ///      communication
   ///    - type: Specify the semantics of communication
   ///    - protocol: Specify a particular protocol to use with the socket.
-  ///      Normally, there is only one protocol for a particular connection
-  ///      type within a protocol family, so a default argument of `.default`
-  ///      is provided
+  ///      (Zero by default, which often indicates a wildcard value in
+  ///      domain/type combinations that only support a single protocol,
+  ///      such as TCP for IPv4/stream.)
   ///   - retryOnInterrupt: Whether to retry the open operation
   ///     if it throws ``Errno/interrupted``.
   ///     The default is `true`.
@@ -28,7 +28,7 @@ extension SocketDescriptor {
   public static func open(
     _ domain: Domain,
     _ type: ConnectionType,
-    _ protocol: ProtocolID = .default,
+    _ protocol: ProtocolID = ProtocolID(rawValue: 0),
     retryOnInterrupt: Bool = true
   ) throws -> SocketDescriptor {
     try SocketDescriptor._open(
@@ -40,7 +40,7 @@ extension SocketDescriptor {
   internal static func _open(
     _ domain: Domain,
     _ type: ConnectionType,
-    _ protocol: ProtocolID = .default,
+    _ protocol: ProtocolID,
     retryOnInterrupt: Bool
   ) -> Result<SocketDescriptor, Errno> {
     valueOrErrno(retryOnInterrupt: retryOnInterrupt) {

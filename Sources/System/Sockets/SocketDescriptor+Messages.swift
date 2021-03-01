@@ -69,7 +69,7 @@ extension SocketDescriptor {
     ///    calls. This method reallocates the buffer if there isn't enough
     ///    capacity or if the storage is shared with another value.
     public mutating func appendMessage(
-      level: SocketDescriptor.Option.Level,
+      level: SocketDescriptor.ProtocolID,
       type: SocketDescriptor.Option,
       bytes: UnsafeRawBufferPointer
     ) {
@@ -98,7 +98,7 @@ extension SocketDescriptor {
     ///    calls. This method reallocates the buffer if there isn't enough
     ///    capacity or if the storage is shared with another value.
     public mutating func appendMessage(
-      level: SocketDescriptor.Option.Level,
+      level: SocketDescriptor.ProtocolID,
       type: SocketDescriptor.Option,
       unsafeUninitializedCapacity capacity: Int,
       initializingWith body: (UnsafeMutableRawBufferPointer) throws -> Int
@@ -297,8 +297,9 @@ extension SocketDescriptor.AncillaryMessageBuffer.Message {
     }
   }
 
-  /// The protocol of the message.
-  public var level: SocketDescriptor.Option.Level {
+  /// The protocol level of the message. Socket-level command messages
+  /// use the special protocol value `SocketDescriptor.ProtocolID.socketOption`.
+  public var level: SocketDescriptor.ProtocolID {
     .init(rawValue: _header.cmsg_level)
   }
 
@@ -335,6 +336,7 @@ extension SocketDescriptor.AncillaryMessageBuffer.Message {
 // @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketDescriptor {
 
+  @_alwaysEmitIntoClient
   public func sendMessage(
     bytes: UnsafeRawBufferPointer,
     recipient: SocketAddress? = nil,
@@ -342,12 +344,29 @@ extension SocketDescriptor {
     flags: MessageFlags = [],
     retryOnInterrupt: Bool = true
   ) throws -> Int {
-    try recipient._withUnsafeBytes { recipient in
-      try ancillary._withUnsafeBytes { ancillary in
+    try _sendMessage(
+      bytes: bytes,
+      recipient: recipient,
+      ancillary: ancillary,
+      flags: flags,
+      retryOnInterrupt: retryOnInterrupt
+    ).get()
+  }
+
+  @usableFromInline
+  internal func _sendMessage(
+    bytes: UnsafeRawBufferPointer,
+    recipient: SocketAddress?,
+    ancillary: AncillaryMessageBuffer?,
+    flags: MessageFlags,
+    retryOnInterrupt: Bool
+  ) -> Result<Int, Errno> {
+    recipient._withUnsafeBytes { recipient in
+      ancillary._withUnsafeBytes { ancillary in
         var iov = CInterop.IOVec()
         iov.iov_base = UnsafeMutableRawPointer(mutating: bytes.baseAddress)
         iov.iov_len = bytes.count
-        return try withUnsafePointer(to: &iov) { iov in
+        return withUnsafePointer(to: &iov) { iov in
           var m = CInterop.MsgHdr()
           m.msg_name = UnsafeMutableRawPointer(mutating: recipient.baseAddress)
           m.msg_namelen = UInt32(recipient.count)
@@ -356,9 +375,9 @@ extension SocketDescriptor {
           m.msg_control = UnsafeMutableRawPointer(mutating: ancillary.baseAddress)
           m.msg_controllen = CInterop.SockLen(ancillary.count)
           m.msg_flags = 0
-          return try withUnsafePointer(to: &m) { message in
-            try _sendmsg(message, flags.rawValue,
-                         retryOnInterrupt: retryOnInterrupt).get()
+          return withUnsafePointer(to: &m) { message in
+            _sendmsg(message, flags.rawValue,
+                     retryOnInterrupt: retryOnInterrupt)
           }
         }
       }
