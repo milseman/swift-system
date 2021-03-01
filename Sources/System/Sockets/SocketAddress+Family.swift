@@ -17,6 +17,9 @@ extension SocketAddress {
     @_alwaysEmitIntoClient
     public init(rawValue: CInterop.SAFamily) { self.rawValue = rawValue }
 
+    @_alwaysEmitIntoClient
+    public init(_ rawValue: CInterop.SAFamily) { self.rawValue = rawValue }
+
     /// Unspecified address family.
     ///
     /// The corresponding C constant is `AF_UNSPEC`.

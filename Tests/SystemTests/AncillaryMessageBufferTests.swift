@@ -31,7 +31,6 @@ final class AncillaryMessageBufferTest: XCTestCase {
     // Check that we can access appended messages.
     var i = 0
     for message in buffer {
-      print(i)
       XCTAssertEqual(Int(message.level.rawValue), 100 * i)
       XCTAssertEqual(Int(message.type.rawValue), 1000 * i)
       message.withUnsafeBytes { buffer in

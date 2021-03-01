@@ -123,6 +123,10 @@ extension SocketAddress.IPv4 {
     public init(rawValue: CInterop.InAddrT) {
       self.rawValue = rawValue
     }
+
+    public init(_ value: CInterop.InAddrT) {
+      self.rawValue = value
+    }
   }
 
   public var address: Address {
@@ -135,6 +139,28 @@ extension SocketAddress.IPv4 {
     }
   }
 }
+
+extension SocketAddress.IPv4.Address {
+  /// The IPv4 address 0.0.0.0.
+  ///
+  /// This corresponds to the C constant `INADDR_ANY`.
+  @_alwaysEmitIntoClient
+  public static var any: Self { Self(_INADDR_ANY) }
+
+  /// The IPv4 loopback address 127.0.0.1.
+  ///
+  /// This corresponds to the C constant `INADDR_ANY`.
+  @_alwaysEmitIntoClient
+  public static var loopback: Self { Self(_INADDR_LOOPBACK) }
+
+  /// The IPv4 broadcast address 255.255.255.255.
+  ///
+  /// This corresponds to the C constant `INADDR_BROADCAST`.
+  @_alwaysEmitIntoClient
+  public static var broadcast: Self { Self(_INADDR_BROADCAST) }
+}
+
+
 
 // @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress.IPv4.Address: CustomStringConvertible {

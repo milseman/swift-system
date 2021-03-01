@@ -67,13 +67,6 @@ extension SocketAddress.Local {
 
 // @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress.Local: Hashable {
-  public static func ==(left: Self, right: Self) -> Bool {
-    left.path == right.path
-  }
-
-  public func hash(into hasher: inout Hasher) {
-    hasher.combine(path)
-  }
 }
 
 // @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)

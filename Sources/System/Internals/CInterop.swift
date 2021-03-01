@@ -78,4 +78,6 @@ public enum CInterop {
   public typealias IOVec = iovec
   public typealias MsgHdr = msghdr
   public typealias CMsgHdr = cmsghdr  // Note: c is for "control", not "C"
+
+  public typealias AddrInfo = addrinfo
 }

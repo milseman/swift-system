@@ -260,3 +260,37 @@ internal func system_accept(
   return accept(socket, addr, len)
 }
 
+internal func system_getaddrinfo(
+  _ hostname: UnsafePointer<CChar>?,
+  _ servname: UnsafePointer<CChar>?,
+  _ hints: UnsafePointer<CInterop.AddrInfo>?,
+  _ res: UnsafeMutablePointer<UnsafeMutablePointer<CInterop.AddrInfo>?>?
+) -> CInt {
+  #if ENABLE_MOCKING
+  if mockingEnabled {
+    return _mock(hostname.map { String(cString: $0) },
+                 servname.map { String(cString: $0) },
+                 hints, res)
+  }
+  #endif
+  return getaddrinfo(hostname, servname, hints, res)
+}
+
+internal func system_freeaddrinfo(
+  _ addrinfo: UnsafeMutablePointer<CInterop.AddrInfo>?
+) {
+  #if ENABLE_MOCKING
+  if mockingEnabled {
+    _ = _mock(addrinfo)
+    return
+  }
+  #endif
+  return freeaddrinfo(addrinfo)
+}
+
+internal func system_gai_strerror(_ error: CInt) -> UnsafePointer<CChar> {
+  #if ENABLE_MOCKING
+  // FIXME
+  #endif
+  return gai_strerror(error)
+}

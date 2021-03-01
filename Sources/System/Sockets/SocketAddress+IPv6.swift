@@ -105,8 +105,14 @@ extension SocketAddress.IPv6 {
     /// The raw internet address value, in host byte order.
     public var rawValue: CInterop.In6Addr
 
+    @_alwaysEmitIntoClient
     public init(rawValue: CInterop.In6Addr) {
       self.rawValue = rawValue
+    }
+
+    @_alwaysEmitIntoClient
+    public init(_ value: CInterop.In6Addr) {
+      self.rawValue = value
     }
   }
 
@@ -117,6 +123,26 @@ extension SocketAddress.IPv6 {
     set {
       rawValue.sin6_addr = newValue.rawValue
     }
+  }
+}
+
+extension SocketAddress.IPv6.Address {
+  /// The IPv6 address "::" (i.e., all zero).
+  ///
+  /// This corresponds to the C constant `IN6ADDR_ANY_INIT`.
+  @_alwaysEmitIntoClient
+  public static var any: Self {
+    Self(CInterop.In6Addr())
+  }
+
+  /// The IPv4 loopback address "::1".
+  ///
+  /// This corresponds to the C constant `IN6ADDR_LOOPBACK_INIT`.
+  @_alwaysEmitIntoClient
+  public static var loopback: Self {
+    var addr = CInterop.In6Addr()
+    addr.__u6_addr.__u6_addr8.15 = 1
+    return Self(addr)
   }
 }
 

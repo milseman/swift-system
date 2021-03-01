@@ -51,15 +51,15 @@ final class SocketAddressTest: XCTestCase {
   func test_description() {
     let ipv4 = SocketAddress(SocketAddress.IPv4(address: "1.2.3.4", port: 80)!)
     let desc4 = "\(ipv4)"
-    XCTAssertEqual(desc4, "SocketAddress(family: ipv4) 1.2.3.4:80")
+    XCTAssertEqual(desc4, "SocketAddress(family: ipv4, address: 1.2.3.4:80)")
 
     let ipv6 = SocketAddress(SocketAddress.IPv6(address: "1234::ff", port: 80)!)
     let desc6 = "\(ipv6)"
-    XCTAssertEqual(desc6, "SocketAddress(family: ipv6) [1234::ff]:80")
+    XCTAssertEqual(desc6, "SocketAddress(family: ipv6, address: [1234::ff]:80)")
 
     let local = SocketAddress(SocketAddress.Local("/tmp/test.sock"))
     let descl = "\(local)"
-    XCTAssertEqual(descl, "SocketAddress(family: local) /tmp/test.sock")
+    XCTAssertEqual(descl, "SocketAddress(family: local, address: /tmp/test.sock)")
   }
 
   // MARK: IPv4

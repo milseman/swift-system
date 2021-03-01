@@ -52,12 +52,15 @@ extension FileDescriptor {
 extension SocketDescriptor {
   /// Communications domain: the protocol family which should be used
   @frozen
-  public struct Domain: RawRepresentable, Hashable {
+  public struct Domain: RawRepresentable, Hashable, CustomStringConvertible {
     @_alwaysEmitIntoClient
     public var rawValue: CInt
 
     @_alwaysEmitIntoClient
     public init(rawValue: CInt) { self.rawValue = rawValue }
+
+    @_alwaysEmitIntoClient
+    public init(_ rawValue: CInt) { self.rawValue = rawValue }
 
     /// Unspecified protocol.
     ///
@@ -110,16 +113,33 @@ extension SocketDescriptor {
     /// The corresponding C constant is `PF_NDRV`
     @_alwaysEmitIntoClient
     public static var networkDevice: Domain { Domain(rawValue: _PF_NDRV) }
+
+    public var description: String {
+      switch self {
+      case .unspecified: return "unspecified"
+      case .local: return "local"
+      case .ipv4: return "ipv4"
+      case .ipv6: return "ipv6"
+      case .routing: return "routing"
+      case .keyManagement: return "keyManagement"
+      case .system: return "system"
+      case .networkDevice: return "networkDevice"
+      default: return rawValue.description
+      }
+    }
   }
 
   /// TODO
   @frozen
-  public struct ConnectionType: RawRepresentable {
+  public struct ConnectionType: RawRepresentable, Hashable, CustomStringConvertible {
     @_alwaysEmitIntoClient
     public var rawValue: CInt
 
     @_alwaysEmitIntoClient
     public init(rawValue: CInt) { self.rawValue = rawValue }
+
+    @_alwaysEmitIntoClient
+    public init(_ rawValue: CInt) { self.rawValue = rawValue }
 
     /// Sequenced, reliable, two-way connection based byte streams.
     ///
@@ -133,34 +153,117 @@ extension SocketDescriptor {
     @_alwaysEmitIntoClient
     public static var datagram: ConnectionType { ConnectionType(rawValue: _SOCK_DGRAM) }
 
-    /// Only available to the super user
+    /// Raw protocol interface. Only available to the super user
     ///
     /// The corresponding C constant is `SOCK_RAW`
     @_alwaysEmitIntoClient
     public static var raw: ConnectionType { ConnectionType(rawValue: _SOCK_RAW) }
+
+    /// Reliably delivered message.
+    ///
+    /// The corresponding C constant is `SOCK_RDM`
+    @_alwaysEmitIntoClient
+    public static var reliablyDeliveredMessage: ConnectionType {
+      ConnectionType(rawValue: _SOCK_RDM)
+    }
+
+    /// Sequenced packet stream.
+    ///
+    /// The corresponding C constant is `SOCK_SEQPACKET`
+    @_alwaysEmitIntoClient
+    public static var sequencedPacketStream: ConnectionType {
+      ConnectionType(rawValue: _SOCK_SEQPACKET)
+    }
+
+    public var description: String {
+      switch self {
+      case .stream: return "stream"
+      case .datagram: return "datagram"
+      case .raw: return "raw"
+      case .reliablyDeliveredMessage: return "rdm"
+      case .sequencedPacketStream: return "seqpacket"
+      default: return rawValue.description
+      }
+    }
   }
 
   /// TODO
   @frozen
-  public struct ProtocolID: RawRepresentable {
+  public struct ProtocolID: RawRepresentable, Hashable, CustomStringConvertible {
     @_alwaysEmitIntoClient
     public var rawValue: CInt
 
     @_alwaysEmitIntoClient
     public init(rawValue: CInt) { self.rawValue = rawValue }
 
+    @_alwaysEmitIntoClient
+    public init(_ rawValue: CInt) { self.rawValue = rawValue }
+
     /// The default protocol for the domain and connection type combination.
     @_alwaysEmitIntoClient
-    public static var `default`: ProtocolID { self.init(rawValue: 0) }
+    public static var `default`: ProtocolID { Self(0) }
+
+    /// Internet Protocol (IP)
+    ///
+    /// This corresponds to the C constant `IPPROTO_IP`.
+    @_alwaysEmitIntoClient
+    public static var ip: ProtocolID { Self(_IPPROTO_IP) }
+
+    /// Transmission Control Protocol (TCP)
+    ///
+    /// This corresponds to the C constant `IPPROTO_TCP`.
+    @_alwaysEmitIntoClient
+    public static var tcp: ProtocolID { Self(_IPPROTO_TCP) }
+
+    /// User Datagram Protocol (UDP)
+    ///
+    /// This corresponds to the C constant `IPPROTO_UDP`.
+    @_alwaysEmitIntoClient
+    public static var udp: ProtocolID { Self(_IPPROTO_UDP) }
+
+    /// IPv4 encapsulation.
+    ///
+    /// This corresponds to the C constant `IPPROTO_IPV4`.
+    @_alwaysEmitIntoClient
+    public static var ipv4: ProtocolID { Self(_IPPROTO_IPV4) }
+
+    /// IPv6 header.
+    ///
+    /// This corresponds to the C constant `IPPROTO_IPV6`.
+    @_alwaysEmitIntoClient
+    public static var ipv6: ProtocolID { Self(_IPPROTO_IPV6) }
+
+    /// Raw IP packet.
+    ///
+    /// This corresponds to the C constant `IPPROTO_RAW`.
+    @_alwaysEmitIntoClient
+    public static var raw: ProtocolID { Self(_IPPROTO_RAW) }
+
+    public var description: String {
+      switch self {
+      case .default: return "default"
+      case .ip: return "ip"
+      case .tcp: return "tcp"
+      case .udp: return "udp"
+      case .ipv4: return "ipv4"
+      case .ipv6: return "ipv6"
+      case .raw: return "raw"
+      default: return rawValue.description
+      }
+    }
   }
 
   // TODO: option flags (SO_DEBUG)?
 
   // TODO:
   @frozen
-  public struct MessageFlags: OptionSet {
+  public struct MessageFlags: OptionSet, CustomStringConvertible {
     @_alwaysEmitIntoClient
     public var rawValue: CInt
+
+    public var description: String {
+      rawValue.description
+    }
 
     @_alwaysEmitIntoClient
     public init(rawValue: CInt) { self.rawValue = rawValue }

@@ -237,15 +237,15 @@ extension SocketAddress: CustomStringConvertible {
     switch family {
     case .ipv4:
       let address = IPv4(self)!
-      return "SocketAddress(family: \(family)) \(address)"
+      return "SocketAddress(family: \(family), address: \(address))"
     case .ipv6:
       let address = IPv6(self)!
-      return "SocketAddress(family: \(family)) \(address)"
+      return "SocketAddress(family: \(family), address: \(address))"
     case .local:
       let address = Local(self)!
-      return "SocketAddress(family: \(family)) \(address)"
+      return "SocketAddress(family: \(family), address: \(address))"
     default:
-      return "SocketAddress(family: \(family))"
+      return "SocketAddress(family: \(family), \(self._length) bytes)"
     }
   }
 }
