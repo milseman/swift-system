@@ -161,7 +161,7 @@ internal func system_recv(
 
 internal func system_sendmsg(
   _ socket: CInt,
-  _ message: UnsafePointer<CInterop.MsgHdr>,
+  _ message: UnsafePointer<CInterop.MsgHdr>!,
   _ flags: CInt
 ) -> Int {
   #if ENABLE_MOCKING
@@ -172,7 +172,7 @@ internal func system_sendmsg(
 
 internal func system_recvmsg(
   _ socket: CInt,
-  _ message: UnsafeMutablePointer<CInterop.MsgHdr>,
+  _ message: UnsafeMutablePointer<CInterop.MsgHdr>!,
   _ flags: CInt
 ) -> Int {
   #if ENABLE_MOCKING
@@ -259,5 +259,4 @@ internal func system_accept(
   #endif
   return accept(socket, addr, len)
 }
-
 

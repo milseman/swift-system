@@ -10,6 +10,7 @@
 // @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress {
   @frozen
+  /// The address family identifier
   public struct Family: RawRepresentable, Hashable {
     public let rawValue: CInterop.SAFamily
 

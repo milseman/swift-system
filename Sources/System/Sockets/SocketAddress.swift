@@ -8,6 +8,11 @@
 */
 
 // @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+/// An opaque type holding a socket address and port number in some address family.
+///
+/// TODO: Show examples of creating an ipv4 and ipv6 address
+///
+/// The corresponding C type is `sockaddr_t`
 public struct SocketAddress {
   internal var _variant: _Variant
 
@@ -92,6 +97,7 @@ extension SocketAddress {
 
 // @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress {
+  /// A default capacity, with enough storage space to fit any IPv4/IPv6 address.
   public static var defaultCapacity: Int { MemoryLayout<_InlineStorage>.size }
 
   @_alignment(8) // This must be large enough to cover any sockaddr variant
@@ -217,6 +223,7 @@ extension SocketAddress {
     }
   }
 
+   /// The address family identifier of this socket address.
   public var family: Family {
     withRawAddress { addr, length in
       Family(rawValue: addr.pointee.sa_family)

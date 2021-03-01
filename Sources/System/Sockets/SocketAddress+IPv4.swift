@@ -10,6 +10,7 @@
 // @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress {
   @frozen
+  /// An IPv4 address and port number.
   public struct IPv4: RawRepresentable {
     public var rawValue: CInterop.SockAddrIn
 
@@ -34,6 +35,7 @@ extension SocketAddress {
 
 // @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress {
+  /// Create a SocketAddress from an IPv4 address and port number.
   public init(_ ipv4: IPv4) {
     self = Swift.withUnsafeBytes(of: ipv4.rawValue) { buffer in
       SocketAddress(buffer)
@@ -43,6 +45,7 @@ extension SocketAddress {
 
 // @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress.IPv4 {
+  /// Create a socket address from a given Internet address and port number.
   public init(address: Address, port: Port) {
     rawValue = CInterop.SockAddrIn()
     rawValue.sin_family = CInterop.SAFamily(SocketDescriptor.Domain.ipv4.rawValue);
@@ -78,6 +81,7 @@ extension SocketAddress.IPv4: CustomStringConvertible {
 // @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress.IPv4 {
   @frozen
+  /// The port number on which the socket is listening.
   public struct Port: RawRepresentable, ExpressibleByIntegerLiteral, Hashable {
     /// The port number, in host byte order.
     public var rawValue: CInterop.InPort
@@ -111,6 +115,7 @@ extension SocketAddress.IPv4.Port: CustomStringConvertible {
 // @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress.IPv4 {
   @frozen
+  /// A 32-bit IPv4 address.
   public struct Address: RawRepresentable, Hashable {
     /// The raw internet address value, in host byte order.
     public var rawValue: CInterop.InAddrT

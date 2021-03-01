@@ -10,6 +10,7 @@
 // @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress {
   @frozen
+  /// An IPv6 address and port number.
   public struct IPv6: RawRepresentable {
     public var rawValue: CInterop.SockAddrIn6
 
@@ -34,6 +35,7 @@ extension SocketAddress {
 
 // @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress {
+  /// Create a SocketAddress from an IPv6 address and port number.
   public init(_ address: IPv6) {
     self = Swift.withUnsafeBytes(of: address.rawValue) { buffer in
       SocketAddress(buffer)
@@ -43,6 +45,7 @@ extension SocketAddress {
 
 // @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress.IPv6 {
+  /// Create a socket address from an IPv6 address and port number.
   public init(address: Address, port: Port) {
     // FIXME: We aren't modeling flowinfo & scope_id yet.
     // If we need to do that, we can define new initializers/accessors later.
@@ -97,6 +100,7 @@ extension SocketAddress.IPv6 {
 // @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress.IPv6 {
   @frozen
+  /// A 128-bit IPv6 address.    
   public struct Address: RawRepresentable {
     /// The raw internet address value, in host byte order.
     public var rawValue: CInterop.In6Addr
@@ -118,6 +122,7 @@ extension SocketAddress.IPv6 {
 
 // @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketAddress.IPv6.Address {
+  /// Create a 128-bit IPv6 address from raw bytes in memory.
   public init(bytes: UnsafeRawBufferPointer) {
     precondition(bytes.count == MemoryLayout<CInterop.In6Addr>.size)
     var addr = CInterop.In6Addr()
