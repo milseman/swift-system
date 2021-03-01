@@ -44,7 +44,7 @@ extension _RawBuffer {
 
   internal mutating func ensureUnique(capacity: Int) {
     let unique = isKnownUniquelyReferenced(&_storage)
-    if !unique || self.capacity > capacity {
+    if !unique || self.capacity < capacity {
       _storage = _copy(capacity: _grow(desired: capacity))
     }
   }
@@ -90,7 +90,7 @@ extension _RawBuffer {
     copy.withUnsafeMutablePointers { dstlen, dst in
       self.withUnsafeBytes { src in
         guard src.count > 0 else { return }
-        assert(src.count == dstlen.pointee)
+        assert(src.count <= dstlen.pointee)
         UnsafeMutableRawPointer(dst)
           .copyMemory(
             from: src.baseAddress!,

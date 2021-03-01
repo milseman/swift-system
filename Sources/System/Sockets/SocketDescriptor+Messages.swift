@@ -19,6 +19,13 @@ extension SocketDescriptor {
     internal var _buffer: _RawBuffer
     internal var _endOffset: Int
 
+    /// Initialize a new empty ancillary message buffer with no preallocated
+    /// storage.
+    internal init() {
+      _buffer = _RawBuffer()
+      _endOffset = 0
+    }
+
     /// Initialize a new empty ancillary message buffer of the
     /// specified minimum capacity (in bytes).
     internal init(minimumCapacity: Int) {
@@ -64,19 +71,20 @@ extension SocketDescriptor {
     public mutating func appendMessage(
       level: SocketDescriptor.Option.Level,
       type: SocketDescriptor.Option,
-      data: UnsafeRawBufferPointer
+      bytes: UnsafeRawBufferPointer
     ) {
       appendMessage(
         level: level,
         type: type,
-        unsafeUninitializedCapacity: data.count
+        unsafeUninitializedCapacity: bytes.count
       ) { buffer in
-        if data.count > 0 {
+        assert(buffer.count >= bytes.count)
+        if bytes.count > 0 {
           buffer.baseAddress!.copyMemory(
-            from: data.baseAddress!,
-            byteCount: data.count)
+            from: bytes.baseAddress!,
+            byteCount: bytes.count)
         }
-        return data.count
+        return bytes.count
       }
     }
 
@@ -103,13 +111,14 @@ extension SocketDescriptor {
         assert(buffer.count >= _endOffset + delta)
         let p = buffer.baseAddress! + _endOffset
         let header = p.bindMemory(to: CInterop.CMsgHdr.self, capacity: 1)
+        header.pointee = CInterop.CMsgHdr()
         header.pointee.cmsg_level = level.rawValue
         header.pointee.cmsg_type = type.rawValue
         let length = try body(
           UnsafeMutableRawBufferPointer(start: p + headerSize, count: capacity))
-        precondition(length > 0 && length <= capacity)
+        precondition(length >= 0 && length <= capacity)
         header.pointee.cmsg_len = CInterop.SockLen(headerSize + length)
-        return length
+        return headerSize + length
       }
       _endOffset += messageLength
     }
@@ -273,12 +282,13 @@ extension SocketDescriptor.AncillaryMessageBuffer.Message {
     _ body: (UnsafeRawBufferPointer) throws -> R
   ) rethrows -> R {
     try _base._withUnsafeBytes { buffer in
-      assert(_offset + _base._headerSize <= buffer.count)
+      let headerSize = _base._headerSize
+      assert(_offset + headerSize <= buffer.count)
       let p = buffer.baseAddress! + _offset
       let header = p.assumingMemoryBound(to: CInterop.CMsgHdr.self)
-      let length = Int(header.pointee.cmsg_len)
-      let data = p + _base._headerSize
-      let count = Swift.min(_offset + length, buffer.count)
+      let data = p + headerSize
+      let count = Swift.min(Int(header.pointee.cmsg_len) - headerSize,
+                            buffer.count)
       return try body(UnsafeRawBufferPointer(start: data, count: count))
     }
   }
