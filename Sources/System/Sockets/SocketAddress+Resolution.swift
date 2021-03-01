@@ -16,8 +16,12 @@ extension SocketAddress {
   ///
   /// This loosely corresponds to the C `struct addrinfo`.
   public struct Info {
-    /// Address family for socket.
-    public let family: Family
+    /// Address family.
+    public var family: Family { Family(rawValue: CInterop.SAFamily(domain.rawValue)) }
+
+    /// Communications domain.
+    public let domain: SocketDescriptor.Domain
+
     /// Socket type.
     public let type: SocketDescriptor.ConnectionType
     /// Protocol for socket.
@@ -28,13 +32,13 @@ extension SocketAddress {
     public let canonicalName: String?
 
     internal init(
-      family: Family,
+      domain: SocketDescriptor.Domain,
       type: SocketDescriptor.ConnectionType,
       protocol: SocketDescriptor.ProtocolID,
       address: SocketAddress,
       canonicalName: String? = nil
     ) {
-      self.family = family
+      self.domain = domain
       self.type = type
       self.protocol = `protocol`
       self.address = address
@@ -338,7 +342,7 @@ extension SocketAddress {
     p = entries
     while let entry = p {
       let info = Info(
-        family: Family(UInt8(entry.pointee.ai_family)),
+        domain: SocketDescriptor.Domain(entry.pointee.ai_family),
         type: SocketDescriptor.ConnectionType(entry.pointee.ai_socktype),
         protocol: SocketDescriptor.ProtocolID(entry.pointee.ai_protocol),
         address: SocketAddress(address: entry.pointee.ai_addr,

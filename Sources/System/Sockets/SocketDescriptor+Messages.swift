@@ -134,14 +134,46 @@ extension SocketDescriptor {
     }
 
     internal mutating func _withUnsafeMutableBytes<R>(
+      entireCapacity: Bool,
       _ body: (UnsafeMutableRawBufferPointer) throws -> R
     ) rethrows -> R {
       return try _buffer.withUnsafeMutableBytes { buffer in
         assert(buffer.count >= _endOffset)
-        let buffer = UnsafeMutableRawBufferPointer(rebasing: buffer.prefix(_endOffset))
-        return try body(buffer)
+        if entireCapacity {
+          return try body(buffer)
+        } else {
+          return try body(.init(rebasing: buffer.prefix(_endOffset)))
+        }
       }
     }
+
+    internal mutating func _withMutableCInterop<R>(
+      entireCapacity: Bool,
+      _ body: (UnsafeMutableRawPointer?, inout CInterop.SockLen) throws -> R
+    ) rethrows -> R {
+      let (result, length): (R, Int) = try _withUnsafeMutableBytes(
+        entireCapacity: entireCapacity
+      ) { buffer in
+        var length = CInterop.SockLen(buffer.count)
+        let result = try body(buffer.baseAddress, &length)
+        precondition(length >= 0 && length <= buffer.count)
+        return (result, Int(length))
+      }
+      _endOffset = length
+      return result
+    }
+  }
+}
+
+
+extension Optional where Wrapped == SocketDescriptor.AncillaryMessageBuffer {
+  internal func _withUnsafeBytes<R>(
+    _ body: (UnsafeRawBufferPointer) throws -> R
+  ) rethrows -> R {
+    guard let buffer = self else {
+      return try body(UnsafeRawBufferPointer(start: nil, count: 0))
+    }
+    return try buffer._withUnsafeBytes(body)
   }
 }
 
@@ -193,6 +225,8 @@ extension SocketDescriptor.AncillaryMessageBuffer: Collection {
 
   /// The index of the first message in the collection, or `endIndex` if
   /// the collection contains no messages.
+  ///
+  /// This roughly corresponds to the C macro `CMSG_FIRSTHDR`.
   public var startIndex: Index { Index(_offset: 0) }
 
   /// The index after the last message in the collection.
@@ -223,6 +257,8 @@ extension SocketDescriptor.AncillaryMessageBuffer: Collection {
   }
 
   /// Returns the index immediately following `i` in the collection.
+  ///
+  /// This roughly corresponds to the C macro `CMSG_NXTHDR`.
   ///
   /// - Complexity: O(1)
   public func index(after i: Index) -> Index {
@@ -274,6 +310,8 @@ extension SocketDescriptor.AncillaryMessageBuffer.Message {
   /// Calls `body` with an unsafe raw buffer pointer containing the
   /// message payload.
   ///
+  /// This roughly corresponds to the C macro `CMSG_DATA`.
+  ///
   /// - Note: The buffer passed to `body` does not include storage reserved
   ///    for holding the message header, such as the `level` and `type` values.
   ///    To access header information, you have to use the corresponding
@@ -296,107 +334,32 @@ extension SocketDescriptor.AncillaryMessageBuffer.Message {
 
 // @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SocketDescriptor {
-  /// Holds reusable metadata buffers and other ancillary information
-  /// required by `sendMessage` and `receiveMessage`.
-  ///
-  /// This struct corresponds to the C `struct msghdr`, although it doesn't
-  /// directly represent that type. (It's a memory-safe variant of it without
-  /// the parts representing buffers for regular I/O data.)
-  public struct MessageHeader {
-    /// Message flags.
-    ///
-    /// `receiveMessage` sets this on return indicating condititions of
-    /// the received message (`.endOfRecord`, `.dataTruncated`,
-    /// `.ancillaryTruncated`, `.outOfBand`).
-    ///
-    /// `sendMessage` ignores this field.
-    public var flags: MessageFlags = .none
-
-    /// The address of the remote end of the collection.
-    ///
-    /// The `receiveMessage` method overwrites the original address with the
-    /// address of the sender of the message. (If the address is unavailable,
-    /// the `family` will be `.unspecified`.)
-    ///
-    /// For `sendMessage`, this identifies the address of the intended recipient.
-    /// (Set the `family` to `.unspecified` if you don't need/want to specify a
-    /// recipient.)
-    public var remoteAddress: SocketAddress
-
-    /// A buffer holding protocol control messages or other ancillary data.
-    public var ancillaryMessages: AncillaryMessageBuffer
-
-    /// Initialize a new reusable message header, with components of the
-    /// specified preallocated storage capacity.
-    ///
-    /// - Parameter flag: The desired message flags. By default, no flags are set.
-    /// - Parameter addressCapacity: The desired capacity (in bytes) of the
-    ///    `remoteAddress` buffer. By default, the buffer will be large enough
-    ///    to hold an IPv4/IPv6 address.
-    /// - Parameter ancillaryCapacity: The desired capacity (in bytes) if
-    ///    the buffer holding ancillary/control messages. The capacity is
-    ///    zero by default, meaning no space is allocated.
-    public init(
-      flags: MessageFlags = .none,
-      addressCapacity: Int = SocketAddress.defaultCapacity,
-      ancillaryCapacity: Int = 0
-    ) {
-      self.flags = flags
-      self.remoteAddress = SocketAddress(minimumCapacity: addressCapacity)
-      self.ancillaryMessages = AncillaryMessageBuffer(minimumCapacity: ancillaryCapacity)
-    }
-
-    internal func _withUnsafeBuffers<R>(
-      _ body: (
-        MessageFlags,
-        UnsafeRawBufferPointer,
-        UnsafeRawBufferPointer
-      ) throws -> R
-    ) rethrows -> R {
-      try remoteAddress.withUnsafeBytes { remoteAddress in
-        try ancillaryMessages._withUnsafeBytes { ancillaryMessages in
-          try body(flags, remoteAddress, ancillaryMessages)
-        }
-      }
-    }
-
-    internal mutating func _withUnsafeMutableBuffers<R>(
-      _ body: (
-        inout MessageFlags,
-        UnsafeMutableRawBufferPointer,
-        UnsafeMutableRawBufferPointer
-      ) throws -> R
-    ) rethrows -> R {
-      try remoteAddress._withUnsafeMutableBytes { remoteAddress in
-        try ancillaryMessages._withUnsafeMutableBytes { ancillaryMessages in
-          try body(&flags, remoteAddress, ancillaryMessages)
-        }
-      }
-    }
-  }
 
   public func sendMessage(
-    header: MessageHeader,
     bytes: UnsafeRawBufferPointer,
+    recipient: SocketAddress? = nil,
+    ancillary: AncillaryMessageBuffer? = nil,
     flags: MessageFlags = [],
     retryOnInterrupt: Bool = true
   ) throws -> Int {
-    try header._withUnsafeBuffers { msgflags, remoteAddress, ancillaryMessages in
-      var iov = CInterop.IOVec()
-      iov.iov_base = UnsafeMutableRawPointer(mutating: bytes.baseAddress)
-      iov.iov_len = bytes.count
-      return try withUnsafePointer(to: &iov) { iov in
-        var m = CInterop.MsgHdr()
-        m.msg_name = UnsafeMutableRawPointer(mutating: remoteAddress.baseAddress)
-        m.msg_namelen = UInt32(remoteAddress.count)
-        m.msg_iov = UnsafeMutablePointer(mutating: iov)
-        m.msg_iovlen = 1
-        m.msg_control = UnsafeMutableRawPointer(mutating: ancillaryMessages.baseAddress)
-        m.msg_controllen = CInterop.SockLen(ancillaryMessages.count)
-        m.msg_flags = msgflags.rawValue
-        return try withUnsafePointer(to: &m) { message in
-          try _sendmsg(message, flags.rawValue,
-                       retryOnInterrupt: retryOnInterrupt).get()
+    try recipient._withUnsafeBytes { recipient in
+      try ancillary._withUnsafeBytes { ancillary in
+        var iov = CInterop.IOVec()
+        iov.iov_base = UnsafeMutableRawPointer(mutating: bytes.baseAddress)
+        iov.iov_len = bytes.count
+        return try withUnsafePointer(to: &iov) { iov in
+          var m = CInterop.MsgHdr()
+          m.msg_name = UnsafeMutableRawPointer(mutating: recipient.baseAddress)
+          m.msg_namelen = UInt32(recipient.count)
+          m.msg_iov = UnsafeMutablePointer(mutating: iov)
+          m.msg_iovlen = 1
+          m.msg_control = UnsafeMutableRawPointer(mutating: ancillary.baseAddress)
+          m.msg_controllen = CInterop.SockLen(ancillary.count)
+          m.msg_flags = 0
+          return try withUnsafePointer(to: &m) { message in
+            try _sendmsg(message, flags.rawValue,
+                         retryOnInterrupt: retryOnInterrupt).get()
+          }
         }
       }
     }
@@ -411,44 +374,157 @@ extension SocketDescriptor {
       system_sendmsg(self.rawValue, message, flags)
     }
   }
+}
 
+// @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension SocketDescriptor {
+
+  @_alwaysEmitIntoClient
   public func receiveMessage(
-    header: inout MessageHeader,
     bytes: UnsafeMutableRawBufferPointer,
     flags: MessageFlags = [],
     retryOnInterrupt: Bool = true
-  ) throws -> Int {
-    let (result, senderLength, ancillaryLength): (Result<Int, Errno>, Int, Int)
-    (result, senderLength, ancillaryLength) =
-      header._withUnsafeMutableBuffers { msgflags, remoteAddress, ancillaryMessages in
-        var iov = CInterop.IOVec()
-        iov.iov_base = bytes.baseAddress
-        iov.iov_len = bytes.count
-        return withUnsafePointer(to: &iov) { iov in
-          var m = CInterop.MsgHdr()
-          m.msg_name = remoteAddress.baseAddress
-          m.msg_namelen = UInt32(remoteAddress.count)
-          m.msg_iov = UnsafeMutablePointer(mutating: iov)
-          m.msg_iovlen = 1
-          m.msg_control = UnsafeMutableRawPointer(mutating: ancillaryMessages.baseAddress)
-          m.msg_controllen = CInterop.SockLen(ancillaryMessages.count)
-          m.msg_flags = msgflags.rawValue
-          let result = withUnsafeMutablePointer(to: &m) { m in
-            _recvmsg(m, flags.rawValue, retryOnInterrupt: retryOnInterrupt)
+  ) throws -> (received: Int, flags: MessageFlags) {
+    return try _receiveMessage(
+      bytes: bytes,
+      sender: nil,
+      ancillary: nil,
+      flags: flags,
+      retryOnInterrupt: retryOnInterrupt
+    ).get()
+  }
+
+  @_alwaysEmitIntoClient
+  public func receiveMessage(
+    bytes: UnsafeMutableRawBufferPointer,
+    sender: inout SocketAddress,
+    flags: MessageFlags = [],
+    retryOnInterrupt: Bool = true
+  ) throws -> (received: Int, flags: MessageFlags) {
+    return try _receiveMessage(
+      bytes: bytes,
+      sender: &sender,
+      ancillary: nil,
+      flags: flags,
+      retryOnInterrupt: retryOnInterrupt
+    ).get()
+  }
+
+  @_alwaysEmitIntoClient
+  public func receiveMessage(
+    bytes: UnsafeMutableRawBufferPointer,
+    ancillary: inout AncillaryMessageBuffer,
+    flags: MessageFlags = [],
+    retryOnInterrupt: Bool = true
+  ) throws -> (received: Int, flags: MessageFlags) {
+    return try _receiveMessage(
+      bytes: bytes,
+      sender: nil,
+      ancillary: &ancillary,
+      flags: flags,
+      retryOnInterrupt: retryOnInterrupt
+    ).get()
+  }
+
+  @_alwaysEmitIntoClient
+  public func receiveMessage(
+    bytes: UnsafeMutableRawBufferPointer,
+    sender: inout SocketAddress,
+    ancillary: inout AncillaryMessageBuffer,
+    flags: MessageFlags = [],
+    retryOnInterrupt: Bool = true
+  ) throws -> (received: Int, flags: MessageFlags) {
+    return try _receiveMessage(
+      bytes: bytes,
+      sender: &sender,
+      ancillary: &ancillary,
+      flags: flags,
+      retryOnInterrupt: retryOnInterrupt
+    ).get()
+  }
+}
+
+extension Optional where Wrapped == UnsafeMutablePointer<SocketAddress> {
+  internal func _withMutableCInterop<R>(
+    entireCapacity: Bool,
+    _ body: (
+      UnsafeMutablePointer<CInterop.SockAddr>?,
+      inout CInterop.SockLen
+    ) throws -> R
+  ) rethrows -> R {
+    guard let ptr = self else {
+      var c: CInterop.SockLen = 0
+      let result = try body(nil, &c)
+      precondition(c == 0)
+      return result
+    }
+    return try ptr.pointee._withMutableCInterop(
+      entireCapacity: entireCapacity,
+      body)
+  }
+}
+
+extension Optional
+where Wrapped == UnsafeMutablePointer<SocketDescriptor.AncillaryMessageBuffer>
+{
+  internal func _withMutableCInterop<R>(
+    entireCapacity: Bool,
+    _ body: (UnsafeMutableRawPointer?, inout CInterop.SockLen) throws -> R
+  ) rethrows -> R {
+    guard let buffer = self else {
+      var length: CInterop.SockLen = 0
+      let r = try body(nil, &length)
+      precondition(length == 0)
+      return r
+    }
+    return try buffer.pointee._withMutableCInterop(
+      entireCapacity: entireCapacity,
+      body
+    )
+  }
+}
+
+extension SocketDescriptor {
+  @usableFromInline
+  internal func _receiveMessage(
+    bytes: UnsafeMutableRawBufferPointer,
+    sender: UnsafeMutablePointer<SocketAddress>?,
+    ancillary: UnsafeMutablePointer<AncillaryMessageBuffer>?,
+    flags: MessageFlags,
+    retryOnInterrupt: Bool
+  ) -> Result<(Int, MessageFlags), Errno> {
+    let result: Result<Int, Errno>
+    let receivedFlags: CInt
+    (result, receivedFlags) =
+      sender._withMutableCInterop(entireCapacity: true) { adr, adrlen in
+        ancillary._withMutableCInterop(entireCapacity: true) { anc, anclen in
+          var iov = CInterop.IOVec()
+          iov.iov_base = bytes.baseAddress
+          iov.iov_len = bytes.count
+          return withUnsafePointer(to: &iov) { iov in
+            var m = CInterop.MsgHdr()
+            m.msg_name = UnsafeMutableRawPointer(adr)
+            m.msg_namelen = adrlen
+            m.msg_iov = UnsafeMutablePointer(mutating: iov)
+            m.msg_iovlen = 1
+            m.msg_control = anc
+            m.msg_controllen = anclen
+            m.msg_flags = 0
+            let result = withUnsafeMutablePointer(to: &m) { m in
+              _recvmsg(m, flags.rawValue, retryOnInterrupt: retryOnInterrupt)
+            }
+            if case .failure = result {
+              adrlen = 0
+              anclen = 0
+            } else {
+              adrlen = m.msg_namelen
+              anclen = m.msg_controllen
+            }
+            return (result, m.msg_flags)
           }
-          return (result, Int(m.msg_namelen), Int(m.msg_controllen))
         }
       }
-    if case .success = result {
-      precondition(senderLength <= header.remoteAddress._capacity)
-      precondition(ancillaryLength <= header.ancillaryMessages._capacity)
-      header.remoteAddress._length = senderLength
-      header.ancillaryMessages._endOffset = ancillaryLength
-    } else {
-      header.remoteAddress._length = 0
-      header.ancillaryMessages._endOffset = 0
-    }
-    return try result.get()
+    return result.map { ($0, MessageFlags(rawValue: receivedFlags)) }
   }
 
   internal func _recvmsg(

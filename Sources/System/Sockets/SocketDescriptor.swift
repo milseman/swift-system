@@ -261,10 +261,6 @@ extension SocketDescriptor {
     @_alwaysEmitIntoClient
     public var rawValue: CInt
 
-    public var description: String {
-      rawValue.description
-    }
-
     @_alwaysEmitIntoClient
     public init(rawValue: CInt) { self.rawValue = rawValue }
 
@@ -306,6 +302,20 @@ extension SocketDescriptor {
     public static var ancillaryTruncated: MessageFlags { MessageFlags(_MSG_CTRUNC) }
 
     // TODO: any of the others? I'm going off of man pagees...
+
+    public var description: String {
+      let descriptions: [(Element, StaticString)] = [
+        (.outOfBand, ".outOfBand"),
+        (.doNotRoute, ".doNotRoute"),
+        (.peek, ".peek"),
+        (.waitForAll, ".waitForAll"),
+        (.endOfRecord, ".endOfRecord"),
+        (.dataTruncated, ".dataTruncated"),
+        (.ancillaryTruncated, ".ancillaryTruncated"),
+      ]
+      return _buildDescription(descriptions)
+    }
+
   }
 
   @frozen

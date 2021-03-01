@@ -192,17 +192,22 @@ extension SocketAddress {
   /// raw bytes of this address. This is useful when you
   /// need to pass an address to a function that takes a
   /// a C `sockaddr` pointer along with a `socklen_t` length value.
-  public func withRawAddress<R>(
-    _ body: (UnsafePointer<CInterop.SockAddr>, CInterop.SockLen) throws -> R
+  public func withUnsafeCInterop<R>(
+    _ body: (UnsafePointer<CInterop.SockAddr>?, CInterop.SockLen) throws -> R
   ) rethrows -> R {
     try withUnsafeBytes { bytes in
-      let start = bytes.baseAddress!.assumingMemoryBound(to: CInterop.SockAddr.self)
+      let start = bytes.baseAddress?.assumingMemoryBound(to: CInterop.SockAddr.self)
       let length = CInterop.SockLen(bytes.count)
-      return try body(start, length)
+      if length >= MemoryLayout<CInterop.SockAddr>.size {
+        return try body(start, length)
+      } else {
+        return try body(nil, 0)
+      }
     }
   }
 
   internal mutating func _withUnsafeMutableBytes<R>(
+    entireCapacity: Bool,
     _ body: (UnsafeMutableRawBufferPointer) throws -> R
   ) rethrows -> R {
     switch _variant {
@@ -210,23 +215,52 @@ extension SocketAddress {
       assert(length <= MemoryLayout<_InlineStorage>.size)
       defer { self._variant = .small(length: length, bytes: bytes) }
       return try Swift.withUnsafeMutableBytes(of: &bytes) { buffer in
-        try body(UnsafeMutableRawBufferPointer(rebasing: buffer[..<Int(length)]))
+        if entireCapacity {
+          return try body(buffer)
+        } else {
+          return try body(.init(rebasing: buffer[..<Int(length)]))
+        }
       }
     case .large(length: let length, bytes: var bytes):
       self._variant = .small(length: 0, bytes: _InlineStorage()) // Prevent CoW copies
       defer { self._variant = .large(length: length, bytes: bytes) }
       return try bytes.withUnsafeMutableBytes { buffer in
         precondition(length <= buffer.count)
-        let buffer = UnsafeMutableRawBufferPointer(rebasing: buffer[..<length])
-        return try body(buffer)
+        if entireCapacity {
+          return try body(buffer)
+        } else {
+          return try body(.init(rebasing: buffer[..<length]))
+        }
       }
     }
   }
 
+  internal mutating func _withMutableCInterop<R>(
+    entireCapacity: Bool,
+    _ body: (
+      UnsafeMutablePointer<CInterop.SockAddr>?,
+      inout CInterop.SockLen
+    ) throws -> R
+  ) rethrows -> R {
+    let (result, length): (R, Int) = try _withUnsafeMutableBytes(
+      entireCapacity: true
+    ) { bytes in
+      let start = bytes.baseAddress?.assumingMemoryBound(to: CInterop.SockAddr.self)
+      var length = CInterop.SockLen(bytes.count)
+      let result = try body(start, &length)
+      precondition(length >= 0 && length <= bytes.count, "\(length) \(bytes.count)")
+      return (result, Int(length))
+    }
+    self._length = length
+    return result
+  }
+
+
    /// The address family identifier of this socket address.
   public var family: Family {
-    withRawAddress { addr, length in
-      Family(rawValue: addr.pointee.sa_family)
+    withUnsafeCInterop { addr, length in
+      guard let addr = addr else { return .unspecified }
+      return Family(rawValue: addr.pointee.sa_family)
     }
   }
 }
@@ -236,16 +270,20 @@ extension SocketAddress: CustomStringConvertible {
   public var description: String {
     switch family {
     case .ipv4:
-      let address = IPv4(self)!
-      return "SocketAddress(family: \(family), address: \(address))"
+      if let address = IPv4(self) {
+        return "SocketAddress(family: \(family), address: \(address))"
+      }
     case .ipv6:
-      let address = IPv6(self)!
-      return "SocketAddress(family: \(family), address: \(address))"
+      if let address = IPv6(self) {
+        return "SocketAddress(family: \(family), address: \(address))"
+      }
     case .local:
-      let address = Local(self)!
-      return "SocketAddress(family: \(family), address: \(address))"
+      if let address = Local(self) {
+        return "SocketAddress(family: \(family), address: \(address))"
+      }
     default:
-      return "SocketAddress(family: \(family), \(self._length) bytes)"
+      break
     }
+    return "SocketAddress(family: \(family), \(self._length) bytes)"
   }
 }

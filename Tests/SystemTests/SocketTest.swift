@@ -61,9 +61,7 @@ final class SocketTest: XCTestCase {
         name: "recvmsg", rawSocket, Wildcard(), 42,
         interruptable: true
       ) { retryOnInterrupt in
-        var header = SocketDescriptor.MessageHeader()
-        header.flags.rawValue = 42
-        _ = try socket.receiveMessage(header: &header, bytes: rawBuf,
+        _ = try socket.receiveMessage(bytes: rawBuf,
                                       flags: .init(rawValue: 42),
                                       retryOnInterrupt: retryOnInterrupt)
       },
@@ -71,10 +69,7 @@ final class SocketTest: XCTestCase {
         name: "sendmsg", rawSocket, Wildcard(), 42,
         interruptable: true
       ) { retryOnInterrupt in
-        var header = SocketDescriptor.MessageHeader()
-        header.flags.rawValue = 42
-        _ = try socket.sendMessage(header: header,
-                                   bytes: UnsafeRawBufferPointer(rawBuf),
+        _ = try socket.sendMessage(bytes: UnsafeRawBufferPointer(rawBuf),
                                    flags: .init(rawValue: 42),
                                    retryOnInterrupt: retryOnInterrupt)
       },

@@ -5,8 +5,11 @@ internal struct SystemSamples: ParsableCommand {
     commandName: "system-samples",
     abstract: "A collection of little programs exercising some System features.",
     subcommands: [
-      Resolve.self
+      Resolve.self,
+      Connect.self,
+      Listen.self,
     ])
 }
 
+disableBuffering()
 SystemSamples.main()
