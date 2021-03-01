@@ -59,7 +59,7 @@ extension TestCase {
     _ message: String? = nil
   ) where S1.Element: Equatable, S1.Element == S2.Element {
     if !expected.elementsEqual(actual) {
-      defer { print("expected: \(expected), actual: \(actual)") }
+      defer { print("expected: \(expected)\n  actual: \(actual)") }
       fail(message)
     }
   }
@@ -68,7 +68,7 @@ extension TestCase {
     _ message: String? = nil
   ) {
     if actual != expected {
-      defer { print("expected: \(expected), actual: \(actual)") }
+      defer { print("expected: \(expected)\n  actual: \(actual)") }
       fail(message)
     }
   }
@@ -98,7 +98,7 @@ extension TestCase {
     if !check() {
       let e = expected.map { "\($0)" } ?? "nil"
       let a = actual.map { "\($0)" } ?? "nil"
-      defer { print("expected: \(e), actual: \(a)") }
+      defer { print("expected: \(e)\n  actual: \(a)") }
       fail(message)
     }
   }
