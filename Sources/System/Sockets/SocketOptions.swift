@@ -443,9 +443,20 @@ extension SocketDescriptor {
 
 extension SocketDescriptor {
   // TODO: Wrappers and convenience overloads for other concrete types
-  // (timeval, linger) Clients can use getOption(_:_:into:&) for now.
+  // (timeval, linger)
+  // For now, clients can use the UMRBP-based variants below.
 
-  /// Get an option associated with this socket.
+  /// Copy an option associated with this socket into the specified buffer.
+  ///
+  /// The method corresponds to the C function `getsockopt`.
+  ///
+  /// - Parameters:
+  ///    - level: The option level. To get a socket-level option, specify `.socketLevel`.
+  ///       Otherwise use the protocol value that defines your desired option.
+  ///    - option: The option identifier within the level.
+  ///    - buffer: The buffer into which to copy the option value.
+  ///
+  /// - Returns: The number of bytes copied into the supplied buffer.
   @_alwaysEmitIntoClient
   public func getOption(
     _ level: ProtocolID,
@@ -455,6 +466,17 @@ extension SocketDescriptor {
     try _getOption(level, option, into: buffer).get()
   }
 
+  /// Return the value of an option associated with this socket as a `CInt` value.
+  ///
+  /// The method corresponds to the C function `getsockopt`.
+  ///
+  /// - Parameters:
+  ///    - level: The option level. To get a socket-level option, specify `.socketLevel`.
+  ///       Otherwise use the protocol value that defines your desired option.
+  ///    - option: The option identifier within the level.
+  ///    - type: The type to return. Must be set to `CInt.self` (the default).
+  ///
+  /// - Returns: The current value of the option.
   @_alwaysEmitIntoClient
   public func getOption(
     _ level: ProtocolID,
@@ -469,6 +491,17 @@ extension SocketDescriptor {
     return value
   }
 
+  /// Return the value of an option associated with this socket as a `Bool` value.
+  ///
+  /// The method corresponds to the C function `getsockopt`.
+  ///
+  /// - Parameters:
+  ///    - level: The option level. To get a socket-level option, specify `.socketLevel`.
+  ///       Otherwise use the protocol value that defines your desired option.
+  ///    - option: The option identifier within the level.
+  ///    - type: The type to return. Must be set to `Bool.self` (the default).
+  ///
+  /// - Returns: True if the current value is not zero; otherwise false.
   @_alwaysEmitIntoClient
   public func getOption(
     _ level: ProtocolID,
@@ -495,6 +528,16 @@ extension SocketDescriptor {
 }
 
 extension SocketDescriptor {
+  /// Set the value of an option associated with this socket to the contents
+  /// of the specified buffer.
+  ///
+  /// The method corresponds to the C function `setsockopt`.
+  ///
+  /// - Parameters:
+  ///    - level: The option level. To set a socket-level option, specify `.socketLevel`.
+  ///       Otherwise use the protocol value that defines your desired option.
+  ///    - option: The option identifier within the level.
+  ///    - buffer: The buffer that contains the desired option value.
   @_alwaysEmitIntoClient
   public func setOption(
     _ level: ProtocolID,
@@ -504,6 +547,16 @@ extension SocketDescriptor {
     try _setOption(level, option, from: buffer).get()
   }
 
+  /// Set the value of an option associated with this socket to the supplied
+  /// `CInt` value.
+  ///
+  /// The method corresponds to the C function `setsockopt`.
+  ///
+  /// - Parameters:
+  ///    - level: The option level. To set a socket-level option, specify `.socketLevel`.
+  ///       Otherwise use the protocol value that defines your desired option.
+  ///    - option: The option identifier within the level.
+  ///    - value: The desired new value for the option.
   @_alwaysEmitIntoClient
   public func setOption(
     _ level: ProtocolID,
@@ -516,7 +569,17 @@ extension SocketDescriptor {
     }
   }
 
-  /// Set an option associated with this socket.
+  /// Set the value of an option associated with this socket to the supplied
+  /// `Bool` value.
+  ///
+  /// The method corresponds to the C function `setsockopt`.
+  ///
+  /// - Parameters:
+  ///    - level: The option level. To set a socket-level option, specify `.socketLevel`.
+  ///       Otherwise use the protocol value that defines your desired option.
+  ///    - option: The option identifier within the level.
+  ///    - value: The desired new value for the option. (`true` gets stored
+  ///       as `(1 as CInt)`. `false` is represented by `(0 as CInt)`).
   @_alwaysEmitIntoClient
   public func setOption(
     _ level: ProtocolID,
