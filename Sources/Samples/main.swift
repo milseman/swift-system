@@ -9,6 +9,7 @@ internal struct SystemSamples: ParsableCommand {
       ReverseResolve.self,
       Connect.self,
       Listen.self,
+      PrintExample.self,
     ])
 }
 

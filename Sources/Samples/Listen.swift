@@ -32,9 +32,20 @@ struct Listen: ParsableCommand {
   @Flag(help: "Use UDP")
   var udp: Bool = false
 
-  func startServer(
-    on addresses: [SocketAddress.Info]
+  static func startServer(
+    hostname: String?,
+    service: String?,
+    flags: SocketAddress.NameResolverFlags? = nil,
+    family: SocketAddress.Family? = nil,
+    type: SocketDescriptor.ConnectionType? = nil
   ) throws -> (SocketDescriptor, SocketAddress.Info)? {
+    let addresses = try SocketAddress.resolveName(
+      hostname: hostname,
+      service: service,
+      flags: .canonicalName,
+      family: family,
+      type: type)
+
     for info in addresses {
       do {
         let socket = try SocketDescriptor.open(
@@ -76,15 +87,13 @@ struct Listen: ParsableCommand {
   }
 
   func run() throws {
-    let addresses = try SocketAddress.resolveName(
+    guard let (socket, address) = try Listen.startServer(
       hostname: nil,
       service: service,
       flags: .canonicalName,
       family: ipv6 ? .ipv6 : .ipv4,
-      type: udp ? .datagram : .stream)
-
-
-    guard let (socket, address) = try startServer(on: addresses) else {
+      type: udp ? .datagram : .stream
+    ) else {
       complain("Can't listen on \(service)")
       throw ExitCode.failure
     }
