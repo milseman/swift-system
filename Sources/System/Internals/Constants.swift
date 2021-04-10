@@ -530,3 +530,5 @@ internal var _SEEK_HOLE: CInt { SEEK_HOLE }
 internal var _SEEK_DATA: CInt { SEEK_DATA }
 #endif
 
+@_alwaysEmitIntoClient
+internal var _FD_SETSIZE: CInt { FD_SETSIZE }

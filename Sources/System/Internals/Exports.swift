@@ -165,3 +165,48 @@ internal func getTLS(_ key: _PlatformTLSKey) -> UnsafeMutableRawPointer? {
   return pthread_getspecific(key)
   #endif
 }
+
+// MARK: - fd_set
+//
+// For some reason the macros aren't imported in the Darwin module.
+// So, we duplicate what's in the headers...
+//
+
+@_alwaysEmitIntoClient
+internal func system_fd_zero(_ set: inout CInterop.FDSet) {
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+  // For some reason the macros aren't imported in the Darwin module.
+  // So, we duplicate what's in the headers...
+  bzero(&set, MemoryLayout<CInterop.FDSet>.stride)
+#else
+#error("TODO")
+#endif
+}
+
+@_alwaysEmitIntoClient
+internal func system_fd_insert(_ fd: CInt, _ set: inout CInterop.FDSet) {
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+  __darwin_fd_set(fd, &set)
+#else
+#error("TODO")
+#endif
+}
+
+@_alwaysEmitIntoClient
+internal func system_fd_remove(_ fd: CInt, _ set: inout CInterop.FDSet) {
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+  __darwin_fd_clr(fd, &set)
+#else
+#error("TODO")
+#endif
+}
+
+@_alwaysEmitIntoClient
+internal func system_fd_cotains(_ fd: CInt, _ set: CInterop.FDSet) -> Bool {
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+  var copy = set
+  return 0 != __darwin_fd_isset(fd, &copy)
+#else
+#error("TODO")
+#endif
+}

@@ -63,4 +63,9 @@ public enum CInterop {
   /// on API.
   public typealias PlatformUnicodeEncoding = UTF8
   #endif
+
+  public typealias FDSet = fd_set
+
+  public typealias TimeSpec = timespec
+
 }
