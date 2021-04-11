@@ -63,4 +63,6 @@ public enum CInterop {
   /// on API.
   public typealias PlatformUnicodeEncoding = UTF8
   #endif
+
+  public typealias KEvent = kevent
 }

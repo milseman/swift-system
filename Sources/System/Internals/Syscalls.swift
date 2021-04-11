@@ -115,3 +115,12 @@ internal func system_dup2(_ fd: Int32, _ fd2: Int32) -> Int32 {
   #endif
   return dup2(fd, fd2)
 }
+
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+internal func system_kqueue() -> Int32 {
+  #if ENABLE_MOCKING
+  if mockingEnabled { return _mock() }
+  #endif
+  return kqueue()
+}
+#endif
