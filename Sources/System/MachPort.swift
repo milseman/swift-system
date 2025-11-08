@@ -11,6 +11,12 @@
 
 import Darwin.Mach
 
+/// A protocol representing a type of Mach port right.
+///
+/// Mach port rights are used to control access to Mach ports. This protocol
+/// is adopted by `Mach.ReceiveRight`, `Mach.SendRight`, and
+/// `Mach.SendOnceRight` to provide type-safe management of different port
+/// right types.
 @available(System 1.4.0, *)
 public protocol MachPortRight {}
 
@@ -29,6 +35,10 @@ internal func _machPrecondition(
 @available(System 1.4.0, *)
 @frozen
 public enum Mach {
+  /// A type-safe wrapper for managing Mach port rights.
+  ///
+  /// - Parameter RightType: The type of Mach port right being managed
+  ///   (e.g., `ReceiveRight`, `SendRight`, or `SendOnceRight`).
   @available(System 1.4.0, *)
   public struct Port<RightType: MachPortRight>: ~Copyable {
     @usableFromInline
@@ -43,13 +53,17 @@ public enum Mach {
     /// This initializer traps if `name` is `MACH_PORT_NULL`, or if `name` is
     /// `MACH_PORT_DEAD` and the `RightType` is `Mach.ReceiveRight`.
     ///
-    /// If the type of the right does not match the `RightType` of the 
+    /// If the type of the right does not match the `RightType` of the
     /// `Mach.Port` being constructed, behavior is undefined.
     ///
     /// The underlying port right will be automatically deallocated at the
     /// end of the `Mach.Port` instance's lifetime.
     ///
     /// This initializer makes a syscall to guard the right.
+    ///
+    /// - Parameter name: The Mach port name to take ownership of.
+    ///
+    /// - Returns: A `Mach.Port` instance managing the specified port right.
     public init(name: mach_port_name_t) {
       precondition(name != mach_port_name_t(MACH_PORT_NULL),
                    "Mach.Port cannot be initialized with MACH_PORT_NULL")
@@ -80,6 +94,11 @@ public enum Mach {
     ///
     /// The body block may optionally return something, which will then be
     /// returned to the caller of withBorrowedName.
+    ///
+    /// - Parameter body: A closure that receives the port name and performs
+    ///   non-consuming operations on it.
+    ///
+    /// - Returns: The value returned by the `body` closure.
     @inlinable
     public func withBorrowedName<ReturnType>(
       body: (mach_port_name_t) -> ReturnType
@@ -145,6 +164,10 @@ extension Mach.Port where RightType == Mach.ReceiveRight {
   ///
   /// The underlying port right will be automatically deallocated when
   /// the Mach.Port object is destroyed.
+  ///
+  /// - Parameters:
+  ///   - name: The Mach port name to take ownership of.
+  ///   - context: The guard context value used to guard this receive right.
   public init(name: mach_port_name_t, context: mach_port_context_t) {
     precondition(name != mach_port_name_t(MACH_PORT_NULL),
                  "Mach.Port cannot be initialized with MACH_PORT_NULL")
@@ -220,6 +243,11 @@ extension Mach.Port where RightType == Mach.ReceiveRight {
   ///
   /// The body block may optionally return something, which will then be
   /// returned to the caller of withBorrowedName.
+  ///
+  /// - Parameter body: A closure that receives the port name and guard context,
+  ///   and performs non-consuming operations on them.
+  ///
+  /// - Returns: The value returned by the `body` closure.
   @inlinable
   @available(System 1.4.0, *)
   public func withBorrowedName<ReturnType>(
@@ -234,6 +262,8 @@ extension Mach.Port where RightType == Mach.ReceiveRight {
   ///
   /// This function will abort if the right could not be created.
   /// Callers may assert that a valid right is always returned.
+  ///
+  /// - Returns: A new `Mach.Port<Mach.SendOnceRight>` instance.
   @inlinable
   @available(System 1.4.0, *)
   public func makeSendOnceRight() -> Mach.Port<Mach.SendOnceRight> {
@@ -263,6 +293,8 @@ extension Mach.Port where RightType == Mach.ReceiveRight {
   ///
   /// This function will abort if the right could not be created.
   /// Callers may assert that a valid right is always returned.
+  ///
+  /// - Returns: A new `Mach.Port<Mach.SendRight>` instance.
   @inlinable
   @available(System 1.4.0, *)
   public func makeSendRight() -> Mach.Port<Mach.SendRight> {
@@ -281,6 +313,9 @@ extension Mach.Port where RightType == Mach.ReceiveRight {
   /// Access the make-send count.
   ///
   /// Each get/set of this property makes a syscall.
+  ///
+  /// The getter retrieves the current make-send count from the port.
+  /// The setter updates the make-send count to the specified value.
   @inlinable
   @available(System 1.4.0, *)
   public var makeSendCount: mach_port_mscount_t {
@@ -336,6 +371,11 @@ extension Mach.Port where RightType == Mach.SendRight {
   /// If the send right being copied has become a dead name, meaning the
   /// receiving side has been deallocated, then copySendRight() will throw
   /// a Mach.PortRightError.deadName error.
+  ///
+  /// - Returns: A new `Mach.Port<Mach.SendRight>` instance.
+  ///
+  /// - Throws: `Mach.PortRightError.deadName` if the send right has become
+  ///   a dead name because the receive right has been deallocated.
   @inlinable
   @available(System 1.4.0, *)
   public func copySendRight() throws -> Mach.Port<Mach.SendRight> {
