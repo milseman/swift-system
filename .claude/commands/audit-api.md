@@ -3,7 +3,7 @@
 Use project-steward to audit API documentation (doc comments for public APIs).
 
 ## Scope
-Check all public APIs in Sources/SystemPackage/ (or $ARGUMENTS if provided).
+Check all public APIs in Sources/System/ (or $ARGUMENTS if provided).
 
 ## Look For
 - Missing doc comments on public declarations
