@@ -18,13 +18,19 @@ Check all public APIs in Sources/SystemPackage/ (or $ARGUMENTS if provided).
 ## Process
 1. Scan and list ALL issues with file:line references
 2. Ask: "Fix all / pick specific / skip?"
-3. Apply approved fixes
-4. Generate commit message:
+3. Apply approved fixes (edit files directly)
+4. Show what changed
+5. Provide commit message for user to copy:
 ```
 Improve API documentation
 
 - [Each specific change]
 ```
+
+## Important
+- DO NOT run git commands (no git add, git commit, etc.)
+- Only edit source files
+- User will commit changes themselves
 
 ## Rules
 - Only audit public (non-underscored) declarations
