@@ -12,6 +12,9 @@ Check all public APIs in Sources/SystemPackage/ (or $ARGUMENTS if provided).
 - Missing throws documentation
 - Unclear or incomplete descriptions
 
+## Skip
+- Deprecated APIs (marked with `@available(*, deprecated)`)
+
 ## Process
 1. Scan and list ALL issues with file:line references
 2. Ask: "Fix all / pick specific / skip?"
