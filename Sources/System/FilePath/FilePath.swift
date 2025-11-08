@@ -44,6 +44,9 @@ public struct FilePath: Sendable {
   internal var _storage: SystemString
 
   /// Creates an empty file path.
+  ///
+  /// The resulting path has no root and no components, representing an
+  /// empty relative path.
   public init() {
     self._storage = SystemString()
     _invariantCheck()
@@ -75,6 +78,11 @@ extension FilePath: Codable {
 
   // Decoder is written explicitly to ensure that we validate invariants on
   // untrusted input.
+  /// Creates a file path by decoding from the given decoder.
+  ///
+  /// - Parameter decoder: The decoder to read data from.
+  /// - Throws: `DecodingError` if the decoded data does not satisfy the
+  ///   invariants of `FilePath`.
   public init(from decoder: any Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     self._storage = try container.decode(SystemString.self, forKey: ._storage)
