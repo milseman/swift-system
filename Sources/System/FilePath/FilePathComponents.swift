@@ -92,7 +92,12 @@ extension FilePath.Component {
     case regular
   }
 
-  /// The kind of this component
+  /// The kind of this component.
+  ///
+  /// This property indicates whether the component is a regular file or
+  /// directory name (`.regular`), the special current directory component
+  /// (`.currentDirectory`), or the special parent directory component
+  /// (`.parentDirectory`).
   public var kind: Kind {
     if _path._isCurrentDirectory(_range) { return .currentDirectory }
     if _path._isParentDirectory(_range) { return .parentDirectory }

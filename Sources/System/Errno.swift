@@ -1537,8 +1537,10 @@ extension Errno {
 // Use "hidden" entry points for `NSError` bridging
 @available(System 0.0.1, *)
 extension Errno {
+  /// The error code for NSError bridging.
   public var _code: Int { Int(rawValue) }
 
+  /// The error domain for NSError bridging.
   public var _domain: String { "NSPOSIXErrorDomain" }
 }
 
@@ -1564,6 +1566,12 @@ extension Errno: CustomStringConvertible, CustomDebugStringConvertible {
 
 @available(System 0.0.1, *)
 extension Errno {
+  /// Pattern matches an `Errno` value against a general `Error` value.
+  ///
+  /// - Parameters:
+  ///   - lhs: The `Errno` pattern to match against.
+  ///   - rhs: The error to test.
+  /// - Returns: `true` if `rhs` is an `Errno` equal to `lhs`, otherwise `false`.
   @_alwaysEmitIntoClient
   public static func ~=(_ lhs: Errno, _ rhs: Error) -> Bool {
     guard let value = rhs as? Errno else { return false }

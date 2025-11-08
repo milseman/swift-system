@@ -41,6 +41,11 @@ extension FilePath {
   }
 
   /// View the non-root components that make up this path.
+  ///
+  /// This property provides read and write access to the path's non-root
+  /// components as a collection. When read, it returns a view of the
+  /// components. When modified, changes are applied back to the path while
+  /// preserving the root.
   public var components: ComponentView {
     __consuming get { ComponentView(self) }
     _modify {
@@ -68,12 +73,23 @@ extension FilePath {
 extension FilePath.ComponentView: BidirectionalCollection {
   public typealias Element = FilePath.Component
 
+  /// A position in a `ComponentView`.
+  ///
+  /// This type represents an index into the component view, allowing
+  /// bidirectional traversal of path components.
   @available(System 0.0.2, *)
   public struct Index: Sendable, Comparable, Hashable {
     internal typealias Storage = SystemString.Index
 
     internal var _storage: Storage
 
+    /// Returns a Boolean value indicating whether the first index is less than
+    /// the second.
+    ///
+    /// - Parameters:
+    ///   - lhs: The first index to compare.
+    ///   - rhs: The second index to compare.
+    /// - Returns: `true` if `lhs` is less than `rhs`; otherwise, `false`.
     public static func < (lhs: Self, rhs: Self) -> Bool {
       lhs._storage < rhs._storage
     }
@@ -83,17 +99,40 @@ extension FilePath.ComponentView: BidirectionalCollection {
     }
   }
 
+  /// The position of the first component in the view.
+  ///
+  /// If the view is empty, `startIndex` is equal to `endIndex`.
   public var startIndex: Index { Index(_start) }
+
+  /// The position one past the last component in the view.
+  ///
+  /// `endIndex` is not a valid argument to `subscript`. It is always reachable
+  /// from `startIndex` by zero or more applications of `index(after:)`.
   public var endIndex: Index { Index(_path._storage.endIndex) }
 
+  /// Returns the position immediately after the given index.
+  ///
+  /// - Parameter i: A valid index of the collection. `i` must be less than
+  ///   `endIndex`.
+  /// - Returns: The index value immediately after `i`.
   public func index(after i: Index) -> Index {
     return Index(_path._parseComponent(startingAt: i._storage).nextStart)
   }
 
+  /// Returns the position immediately before the given index.
+  ///
+  /// - Parameter i: A valid index of the collection. `i` must be greater than
+  ///   `startIndex`.
+  /// - Returns: The index value immediately before `i`.
   public func index(before i: Index) -> Index {
     Index(_path._parseComponent(priorTo: i._storage).lowerBound)
   }
 
+  /// Accesses the component at the specified position.
+  ///
+  /// - Parameter position: The position of the component to access. `position`
+  ///   must be a valid index of the collection that is not equal to `endIndex`.
+  /// - Returns: The component at the specified position.
   public subscript(position: Index) -> FilePath.Component {
     let end = _path._parseComponent(startingAt: position._storage).componentEnd
     return FilePath.Component(_path, position._storage ..< end)
@@ -102,6 +141,10 @@ extension FilePath.ComponentView: BidirectionalCollection {
 
 @available(System 0.0.2, *)
 extension FilePath.ComponentView: RangeReplaceableCollection {
+  /// Creates an empty component view.
+  ///
+  /// This initializer creates a view with no components, representing an
+  /// empty relative path with no root.
   public init() {
     self.init(FilePath())
   }
@@ -112,6 +155,16 @@ extension FilePath.ComponentView: RangeReplaceableCollection {
   // can just memcpy in those cases. We
   // probably want to do that for all RRC operations.
 
+  /// Replaces a range of components with the elements of a collection.
+  ///
+  /// This method replaces the components in the specified range with the
+  /// components from `newElements`. The number of new components need not
+  /// match the number of components being replaced.
+  ///
+  /// - Parameters:
+  ///   - subrange: The range of components to replace. The bounds of the range
+  ///     must be valid indices of the collection.
+  ///   - newElements: The new components to add to the component view.
   public mutating func replaceSubrange<C>(
     _ subrange: Range<Index>, with newElements: C
   ) where C : Collection, Self.Element == C.Element {
@@ -152,7 +205,15 @@ extension FilePath.ComponentView: RangeReplaceableCollection {
 
 @available(System 0.0.2, *)
 extension FilePath {
-  /// Create a file path from a root and a collection of components.
+  /// Creates a file path from a root and a collection of components.
+  ///
+  /// This initializer constructs a complete file path by combining an optional
+  /// root with a collection of path components. If no root is provided, the
+  /// resulting path will be relative.
+  ///
+  /// - Parameters:
+  ///   - root: An optional root for the path. Pass `nil` for a relative path.
+  ///   - components: A collection of components to append after the root.
   public init<C: Collection>(
     root: Root?, _ components: C
   ) where C.Element == Component {
@@ -161,13 +222,28 @@ extension FilePath {
     self.init(str)
   }
 
-  /// Create a file path from a root and any number of components.
+  /// Creates a file path from a root and any number of components.
+  ///
+  /// This convenience initializer allows you to specify path components using
+  /// a variadic parameter list.
+  ///
+  /// - Parameters:
+  ///   - root: An optional root for the path. Pass `nil` for a relative path.
+  ///   - components: Zero or more components to append after the root.
   public init(root: Root?, components: Component...) {
     self.init(root: root, components)
   }
 
-  /// Create a file path from an optional root and a slice of another path's
+  /// Creates a file path from an optional root and a slice of another path's
   /// components.
+  ///
+  /// This initializer efficiently constructs a path from a root and a
+  /// subsequence of components extracted from another path's component view.
+  ///
+  /// - Parameters:
+  ///   - root: An optional root for the path. Pass `nil` for a relative path.
+  ///   - components: A subsequence of components from another path's
+  ///     component view.
   public init(root: Root?, _ components: ComponentView.SubSequence) {
     var str = root?._systemString ?? SystemString()
     let (start, end) =

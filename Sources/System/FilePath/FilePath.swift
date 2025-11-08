@@ -43,7 +43,7 @@ public struct FilePath: Sendable {
   // components, etc.
   internal var _storage: SystemString
 
-  /// Creates an empty, null-terminated path.
+  /// Creates an empty file path.
   public init() {
     self._storage = SystemString()
     _invariantCheck()
@@ -61,7 +61,7 @@ public struct FilePath: Sendable {
 
 @available(System 0.0.1, *)
 extension FilePath {
-  /// The length of the file path, excluding the null terminator.
+  /// The length of the file path in bytes, excluding the null terminator.
   public var length: Int { _storage.length }
 }
 
