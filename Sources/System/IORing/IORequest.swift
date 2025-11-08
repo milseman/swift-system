@@ -187,11 +187,15 @@ extension IORing {
 
 
 extension IORing.Request {
+    /// Creates a no-op request.
+    ///
     /// - Parameter context: User-defined context value to identify this operation.
     @inlinable public static func nop(context: UInt64 = 0) -> IORing.Request {
         .init(core: .nop)
     }
 
+    /// Reads data from a registered file into a registered buffer.
+    ///
     /// - Parameters:
     ///   - file: The file to read from.
     ///   - buffer: The buffer to read data into.
@@ -206,6 +210,8 @@ extension IORing.Request {
         .init(core: .readSlot(file: file, buffer: buffer, offset: offset, context: context))
     }
 
+    /// Reads data from a file into a registered buffer.
+    ///
     /// - Parameters:
     ///   - file: The file to read from.
     ///   - buffer: The buffer to read data into.
@@ -220,6 +226,8 @@ extension IORing.Request {
         .init(core: .read(file: file, buffer: buffer, offset: offset, context: context))
     }
 
+    /// Reads data from a registered file into an unregistered buffer.
+    ///
     /// - Parameters:
     ///   - file: The file to read from.
     ///   - buffer: The buffer to read data into.
@@ -234,6 +242,8 @@ extension IORing.Request {
         .init(core: .readUnregisteredSlot(file: file, buffer: buffer, offset: offset, context: context))
     }
 
+    /// Reads data from a file into an unregistered buffer.
+    ///
     /// - Parameters:
     ///   - file: The file to read from.
     ///   - buffer: The buffer to read data into.
@@ -248,6 +258,8 @@ extension IORing.Request {
         .init(core: .readUnregistered(file: file, buffer: buffer, offset: offset, context: context))
     }
 
+    /// Writes data from a registered buffer to a registered file.
+    ///
     /// - Parameters:
     ///   - buffer: The buffer containing data to write.
     ///   - file: The file to write to.
@@ -262,6 +274,8 @@ extension IORing.Request {
         .init(core: .writeSlot(file: file, buffer: buffer, offset: offset, context: context))
     }
 
+    /// Writes data from a registered buffer to a file.
+    ///
     /// - Parameters:
     ///   - buffer: The buffer containing data to write.
     ///   - file: The file to write to.
@@ -276,6 +290,8 @@ extension IORing.Request {
         .init(core: .write(file: file, buffer: buffer, offset: offset, context: context))
     }
 
+    /// Writes data from an unregistered buffer to a registered file.
+    ///
     /// - Parameters:
     ///   - buffer: The buffer containing data to write.
     ///   - file: The file to write to.
@@ -291,6 +307,8 @@ extension IORing.Request {
                 file: file, buffer: buffer, offset: offset, context: context))
     }
 
+    /// Writes data from an unregistered buffer to a file.
+    ///
     /// - Parameters:
     ///   - buffer: The buffer containing data to write.
     ///   - file: The file to write to.
@@ -307,6 +325,8 @@ extension IORing.Request {
         )
     }
 
+    /// Closes a file descriptor.
+    ///
     /// - Parameters:
     ///   - file: The file to close.
     ///   - context: User-defined context value to identify this operation. Defaults to 0.
@@ -317,6 +337,8 @@ extension IORing.Request {
         .init(core: .close(file, context: context))
     }
 
+    /// Closes a registered file.
+    ///
     /// - Parameters:
     ///   - file: The file to close.
     ///   - context: User-defined context value to identify this operation. Defaults to 0.
@@ -327,6 +349,8 @@ extension IORing.Request {
         .init(core: .closeSlot(file, context: context))
     }
 
+    /// Opens a file into a registered file slot.
+    ///
     /// - Parameters:
     ///   - path: The file path to open.
     ///   - directory: The directory file descriptor to resolve relative paths against.
@@ -350,6 +374,8 @@ extension IORing.Request {
                 permissions: permissions, intoSlot: slot, context: context))
     }
 
+    /// Opens a file relative to a directory.
+    ///
     /// - Parameters:
     ///   - path: The file path to open.
     ///   - directory: The directory file descriptor to resolve relative paths against.
@@ -372,6 +398,8 @@ extension IORing.Request {
             ))
     }
 
+    /// Removes a file relative to a directory.
+    ///
     /// - Parameters:
     ///   - path: The file path to remove.
     ///   - directory: The directory file descriptor to resolve relative paths against.
@@ -411,6 +439,8 @@ extension IORing.Request {
     	case first
     }
     
+    /// Cancels operations matching a specific context value.
+    ///
     /// - Parameters:
     ///   - matchAll: Whether to cancel all matching operations or just the first.
     ///   - matchingContext: The context value to match for cancellation.
@@ -426,6 +456,8 @@ extension IORing.Request {
         }
     }
     
+    /// Cancels operations on a specific file descriptor.
+    ///
     /// - Parameters:
     ///   - matchAll: Whether to cancel all matching operations or just the first.
     ///   - matching: The file descriptor whose operations should be canceled.
@@ -441,6 +473,8 @@ extension IORing.Request {
         }
     }
     
+    /// Cancels operations on a specific registered file.
+    ///
     /// - Parameters:
     ///   - matchAll: Whether to cancel all matching operations or just the first.
     ///   - matching: The registered file whose operations should be canceled.
@@ -456,6 +490,8 @@ extension IORing.Request {
         }
     }
 
+    /// Cancels operations based on a match policy.
+    ///
     /// - Parameter matchAll: Whether to cancel all operations or just one.
     @inlinable public static func cancel(
     	_ matchAll: CancellationMatch,

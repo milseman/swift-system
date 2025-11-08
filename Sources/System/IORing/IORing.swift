@@ -296,11 +296,28 @@ private func setUpRing(
     return (params: params, ringDescriptor: ringDescriptor, ringPtr: ringPtr, ringSize: ringSize, submissionRingPtr: sqPtr, submissionRingSize: Int(submitRingSize), completionRingPtr: cqPtr, completionRingSize: Int(completionRingSize), sqes: sqes!)
 }
 
-///IORing provides facilities for
-/// * Registering and unregistering resources (files and buffers), an `io_uring` specific variation on Unix file IOdescriptors that improves their efficiency
+/// A high-performance asynchronous I/O interface using Linux's io_uring.
+///
+/// IORing provides an efficient mechanism for performing asynchronous I/O operations on Linux systems.
+/// It allows you to submit I/O requests and retrieve completions without system call overhead for each operation.
+///
+/// IORing provides facilities for:
+/// * Registering and unregistering resources (files and buffers), an `io_uring` specific variation on Unix file descriptors that improves their efficiency
 /// * Registering and unregistering eventfds, which allow asynchronous waiting for completions
 /// * Enqueueing IO requests
 /// * Dequeueing IO completions
+///
+/// Example usage:
+/// ```swift
+/// var ring = try IORing(queueDepth: 256)
+/// // Prepare and submit I/O requests
+/// _ = ring.prepare(request: someRequest)
+/// try ring.submitPreparedRequests()
+/// // Retrieve completions
+/// if let completion = ring.tryConsumeCompletion() {
+///     // Process completion
+/// }
+/// ```
 public struct IORing: ~Copyable {
     let ringFlags: UInt32
     @usableFromInline let ringDescriptor: Int32
@@ -331,6 +348,7 @@ public struct IORing: ~Copyable {
     /// RegisteredResource is used via its typealiases, RegisteredFile and RegisteredBuffer.
     /// Registering file descriptors and buffers with the IORing allows for more efficient access to them.
     public struct RegisteredResource<T> {
+        /// The type of the underlying resource (file descriptor or buffer).
         public typealias Resource = T
         @usableFromInline let resource: T
 
@@ -354,8 +372,12 @@ public struct IORing: ~Copyable {
 
     /// Configuration options for initializing an IORing.
     public struct SetupFlags: OptionSet, RawRepresentable, Hashable {
+        /// The raw bitmask value of the flags.
         public var rawValue: UInt32
 
+        /// Creates a new set of setup flags from the given raw value.
+        ///
+        /// - Parameter rawValue: The raw bitmask value.
         @inlinable public init(rawValue: UInt32) {
             self.rawValue = rawValue
         }
@@ -937,8 +959,12 @@ public struct IORing: ~Copyable {
 
     /// Describes which io_uring features are supported by the kernel.
     public struct Features: OptionSet, RawRepresentable, Hashable {
+		/// The raw bitmask value of the features.
 		public let rawValue: UInt32
 
+		/// Creates a new set of features from the given raw value.
+		///
+		/// - Parameter rawValue: The raw bitmask value.
 		@inlinable public init(rawValue: UInt32) {
             self.rawValue = rawValue
         }

@@ -19,6 +19,7 @@ public extension IORing {
 public extension IORing.Completion {
     /// Flags providing additional information about a completion.
     struct Flags: OptionSet, Hashable, Codable {
+        /// The raw flag value.
         public let rawValue: UInt32
 
         @inlinable public init(rawValue: UInt32) {
