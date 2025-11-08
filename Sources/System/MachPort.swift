@@ -64,6 +64,10 @@ public enum Mach {
     /// - Parameter name: The Mach port name to take ownership of.
     ///
     /// - Returns: A `Mach.Port` instance managing the specified port right.
+    ///
+    /// - Precondition: `name` must not be `MACH_PORT_NULL`. For receive rights,
+    ///   `name` must not be `MACH_PORT_DEAD`. Violating these preconditions will
+    ///   cause a runtime trap.
     public init(name: mach_port_name_t) {
       precondition(name != mach_port_name_t(MACH_PORT_NULL),
                    "Mach.Port cannot be initialized with MACH_PORT_NULL")
@@ -99,6 +103,8 @@ public enum Mach {
     ///   non-consuming operations on it.
     ///
     /// - Returns: The value returned by the `body` closure.
+    ///
+    /// - Throws: Rethrows any error thrown by the `body` closure.
     @inlinable
     public func withBorrowedName<ReturnType>(
       body: (mach_port_name_t) -> ReturnType
@@ -168,6 +174,9 @@ extension Mach.Port where RightType == Mach.ReceiveRight {
   /// - Parameters:
   ///   - name: The Mach port name to take ownership of.
   ///   - context: The guard context value used to guard this receive right.
+  ///
+  /// - Precondition: `name` must not be `MACH_PORT_NULL`. Violating this
+  ///   precondition will cause a runtime trap.
   public init(name: mach_port_name_t, context: mach_port_context_t) {
     precondition(name != mach_port_name_t(MACH_PORT_NULL),
                  "Mach.Port cannot be initialized with MACH_PORT_NULL")
@@ -180,6 +189,9 @@ extension Mach.Port where RightType == Mach.ReceiveRight {
   ///
   /// This initializer will abort if the right could not be created.
   /// Callers may assert that a valid right is always returned.
+  ///
+  /// - Precondition: The underlying Mach kernel call must succeed. If allocation
+  ///   fails, this initializer will trap at runtime.
   @inlinable
   @available(System 1.4.0, *)
   public init() {
@@ -248,6 +260,8 @@ extension Mach.Port where RightType == Mach.ReceiveRight {
   ///   and performs non-consuming operations on them.
   ///
   /// - Returns: The value returned by the `body` closure.
+  ///
+  /// - Throws: Rethrows any error thrown by the `body` closure.
   @inlinable
   @available(System 1.4.0, *)
   public func withBorrowedName<ReturnType>(
@@ -264,6 +278,9 @@ extension Mach.Port where RightType == Mach.ReceiveRight {
   /// Callers may assert that a valid right is always returned.
   ///
   /// - Returns: A new `Mach.Port<Mach.SendOnceRight>` instance.
+  ///
+  /// - Precondition: The underlying Mach kernel call must succeed. If the
+  ///   operation fails, this function will trap at runtime.
   @inlinable
   @available(System 1.4.0, *)
   public func makeSendOnceRight() -> Mach.Port<Mach.SendOnceRight> {
@@ -295,6 +312,9 @@ extension Mach.Port where RightType == Mach.ReceiveRight {
   /// Callers may assert that a valid right is always returned.
   ///
   /// - Returns: A new `Mach.Port<Mach.SendRight>` instance.
+  ///
+  /// - Precondition: The underlying Mach kernel call must succeed. If the
+  ///   operation fails, this function will trap at runtime.
   @inlinable
   @available(System 1.4.0, *)
   public func makeSendRight() -> Mach.Port<Mach.SendRight> {
