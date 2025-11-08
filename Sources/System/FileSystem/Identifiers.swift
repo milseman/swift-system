@@ -24,6 +24,8 @@ public struct UserID: RawRepresentable, Sendable, Hashable, Codable {
   public init(rawValue: CInterop.UserID) { self.rawValue = rawValue }
 
   /// Creates a strongly-typed `UserID` from the raw C value.
+  ///
+  /// - Parameter rawValue: The raw C `uid_t` value.
   @_alwaysEmitIntoClient
   public init(_ rawValue: CInterop.UserID) { self.rawValue = rawValue }
 }
@@ -42,6 +44,8 @@ public struct GroupID: RawRepresentable, Sendable, Hashable, Codable {
   public init(rawValue: CInterop.GroupID) { self.rawValue = rawValue }
 
   /// Creates a strongly-typed `GroupID` from the raw C value.
+  ///
+  /// - Parameter rawValue: The raw C `gid_t` value.
   @_alwaysEmitIntoClient
   public init(_ rawValue: CInterop.GroupID) { self.rawValue = rawValue }
 }
@@ -60,6 +64,8 @@ public struct DeviceID: RawRepresentable, Sendable, Hashable, Codable {
   public init(rawValue: CInterop.DeviceID) { self.rawValue = rawValue }
 
   /// Creates a strongly-typed `DeviceID` from the raw C value.
+  ///
+  /// - Parameter rawValue: The raw C `dev_t` value.
   @_alwaysEmitIntoClient
   public init(_ rawValue: CInterop.DeviceID) { self.rawValue = rawValue }
 }
@@ -78,6 +84,8 @@ public struct Inode: RawRepresentable, Sendable, Hashable, Codable {
   public init(rawValue: CInterop.Inode) { self.rawValue = rawValue }
 
   /// Creates a strongly-typed `Inode` from the raw C value.
+  ///
+  /// - Parameter rawValue: The raw C `ino_t` value.
   @_alwaysEmitIntoClient
   public init(_ rawValue: CInterop.Inode) { self.rawValue = rawValue }
 }
