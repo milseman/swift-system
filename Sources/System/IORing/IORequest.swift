@@ -167,6 +167,7 @@ internal func makeRawRequest_readWrite_unregistered_slot(
 }
 
 extension IORing {
+    /// Represents an IO operation to be submitted to the ring.
     public struct Request {
         @usableFromInline var core: IORequestCore
 
@@ -183,10 +184,22 @@ extension IORing {
 
 
 extension IORing.Request {
+    /// Creates a no-op request that does nothing but can be used for synchronization.
+    ///
+    /// - Parameter context: User-defined context value to associate with this request.
+    /// - Returns: A no-op request.
     @inlinable public static func nop(context: UInt64 = 0) -> IORing.Request {
         .init(core: .nop)
     }
 
+    /// Creates a read request using registered file and buffer.
+    ///
+    /// - Parameters:
+    ///   - file: The registered file to read from.
+    ///   - buffer: The registered buffer to read into.
+    ///   - offset: The file offset to read from.
+    ///   - context: User-defined context value to associate with this request.
+    /// - Returns: A read request.
     @inlinable public static func read(
         _ file: IORing.RegisteredFile,
         into buffer: IORing.RegisteredBuffer,
@@ -196,6 +209,14 @@ extension IORing.Request {
         .init(core: .readSlot(file: file, buffer: buffer, offset: offset, context: context))
     }
 
+    /// Creates a read request using a file descriptor and registered buffer.
+    ///
+    /// - Parameters:
+    ///   - file: The file descriptor to read from.
+    ///   - buffer: The registered buffer to read into.
+    ///   - offset: The file offset to read from.
+    ///   - context: User-defined context value to associate with this request.
+    /// - Returns: A read request.
     @inlinable public static func read(
         _ file: FileDescriptor,
         into buffer: IORing.RegisteredBuffer,
@@ -205,6 +226,14 @@ extension IORing.Request {
         .init(core: .read(file: file, buffer: buffer, offset: offset, context: context))
     }
 
+    /// Creates a read request using a registered file and unregistered buffer.
+    ///
+    /// - Parameters:
+    ///   - file: The registered file to read from.
+    ///   - buffer: The buffer to read into.
+    ///   - offset: The file offset to read from.
+    ///   - context: User-defined context value to associate with this request.
+    /// - Returns: A read request.
     @inlinable public static func read(
         _ file: IORing.RegisteredFile,
         into buffer: UnsafeMutableRawBufferPointer,
@@ -214,6 +243,14 @@ extension IORing.Request {
         .init(core: .readUnregisteredSlot(file: file, buffer: buffer, offset: offset, context: context))
     }
 
+    /// Creates a read request using a file descriptor and unregistered buffer.
+    ///
+    /// - Parameters:
+    ///   - file: The file descriptor to read from.
+    ///   - buffer: The buffer to read into.
+    ///   - offset: The file offset to read from.
+    ///   - context: User-defined context value to associate with this request.
+    /// - Returns: A read request.
     @inlinable public static func read(
         _ file: FileDescriptor,
         into buffer: UnsafeMutableRawBufferPointer,
@@ -223,6 +260,14 @@ extension IORing.Request {
         .init(core: .readUnregistered(file: file, buffer: buffer, offset: offset, context: context))
     }
 
+    /// Creates a write request using registered buffer and file.
+    ///
+    /// - Parameters:
+    ///   - buffer: The registered buffer to write from.
+    ///   - file: The registered file to write to.
+    ///   - offset: The file offset to write to.
+    ///   - context: User-defined context value to associate with this request.
+    /// - Returns: A write request.
     @inlinable public static func write(
         _ buffer: IORing.RegisteredBuffer,
         into file: IORing.RegisteredFile,
@@ -232,6 +277,14 @@ extension IORing.Request {
         .init(core: .writeSlot(file: file, buffer: buffer, offset: offset, context: context))
     }
 
+    /// Creates a write request using registered buffer and file descriptor.
+    ///
+    /// - Parameters:
+    ///   - buffer: The registered buffer to write from.
+    ///   - file: The file descriptor to write to.
+    ///   - offset: The file offset to write to.
+    ///   - context: User-defined context value to associate with this request.
+    /// - Returns: A write request.
     @inlinable public static func write(
         _ buffer: IORing.RegisteredBuffer,
         into file: FileDescriptor,
@@ -241,6 +294,14 @@ extension IORing.Request {
         .init(core: .write(file: file, buffer: buffer, offset: offset, context: context))
     }
 
+    /// Creates a write request using unregistered buffer and registered file.
+    ///
+    /// - Parameters:
+    ///   - buffer: The buffer to write from.
+    ///   - file: The registered file to write to.
+    ///   - offset: The file offset to write to.
+    ///   - context: User-defined context value to associate with this request.
+    /// - Returns: A write request.
     @inlinable public static func write(
         _ buffer: UnsafeMutableRawBufferPointer,
         into file: IORing.RegisteredFile,
@@ -251,6 +312,14 @@ extension IORing.Request {
                 file: file, buffer: buffer, offset: offset, context: context))
     }
 
+    /// Creates a write request using unregistered buffer and file descriptor.
+    ///
+    /// - Parameters:
+    ///   - buffer: The buffer to write from.
+    ///   - file: The file descriptor to write to.
+    ///   - offset: The file offset to write to.
+    ///   - context: User-defined context value to associate with this request.
+    /// - Returns: A write request.
     @inlinable public static func write(
         _ buffer: UnsafeMutableRawBufferPointer,
         into file: FileDescriptor,
@@ -262,6 +331,12 @@ extension IORing.Request {
         )
     }
 
+    /// Creates a close request for a file descriptor.
+    ///
+    /// - Parameters:
+    ///   - file: The file descriptor to close.
+    ///   - context: User-defined context value to associate with this request.
+    /// - Returns: A close request.
     @inlinable public static func close(
         _ file: FileDescriptor,
         context: UInt64 = 0
@@ -269,6 +344,12 @@ extension IORing.Request {
         .init(core: .close(file, context: context))
     }
 
+    /// Creates a close request for a registered file.
+    ///
+    /// - Parameters:
+    ///   - file: The registered file to close.
+    ///   - context: User-defined context value to associate with this request.
+    /// - Returns: A close request.
     @inlinable public static func close(
         _ file: IORing.RegisteredFile,
         context: UInt64 = 0
@@ -276,6 +357,17 @@ extension IORing.Request {
         .init(core: .closeSlot(file, context: context))
     }
 
+    /// Creates an open request that opens a file into a registered file slot.
+    ///
+    /// - Parameters:
+    ///   - path: The path of the file to open.
+    ///   - directory: The directory file descriptor for relative path resolution.
+    ///   - slot: The registered file slot to receive the opened file.
+    ///   - mode: The access mode for opening the file.
+    ///   - options: Additional options for opening the file.
+    ///   - permissions: File permissions to use when creating a new file (only used with `.create` option).
+    ///   - context: User-defined context value to associate with this request.
+    /// - Returns: An open request.
     @inlinable public static func open(
         _ path: FilePath,
         in directory: FileDescriptor,
@@ -291,6 +383,16 @@ extension IORing.Request {
                 permissions: permissions, intoSlot: slot, context: context))
     }
 
+    /// Creates an open request that returns a file descriptor.
+    ///
+    /// - Parameters:
+    ///   - path: The path of the file to open.
+    ///   - directory: The directory file descriptor for relative path resolution.
+    ///   - mode: The access mode for opening the file.
+    ///   - options: Additional options for opening the file.
+    ///   - permissions: File permissions to use when creating a new file (only used with `.create` option).
+    ///   - context: User-defined context value to associate with this request.
+    /// - Returns: An open request.
     @inlinable public static func open(
         _ path: FilePath,
         in directory: FileDescriptor,
@@ -306,6 +408,13 @@ extension IORing.Request {
             ))
     }
 
+    /// Creates an unlink request to remove a file.
+    ///
+    /// - Parameters:
+    ///   - path: The path of the file to unlink.
+    ///   - directory: The directory file descriptor for relative path resolution.
+    ///   - context: User-defined context value to associate with this request.
+    /// - Returns: An unlink request.
     @inlinable public static func unlink(
         _ path: FilePath,
         in directory: FileDescriptor,
@@ -335,14 +444,23 @@ extension IORing.Request {
 @inlinable internal static var SWIFT_IORING_ASYNC_CANCEL_USERDATA: UInt32 { 1 << 4 }
 @inlinable internal static var SWIFT_IORING_ASYNC_CANCEL_OP: UInt32 { 1 << 5 }
 
+    /// Specifies whether to cancel all matching requests or just the first one.
     public enum CancellationMatch {
-    	case all
-    	case first
+        /// Cancel all requests matching the criteria.
+        case all
+        /// Cancel only the first request matching the criteria.
+        case first
     }
-    
+
+    /// Creates a cancellation request matching a specific context value.
+    ///
+    /// - Parameters:
+    ///   - matchAll: Whether to cancel all matching requests or just the first.
+    ///   - matchingContext: The context value to match against pending requests.
+    /// - Returns: A cancellation request.
     @inlinable public static func cancel(
-    	_ matchAll: CancellationMatch,
-    	matchingContext: UInt64
+        _ matchAll: CancellationMatch,
+        matchingContext: UInt64
     ) -> IORing.Request {
         switch matchAll {
             case .all:
@@ -351,10 +469,16 @@ extension IORing.Request {
                 .init(core: .cancelContext(flags: SWIFT_IORING_ASYNC_CANCEL_USERDATA, targetContext: matchingContext))
         }
     }
-    
+
+    /// Creates a cancellation request matching a specific file descriptor.
+    ///
+    /// - Parameters:
+    ///   - matchAll: Whether to cancel all matching requests or just the first.
+    ///   - matching: The file descriptor to match against pending requests.
+    /// - Returns: A cancellation request.
     @inlinable public static func cancel(
-    	_ matchAll: CancellationMatch,
-    	matching: FileDescriptor
+        _ matchAll: CancellationMatch,
+        matching: FileDescriptor
     ) -> IORing.Request {
         switch matchAll {
             case .all:
@@ -363,10 +487,16 @@ extension IORing.Request {
                 .init(core: .cancelFD(flags: SWIFT_IORING_ASYNC_CANCEL_FD, targetFD: matching))
         }
     }
-    
+
+    /// Creates a cancellation request matching a specific registered file.
+    ///
+    /// - Parameters:
+    ///   - matchAll: Whether to cancel all matching requests or just the first.
+    ///   - matching: The registered file to match against pending requests.
+    /// - Returns: A cancellation request.
     @inlinable public static func cancel(
-    	_ matchAll: CancellationMatch,
-    	matching: IORing.RegisteredFile
+        _ matchAll: CancellationMatch,
+        matching: IORing.RegisteredFile
     ) -> IORing.Request {
         switch matchAll {
             case .all:
@@ -376,8 +506,12 @@ extension IORing.Request {
         }
     }
 
+    /// Creates a cancellation request matching any pending request.
+    ///
+    /// - Parameter matchAll: Whether to cancel all pending requests or just one.
+    /// - Returns: A cancellation request.
     @inlinable public static func cancel(
-    	_ matchAll: CancellationMatch,
+        _ matchAll: CancellationMatch
     ) -> IORing.Request {
         switch matchAll {
             case .all:

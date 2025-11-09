@@ -326,10 +326,14 @@ public struct IORing: ~Copyable {
 
     var features = Features(rawValue: 0)
     
-    /// RegisteredResource is used via its typealiases, RegisteredFile and RegisteredBuffer. Registering file descriptors and buffers with the IORing allows for more efficient access to them.
+    /// RegisteredResource wraps a file descriptor or buffer that has been registered with an IORing.
+    /// Registering resources allows for more efficient access to them during IO operations.
+    ///
+    /// This type is used via its typealiases `RegisteredFile` and `RegisteredBuffer`.
     public struct RegisteredResource<T> {
         public typealias Resource = T
         @usableFromInline let resource: T
+        /// The index of this resource in the ring's registered resource table.
         public let index: Int
 
         @inlinable internal init(
@@ -341,34 +345,48 @@ public struct IORing: ~Copyable {
         }
     }
 
+    /// A registered file descriptor for use with io_uring operations.
     public typealias RegisteredFile = RegisteredResource<UInt32>
+    /// A registered buffer for use with io_uring operations.
     public typealias RegisteredBuffer = RegisteredResource<iovec>
 
-    /// SetupFlags represents configuration options to an IORing as it's being created
+    /// Configuration options for initializing an IORing.
     public struct SetupFlags: OptionSet, RawRepresentable, Hashable {
         public var rawValue: UInt32
 
         @inlinable public init(rawValue: UInt32) {
             self.rawValue = rawValue
         }
-        @inlinable public static var pollCompletions: SetupFlags { .init(rawValue: UInt32(1) << 0) } //IORING_SETUP_IOPOLL
-        @inlinable public static var pollSubmissions: SetupFlags { .init(rawValue: UInt32(1) << 1) } //IORING_SETUP_SQPOLL
+        /// `IORING_SETUP_IOPOLL` - Use polling for IO completions instead of interrupts.
+        @inlinable public static var pollCompletions: SetupFlags { .init(rawValue: UInt32(1) << 0) }
+        /// `IORING_SETUP_SQPOLL` - Use kernel polling thread for submissions.
+        @inlinable public static var pollSubmissions: SetupFlags { .init(rawValue: UInt32(1) << 1) }
         //TODO: figure out how to expose IORING_SETUP_SQ_AFF, IORING_SETUP_CQSIZE, IORING_SETUP_ATTACH_WQ
-        @inlinable public static var clampMaxEntries: SetupFlags { .init(rawValue: UInt32(1) << 4) } //IORING_SETUP_CLAMP
-        @inlinable public static var startDisabled: SetupFlags { .init(rawValue: UInt32(1) << 6) } //IORING_SETUP_R_DISABLED
-        @inlinable public static var continueSubmittingOnError: SetupFlags { .init(rawValue: UInt32(1) << 7) } //IORING_SETUP_SUBMIT_ALL
+        /// `IORING_SETUP_CLAMP` - Clamp queue depth to kernel maximum if exceeded.
+        @inlinable public static var clampMaxEntries: SetupFlags { .init(rawValue: UInt32(1) << 4) }
+        /// `IORING_SETUP_R_DISABLED` - Start ring in disabled state; enable explicitly later.
+        @inlinable public static var startDisabled: SetupFlags { .init(rawValue: UInt32(1) << 6) }
+        /// `IORING_SETUP_SUBMIT_ALL` - Continue submitting requests even if one fails.
+        @inlinable public static var continueSubmittingOnError: SetupFlags { .init(rawValue: UInt32(1) << 7) }
         //TODO: do we want to expose IORING_SETUP_COOP_TASKRUN and IORING_SETUP_TASKRUN_FLAG?
         //public static var runTasksCooperatively: SetupFlags { .init(rawValue: UInt32(1) << 8) } //IORING_SETUP_COOP_TASKRUN
         //TODO: can we even do different size sqe/cqe? It requires a kernel feature, but how do we convince swift to let the types be different sizes?
         //internal static var use128ByteSQEs: SetupFlags { .init(rawValue: UInt32(1) << 10) } //IORING_SETUP_SQE128
         //internal static var use32ByteCQEs: SetupFlags { .init(rawValue: UInt32(1) << 11) } //IORING_SETUP_CQE32
-        @inlinable public static var singleSubmissionThread: SetupFlags { .init(rawValue: UInt32(1) << 12) } //IORING_SETUP_SINGLE_ISSUER
-        @inlinable public static var deferRunningTasks: SetupFlags { .init(rawValue: UInt32(1) << 13) } //IORING_SETUP_DEFER_TASKRUN
+        /// `IORING_SETUP_SINGLE_ISSUER` - Only one thread will submit requests.
+        @inlinable public static var singleSubmissionThread: SetupFlags { .init(rawValue: UInt32(1) << 12) }
+        /// `IORING_SETUP_DEFER_TASKRUN` - Defer running completion tasks until explicitly requested.
+        @inlinable public static var deferRunningTasks: SetupFlags { .init(rawValue: UInt32(1) << 13) }
         //pretty sure we don't want to expose IORING_SETUP_NO_MMAP or IORING_SETUP_REGISTERED_FD_ONLY currently
         //TODO: should IORING_SETUP_NO_SQARRAY be the default? do we need to adapt anything to it?
     }
 
-    /// Initializes an IORing with enough space for `queueDepth` prepared requests and completed operations
+    /// Initializes an IORing with the specified queue depth and optional configuration flags.
+    ///
+    /// - Parameters:
+    ///   - queueDepth: Maximum number of operations that can be queued.
+    ///   - flags: Configuration flags for the ring.
+    /// - Throws: `Errno` if initialization fails.
     public init(queueDepth: UInt32, flags: SetupFlags = []) throws(Errno) {
         guard ioringSupported else {
             throw Errno.notSupported
@@ -620,7 +638,13 @@ public struct IORing: ~Copyable {
         return nil
     }
 
-    /// Registers an event monitoring file descriptor with the ring. The file descriptor becomes readable whenever completions are ready to be dequeued. See `man eventfd(2)` for additional information.
+    /// Registers event monitoring file descriptor with the ring.
+    ///
+    /// The file descriptor becomes readable whenever completions are ready to be dequeued.
+    /// See `man eventfd(2)` for additional information.
+    ///
+    /// - Parameter descriptor: The event file descriptor to register.
+    /// - Throws: `Errno` if registration fails.
     public mutating func registerEventFD(_ descriptor: FileDescriptor) throws(Errno) {
         var rawfd = descriptor.rawValue
         let result = withUnsafePointer(to: &rawfd) { fdptr in
@@ -637,7 +661,9 @@ public struct IORing: ~Copyable {
         }
     }
 
-    /// Removes a registered event file descriptor from the ring
+    /// Removes a registered event file descriptor from the ring.
+    ///
+    /// - Throws: `Errno` if unregistration fails.
     public mutating func unregisterEventFD() throws(Errno) {
         let result = io_uring_register(
             ringDescriptor,
@@ -650,7 +676,11 @@ public struct IORing: ~Copyable {
         }
     }
 
-    /// Registers `count` files with the ring for later use in IO operations
+    /// Registers file slots with the ring for efficient file operations.
+    ///
+    /// - Parameter count: The number of file slots to register.
+    /// - Returns: A collection providing indexed access to the registered file slots.
+    /// - Throws: `Errno` if registration fails.
     public mutating func registerFileSlots(count: Int) throws(Errno) -> RegisteredResources<RegisteredFile.Resource> {
         precondition(_registeredFiles.isEmpty)
         precondition(count < UInt32.max)
@@ -674,7 +704,9 @@ public struct IORing: ~Copyable {
         return registeredFileSlots
     }
 
-    /// Removes registered files from the ring
+    /// Removes registered file slots from the ring.
+    ///
+    /// - Throws: `Errno` if unregistration fails.
     public func unregisterFiles() throws {
             let result = io_uring_register(
             ringDescriptor,
@@ -693,7 +725,11 @@ public struct IORing: ~Copyable {
         RegisteredResources(resources: _registeredFiles)
     }
 
-    /// Registers buffers with the ring for later use in IO operations
+    /// Registers buffers with the ring for efficient IO operations.
+    ///
+    /// - Parameter buffers: The buffers to register with the ring.
+    /// - Returns: A collection providing indexed access to the registered buffers.
+    /// - Throws: `Errno` if registration fails.
     public mutating func registerBuffers(_ buffers: some Collection<UnsafeMutableRawBufferPointer>) throws(Errno)
         -> RegisteredResources<RegisteredBuffer.Resource>
     {
@@ -718,7 +754,11 @@ public struct IORing: ~Copyable {
         return registeredBuffers
     }
 
-    /// Registers buffers with the ring for later use in IO operations
+    /// Registers buffers with the ring for efficient IO operations.
+    ///
+    /// - Parameter buffers: The buffers to register with the ring.
+    /// - Returns: A collection providing indexed access to the registered buffers.
+    /// - Throws: `Errno` if registration fails.
     @inlinable
     public mutating func registerBuffers(_ buffers: UnsafeMutableRawBufferPointer...) throws(Errno)
         -> RegisteredResources<RegisteredBuffer.Resource>
@@ -726,7 +766,7 @@ public struct IORing: ~Copyable {
         try registerBuffers(buffers)
     }
 
-    /// A view of the registered files or buffers in a ring
+    /// A view of the registered files or buffers in a ring.
     public struct RegisteredResources<T>: RandomAccessCollection {
         @usableFromInline let resources: [T]
 
@@ -743,12 +783,15 @@ public struct IORing: ~Copyable {
         }
     }
 
-    /// Allows access to registered files by index
+    /// Allows access to registered buffers by index.
     @inlinable
     public var registeredBuffers: RegisteredResources<RegisteredBuffer.Resource> {
         RegisteredResources(resources: _registeredBuffers)
     }
 
+    /// Removes registered buffers from the ring.
+    ///
+    /// - Throws: `Errno` if unregistration fails.
     public func unregisterBuffers() throws {
         let result = io_uring_register(
             self.ringDescriptor,
@@ -836,33 +879,48 @@ public struct IORing: ~Copyable {
         return true
     }
 
-    /// Describes which io_uring features are supported by the kernel this program is running on
+    /// Describes kernel-supported io_uring features.
     public struct Features: OptionSet, RawRepresentable, Hashable {
 		public let rawValue: UInt32
-		
+
 		@inlinable public init(rawValue: UInt32) {
             self.rawValue = rawValue
         }
-		
+
 		//IORING_FEAT_SINGLE_MMAP is handled internally
-		@inlinable public static var nonDroppingCompletions: Features { .init(rawValue: UInt32(1) << 1) } //IORING_FEAT_NODROP
-		@inlinable public static var stableSubmissions: Features { .init(rawValue: UInt32(1) << 2) } //IORING_FEAT_SUBMIT_STABLE
-		@inlinable public static var currentFilePosition: Features { .init(rawValue: UInt32(1) << 3) } //IORING_FEAT_RW_CUR_POS
-		@inlinable public static var assumingTaskCredentials: Features { .init(rawValue: UInt32(1) << 4) } //IORING_FEAT_CUR_PERSONALITY
-		@inlinable public static var fastPolling: Features { .init(rawValue: UInt32(1) << 5) } //IORING_FEAT_FAST_POLL
-		@inlinable public static var epoll32BitFlags: Features { .init(rawValue: UInt32(1) << 6) } //IORING_FEAT_POLL_32BITS
-		@inlinable public static var pollNonFixedFiles: Features { .init(rawValue: UInt32(1) << 7) } //IORING_FEAT_SQPOLL_NONFIXED
-		@inlinable public static var extendedArguments: Features { .init(rawValue: UInt32(1) << 8) } //IORING_FEAT_EXT_ARG
-		@inlinable public static var nativeWorkers: Features { .init(rawValue: UInt32(1) << 9) } //IORING_FEAT_NATIVE_WORKERS
-		@inlinable public static var resourceTags: Features { .init(rawValue: UInt32(1) << 10) } //IORING_FEAT_RSRC_TAGS
-		@inlinable public static var allowsSkippingSuccessfulCompletions: Features { .init(rawValue: UInt32(1) << 11) } //IORING_FEAT_CQE_SKIP
-		@inlinable public static var improvedLinkedFiles: Features { .init(rawValue: UInt32(1) << 12) } //IORING_FEAT_LINKED_FILE
-		@inlinable public static var registerRegisteredRings: Features { .init(rawValue: UInt32(1) << 13) } //IORING_FEAT_REG_REG_RING
-		@inlinable public static var minimumTimeout: Features { .init(rawValue: UInt32(1) << 15) } //IORING_FEAT_MIN_TIMEOUT
-		@inlinable public static var bundledSendReceive: Features { .init(rawValue: UInt32(1) << 14) } //IORING_FEAT_RECVSEND_BUNDLE
+		/// `IORING_FEAT_NODROP` - Kernel will not drop completion events.
+		@inlinable public static var nonDroppingCompletions: Features { .init(rawValue: UInt32(1) << 1) }
+		/// `IORING_FEAT_SUBMIT_STABLE` - Submission queue entries remain stable after submission.
+		@inlinable public static var stableSubmissions: Features { .init(rawValue: UInt32(1) << 2) }
+		/// `IORING_FEAT_RW_CUR_POS` - Supports reading/writing at the current file position.
+		@inlinable public static var currentFilePosition: Features { .init(rawValue: UInt32(1) << 3) }
+		/// `IORING_FEAT_CUR_PERSONALITY` - Supports assuming task credentials.
+		@inlinable public static var assumingTaskCredentials: Features { .init(rawValue: UInt32(1) << 4) }
+		/// `IORING_FEAT_FAST_POLL` - Fast polling support for operations.
+		@inlinable public static var fastPolling: Features { .init(rawValue: UInt32(1) << 5) }
+		/// `IORING_FEAT_POLL_32BITS` - Supports 32-bit poll flags in epoll operations.
+		@inlinable public static var epoll32BitFlags: Features { .init(rawValue: UInt32(1) << 6) }
+		/// `IORING_FEAT_SQPOLL_NONFIXED` - SQPOLL mode can use non-fixed files.
+		@inlinable public static var pollNonFixedFiles: Features { .init(rawValue: UInt32(1) << 7) }
+		/// `IORING_FEAT_EXT_ARG` - Supports extended arguments for enter syscall.
+		@inlinable public static var extendedArguments: Features { .init(rawValue: UInt32(1) << 8) }
+		/// `IORING_FEAT_NATIVE_WORKERS` - Uses native kernel workers instead of workqueue.
+		@inlinable public static var nativeWorkers: Features { .init(rawValue: UInt32(1) << 9) }
+		/// `IORING_FEAT_RSRC_TAGS` - Supports resource tagging.
+		@inlinable public static var resourceTags: Features { .init(rawValue: UInt32(1) << 10) }
+		/// `IORING_FEAT_CQE_SKIP` - Allows skipping completion events for successful operations.
+		@inlinable public static var allowsSkippingSuccessfulCompletions: Features { .init(rawValue: UInt32(1) << 11) }
+		/// `IORING_FEAT_LINKED_FILE` - Improved linked file support.
+		@inlinable public static var improvedLinkedFiles: Features { .init(rawValue: UInt32(1) << 12) }
+		/// `IORING_FEAT_REG_REG_RING` - Supports registering rings with rings.
+		@inlinable public static var registerRegisteredRings: Features { .init(rawValue: UInt32(1) << 13) }
+		/// `IORING_FEAT_MIN_TIMEOUT` - Supports minimum timeout for wait operations.
+		@inlinable public static var minimumTimeout: Features { .init(rawValue: UInt32(1) << 15) }
+		/// `IORING_FEAT_RECVSEND_BUNDLE` - Supports bundled send/receive operations.
+		@inlinable public static var bundledSendReceive: Features { .init(rawValue: UInt32(1) << 14) }
 	}
 
-    /// Describes which io_uring features are supported by the kernel this program is running on
+    /// The io_uring features supported by the kernel this program is running on.
 	public var supportedFeatures: Features {
         return features
     }
@@ -883,10 +941,12 @@ public struct IORing: ~Copyable {
 }
 
 extension IORing.RegisteredBuffer {
+    /// Provides unsafe access to the underlying buffer pointer.
     @unsafe @inlinable public var unsafeBuffer: UnsafeMutableRawBufferPointer {
         return .init(start: resource.iov_base, count: resource.iov_len)
     }
 
+    /// Provides safe access to the buffer as a mutable raw span.
     @inlinable public var mutableBytes: MutableRawSpan {
         @_lifetime(&self)
         mutating get {
@@ -895,6 +955,7 @@ extension IORing.RegisteredBuffer {
         }
     }
 
+    /// Provides safe read-only access to the buffer as a raw span.
     @inlinable public var bytes: RawSpan {
         let span = RawSpan(_unsafeBytes: UnsafeRawBufferPointer(unsafeBuffer))
         return unsafe _overrideLifetime(span, borrowing: self)
