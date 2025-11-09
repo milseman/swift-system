@@ -90,10 +90,14 @@ public struct Stat: RawRepresentable, Sendable {
 
   /// Creates a `Stat` struct from a `FilePath`.
   ///
-  /// `followTargetSymlink` determines the behavior if `path` ends with a symbolic link.
-  /// By default, `followTargetSymlink` is `true` and this initializer behaves like `stat()`.
-  /// If `followTargetSymlink` is set to `false`, this initializer behaves like `lstat()` and
-  /// returns information about the symlink itself.
+  /// - Parameters:
+  ///   - path: The file path to stat.
+  ///   - followTargetSymlink: Determines the behavior if `path` ends with a symbolic link.
+  ///     By default, `true` (behaves like `stat()`). If `false`, behaves like `lstat()` and
+  ///     returns information about the symlink itself.
+  ///   - retryOnInterrupt: Whether to retry if interrupted. Default is `true`.
+  ///
+  /// - Throws: `Errno` if the stat operation fails.
   ///
   /// The corresponding C function is `stat()` or `lstat()` as described above.
   @_alwaysEmitIntoClient
@@ -113,10 +117,14 @@ public struct Stat: RawRepresentable, Sendable {
 
   /// Creates a `Stat` struct from an `UnsafePointer<CChar>` path.
   ///
-  /// `followTargetSymlink` determines the behavior if `path` ends with a symbolic link.
-  /// By default, `followTargetSymlink` is `true` and this initializer behaves like `stat()`.
-  /// If `followTargetSymlink` is set to `false`, this initializer behaves like `lstat()` and
-  /// returns information about the symlink itself.
+  /// - Parameters:
+  ///   - path: An unsafe pointer to a C string representing the file path.
+  ///   - followTargetSymlink: Determines the behavior if `path` ends with a symbolic link.
+  ///     By default, `true` (behaves like `stat()`). If `false`, behaves like `lstat()` and
+  ///     returns information about the symlink itself.
+  ///   - retryOnInterrupt: Whether to retry if interrupted. Default is `true`.
+  ///
+  /// - Throws: `Errno` if the stat operation fails.
   ///
   /// The corresponding C function is `stat()` or `lstat()` as described above.
   @_alwaysEmitIntoClient
@@ -150,6 +158,12 @@ public struct Stat: RawRepresentable, Sendable {
 
   /// Creates a `Stat` struct from a `FileDescriptor`.
   ///
+  /// - Parameters:
+  ///   - fd: The file descriptor to stat.
+  ///   - retryOnInterrupt: Whether to retry if interrupted. Default is `true`.
+  ///
+  /// - Throws: `Errno` if the stat operation fails.
+  ///
   /// The corresponding C function is `fstat()`.
   @_alwaysEmitIntoClient
   public init(
@@ -177,6 +191,13 @@ public struct Stat: RawRepresentable, Sendable {
   ///
   /// If `path` is relative, it is resolved against the current working directory.
   ///
+  /// - Parameters:
+  ///   - path: The file path to stat.
+  ///   - flags: The flags controlling symlink behavior and path resolution.
+  ///   - retryOnInterrupt: Whether to retry if interrupted. Default is `true`.
+  ///
+  /// - Throws: `Errno` if the stat operation fails.
+  ///
   /// The corresponding C function is `fstatat()`.
   @_alwaysEmitIntoClient
   public init(
@@ -200,6 +221,14 @@ public struct Stat: RawRepresentable, Sendable {
   /// If `path` is absolute (starts with a forward slash), then `fd` is ignored.
   /// If `path` is relative, it is resolved against the directory given by `fd`.
   ///
+  /// - Parameters:
+  ///   - path: The file path to stat.
+  ///   - fd: The file descriptor of the directory to resolve relative paths against.
+  ///   - flags: The flags controlling symlink behavior and path resolution.
+  ///   - retryOnInterrupt: Whether to retry if interrupted. Default is `true`.
+  ///
+  /// - Throws: `Errno` if the stat operation fails.
+  ///
   /// The corresponding C function is `fstatat()`.
   @_alwaysEmitIntoClient
   public init(
@@ -222,6 +251,13 @@ public struct Stat: RawRepresentable, Sendable {
   ///
   /// If `path` is relative, it is resolved against the current working directory.
   ///
+  /// - Parameters:
+  ///   - path: An unsafe pointer to a C string representing the file path.
+  ///   - flags: The flags controlling symlink behavior and path resolution.
+  ///   - retryOnInterrupt: Whether to retry if interrupted. Default is `true`.
+  ///
+  /// - Throws: `Errno` if the stat operation fails.
+  ///
   /// The corresponding C function is `fstatat()`.
   @_alwaysEmitIntoClient
   public init(
@@ -242,6 +278,14 @@ public struct Stat: RawRepresentable, Sendable {
   ///
   /// If `path` is absolute (starts with a forward slash), then `fd` is ignored.
   /// If `path` is relative, it is resolved against the directory given by `fd`.
+  ///
+  /// - Parameters:
+  ///   - path: An unsafe pointer to a C string representing the file path.
+  ///   - fd: The file descriptor of the directory to resolve relative paths against.
+  ///   - flags: The flags controlling symlink behavior and path resolution.
+  ///   - retryOnInterrupt: Whether to retry if interrupted. Default is `true`.
+  ///
+  /// - Throws: `Errno` if the stat operation fails.
   ///
   /// The corresponding C function is `fstatat()`.
   @_alwaysEmitIntoClient
@@ -569,6 +613,10 @@ extension FileDescriptor {
 
   /// Creates a `Stat` struct for the file referenced by this `FileDescriptor`.
   ///
+  /// - Parameter retryOnInterrupt: Whether to retry if interrupted. Default is `true`.
+  /// - Returns: A `Stat` struct containing file metadata.
+  /// - Throws: `Errno` if the stat operation fails.
+  ///
   /// The corresponding C function is `fstat()`.
   @_alwaysEmitIntoClient
   public func stat(
@@ -585,10 +633,14 @@ extension FilePath {
 
   /// Creates a `Stat` struct for the file referenced by this `FilePath`.
   ///
-  /// `followTargetSymlink` determines the behavior if `path` ends with a symbolic link.
-  /// By default, `followTargetSymlink` is `true` and this initializer behaves like `stat()`.
-  /// If `followTargetSymlink` is set to `false`, this initializer behaves like `lstat()` and
-  /// returns information about the symlink itself.
+  /// - Parameters:
+  ///   - followTargetSymlink: Determines the behavior if the path ends with a symbolic link.
+  ///     By default, `true` (behaves like `stat()`). If `false`, behaves like `lstat()` and
+  ///     returns information about the symlink itself.
+  ///   - retryOnInterrupt: Whether to retry if interrupted. Default is `true`.
+  ///
+  /// - Returns: A `Stat` struct containing file metadata.
+  /// - Throws: `Errno` if the stat operation fails.
   ///
   /// The corresponding C function is `stat()` or `lstat()` as described above.
   @_alwaysEmitIntoClient
@@ -601,7 +653,14 @@ extension FilePath {
 
   /// Creates a `Stat` struct for the file referenced by this `FilePath` using the given `Flags`.
   ///
-  /// If `path` is relative, it is resolved against the current working directory.
+  /// If the path is relative, it is resolved against the current working directory.
+  ///
+  /// - Parameters:
+  ///   - flags: The flags controlling symlink behavior and path resolution.
+  ///   - retryOnInterrupt: Whether to retry if interrupted. Default is `true`.
+  ///
+  /// - Returns: A `Stat` struct containing file metadata.
+  /// - Throws: `Errno` if the stat operation fails.
   ///
   /// The corresponding C function is `fstatat()`.
   @_alwaysEmitIntoClient
@@ -615,8 +674,16 @@ extension FilePath {
   /// Creates a `Stat` struct for the file referenced by this `FilePath` using the given `Flags`,
   /// including a `FileDescriptor` to resolve a relative path.
   ///
-  /// If `path` is absolute (starts with a forward slash), then `fd` is ignored.
-  /// If `path` is relative, it is resolved against the directory given by `fd`.
+  /// If the path is absolute (starts with a forward slash), then `fd` is ignored.
+  /// If the path is relative, it is resolved against the directory given by `fd`.
+  ///
+  /// - Parameters:
+  ///   - fd: The file descriptor of the directory to resolve relative paths against.
+  ///   - flags: The flags controlling symlink behavior and path resolution.
+  ///   - retryOnInterrupt: Whether to retry if interrupted. Default is `true`.
+  ///
+  /// - Returns: A `Stat` struct containing file metadata.
+  /// - Throws: `Errno` if the stat operation fails.
   ///
   /// The corresponding C function is `fstatat()`.
   @_alwaysEmitIntoClient

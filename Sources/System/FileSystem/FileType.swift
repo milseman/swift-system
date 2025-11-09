@@ -43,6 +43,8 @@ public struct FileType: RawRepresentable, Sendable, Hashable, Codable {
 
   /// Creates a strongly-typed file type from the raw C `mode_t`.
   ///
+  /// - Parameter rawValue: The raw C `mode_t` value.
+  ///
   /// - Note: This initializer stores the `rawValue` directly and **does not**
   ///   mask the value with `S_IFMT`. If the supplied `rawValue` contains bits
   ///   outside of the `S_IFMT` mask, the resulting `FileType` will not compare
