@@ -11,6 +11,11 @@
 
 import Darwin.Mach
 
+/// A marker protocol representing a type of Mach port right.
+///
+/// Mach port rights represent different types of capabilities for interprocess communication.
+/// This protocol is used as a generic constraint for `Mach.Port` to enforce type safety
+/// at compile time.
 @available(System 1.4.0, *)
 public protocol MachPortRight {}
 
@@ -26,9 +31,23 @@ internal func _machPrecondition(
   precondition(kr == expected, file: file, line: line)
 }
 
+/// Namespace for Mach port-related types and operations.
+///
+/// The Mach namespace provides type-safe wrappers around Mach port rights,
+/// which are fundamental to interprocess communication on Darwin platforms.
 @available(System 1.4.0, *)
 @frozen
 public enum Mach {
+  /// A type-safe wrapper for Mach port rights.
+  ///
+  /// `Mach.Port` provides automatic lifetime management for Mach port rights,
+  /// ensuring that the underlying port right is properly deallocated when
+  /// the `Port` instance is destroyed.
+  ///
+  /// The `RightType` parameter specifies the kind of right being managed:
+  /// - `ReceiveRight`: The right to receive messages sent to a port
+  /// - `SendRight`: The right to send messages to a port
+  /// - `SendOnceRight`: The right to send a single message to a port
   @available(System 1.4.0, *)
   public struct Port<RightType: MachPortRight>: ~Copyable {
     @usableFromInline
@@ -116,11 +135,17 @@ public enum Mach {
     case deadName
   }
 
-  /// The MachPortRight type used to manage a receive right.
+  /// The MachPortRight type for managing a receive right.
+  ///
+  /// A receive right grants the holder the ability to receive messages sent to a Mach port.
+  /// Each port has exactly one receive right, which can be used to create send rights.
   @frozen
   public struct ReceiveRight: MachPortRight {}
 
-  /// The MachPortRight type used to manage a send right.
+  /// The MachPortRight type for managing a send right.
+  ///
+  /// A send right grants the holder the ability to send messages to a Mach port.
+  /// Multiple send rights can exist for the same port, and they can be copied.
   @frozen
   public struct SendRight: MachPortRight {}
 
