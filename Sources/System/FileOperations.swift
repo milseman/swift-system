@@ -147,6 +147,8 @@ extension FileDescriptor {
   /// If this is the last reference to the underlying object,
   /// the object will be deactivated.
   ///
+  /// - Throws: `Errno` if the close operation fails.
+  ///
   /// The corresponding C function is `close`.
   @_alwaysEmitIntoClient
   public func close() throws { try _close().get() }
@@ -163,6 +165,8 @@ extension FileDescriptor {
   ///   - whence: The origin of the new offset.
   /// - Returns: The file's offset location,
   ///   in bytes from the beginning of the file.
+  ///
+  /// - Throws: `Errno` if the seek operation fails.
   ///
   /// The corresponding C function is `lseek`.
   @_alwaysEmitIntoClient
@@ -201,6 +205,8 @@ extension FileDescriptor {
   ///     Pass `false` to try only once and throw an error upon interruption.
   /// - Returns: The number of bytes that were read.
   ///
+  /// - Throws: `Errno` if the read operation fails.
+  ///
   /// The <doc://com.apple.documentation/documentation/swift/unsafemutablerawbufferpointer/count-95usp> property of `buffer`
   /// determines the maximum number of bytes that are read into that buffer.
   ///
@@ -238,6 +244,8 @@ extension FileDescriptor {
   ///     The default is `true`.
   ///     Pass `false` to try only once and throw an error upon interruption.
   /// - Returns: The number of bytes that were read.
+  ///
+  /// - Throws: `Errno` if the read operation fails.
   ///
   /// The <doc://com.apple.documentation/documentation/swift/unsafemutablerawbufferpointer/count-95usp> property of `buffer`
   /// determines the maximum number of bytes that are read into that buffer.
@@ -293,6 +301,8 @@ extension FileDescriptor {
   ///     Pass `false` to try only once and throw an error upon interruption.
   /// - Returns: The number of bytes that were written.
   ///
+  /// - Throws: `Errno` if the write operation fails.
+  ///
   /// After writing,
   /// this method increments the file's offset by the number of bytes written.
   /// To change the file's offset,
@@ -327,6 +337,8 @@ extension FileDescriptor {
   ///     The default is `true`.
   ///     Pass `false` to try only once and throw an error upon interruption.
   /// - Returns: The number of bytes that were written.
+  ///
+  /// - Throws: `Errno` if the write operation fails.
   ///
   /// Unlike ``write(_:retryOnInterrupt:)``,
   /// this method leaves the file's existing offset unchanged.
@@ -380,6 +392,8 @@ extension FileDescriptor {
   ///      if it throws ``Errno/interrupted``. The default is `true`.
   ///      Pass `false` to try only once and throw an error upon interruption.
   /// - Returns: The new file descriptor.
+  ///
+  /// - Throws: `Errno` if the duplicate operation fails.
   ///
   /// If the `target` descriptor is already in use, then it is first
   /// deallocated as if a close(2) call had been done first.
@@ -439,7 +453,9 @@ extension FileDescriptor {
 extension FileDescriptor {
   /// Creates a unidirectional data channel, which can be used for interprocess communication.
   ///
-  /// - Returns: The pair of file descriptors.
+  /// - Returns: The pair of file descriptors (read end and write end).
+  ///
+  /// - Throws: `Errno` if the pipe creation fails.
   ///
   /// The corresponding C function is `pipe`.
   @_alwaysEmitIntoClient
@@ -472,6 +488,8 @@ extension FileDescriptor {
   ///   - retryOnInterrupt: Whether to retry the write operation
   ///      if it throws ``Errno/interrupted``. The default is `true`.
   ///      Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// - Throws: `Errno` if the resize operation fails.
   ///
   /// The file referenced by this file descriptor will by truncated (or extended) to `newSize`.
   ///

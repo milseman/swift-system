@@ -27,6 +27,10 @@ public struct FileMode: RawRepresentable, Sendable, Hashable, Codable {
 
   /// Creates a `FileMode` from the given file type and permissions.
   ///
+  /// - Parameters:
+  ///   - type: The file type.
+  ///   - permissions: The file permissions.
+  ///
   /// - Note: This initializer masks the inputs with their respective bit masks.
   @_alwaysEmitIntoClient
   public init(type: FileType, permissions: FilePermissions) {

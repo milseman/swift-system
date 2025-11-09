@@ -92,7 +92,7 @@ extension FilePath.Component {
     case regular
   }
 
-  /// The kind of this component
+  /// The kind of this component.
   public var kind: Kind {
     if _path._isCurrentDirectory(_range) { return .currentDirectory }
     if _path._isParentDirectory(_range) { return .parentDirectory }
