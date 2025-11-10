@@ -1,38 +1,94 @@
 import ArgumentParser
 import Foundation
-import SwiftAnalysis
 
-@main
-struct SwiftAnalysisTool: ParsableCommand {
-    static let configuration = CommandConfiguration(
-        abstract: "Swift package analysis tools for Claude",
-        subcommands: [AnalyzeDocs.self]
-    )
-}
+struct ExtractAPI: ParsableCommand {
+    @Option(help: "Target to analyze (default: all non-test targets)")
+    var target: String?
 
-struct AnalyzeDocs: ParsableCommand {
-    static let configuration = CommandConfiguration(
-        abstract: "Analyze documentation coverage and quality"
-    )
+    @Option(help: "Minimum access level to extract")
+    var accessLevel: AccessLevel = .public
+
+    @Option(help: "Output format")
+    var format: OutputFormat = .json
 
     func run() throws {
-        print("Hello from documentation analyzer!")
+        // Get package structure
+        let packageStructure = try getPackageStructure()
 
-        // Print current working directory
-        let currentDirectory = FileManager.default.currentDirectoryPath
-        print("Current working directory: \(currentDirectory)")
+        // Filter targets: use specified target or all non-test targets
+        let targetsToAnalyze: [PackageTarget]
+        if let targetName = target {
+            guard let foundTarget = packageStructure.targets.first(where: { $0.name == targetName }) else {
+                throw ValidationError("Target '\(targetName)' not found in package")
+            }
+            targetsToAnalyze = [foundTarget]
+        } else {
+            // Filter out test targets
+            targetsToAnalyze = packageStructure.targets.filter { target in
+                !target.type.contains("test") && !target.name.lowercased().contains("test")
+            }
+        }
 
-        // Use the library to analyze the package
-        print("\nAttempting to run 'swift package describe --type json'...")
+        if targetsToAnalyze.isEmpty {
+            throw ValidationError("No targets found to analyze")
+        }
 
-        let analyzer = PackageAnalyzer()
-        do {
-            let packageInfo = try analyzer.analyzePackage()
-            print("✓ Successfully ran 'swift package describe'")
-            print("Output preview (first 200 chars):")
-            print(String(packageInfo.jsonOutput.prefix(200)))
-        } catch {
-            print("✗ Failed: \(error)")
+        // Extract API from each target
+        let extractor = APIExtractor(accessLevel: accessLevel)
+        var allDeclarations: [APIDeclaration] = []
+
+        for target in targetsToAnalyze {
+            let declarations = try extractor.extract(target: target)
+            allDeclarations.append(contentsOf: declarations)
+        }
+
+        let result = APIExtractionResult(
+            packageName: packageStructure.name,
+            totalDeclarations: allDeclarations.count,
+            declarations: allDeclarations
+        )
+
+        // Output based on format
+        switch format {
+        case .json:
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            let jsonData = try encoder.encode(result)
+            if let jsonString = String(data: jsonData, encoding: .utf8) {
+                print(jsonString)
+            }
+        case .markdown:
+            print(result.toMarkdown())
         }
     }
 }
+
+// MARK: - Helper Functions
+
+func getPackageStructure() throws -> PackageStructure {
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/swift")
+    process.arguments = ["package", "describe", "--type", "json"]
+
+    let outputPipe = Pipe()
+    let errorPipe = Pipe()
+    process.standardOutput = outputPipe
+    process.standardError = errorPipe
+
+    try process.run()
+    process.waitUntilExit()
+
+    guard process.terminationStatus == 0 else {
+        let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
+        let errorMessage = String(data: errorData, encoding: .utf8) ?? "Unknown error"
+        throw ValidationError("Failed to run 'swift package describe': \(errorMessage)")
+    }
+
+    let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
+
+    let decoder = JSONDecoder()
+    return try decoder.decode(PackageStructure.self, from: outputData)
+}
+
+// Run the CLI
+ExtractAPI.main()

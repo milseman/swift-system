@@ -1,0 +1,6 @@
+{
+  "name": "swift-api-extract",
+  "version": "0.1.0",
+  "description": "Extract public Swift API declarations with documentation and precise file locations for Claude Code to analyze and edit",
+  "command": "./extract-api.sh"
+}

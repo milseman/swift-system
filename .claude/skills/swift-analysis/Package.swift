@@ -9,6 +9,7 @@ let package = Package(
         .macOS(.v13)
     ],
     dependencies: [
+        .package(url: "https://github.com/apple/swift-syntax.git", from: "509.0.0"),
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.0.0")
     ],
     targets: [
@@ -19,7 +20,9 @@ let package = Package(
             name: "SwiftAnalysisTool",
             dependencies: [
                 "SwiftAnalysis",
-                .product(name: "ArgumentParser", package: "swift-argument-parser")
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
+                .product(name: "SwiftSyntax", package: "swift-syntax"),
+                .product(name: "SwiftParser", package: "swift-syntax")
             ]
         )
     ]
