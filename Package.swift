@@ -120,8 +120,11 @@ let package = Package(
   platforms: platforms,
   products: [
     .library(name: "SystemPackage", targets: ["SystemPackage"]),
+    .library(name: "SystemSockets", targets: ["SystemSockets"]),
   ],
-  dependencies: [],
+  dependencies: [
+    .package(url: "https://github.com/apple/swift-argument-parser", from: "1.3.0"),
+  ],
   targets: [
     .target(
       name: "CSystem",
@@ -140,6 +143,49 @@ let package = Package(
       dependencies: ["SystemPackage"],
       exclude: testsToExclude,
       cSettings: cSettings,
+      swiftSettings: swiftSettings),
+    .target(
+      name: "SystemSockets",
+      dependencies: ["SystemPackage", "CSystem"],
+      path: "Sources/SystemSockets",
+      cSettings: cSettings,
+      swiftSettings: swiftSettings),
+    .testTarget(
+      name: "SystemSocketsTests",
+      dependencies: ["SystemSockets"],
+      cSettings: cSettings,
+      swiftSettings: swiftSettings),
+    .executableTarget(
+      name: "sample-connect",
+      dependencies: [
+        "SystemSockets",
+        .product(name: "ArgumentParser", package: "swift-argument-parser"),
+      ],
+      path: "Sources/Samples/Connect",
+      swiftSettings: swiftSettings),
+    .executableTarget(
+      name: "sample-listen",
+      dependencies: [
+        "SystemSockets",
+        .product(name: "ArgumentParser", package: "swift-argument-parser"),
+      ],
+      path: "Sources/Samples/Listen",
+      swiftSettings: swiftSettings),
+    .executableTarget(
+      name: "sample-resolve",
+      dependencies: [
+        "SystemSockets",
+        .product(name: "ArgumentParser", package: "swift-argument-parser"),
+      ],
+      path: "Sources/Samples/Resolve",
+      swiftSettings: swiftSettings),
+    .executableTarget(
+      name: "sample-reverse-resolve",
+      dependencies: [
+        "SystemSockets",
+        .product(name: "ArgumentParser", package: "swift-argument-parser"),
+      ],
+      path: "Sources/Samples/ReverseResolve",
       swiftSettings: swiftSettings),
   ],
   swiftLanguageVersions: [.v5]
