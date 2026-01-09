@@ -10,7 +10,6 @@
 import ArgumentParser
 import SystemSockets
 
-@main
 struct Listen: ParsableCommand {
   static let configuration = CommandConfiguration(
     abstract: "Run a simple TCP echo server"

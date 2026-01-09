@@ -10,7 +10,6 @@
 import ArgumentParser
 import SystemSockets
 
-@main
 struct ReverseResolve: ParsableCommand {
   static let configuration = CommandConfiguration(
     abstract: "Reverse resolve an IP address to a hostname using getnameinfo"

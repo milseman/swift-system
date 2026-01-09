@@ -10,7 +10,6 @@
 import ArgumentParser
 import SystemSockets
 
-@main
 struct Resolve: ParsableCommand {
   static let configuration = CommandConfiguration(
     abstract: "Resolve a hostname to IP addresses using getaddrinfo"

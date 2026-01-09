@@ -10,7 +10,6 @@
 import ArgumentParser
 import SystemSockets
 
-@main
 struct Connect: ParsableCommand {
   static let configuration = CommandConfiguration(
     abstract: "Connect to a TCP server and send/receive messages"

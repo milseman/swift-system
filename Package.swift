@@ -121,6 +121,7 @@ let package = Package(
   products: [
     .library(name: "SystemPackage", targets: ["SystemPackage"]),
     .library(name: "SystemSockets", targets: ["SystemSockets"]),
+    .executable(name: "system-samples", targets: ["Samples"]),
   ],
   dependencies: [
     .package(url: "https://github.com/apple/swift-argument-parser", from: "1.3.0"),
@@ -156,36 +157,13 @@ let package = Package(
       cSettings: cSettings,
       swiftSettings: swiftSettings),
     .executableTarget(
-      name: "sample-connect",
+      name: "Samples",
       dependencies: [
+        "SystemPackage",
         "SystemSockets",
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
       ],
-      path: "Sources/Samples/Connect",
-      swiftSettings: swiftSettings),
-    .executableTarget(
-      name: "sample-listen",
-      dependencies: [
-        "SystemSockets",
-        .product(name: "ArgumentParser", package: "swift-argument-parser"),
-      ],
-      path: "Sources/Samples/Listen",
-      swiftSettings: swiftSettings),
-    .executableTarget(
-      name: "sample-resolve",
-      dependencies: [
-        "SystemSockets",
-        .product(name: "ArgumentParser", package: "swift-argument-parser"),
-      ],
-      path: "Sources/Samples/Resolve",
-      swiftSettings: swiftSettings),
-    .executableTarget(
-      name: "sample-reverse-resolve",
-      dependencies: [
-        "SystemSockets",
-        .product(name: "ArgumentParser", package: "swift-argument-parser"),
-      ],
-      path: "Sources/Samples/ReverseResolve",
+      path: "Sources/Samples",
       swiftSettings: swiftSettings),
   ],
   swiftLanguageVersions: [.v5]
