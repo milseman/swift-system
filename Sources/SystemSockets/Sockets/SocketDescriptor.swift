@@ -415,3 +415,26 @@ extension SocketDescriptor {
     }
   }
 }
+
+// MARK: - Socket Option
+
+@available(System 99, *)
+extension SocketDescriptor {
+  /// A generic socket option identifier.
+  ///
+  /// This type represents raw socket option constants that can be used
+  /// with ancillary messages or generic get/set socket option operations.
+  @frozen
+  public struct Option: RawRepresentable, Hashable, Sendable, CustomStringConvertible {
+    @_alwaysEmitIntoClient
+    public var rawValue: CInt
+
+    @_alwaysEmitIntoClient
+    public init(rawValue: CInt) { self.rawValue = rawValue }
+
+    @_alwaysEmitIntoClient
+    private init(_ rawValue: CInt) { self.init(rawValue: rawValue) }
+
+    public var description: String { "Option(\(rawValue))" }
+  }
+}
