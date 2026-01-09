@@ -10,7 +10,6 @@
 import ArgumentParser
 import SystemSockets
 
-@available(macOS 15.0, *)
 @main
 struct ReverseResolve: ParsableCommand {
   static let configuration = CommandConfiguration(
