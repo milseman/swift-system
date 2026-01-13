@@ -50,6 +50,7 @@ final class ErrnoTest: XCTestCase {
     XCTAssert(EMFILE == Errno.tooManyOpenFiles.rawValue)
 #if !os(Windows)
     XCTAssert(ENOTTY == Errno.inappropriateIOCTLForDevice.rawValue)
+    XCTAssert(ENOTTY == Errno.notTerminal.rawValue)
     XCTAssert(ETXTBSY == Errno.textFileBusy.rawValue)
 #endif
     XCTAssert(EFBIG == Errno.fileTooLarge.rawValue)
