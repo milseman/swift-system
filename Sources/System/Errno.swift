@@ -1,7 +1,7 @@
 /*
  This source file is part of the Swift System open source project
 
- Copyright (c) 2021 - 2024 Apple Inc. and the Swift System project authors
+ Copyright (c) 2021 - 2025 Apple Inc. and the Swift System project authors
  Licensed under Apache License v2.0 with Runtime Library Exception
 
  See https://swift.org/LICENSE.txt for license information
@@ -369,6 +369,15 @@ public struct Errno: RawRepresentable, Error, Hashable, Codable {
   /// The corresponding C error is `ENOTTY`.
   @_alwaysEmitIntoClient
   public static var inappropriateIOCTLForDevice: Errno { .init(rawValue: _ENOTTY) }
+
+  /// Not a terminal device.
+  ///
+  /// You attempted a terminal operation on a file
+  /// that is not a terminal device.
+  ///
+  /// The corresponding C error is `ENOTTY`.
+  @_alwaysEmitIntoClient
+  public static var notTerminal: Errno { inappropriateIOCTLForDevice }
 
   @_alwaysEmitIntoClient
   @available(*, unavailable, renamed: "inappropriateIOCTLForDevice")
