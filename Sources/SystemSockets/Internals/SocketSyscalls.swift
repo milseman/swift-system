@@ -35,6 +35,18 @@ internal func system_socket(_ domain: CInt, _ type: CInt, _ protocol: CInt) -> C
   return socket(domain, type, `protocol`)
 }
 
+internal func system_socketpair(
+  _ domain: CInt,
+  _ type: CInt,
+  _ protocol: CInt,
+  _ sv: UnsafeMutablePointer<CInt>?
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(domain, type, `protocol`, sv) }
+#endif
+  return socketpair(domain, type, `protocol`, sv)
+}
+
 internal func system_shutdown(_ socket: CInt, _ how: CInt) -> CInt {
 #if ENABLE_MOCKING
   if mockingEnabled { return _mock(socket, how) }

@@ -11,23 +11,58 @@
 
 import Testing
 
-#if SYSTEM_PACKAGE_DARWIN
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#elseif canImport(Musl)
-import Musl
-#elseif canImport(Android)
-import Android
-#else
-#error("Unsupported Platform")
-#endif
-
 @testable import SystemSockets
 @testable import SystemPackage
 
 @Suite("Socket Message Operations")
 private struct SocketMessagesTests {
+
+  // MARK: - Helper Functions
+
+  /// Extract file descriptors from received ancillary messages (SCM_RIGHTS)
+  private static func extractFileDescriptors(
+    from ancillary: SocketDescriptor.AncillaryMessageBuffer
+  ) -> [CInt] {
+    var fds: [CInt] = []
+    ancillary._withUnsafeBytes { controlData in
+      guard controlData.count >= MemoryLayout<CInterop.CMsgHdr>.size,
+            let baseAddress = controlData.baseAddress else { return }
+
+      let header = baseAddress.assumingMemoryBound(to: CInterop.CMsgHdr.self)
+      if header.pointee.cmsg_level == SocketDescriptor.ProtocolID.socket.rawValue &&
+         header.pointee.cmsg_type == SocketDescriptor.Option.rights.rawValue {
+        let dataOffset = MemoryLayout<CInterop.CMsgHdr>.size
+        let dataSize = Int(header.pointee.cmsg_len) - dataOffset
+        let fdCount = dataSize / MemoryLayout<CInt>.size
+
+        let fdsPtr = (baseAddress + dataOffset).assumingMemoryBound(to: CInt.self)
+        for i in 0..<fdCount {
+          fds.append(fdsPtr[i])
+        }
+      }
+    }
+    return fds
+  }
+
+  /// Create a file with specified content
+  private static func createFile(
+    at path: FilePath,
+    content: String
+  ) throws {
+    let fd = try FileDescriptor.open(
+      path,
+      .writeOnly,
+      options: [.create, .truncate],
+      permissions: [.ownerReadWrite]
+    )
+    defer { try? fd.close() }
+
+    _ = try content.utf8.withContiguousStorageIfAvailable { buffer in
+      try fd.write(UnsafeRawBufferPointer(buffer))
+    }
+  }
+
+  // MARK: - Tests
 
   @available(macOS 15, iOS 18, watchOS 11, tvOS 18, visionOS 2, *)
   @Test func sendReceiveMessageBasic() throws {
@@ -41,7 +76,7 @@ private struct SocketMessagesTests {
 
     var boundAddr = SocketAddress()
     try server.getLocalAddress(into: &boundAddr)
-    let port = boundAddr.ipv4!.port
+    let port = try #require(boundAddr.ipv4?.port)
 
     let client = try SocketDescriptor.open(.ipv4, .stream, protocol: .tcp)
     defer { try? client.close() }
@@ -93,7 +128,7 @@ private struct SocketMessagesTests {
 
     var boundAddr = SocketAddress()
     try receiver.getLocalAddress(into: &boundAddr)
-    let port = boundAddr.ipv4!.port
+    let port = try #require(boundAddr.ipv4?.port)
 
     let sender = try SocketDescriptor.open(.ipv4, .datagram, protocol: .udp)
     defer { try? sender.close() }
@@ -143,48 +178,28 @@ private struct SocketMessagesTests {
   @Test func sendReceiveMessageWithFileDescriptor() throws {
     try withTemporaryFilePath(basename: "socket-fd-test") { tempDir in
       // Test file descriptor passing via SCM_RIGHTS over Unix domain sockets
-      let server = try SocketDescriptor.open(.local, .stream)
-      defer { try? server.close() }
-
-      let client = try SocketDescriptor.open(.local, .stream)
-      defer { try? client.close() }
-
-      let socketPath = tempDir.appending("test.sock")
-      let unixAddr = UnixAddress(socketPath.string)!
-      let address = SocketAddress(unix: unixAddr)
-      try server.bind(to: address)
-      try server.listen(backlog: 1)
-
-      try client.connect(to: address)
-      let accepted = try server.accept()
-      defer { try? accepted.close() }
+      let (client, server) = try SocketDescriptor.openPair(.local, .stream)
+      defer {
+        try? client.close()
+        try? server.close()
+      }
 
       // Create a temporary file to send
       let tempFile = tempDir.appending("test-data.txt")
-      let fd = try FileDescriptor.open(
-        tempFile,
-        .writeOnly,
-        options: [.create, .truncate],
-        permissions: [.ownerReadWrite]
-      )
-
-      // Write test data to the file
       let testData = "File descriptor test data"
-      _ = try testData.utf8.withContiguousStorageIfAvailable { buffer in
-        try fd.write(UnsafeRawBufferPointer(buffer))
-      }
-      try fd.close()
+      try Self.createFile(at: tempFile, content: testData)
 
-      // Reopen for reading to send
+      // Open for reading to send
       let fileToSend = try FileDescriptor.open(tempFile, .readOnly)
+      defer { try? fileToSend.close() }
 
       // Build ancillary message with SCM_RIGHTS
       var ancillary = SocketDescriptor.AncillaryMessageBuffer()
       withUnsafeBytes(of: fileToSend.rawValue) { bytes in
         let span = RawSpan(_unsafeBytes: bytes)
         ancillary.appendMessage(
-          level: SocketDescriptor.ProtocolID(rawValue: SOL_SOCKET),
-          type: .init(rawValue: CInt(SCM_RIGHTS)),
+          level: .socket,
+          type: .rights,
           bytes: span
         )
       }
@@ -205,7 +220,7 @@ private struct SocketMessagesTests {
 
       let received = try buffer.withUnsafeMutableBytes { buf in
         var recvOutput = OutputRawSpan(buffer: buf, initializedCount: 0)
-        return try accepted.receiveMessage(
+        return try server.receiveMessage(
           into: &recvOutput,
           ancillaryMessages: &recvAncillary,
           sender: &sender
@@ -213,21 +228,9 @@ private struct SocketMessagesTests {
       }
       #expect(received == messageBytes.count)
 
-      // Extract the received file descriptor using CMSG_FIRSTHDR/CMSG_NXTHDR pattern
-      var receivedFD: CInt? = nil
-      recvAncillary._withUnsafeBytes { controlData in
-        guard controlData.count >= MemoryLayout<CInterop.CMsgHdr>.size else { return }
-
-        let header = controlData.baseAddress!.assumingMemoryBound(to: CInterop.CMsgHdr.self)
-        if header.pointee.cmsg_level == SOL_SOCKET &&
-           header.pointee.cmsg_type == CInt(SCM_RIGHTS) {
-          let dataOffset = MemoryLayout<CInterop.CMsgHdr>.size
-          let fdPtr = (controlData.baseAddress! + dataOffset).assumingMemoryBound(to: CInt.self)
-          receivedFD = fdPtr.pointee
-        }
-      }
-
-      let receivedFd = try #require(receivedFD, "Should have received a file descriptor")
+      // Extract the received file descriptor
+      let receivedFDs = Self.extractFileDescriptors(from: recvAncillary)
+      let receivedFd = try #require(receivedFDs.first, "Should have received a file descriptor")
       let receivedFile = FileDescriptor(rawValue: receivedFd)
       defer { try? receivedFile.close() }
 
@@ -239,8 +242,6 @@ private struct SocketMessagesTests {
 
       let fileContent = String(decoding: readBuffer.prefix(bytesRead), as: UTF8.self)
       #expect(fileContent == testData, "File content should match")
-
-      try fileToSend.close()
     }
   }
 
@@ -248,44 +249,34 @@ private struct SocketMessagesTests {
   @Test func sendReceiveMessageWithMultipleFileDescriptors() throws {
     try withTemporaryFilePath(basename: "socket-multi-fd") { tempDir in
       // Test passing multiple file descriptors at once
-      let server = try SocketDescriptor.open(.local, .stream)
-      defer { try? server.close() }
-
-      let client = try SocketDescriptor.open(.local, .stream)
-      defer { try? client.close() }
-
-      let socketPath = tempDir.appending("test.sock")
-      let unixAddr = UnixAddress(socketPath.string)!
-      let address = SocketAddress(unix: unixAddr)
-      try server.bind(to: address)
-      try server.listen(backlog: 1)
-
-      try client.connect(to: address)
-      let accepted = try server.accept()
-      defer { try? accepted.close() }
+      let (client, server) = try SocketDescriptor.openPair(.local, .stream)
+      defer {
+        try? client.close()
+        try? server.close()
+      }
 
       // Create three temporary files
       let file1 = tempDir.appending("file1.txt")
       let file2 = tempDir.appending("file2.txt")
       let file3 = tempDir.appending("file3.txt")
 
-      // Write different content to each file
       let testData1 = "First file"
       let testData2 = "Second file"
       let testData3 = "Third file"
 
-      for (path, data) in [(file1, testData1), (file2, testData2), (file3, testData3)] {
-        let fd = try FileDescriptor.open(path, .writeOnly, options: [.create, .truncate], permissions: [.ownerReadWrite])
-        _ = try data.utf8.withContiguousStorageIfAvailable { buffer in
-          try fd.write(UnsafeRawBufferPointer(buffer))
-        }
-        try fd.close()
-      }
+      try Self.createFile(at: file1, content: testData1)
+      try Self.createFile(at: file2, content: testData2)
+      try Self.createFile(at: file3, content: testData3)
 
       // Open all three for reading to send
       let fd1 = try FileDescriptor.open(file1, .readOnly)
       let fd2 = try FileDescriptor.open(file2, .readOnly)
       let fd3 = try FileDescriptor.open(file3, .readOnly)
+      defer {
+        try? fd1.close()
+        try? fd2.close()
+        try? fd3.close()
+      }
 
       // Build ancillary message with three FDs
       var ancillary = SocketDescriptor.AncillaryMessageBuffer()
@@ -293,8 +284,8 @@ private struct SocketMessagesTests {
       fds.withUnsafeBytes { bytes in
         let span = RawSpan(_unsafeBytes: bytes)
         ancillary.appendMessage(
-          level: SocketDescriptor.ProtocolID(rawValue: SOL_SOCKET),
-          type: .init(rawValue: CInt(SCM_RIGHTS)),
+          level: SocketDescriptor.ProtocolID(SocketDescriptor.OptionLevel.socket.rawValue),
+          type: SocketDescriptor.Option.rights,
           bytes: span
         )
       }
@@ -315,7 +306,7 @@ private struct SocketMessagesTests {
 
       let received = try buffer.withUnsafeMutableBytes { buf in
         var recvOutput = OutputRawSpan(buffer: buf, initializedCount: 0)
-        return try accepted.receiveMessage(
+        return try server.receiveMessage(
           into: &recvOutput,
           ancillaryMessages: &recvAncillary,
           sender: &sender
@@ -323,28 +314,12 @@ private struct SocketMessagesTests {
       }
       #expect(received == messageBytes.count)
 
-      // Extract the three received file descriptors
-      var receivedFDs: [CInt] = []
-      recvAncillary._withUnsafeBytes { controlData in
-        guard controlData.count >= MemoryLayout<CInterop.CMsgHdr>.size else { return }
-
-        let header = controlData.baseAddress!.assumingMemoryBound(to: CInterop.CMsgHdr.self)
-        if header.pointee.cmsg_level == SOL_SOCKET &&
-           header.pointee.cmsg_type == CInt(SCM_RIGHTS) {
-          let dataOffset = MemoryLayout<CInterop.CMsgHdr>.size
-          let dataSize = Int(header.pointee.cmsg_len) - dataOffset
-          let fdCount = dataSize / MemoryLayout<CInt>.size
-
-          let fdsPtr = (controlData.baseAddress! + dataOffset).assumingMemoryBound(to: CInt.self)
-          for i in 0..<fdCount {
-            receivedFDs.append(fdsPtr[i])
-          }
-        }
-      }
-
+      // Extract the received file descriptors
+      let receivedFDs = Self.extractFileDescriptors(from: recvAncillary)
       #expect(receivedFDs.count == 3, "Should have received 3 file descriptors")
 
       // Verify we can read correct content from each FD
+      let expectedContents = [testData1, testData2, testData3]
       for (index, fdValue) in receivedFDs.enumerated() {
         let receivedFile = FileDescriptor(rawValue: fdValue)
         defer { try? receivedFile.close() }
@@ -355,13 +330,8 @@ private struct SocketMessagesTests {
         }
 
         let fileContent = String(decoding: readBuffer.prefix(bytesRead), as: UTF8.self)
-        let expectedContent = [testData1, testData2, testData3][index]
-        #expect(fileContent == expectedContent, "FD \(index) content should match")
+        #expect(fileContent == expectedContents[index], "FD \(index) content should match")
       }
-
-      try fd1.close()
-      try fd2.close()
-      try fd3.close()
     }
   }
 }

@@ -244,6 +244,14 @@ extension SocketDescriptor {
     @_alwaysEmitIntoClient
     public static var `default`: ProtocolID { Self(0) }
 
+    /// Socket-level protocol.
+    ///
+    /// Used for socket-level ancillary messages and options.
+    ///
+    /// The corresponding C constant is `SOL_SOCKET`.
+    @_alwaysEmitIntoClient
+    public static var socket: ProtocolID { Self(SOL_SOCKET) }
+
     /// Internet Protocol (IP).
     ///
     /// The corresponding C constant is `IPPROTO_IP`.
@@ -434,6 +442,47 @@ extension SocketDescriptor {
 
     @_alwaysEmitIntoClient
     private init(_ rawValue: CInt) { self.init(rawValue: rawValue) }
+
+    /// Send or receive file descriptors.
+    ///
+    /// Used with `sendmsg`/`recvmsg` ancillary data to pass file descriptors
+    /// between processes over Unix domain sockets.
+    ///
+    /// The corresponding C constant is `SCM_RIGHTS`.
+    @_alwaysEmitIntoClient
+    public static var rights: Option { Option(CInt(SCM_RIGHTS)) }
+
+    #if SYSTEM_PACKAGE_DARWIN
+    /// Send or receive credentials.
+    ///
+    /// Used with `sendmsg`/`recvmsg` ancillary data to pass credentials
+    /// between processes over Unix domain sockets.
+    ///
+    /// The corresponding C constant is `SCM_CREDS`.
+    @_alwaysEmitIntoClient
+    public static var credentials: Option { Option(CInt(SCM_CREDS)) }
+
+    /// Receive timestamp of packet arrival.
+    ///
+    /// The corresponding C constant is `SCM_TIMESTAMP`.
+    @_alwaysEmitIntoClient
+    public static var timestamp: Option { Option(CInt(SCM_TIMESTAMP)) }
+    #elseif os(Linux)
+    /// Send or receive credentials.
+    ///
+    /// Used with `sendmsg`/`recvmsg` ancillary data to pass credentials
+    /// between processes over Unix domain sockets.
+    ///
+    /// The corresponding C constant is `SCM_CREDENTIALS`.
+    @_alwaysEmitIntoClient
+    public static var credentials: Option { Option(CInt(SCM_CREDENTIALS)) }
+
+    /// Receive timestamp of packet arrival.
+    ///
+    /// The corresponding C constant is `SCM_TIMESTAMP`.
+    @_alwaysEmitIntoClient
+    public static var timestamp: Option { Option(CInt(SCM_TIMESTAMP)) }
+    #endif
 
     public var description: String { "Option(\(rawValue))" }
   }

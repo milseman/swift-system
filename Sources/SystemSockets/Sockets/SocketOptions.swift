@@ -147,6 +147,18 @@ extension SocketDescriptor {
     @_alwaysEmitIntoClient
     public static var receiveLowWaterMark: SocketOption { SocketOption(rawValue: SO_RCVLOWAT) }
 
+    /// Send timeout.
+    ///
+    /// The corresponding C constant is `SO_SNDTIMEO`.
+    @_alwaysEmitIntoClient
+    public static var sendTimeout: SocketOption { SocketOption(rawValue: SO_SNDTIMEO) }
+
+    /// Receive timeout.
+    ///
+    /// The corresponding C constant is `SO_RCVTIMEO`.
+    @_alwaysEmitIntoClient
+    public static var receiveTimeout: SocketOption { SocketOption(rawValue: SO_RCVTIMEO) }
+
     /// Get socket error.
     ///
     /// The corresponding C constant is `SO_ERROR`.

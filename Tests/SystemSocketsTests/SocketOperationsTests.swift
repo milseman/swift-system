@@ -311,6 +311,37 @@ private struct SocketOperationsTests {
     let size = try socket.getSocketOption(SocketDescriptor.SocketOption.receiveBufferSize)
     #expect(size > 0)
   }
+
+  @available(System 99, *)
+  @Test func setReceiveTimeout() throws {
+    let socket = try SocketDescriptor.open(.ipv4, .stream, protocol: .tcp)
+    defer { try? socket.close() }
+
+    // Set a 5-second timeout
+    var timeout = timeval(tv_sec: 5, tv_usec: 0)
+
+    try socket.setOption(.socket, SocketDescriptor.SocketOption.receiveTimeout.rawValue, to: timeout)
+
+    // Verify we can read it back
+    let readTimeout: timeval = try socket.getOption(.socket, SocketDescriptor.SocketOption.receiveTimeout.rawValue)
+    #expect(readTimeout.tv_sec == 5)
+  }
+
+  @available(System 99, *)
+  @Test func setSendTimeout() throws {
+    let socket = try SocketDescriptor.open(.ipv4, .stream, protocol: .tcp)
+    defer { try? socket.close() }
+
+    // Set a 3-second timeout
+    var timeout = timeval(tv_sec: 3, tv_usec: 500_000)
+
+    try socket.setOption(.socket, SocketDescriptor.SocketOption.sendTimeout.rawValue, to: timeout)
+
+    // Verify we can read it back
+    let readTimeout: timeval = try socket.getOption(.socket, SocketDescriptor.SocketOption.sendTimeout.rawValue)
+    #expect(readTimeout.tv_sec == 3)
+    #expect(readTimeout.tv_usec == 500_000)
+  }
 }
 
 #endif
