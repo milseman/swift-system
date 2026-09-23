@@ -171,6 +171,19 @@ final class FileOperationsTest: XCTestCase {
       MockTestCase(name: "fcntl", .noInterrupt, rawFD, F_DUPFD, 10) { _ in
         _ = try fd.duplicate(atLeast: FileDescriptor(rawValue: 10), closeOnExec: false)
       },
+
+      MockTestCase(name: "flock", .interruptable, rawFD, LOCK_EX) { retryOnInterrupt in
+        try fd.lock(retryOnInterrupt: retryOnInterrupt)
+      },
+
+      MockTestCase(name: "flock", .interruptable, rawFD, LOCK_SH | LOCK_NB) {
+        retryOnInterrupt in
+        try fd.lock(shared: true, nonBlocking: true, retryOnInterrupt: retryOnInterrupt)
+      },
+
+      MockTestCase(name: "flock", .interruptable, rawFD, LOCK_UN) { retryOnInterrupt in
+        try fd.unlock(retryOnInterrupt: retryOnInterrupt)
+      },
     ]
 
     for test in syscallTestCases { test.runAllTests() }
@@ -716,6 +729,48 @@ final class FileOperationsTest: XCTestCase {
       }
     }
     XCTAssertThrowsError(try FileDescriptor(rawValue: -1).duplicate(closeOnExec: true)) {
+      XCTAssertEqual($0 as? Errno, .badFileDescriptor)
+    }
+  }
+
+  @available(System 199, *)
+  func testLock() throws {
+    try withTemporaryFilePath(basename: "testLock") { path in
+      let file = path.appending("\(UUID().uuidString).txt")
+      // Locks belong to open files, so two opens of one file conflict,
+      // even in one process.
+      let first = try FileDescriptor.open(file, .readWrite, options: .create, permissions: .ownerReadWrite)
+      try first.closeAfter {
+        let second = try FileDescriptor.open(file, .readWrite)
+        try second.closeAfter {
+          try first.lock()
+          XCTAssertThrowsError(try second.lock(nonBlocking: true)) {
+            XCTAssertEqual($0 as? Errno, .wouldBlock)
+          }
+          XCTAssertThrowsError(try second.lock(shared: true, nonBlocking: true)) {
+            XCTAssertEqual($0 as? Errno, .wouldBlock)
+          }
+
+          // A duplicate shares the lock, so it can release it.
+          let duplicate = try first.duplicate()
+          try duplicate.closeAfter { try duplicate.unlock() }
+          try second.lock(nonBlocking: true)
+          try second.unlock()
+
+          // Shared locks coexist, and exclude an exclusive one.
+          try first.lock(shared: true, nonBlocking: true)
+          try second.lock(shared: true, nonBlocking: true)
+          XCTAssertThrowsError(try first.lock(nonBlocking: true)) {
+            XCTAssertEqual($0 as? Errno, .wouldBlock)
+          }
+          try second.unlock()
+          // With the other shared lock gone, the shared lock can become exclusive.
+          try first.lock(nonBlocking: true)
+          try first.unlock()
+        }
+      }
+    }
+    XCTAssertThrowsError(try FileDescriptor(rawValue: -1).lock()) {
       XCTAssertEqual($0 as? Errno, .badFileDescriptor)
     }
   }

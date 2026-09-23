@@ -233,6 +233,15 @@ internal func system_fcntl(_ fd: Int32, _ cmd: Int32, _ value: Int32) -> Int32 {
 }
 #endif // !os(Windows)
 
+#if !os(Windows) && !os(WASI)
+internal func system_flock(_ fd: Int32, _ operation: Int32) -> Int32 {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(fd, operation) }
+#endif
+  return flock(fd, operation)
+}
+#endif // !os(Windows) && !os(WASI)
+
 // These return an error number rather than setting errno.
 #if os(Linux) || os(Android) || os(FreeBSD) || os(WASI)
 internal func system_posix_fallocate(

@@ -792,6 +792,69 @@ extension FileDescriptor {
 }
 #endif // !os(Windows) && !os(WASI)
 
+#if !os(Windows) && !os(WASI)
+@available(System 199, *)
+extension FileDescriptor {
+  /// Places an advisory lock on the open file that this file descriptor
+  /// refers to.
+  ///
+  /// - Parameters:
+  ///   - shared: Whether to place a shared lock, which several open files
+  ///     can hold at once, rather than an exclusive lock, which only one can.
+  ///     The default is `false`.
+  ///   - nonBlocking: Whether to throw ``Errno/wouldBlock``
+  ///     if another open file holds a conflicting lock,
+  ///     rather than waiting for it to be released.
+  ///     The default is `false`.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// The lock is advisory:
+  /// it only excludes others that also lock the file.
+  /// It belongs to the open file, rather than to this file descriptor,
+  /// so descriptors duplicated from this one share it.
+  /// The lock is released by ``unlock(retryOnInterrupt:)``,
+  /// or when the last descriptor for the open file is closed.
+  /// Locking a file that this open file has already locked
+  /// converts the lock to the requested kind.
+  ///
+  /// The corresponding C function is `flock`.
+  @_alwaysEmitIntoClient
+  public func lock(
+    shared: Bool = false,
+    nonBlocking: Bool = false,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    let operation = (shared ? _LOCK_SH : _LOCK_EX) | (nonBlocking ? _LOCK_NB : 0)
+    try _flock(operation, retryOnInterrupt: retryOnInterrupt).get()
+  }
+
+  /// Removes the advisory lock from the open file that this file descriptor
+  /// refers to.
+  ///
+  /// - Parameters:
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// The corresponding C function is `flock`, with `LOCK_UN`.
+  @_alwaysEmitIntoClient
+  public func unlock(retryOnInterrupt: Bool = true) throws(Errno) {
+    try _flock(_LOCK_UN, retryOnInterrupt: retryOnInterrupt).get()
+  }
+
+  @usableFromInline
+  internal func _flock(_ operation: CInt, retryOnInterrupt: Bool) -> Result<(), Errno> {
+    nothingOrErrno(retryOnInterrupt: retryOnInterrupt) {
+      system_flock(self.rawValue, operation)
+    }
+  }
+}
+#endif // !os(Windows) && !os(WASI)
+
 #if !os(WASI)
 @available(System 1.1.0, *)
 extension FileDescriptor {

@@ -682,6 +682,22 @@ internal var _F_DUPFD: CInt { F_DUPFD }
 internal var _F_DUPFD_CLOEXEC: CInt { F_DUPFD_CLOEXEC }
 #endif
 
+// MARK: - flock
+
+#if !os(Windows) && !os(WASI)
+@_alwaysEmitIntoClient
+internal var _LOCK_SH: CInt { LOCK_SH }
+
+@_alwaysEmitIntoClient
+internal var _LOCK_EX: CInt { LOCK_EX }
+
+@_alwaysEmitIntoClient
+internal var _LOCK_NB: CInt { LOCK_NB }
+
+@_alwaysEmitIntoClient
+internal var _LOCK_UN: CInt { LOCK_UN }
+#endif
+
 #if SYSTEM_PACKAGE_DARWIN
 @_alwaysEmitIntoClient
 internal var _F_FULLFSYNC: CInt { F_FULLFSYNC }
