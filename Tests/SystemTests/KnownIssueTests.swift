@@ -7,21 +7,10 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-#if !os(Windows) && !os(WASI)
-
-import Testing
+import XCTest
 
 #if SYSTEM_PACKAGE_DARWIN
-import Darwin
 import Synchronization
-#elseif canImport(Glibc)
-import Glibc
-#elseif canImport(Musl)
-import Musl
-#elseif canImport(Android)
-import Android
-#else
-#error("Unsupported Platform")
 #endif
 
 #if SYSTEM_PACKAGE
@@ -31,7 +20,7 @@ import Android
 #endif
 
 // Tests for bugs in merged source. Each one checks the documented behavior,
-// and is marked as a known issue, or disabled, until the bug is fixed.
+// and expects the failure, or is skipped, until the bug is fixed.
 //
 // FileDescriptor.writeAll(_: RawSpan, retryOnInterrupt:) and
 // writeAll(toAbsoluteOffset:_: RawSpan, retryOnInterrupt:) document that
@@ -39,61 +28,72 @@ import Android
 // but they ignore the argument: `_writeAllBuffer` always passes
 // `retryOnInterrupt: true` to `_write` (Sources/System/FileHelpers.swift).
 // The OwnedFD methods of the same names forward the argument to them.
-@Suite("Known issues")
-private struct KnownIssueTests {
-
+//
+// These are XCTest tests, which run one at a time: the first installs a
+// signal handler for the process, and keeps a full pipe that another test
+// could drain by using a closed descriptor.
+final class KnownIssueTest: XCTestCase {
   #if SYSTEM_PACKAGE_DARWIN
   // Signal handling needs sigaction, whose handler field has a different name
   // in each C library; this test spells Darwin's.
-  @available(macOS 15, iOS 18, watchOS 11, tvOS 18, visionOS 2, *)
-  @Test func spanWriteAllRetriesAnInterruptedWrite() throws {
+  func testSpanWriteAllRetriesAnInterruptedWrite() throws {
+    guard #available(macOS 15, iOS 18, watchOS 11, tvOS 18, visionOS 2, *) else {
+      throw XCTSkip("Span-based I/O requires macOS 15 or later")
+    }
     // The unbuffered write honors `retryOnInterrupt: false`, which shows
     // that the signal reaches the blocked write.
     let control = try writeOneByteToAFullPipe { fd, bytes in
       try fd.write(bytes, retryOnInterrupt: false)
     }
-    #expect(throws: Errno.interrupted) { try control.get() }
+    XCTAssertThrowsError(try control.get()) {
+      XCTAssertEqual($0 as? Errno, .interrupted)
+    }
 
     let result = try writeOneByteToAFullPipe { fd, bytes in
       try fd.writeAll(RawSpan(_unsafeBytes: bytes), retryOnInterrupt: false)
     }
-    withKnownIssue("writeAll(_: RawSpan, retryOnInterrupt:) ignores retryOnInterrupt") {
-      #expect(throws: Errno.interrupted) { try result.get() }
+    try XCTExpectFailure("writeAll(_: RawSpan, retryOnInterrupt:) ignores retryOnInterrupt") {
+      XCTAssertThrowsError(try result.get()) {
+        XCTAssertEqual($0 as? Errno, .interrupted)
+      }
     }
   }
   #endif // SYSTEM_PACKAGE_DARWIN
 
-  #if ENABLE_MOCKING
-  // This covers the positioned variant too, which can't block. It's disabled
-  // because, with the bug, it never returns: after the forced EINTR, the
-  // retried write returns 0 bytes, and writeAll retries that forever.
-  @available(macOS 15, iOS 18, watchOS 11, tvOS 18, visionOS 2, *)
-  @Test(.disabled("writeAll(_: RawSpan, retryOnInterrupt:) ignores retryOnInterrupt"))
-  func spanWriteAllThrowsOnInterruptWhenNotRetrying() throws {
+  #if ENABLE_MOCKING && !os(WASI)
+  // This covers the positioned variant too, which can't block.
+  func testSpanWriteAllThrowsOnInterruptWhenNotRetrying() throws {
+    guard #available(macOS 15, iOS 18, watchOS 11, tvOS 18, visionOS 2, *) else {
+      throw XCTSkip("Span-based I/O requires macOS 15 or later")
+    }
+    // With the bug, this test never returns: after the forced EINTR, the
+    // retried write returns 0 bytes, and writeAll retries that forever.
+    try XCTSkipIf(true, "writeAll(_: RawSpan, retryOnInterrupt:) ignores retryOnInterrupt")
+
     let bytes: [UInt8] = [1, 2, 3]
     let fd = FileDescriptor(rawValue: 42)
-    MockingDriver.withMockingEnabled { mocking in
+    try MockingDriver.withMockingEnabled { mocking in
       mocking.forceErrno = .counted(errno: EINTR, count: 1)
-      #expect(throws: Errno.interrupted) {
-        try bytes.withUnsafeBytes { bytes in
-          _ = try fd.writeAll(RawSpan(_unsafeBytes: bytes), retryOnInterrupt: false)
-        }
+      XCTAssertThrowsError(try bytes.withUnsafeBytes { bytes in
+        try fd.writeAll(RawSpan(_unsafeBytes: bytes), retryOnInterrupt: false)
+      }) {
+        XCTAssertEqual($0 as? Errno, .interrupted)
       }
-      #expect(mocking.trace.dequeue()?.name == "write")
-      #expect(mocking.trace.isEmpty)
+      XCTAssertEqual(mocking.trace.dequeue()?.name, "write")
+      XCTAssertTrue(mocking.trace.isEmpty)
 
       mocking.forceErrno = .counted(errno: EINTR, count: 1)
-      #expect(throws: Errno.interrupted) {
-        try bytes.withUnsafeBytes { bytes in
-          _ = try fd.writeAll(
-            toAbsoluteOffset: 7, RawSpan(_unsafeBytes: bytes), retryOnInterrupt: false)
-        }
+      XCTAssertThrowsError(try bytes.withUnsafeBytes { bytes in
+        try fd.writeAll(
+          toAbsoluteOffset: 7, RawSpan(_unsafeBytes: bytes), retryOnInterrupt: false)
+      }) {
+        XCTAssertEqual($0 as? Errno, .interrupted)
       }
-      #expect(mocking.trace.dequeue()?.name == "pwrite")
-      #expect(mocking.trace.isEmpty)
+      XCTAssertEqual(mocking.trace.dequeue()?.name, "pwrite")
+      XCTAssertTrue(mocking.trace.isEmpty)
     }
   }
-  #endif // ENABLE_MOCKING
+  #endif // ENABLE_MOCKING && !os(WASI)
 }
 
 #if SYSTEM_PACKAGE_DARWIN
@@ -124,9 +124,10 @@ private func writeOneByteToAFullPipe(
   try check(sigaction(SIGUSR2, &action, &previous))
   defer { sigaction(SIGUSR2, &previous, nil) }
 
-  // Darwin doesn't send signals to workqueue threads, which Swift Testing
-  // runs tests on (pthread_kill fails with ENOTSUP), so the write runs on a
-  // thread of its own.
+  // The write runs on a thread of its own, the only one that gets the
+  // signal. (A test's own thread can be a workqueue thread, as it is under
+  // Swift Testing, and Darwin doesn't signal those: pthread_kill fails with
+  // ENOTSUP.)
   let writer = Writer(fd: pipe.writeEnd, write: write)
   let thread = try writer.start()
   usleep(10_000)
@@ -159,8 +160,8 @@ private final class Writer: @unchecked Sendable {
     var thread: pthread_t? = nil
     let status = pthread_create(&thread, nil, { raw in
       let writer = Unmanaged<Writer>.fromOpaque(raw).takeRetainedValue()
-      // A new thread starts with its creator's signal mask, which blocks
-      // SIGUSR2 on a workqueue thread. Unblock it for the write only.
+      // A new thread starts with its creator's signal mask, which may block
+      // SIGUSR2. Unblock it for the write only.
       var signals = sigset_t()
       sigemptyset(&signals)
       sigaddset(&signals, SIGUSR2)
@@ -203,5 +204,3 @@ private func fill(_ fd: FileDescriptor) throws(Errno) {
   }
 }
 #endif // SYSTEM_PACKAGE_DARWIN
-
-#endif // !os(Windows) && !os(WASI)
