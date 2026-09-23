@@ -283,10 +283,24 @@ internal func system_openat(
 ) -> CInt {
 #if ENABLE_MOCKING
   if mockingEnabled {
-    return _mock(fd, path, oflag)
+    return _mock(fd, String(_errorCorrectingPlatformString: path), oflag)
   }
 #endif
   return openat(fd, path, oflag)
+}
+
+internal func system_openat(
+  _ fd: CInt,
+  _ path: UnsafePointer<CInterop.PlatformChar>,
+  _ oflag: Int32,
+  _ mode: CInterop.Mode
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled {
+    return _mock(fd, String(_errorCorrectingPlatformString: path), oflag, mode)
+  }
+#endif
+  return openat(fd, path, oflag, mode)
 }
 #endif // !os(Windows)
 

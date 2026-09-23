@@ -99,6 +99,24 @@ final class FileOperationsTest: XCTestCase {
         try fd.setPermissions(
           [.ownerReadWrite, .groupRead, .otherRead], retryOnInterrupt: retryOnInterrupt)
       },
+
+      MockTestCase(name: "openat", .interruptable, 42, "a path", O_RDWR | O_APPEND) {
+        retryOnInterrupt in
+        _ = try FileDescriptor.open(
+          FilePath("a path"), relativeTo: FileDescriptor(rawValue: 42), .readWrite,
+          options: [.append], retryOnInterrupt: retryOnInterrupt)
+      },
+
+      MockTestCase(
+        name: "openat", .interruptable, 42, "a path", O_WRONLY | O_CREAT | O_APPEND, 0o777
+      ) {
+        retryOnInterrupt in
+        _ = try FileDescriptor.open(
+          "a path", relativeTo: FileDescriptor(rawValue: 42), .writeOnly,
+          options: [.create, .append],
+          permissions: [.groupReadWriteExecute, .ownerReadWriteExecute, .otherReadWriteExecute],
+          retryOnInterrupt: retryOnInterrupt)
+      },
     ]
     #endif // !os(Windows)
 
@@ -403,6 +421,38 @@ final class FileOperationsTest: XCTestCase {
         try fd.writeAll("abc".utf8)
         try fd.synchronize()
         XCTAssertEqual(try fd.fileSize(), 3)
+      }
+    }
+  }
+
+  func testOpenRelativeTo() throws {
+    try withTemporaryFilePath(basename: "testOpenRelativeTo") { path in
+      let dir = try FileDescriptor.open(path, .readOnly, options: .directory)
+      try dir.closeAfter {
+        let fd = try FileDescriptor.open(
+          "a.txt", relativeTo: dir, .readWrite,
+          options: [.create, .exclusiveCreate], permissions: .ownerReadWrite)
+        try fd.closeAfter {
+          try fd.writeAll("abc".utf8)
+
+          // An absolute path ignores the directory argument.
+          let absolute = try FileDescriptor.open(
+            path.appending("a.txt"), relativeTo: fd, .readOnly)
+          try absolute.closeAfter {
+            let readBytes = try Array<UInt8>(unsafeUninitializedCapacity: 3) { buf, count in
+              count = try absolute.read(into: UnsafeMutableRawBufferPointer(buf))
+            }
+            XCTAssertEqual(readBytes, Array("abc".utf8))
+          }
+
+          // A relative path is resolved against the directory argument.
+          XCTAssertThrowsError(try FileDescriptor.open("a.txt", relativeTo: fd, .readOnly)) {
+            XCTAssertEqual($0 as? Errno, .notDirectory)
+          }
+        }
+        XCTAssertThrowsError(try FileDescriptor.open("b.txt", relativeTo: dir, .readOnly)) {
+          XCTAssertEqual($0 as? Errno, .noSuchFileOrDirectory)
+        }
       }
     }
   }

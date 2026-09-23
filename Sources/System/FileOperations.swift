@@ -515,6 +515,106 @@ extension FileDescriptor {
   }
 }
 
+#if !os(Windows)
+extension FileDescriptor {
+  /// Opens or creates a file for reading or writing,
+  /// resolving a relative path against a directory.
+  ///
+  /// - Parameters:
+  ///   - path: The location of the file to open.
+  ///   - fd: The directory against which a relative `path` is resolved.
+  ///   - mode: The read and write access to use.
+  ///   - options: The behavior for opening the file.
+  ///   - permissions: The file permissions to use for created files.
+  ///     This value must not be `nil` when `options` contains `.create`;
+  ///     passing `nil` in that case is a programmer error and traps at runtime.
+  ///   - retryOnInterrupt: Whether to retry the open operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  /// - Returns: A file descriptor for the open file
+  ///
+  /// If `path` is absolute (starts with a forward slash), then `fd` is ignored.
+  /// If `path` is relative, it is resolved against the directory given by `fd`.
+  ///
+  /// The corresponding C function is `openat`.
+  @_alwaysEmitIntoClient
+  public static func open(
+    _ path: FilePath,
+    relativeTo fd: FileDescriptor,
+    _ mode: FileDescriptor.AccessMode,
+    options: FileDescriptor.OpenOptions = FileDescriptor.OpenOptions(),
+    permissions: FilePermissions? = nil,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) -> FileDescriptor {
+    try path.withPlatformString {
+      FileDescriptor._open(
+        $0, relativeTo: fd, mode, options: options, permissions: permissions,
+        retryOnInterrupt: retryOnInterrupt)
+    }.get()
+  }
+
+  /// Opens or creates a file for reading or writing,
+  /// resolving a relative path against a directory.
+  ///
+  /// - Parameters:
+  ///   - path: The location of the file to open.
+  ///   - fd: The directory against which a relative `path` is resolved.
+  ///   - mode: The read and write access to use.
+  ///   - options: The behavior for opening the file.
+  ///   - permissions: The file permissions to use for created files.
+  ///     This value must not be `nil` when `options` contains `.create`;
+  ///     passing `nil` in that case is a programmer error and traps at runtime.
+  ///   - retryOnInterrupt: Whether to retry the open operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  /// - Returns: A file descriptor for the open file
+  ///
+  /// If `path` is absolute (starts with a forward slash), then `fd` is ignored.
+  /// If `path` is relative, it is resolved against the directory given by `fd`.
+  ///
+  /// The corresponding C function is `openat`.
+  @_alwaysEmitIntoClient
+  public static func open(
+    _ path: UnsafePointer<CChar>,
+    relativeTo fd: FileDescriptor,
+    _ mode: FileDescriptor.AccessMode,
+    options: FileDescriptor.OpenOptions = FileDescriptor.OpenOptions(),
+    permissions: FilePermissions? = nil,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) -> FileDescriptor {
+    try FileDescriptor._open(
+      path, relativeTo: fd, mode, options: options, permissions: permissions,
+      retryOnInterrupt: retryOnInterrupt
+    ).get()
+  }
+
+  @usableFromInline
+  internal static func _open(
+    _ path: UnsafePointer<CChar>,
+    relativeTo fd: FileDescriptor,
+    _ mode: FileDescriptor.AccessMode,
+    options: FileDescriptor.OpenOptions,
+    permissions: FilePermissions?,
+    retryOnInterrupt: Bool
+  ) -> Result<FileDescriptor, Errno> {
+    let oFlag = mode.rawValue | options.rawValue
+    let descOrError: Result<CInt, Errno> = valueOrErrno(retryOnInterrupt: retryOnInterrupt) {
+      if let permissions = permissions {
+        return system_openat(fd.rawValue, path, oFlag, permissions.rawValue)
+      }
+      if options.contains(.create) {
+        fatalError(
+          "FileDescriptor.open: 'permissions' must not be nil when 'options' contains '.create'")
+      }
+      return system_openat(fd.rawValue, path, oFlag)
+    }
+    return descOrError.map { FileDescriptor(rawValue: $0) }
+  }
+}
+#endif // !os(Windows)
+
 #if !os(WASI)
 @available(System 0.0.2, *)
 extension FileDescriptor {
