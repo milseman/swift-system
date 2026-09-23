@@ -32,7 +32,7 @@ struct OwnedRedirect: ParsableCommand {
     // Keep a duplicate of the current standard output, to restore it later.
     // OwnedFD doesn't forward `duplicate()`, which returns a FileDescriptor
     // that has to be adopted.
-    let saved = try OwnedFD.standardOutput.withDescriptor { OwnedFD(taking: try $0.duplicate()) }
+    let saved = OwnedFD(taking: try OwnedFD.standardOutput.fileDescriptor.duplicate())
 
     try redirect(OwnedFD.standardOutput, to: file)
     try report(to: OwnedFD.standardOutput, "\(message)\n")
@@ -52,11 +52,7 @@ struct OwnedRedirect: ParsableCommand {
 /// The corresponding C function is `dup2`.
 func redirect(_ target: borrowing OwnedFD, to source: borrowing OwnedFD) throws {
   // `duplicate(as:)` needs both descriptors as FileDescriptor values.
-  try source.withDescriptor { source in
-    try target.withDescriptor { target in
-      _ = try source.duplicate(as: target)
-    }
-  }
+  _ = try source.fileDescriptor.duplicate(as: target.fileDescriptor)
 }
 
 func report(to fd: borrowing OwnedFD, _ text: String) throws(Errno) {

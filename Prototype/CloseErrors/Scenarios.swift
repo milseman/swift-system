@@ -41,13 +41,13 @@ func allScenarios() -> [Scenario] { [
     try fd.write("abc")
     try fd.close()
   },
-  Scenario(name: "closed-through-hatch", modeledOn: "V10a, testClosingThroughWithDescriptorLeavesOwnerStale") { () throws(Errno) in
+  Scenario(name: "closed-through-hatch", modeledOn: "V10a, testClosingVendedDescriptorLeavesOwnerStale") { () throws(Errno) in
     let fd = OwnedFD.open()
-    fd.withDescriptor { _ = Kernel.close($0) }
+    _ = Kernel.close(fd.fileDescriptor)
   },
   Scenario(name: "closed-through-hatch-reused", modeledOn: "V10a, with the number reused") { () throws(Errno) in
     let culprit = OwnedFD.open()
-    culprit.withDescriptor { _ = Kernel.close($0) }
+    _ = Kernel.close(culprit.fileDescriptor)
     let victim = OwnedFD.open()   // reuses the number
     _ = consume culprit           // closes the victim's descriptor
     try victim.write("abc")

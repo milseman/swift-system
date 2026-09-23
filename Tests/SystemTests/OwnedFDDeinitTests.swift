@@ -35,12 +35,12 @@ private struct OwnedFDDeinitTests {
     }
   }
 
-  @Test func deinitTrapsWhenClosedThroughWithDescriptor() async {
+  @Test func deinitTrapsWhenVendedDescriptorIsClosed() async {
     await #expect(processExitsWith: .failure) {
       let pipe = try FileDescriptor.pipe()
       try pipe.writeEnd.close()
       let owned = OwnedFD(taking: pipe.readEnd)
-      try owned.withDescriptor { try $0.close() }
+      try owned.fileDescriptor.close()
     }
   }
 

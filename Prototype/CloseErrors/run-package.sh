@@ -5,7 +5,7 @@
 # Usage: ./Prototype/CloseErrors/run-package.sh [DROP TRAP MUST_CLOSE EBADF]
 set -u
 root=$(cd "$(dirname "$0")/../.." && pwd)
-policies=(${@:-DROP TRAP MUST_CLOSE EBADF})
+if (( $# )); then policies=("$@"); else policies=(DROP TRAP MUST_CLOSE EBADF); fi
 for policy in $policies; do
   copy=${TMPDIR:-/tmp}/close-errors-package-$policy
   rsync -a --delete --exclude .build --exclude .git "$root/" "$copy/"

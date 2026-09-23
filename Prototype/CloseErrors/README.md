@@ -39,7 +39,7 @@ that no code saw.
 | scope-exit-close-fails | a forgotten close() on NFS | ok; dropped ioError | TRAP | TRAP | ok; dropped ioError |
 | body-throws | any throwing call before close() | threw noSpace | threw noSpace | TRAP | threw noSpace |
 | body-throws-close-fails | testThrowingScopeDropsCloseError | threw noSpace; dropped ioError | TRAP | TRAP | threw noSpace; dropped ioError |
-| closed-through-hatch | V10a, testClosingThroughWithDescriptorLeavesOwnerStale | ok; dropped badFileDescriptor | TRAP | TRAP | TRAP |
+| closed-through-hatch | V10a, testClosingVendedDescriptorLeavesOwnerStale | ok; dropped badFileDescriptor | TRAP | TRAP | TRAP |
 | closed-through-hatch-reused | V10a, with the number reused | threw badFileDescriptor; dropped badFileDescriptor | TRAP | TRAP | TRAP |
 | adopted-twice | V10a adoptTwice | ok; dropped badFileDescriptor | TRAP | TRAP | TRAP |
 | reassign | testReassignmentClosesPreviousDescriptor | ok | ok | TRAP | ok |
@@ -70,11 +70,11 @@ methods) and the Owned samples, each in its own process:
 
 The 10 tests that trap under must-close: `testDeinitClosesOnce`,
 `testBorrowingUseDoesNotClose`, `testThrowingScopeDropsCloseError`,
-`testDeinitClosesRealDescriptor`, `testWithDescriptorCanReturnOwnedFD`,
+`testDeinitClosesRealDescriptor`, `testVendedDescriptorCanBeDuplicatedAndAdopted`,
 `testConsumingParameterClosesInCallee`,
 `testReassignmentClosesPreviousDescriptor`, `testOptionalSetToNilCloses`,
 `testRelinquishedDescriptorStaysOpen`, and
-`testClosingThroughWithDescriptorLeavesOwnerStale`.
+`testClosingVendedDescriptorLeavesOwnerStale`.
 
 ## Compiler checks
 
@@ -126,7 +126,8 @@ Drop I/O errors, as before, and trap on `EBADF` in every build.
   deallocation there is always a programming error. A failed close isn't.
 - **`EBADF` is the one close error that is always a programming error.** It
   can't come from the file, only from the descriptor table. Something closed
-  the descriptor behind its owner's back: `withDescriptor { $0.close() }`, two
+  the descriptor behind its owner's back: closing the vended
+  `fileDescriptor` (or, before it, `withDescriptor { $0.close() }`), two
   owners of one descriptor, or C code that took ownership. If the number had
   been reused first, the owner would have closed an unrelated file, with no
   error to report (`closed-through-hatch-reused`). No policy catches that
@@ -155,7 +156,7 @@ in debug builds. Changing that is a one-line switch to `assertionFailure`,
 which V11e shows would then check only debug builds of SystemPackage.
 
 Tests: `Tests/SystemTests/OwnedFDDeinitTests.swift` checks the trap with
-swift-testing exit tests: closing through `withDescriptor`, and adopting one
+swift-testing exit tests: closing the vended descriptor, and adopting one
 descriptor twice. Controls check that destroying an owner normally exits
 cleanly, and that `close()` throws `EBADF` rather than trapping. Against the
 drop policy, the two trap tests fail as expected.

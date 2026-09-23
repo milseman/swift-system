@@ -86,13 +86,10 @@ func send(_ text: String, through pipe: borrowing OwnedPipe) throws(Errno) {
 
 /// Describes the read end of `pipe` for poll(2).
 ///
-/// The raw descriptor outlives the closure that produced it,
-/// and stays valid only while `pipe` is alive.
+/// The raw descriptor in the result stays valid only while `pipe` is alive.
 func pollDescriptor(forReadEndOf pipe: borrowing OwnedPipe) -> pollfd {
   // poll(2) takes raw descriptors, and System doesn't wrap it.
-  pipe.readEnd.withDescriptor {
-    pollfd(fd: $0.rawValue, events: Int16(POLLIN), revents: 0)
-  }
+  pollfd(fd: pipe.readEnd.fileDescriptor.rawValue, events: Int16(POLLIN), revents: 0)
 }
 
 /// Reads whatever is available from the read end of `pipe`,

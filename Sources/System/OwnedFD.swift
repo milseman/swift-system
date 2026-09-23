@@ -16,7 +16,8 @@
 /// `OwnedFD` can't be copied.
 /// A function that takes a `borrowing OwnedFD` parameter
 /// can read, write, and seek,
-/// but can't close the file descriptor or keep it after returning.
+/// and can reach other operations through ``fileDescriptor``,
+/// but can't close the `OwnedFD` or keep it after returning.
 ///
 /// Destroying an `OwnedFD` closes its file descriptor and ignores any error,
 /// as `closeAfter(_:)` does when its closure throws.
@@ -128,24 +129,26 @@ extension OwnedFD {
     return descriptor
   }
 
-  /// Borrows the file descriptor for the duration of a closure,
-  /// for operations that `OwnedFD` doesn't provide.
+  /// The file descriptor, for operations that `OwnedFD` doesn't provide.
   ///
-  /// The closure must not close the file descriptor,
-  /// and must not use it after returning.
-  /// If the closure closes it, the `OwnedFD` instance's own close fails
-  /// with `EBADF`, which traps if the instance is destroyed
-  /// rather than closed explicitly.
+  /// The returned value refers to the same open file,
+  /// but it doesn't own it:
+  /// it's valid only while this `OwnedFD` instance is alive.
+  /// Don't close it, and don't keep it,
+  /// even from a temporary instance such as the result of `open`.
+  /// If something closes it, the instance's own close fails with `EBADF`,
+  /// which traps if the instance is destroyed rather than closed explicitly.
+  /// To take ownership of the file descriptor, call `relinquish()`.
   @_alwaysEmitIntoClient
-  public func withDescriptor<R: ~Copyable, E: Error>(
-    body: (FileDescriptor) throws(E) -> R
-  ) throws(E) -> R {
-    try body(_descriptor)
-  }
+  public var fileDescriptor: FileDescriptor { _descriptor }
 }
 
 // Forwarded I/O. Each method calls the `FileDescriptor` method of the same
-// name; see that method for documentation.
+// name; see that method for documentation. OwnedFD forwards reading, writing,
+// and seeking, which borrowing code does most, and throws Errno even where the
+// FileDescriptor method doesn't yet. Everything else goes through
+// `fileDescriptor`, so that new FileDescriptor API needs no OwnedFD change.
+// See Prototype/Forwarding for the costs of forwarding the rest.
 extension OwnedFD {
   /// Repositions the offset for the file descriptor.
   ///

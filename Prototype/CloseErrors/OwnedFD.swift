@@ -34,9 +34,8 @@ struct OwnedFD: ~Copyable {
     return raw
   }
 
-  func withDescriptor<R, E: Error>(_ body: (Int32) throws(E) -> R) throws(E) -> R {
-    try body(raw)
-  }
+  /// The descriptor, not owned, as OwnedFD's `fileDescriptor` vends it.
+  var fileDescriptor: Int32 { raw }
 
   func write(_ text: String) throws(Errno) { try Kernel.write(raw, text) }
 

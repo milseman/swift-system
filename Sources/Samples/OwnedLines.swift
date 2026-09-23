@@ -38,7 +38,7 @@ struct OwnedLines: ParsableCommand {
 
     // fdopen(3) takes ownership only if it succeeds, so pass it the raw
     // descriptor first and relinquish ownership afterward.
-    guard let stream = file.withDescriptor(body: { fdopen($0.rawValue, "r") }) else {
+    guard let stream = fdopen(file.fileDescriptor.rawValue, "r") else {
       // `file` still owns the descriptor, and closes it on the way out.
       throw Errno(rawValue: errno)
     }
