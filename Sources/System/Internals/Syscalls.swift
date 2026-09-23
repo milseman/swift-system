@@ -707,6 +707,65 @@ internal func system_getegid() -> CInterop.GroupID {
 }
 #endif // !os(Windows) && !os(WASI)
 
+// These return an error number rather than setting errno.
+#if !os(Windows) && !os(WASI)
+internal func system_getpwuid_r(
+  _ uid: uid_t,
+  _ entry: UnsafeMutablePointer<passwd>,
+  _ buffer: UnsafeMutablePointer<CChar>,
+  _ size: Int,
+  _ result: UnsafeMutablePointer<UnsafeMutablePointer<passwd>?>
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mockReturningErrno(uid, entry, buffer, size, result) }
+#endif
+  return getpwuid_r(uid, entry, buffer, size, result)
+}
+
+internal func system_getpwnam_r(
+  _ name: UnsafePointer<CChar>,
+  _ entry: UnsafeMutablePointer<passwd>,
+  _ buffer: UnsafeMutablePointer<CChar>,
+  _ size: Int,
+  _ result: UnsafeMutablePointer<UnsafeMutablePointer<passwd>?>
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled {
+    return _mockReturningErrno(path: name, entry, buffer, size, result)
+  }
+#endif
+  return getpwnam_r(name, entry, buffer, size, result)
+}
+
+internal func system_getgrgid_r(
+  _ gid: gid_t,
+  _ entry: UnsafeMutablePointer<group>,
+  _ buffer: UnsafeMutablePointer<CChar>,
+  _ size: Int,
+  _ result: UnsafeMutablePointer<UnsafeMutablePointer<group>?>
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mockReturningErrno(gid, entry, buffer, size, result) }
+#endif
+  return getgrgid_r(gid, entry, buffer, size, result)
+}
+
+internal func system_getgrnam_r(
+  _ name: UnsafePointer<CChar>,
+  _ entry: UnsafeMutablePointer<group>,
+  _ buffer: UnsafeMutablePointer<CChar>,
+  _ size: Int,
+  _ result: UnsafeMutablePointer<UnsafeMutablePointer<group>?>
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled {
+    return _mockReturningErrno(path: name, entry, buffer, size, result)
+  }
+#endif
+  return getgrnam_r(name, entry, buffer, size, result)
+}
+#endif // !os(Windows) && !os(WASI)
+
 internal func system_getenv(
   _ name: UnsafePointer<CChar>
 ) -> UnsafeMutablePointer<CChar>? {
