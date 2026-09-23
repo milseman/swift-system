@@ -120,16 +120,8 @@ public struct ControlCharacters: Sendable {
 
   @_alwaysEmitIntoClient
   public subscript(_ character: ControlCharacter) -> CInterop.ControlCharacterValue {
-    get {
-      withUnsafeBytes(of: storage) { buffer in
-        buffer[Int(character.rawValue)]
-      }
-    }
-    set {
-      withUnsafeMutableBytes(of: &storage) { buffer in
-        buffer[Int(character.rawValue)] = newValue
-      }
-    }
+    get { self[rawIndex: Int(character.rawValue)] }
+    set { self[rawIndex: Int(character.rawValue)] = newValue }
   }
 
   @_alwaysEmitIntoClient
