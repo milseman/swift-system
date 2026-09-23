@@ -79,6 +79,7 @@ private struct SocketDescriptorTests {
 
   // MARK: - FileDescriptor Conversion Tests
 
+  @available(System 199, *)
   @Test func checkedConversionFromSocket() throws {
     for (domain, type) in [
       (SocketDescriptor.Domain.local, SocketDescriptor.ConnectionType.stream),
@@ -94,6 +95,7 @@ private struct SocketDescriptorTests {
     }
   }
 
+  @available(System 199, *)
   @Test func checkedConversionFromNonSocket() throws {
     let pipe = try FileDescriptor.pipe()
     defer {
@@ -108,6 +110,7 @@ private struct SocketDescriptorTests {
     #expect(throws: Errno.notSocket) { try SocketDescriptor(devNull) }
   }
 
+  @available(System 199, *)
   @Test func checkedConversionFromInvalidDescriptor() {
     #expect(throws: Errno.badFileDescriptor) {
       try SocketDescriptor(FileDescriptor(rawValue: -1))
