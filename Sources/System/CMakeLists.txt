@@ -17,6 +17,7 @@ add_library(SystemPackage
   MachPort.swift
   PlatformString.swift
   SystemString.swift
+  TerminalDescriptor.swift
   Util.swift
   Util+StringArray.swift
   UtilConsumers.swift
