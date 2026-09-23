@@ -9,6 +9,19 @@
 
 #if !os(Windows) && !os(WASI)
 
+// Must import here to use C winsize properties.
+#if SYSTEM_PACKAGE_DARWIN
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif canImport(Musl)
+import Musl
+#elseif canImport(Android)
+import Android
+#else
+#error("Unsupported Platform")
+#endif
+
 // MARK: - Window Size
 
 @available(System 199, *)

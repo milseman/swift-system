@@ -9,6 +9,19 @@
 
 #if !os(Windows) && !os(WASI)
 
+// Must import here to use C termios properties.
+#if SYSTEM_PACKAGE_DARWIN
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif canImport(Musl)
+import Musl
+#elseif canImport(Android)
+import Android
+#else
+#error("Unsupported Platform")
+#endif
+
 /// Terminal I/O attributes.
 ///
 /// This type represents the POSIX `termios` structure, providing type-safe access

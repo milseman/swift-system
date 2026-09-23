@@ -58,7 +58,8 @@ struct RawMode: ParsableCommand {
 
         // Show bytes in hex
         for byte in bytes {
-          print(String(format: "0x%02X ", byte), terminator: "")
+          let hex = String(byte, radix: 16, uppercase: true)
+          print("0x\(byte < 0x10 ? "0" : "")\(hex) ", terminator: "")
         }
 
         // Try to show as character if printable

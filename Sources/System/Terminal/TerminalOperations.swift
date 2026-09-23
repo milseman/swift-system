@@ -9,6 +9,19 @@
 
 #if !os(Windows) && !os(WASI)
 
+// Must import here to use the C termios initializer.
+#if SYSTEM_PACKAGE_DARWIN
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif canImport(Musl)
+import Musl
+#elseif canImport(Android)
+import Android
+#else
+#error("Unsupported Platform")
+#endif
+
 // MARK: - Terminal Operations
 
 @available(System 199, *)

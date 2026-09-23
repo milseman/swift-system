@@ -12,6 +12,18 @@
 import ArgumentParser
 import SystemPackage
 
+#if SYSTEM_PACKAGE_DARWIN
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif canImport(Musl)
+import Musl
+#elseif canImport(Android)
+import Android
+#else
+#error("Unsupported Platform")
+#endif
+
 struct TerminalSize: ParsableCommand {
   static let configuration = CommandConfiguration(
     abstract: "Display terminal window dimensions"
