@@ -1154,4 +1154,164 @@ extension FilePath {
   }
 }
 
+// MARK: - chmod, lchmod, fchmodat
+
+#if !os(WASI)
+@available(System 199, *)
+extension FilePath {
+  /// Changes the permissions of the file at this path.
+  ///
+  /// - Parameters:
+  ///   - permissions: The new permissions for the file.
+  ///   - followTargetSymlink: Whether to change the permissions
+  ///     of a symbolic link's target, if this path names a symbolic link.
+  ///     The default is `true`.
+  ///     Pass `false` to change the permissions of the link itself,
+  ///     which not every platform supports.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// The corresponding C function is `chmod`,
+  /// or `lchmod` if `followTargetSymlink` is `false`.
+  @_alwaysEmitIntoClient
+  public func setPermissions(
+    _ permissions: FilePermissions,
+    followTargetSymlink: Bool = true,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try withPlatformString {
+      FilePath._setPermissions(
+        $0, permissions, followTargetSymlink: followTargetSymlink,
+        retryOnInterrupt: retryOnInterrupt)
+    }.get()
+  }
+
+  /// Changes the permissions of the file at the given path.
+  ///
+  /// - Parameters:
+  ///   - path: The location of the file.
+  ///   - permissions: The new permissions for the file.
+  ///   - followTargetSymlink: Whether to change the permissions
+  ///     of a symbolic link's target, if `path` names a symbolic link.
+  ///     The default is `true`.
+  ///     Pass `false` to change the permissions of the link itself,
+  ///     which not every platform supports.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// The corresponding C function is `chmod`,
+  /// or `lchmod` if `followTargetSymlink` is `false`.
+  @_alwaysEmitIntoClient
+  public static func setPermissions(
+    _ path: UnsafePointer<CChar>,
+    _ permissions: FilePermissions,
+    followTargetSymlink: Bool = true,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try _setPermissions(
+      path, permissions, followTargetSymlink: followTargetSymlink,
+      retryOnInterrupt: retryOnInterrupt
+    ).get()
+  }
+
+  @usableFromInline
+  internal static func _setPermissions(
+    _ path: UnsafePointer<CChar>,
+    _ permissions: FilePermissions,
+    followTargetSymlink: Bool,
+    retryOnInterrupt: Bool
+  ) -> Result<(), Errno> {
+    nothingOrErrno(retryOnInterrupt: retryOnInterrupt) {
+      if followTargetSymlink {
+        system_chmod(path, permissions.rawValue)
+      } else {
+        system_lchmod(path, permissions.rawValue)
+      }
+    }
+  }
+
+  /// Changes the permissions of the file at this path,
+  /// resolving a relative path against a directory.
+  ///
+  /// - Parameters:
+  ///   - permissions: The new permissions for the file.
+  ///   - fd: The directory against which a relative path is resolved.
+  ///   - flags: Options that control how the path is resolved.
+  ///     Pass ``ResolutionFlags/symlinkNoFollow`` to change the permissions
+  ///     of a symbolic link itself, which not every platform supports.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// If this path is absolute (starts with a forward slash), then `fd` is ignored.
+  /// If this path is relative, it is resolved against the directory given by `fd`.
+  ///
+  /// The corresponding C function is `fchmodat`.
+  @_alwaysEmitIntoClient
+  public func setPermissions(
+    _ permissions: FilePermissions,
+    relativeTo fd: FileDescriptor,
+    flags: FilePath.ResolutionFlags = [],
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try withPlatformString {
+      FilePath._setPermissions(
+        $0, permissions, relativeTo: fd, flags: flags,
+        retryOnInterrupt: retryOnInterrupt)
+    }.get()
+  }
+
+  /// Changes the permissions of the file at the given path,
+  /// resolving a relative path against a directory.
+  ///
+  /// - Parameters:
+  ///   - path: The location of the file.
+  ///   - permissions: The new permissions for the file.
+  ///   - fd: The directory against which a relative `path` is resolved.
+  ///   - flags: Options that control how `path` is resolved.
+  ///     Pass ``ResolutionFlags/symlinkNoFollow`` to change the permissions
+  ///     of a symbolic link itself, which not every platform supports.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// If `path` is absolute (starts with a forward slash), then `fd` is ignored.
+  /// If `path` is relative, it is resolved against the directory given by `fd`.
+  ///
+  /// The corresponding C function is `fchmodat`.
+  @_alwaysEmitIntoClient
+  public static func setPermissions(
+    _ path: UnsafePointer<CChar>,
+    _ permissions: FilePermissions,
+    relativeTo fd: FileDescriptor,
+    flags: FilePath.ResolutionFlags = [],
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try _setPermissions(
+      path, permissions, relativeTo: fd, flags: flags,
+      retryOnInterrupt: retryOnInterrupt
+    ).get()
+  }
+
+  @usableFromInline
+  internal static func _setPermissions(
+    _ path: UnsafePointer<CChar>,
+    _ permissions: FilePermissions,
+    relativeTo fd: FileDescriptor,
+    flags: FilePath.ResolutionFlags,
+    retryOnInterrupt: Bool
+  ) -> Result<(), Errno> {
+    nothingOrErrno(retryOnInterrupt: retryOnInterrupt) {
+      system_fchmodat(fd.rawValue, path, permissions.rawValue, flags.rawValue)
+    }
+  }
+}
+#endif // !os(WASI)
+
 #endif // !os(Windows)

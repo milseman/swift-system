@@ -245,6 +245,48 @@ final class FilePathOperationsTest: XCTestCase {
           try FilePath.resize($0, to: 6, retryOnInterrupt: retryOnInterrupt)
         }
       },
+
+      MockTestCase(name: "chmod", .interruptable, "a path", 0o644) { retryOnInterrupt in
+        try path.setPermissions(
+          [.ownerReadWrite, .groupRead, .otherRead], retryOnInterrupt: retryOnInterrupt)
+      },
+
+      MockTestCase(name: "chmod", .interruptable, "a path", 0o644) { retryOnInterrupt in
+        try "a path".withCString {
+          try FilePath.setPermissions(
+            $0, [.ownerReadWrite, .groupRead, .otherRead],
+            retryOnInterrupt: retryOnInterrupt)
+        }
+      },
+
+      MockTestCase(name: "lchmod", .interruptable, "a path", 0o600) { retryOnInterrupt in
+        try path.setPermissions(
+          .ownerReadWrite, followTargetSymlink: false, retryOnInterrupt: retryOnInterrupt)
+      },
+
+      MockTestCase(name: "lchmod", .interruptable, "a path", 0o600) { retryOnInterrupt in
+        try "a path".withCString {
+          try FilePath.setPermissions(
+            $0, .ownerReadWrite, followTargetSymlink: false,
+            retryOnInterrupt: retryOnInterrupt)
+        }
+      },
+
+      MockTestCase(
+        name: "fchmodat", .interruptable, 42, "a path", 0o600, AT_SYMLINK_NOFOLLOW
+      ) { retryOnInterrupt in
+        try path.setPermissions(
+          .ownerReadWrite, relativeTo: dir, flags: .symlinkNoFollow,
+          retryOnInterrupt: retryOnInterrupt)
+      },
+
+      MockTestCase(name: "fchmodat", .interruptable, 42, "a path", 0o600, 0) {
+        retryOnInterrupt in
+        try "a path".withCString {
+          try FilePath.setPermissions(
+            $0, .ownerReadWrite, relativeTo: dir, retryOnInterrupt: retryOnInterrupt)
+        }
+      },
     ]
 
     for test in syscallTestCases { test.runAllTests() }
@@ -651,6 +693,68 @@ final class FilePathOperationsTest: XCTestCase {
       }
     }
   }
+
+  #if !os(WASI)
+  @available(System 199, *)
+  func testSetPermissions() throws {
+    try withTemporaryFilePath(basename: "testSetPermissions") { path in
+      let file = path.appending("file")
+      let fd = try FileDescriptor.open(
+        file, .writeOnly, options: .create, permissions: .ownerReadWrite)
+      try fd.close()
+
+      try file.setPermissions([.ownerRead, .groupRead])
+      XCTAssertEqual(try file.stat().permissions, [.ownerRead, .groupRead])
+
+      try file.withCString { try FilePath.setPermissions($0, .ownerReadWrite) }
+      XCTAssertEqual(try file.stat().permissions, .ownerReadWrite)
+
+      // By default, a symbolic link's target changes.
+      let link = path.appending("link")
+      try link.makeSymbolicLink(to: "file")
+      let linkPermissions = try link.stat(followTargetSymlink: false).permissions
+      try link.setPermissions([.ownerReadWrite, .groupRead])
+      XCTAssertEqual(try file.stat().permissions, [.ownerReadWrite, .groupRead])
+      XCTAssertEqual(try link.stat(followTargetSymlink: false).permissions, linkPermissions)
+
+      #if SYSTEM_PACKAGE_DARWIN || os(FreeBSD)
+      // Only some platforms can change a symbolic link's own permissions.
+      try link.setPermissions(.ownerReadWriteExecute, followTargetSymlink: false)
+      XCTAssertEqual(
+        try link.stat(followTargetSymlink: false).permissions, .ownerReadWriteExecute)
+      XCTAssertEqual(try file.stat().permissions, [.ownerReadWrite, .groupRead])
+      #endif
+
+      XCTAssertThrowsError(try path.appending("missing").setPermissions(.ownerReadWrite)) {
+        XCTAssertEqual($0 as? Errno, .noSuchFileOrDirectory)
+      }
+
+      let dir = try FileDescriptor.open(path, .readOnly, options: .directory)
+      try dir.closeAfter {
+        try FilePath("file").setPermissions(.ownerRead, relativeTo: dir)
+        XCTAssertEqual(try file.stat().permissions, .ownerRead)
+
+        try "link".withCString {
+          try FilePath.setPermissions($0, .ownerReadWrite, relativeTo: dir)
+        }
+        XCTAssertEqual(try file.stat().permissions, .ownerReadWrite)
+
+        #if SYSTEM_PACKAGE_DARWIN || os(FreeBSD)
+        try FilePath("link").setPermissions(
+          .ownerRead, relativeTo: dir, flags: .symlinkNoFollow)
+        XCTAssertEqual(try link.stat(followTargetSymlink: false).permissions, .ownerRead)
+        XCTAssertEqual(try file.stat().permissions, .ownerReadWrite)
+        #endif
+
+        XCTAssertThrowsError(
+          try FilePath("missing").setPermissions(.ownerRead, relativeTo: dir)
+        ) {
+          XCTAssertEqual($0 as? Errno, .noSuchFileOrDirectory)
+        }
+      }
+    }
+  }
+  #endif // !os(WASI)
 }
 
 #endif // !os(Windows)

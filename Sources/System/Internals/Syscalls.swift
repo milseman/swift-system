@@ -417,6 +417,48 @@ internal func system_truncate(
   return truncate(path, length)
 }
 
+#if !os(WASI)
+internal func system_chmod(
+  _ path: UnsafePointer<CInterop.PlatformChar>,
+  _ mode: CInterop.Mode
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(path: path, mode) }
+#endif
+  return chmod(path, mode)
+}
+
+internal func system_lchmod(
+  _ path: UnsafePointer<CInterop.PlatformChar>,
+  _ mode: CInterop.Mode
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(path: path, mode) }
+#endif
+#if os(Android) || os(OpenBSD)
+  // Not every Android API level, nor OpenBSD, declares lchmod.
+  // This is its POSIX spelling.
+  return fchmodat(AT_FDCWD, path, mode, AT_SYMLINK_NOFOLLOW)
+#else
+  return lchmod(path, mode)
+#endif
+}
+
+internal func system_fchmodat(
+  _ fd: CInt,
+  _ path: UnsafePointer<CInterop.PlatformChar>,
+  _ mode: CInterop.Mode,
+  _ flag: CInt
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled {
+    return _mock(fd, String(_errorCorrectingPlatformString: path), mode, flag)
+  }
+#endif
+  return fchmodat(fd, path, mode, flag)
+}
+#endif // !os(WASI)
+
 internal func system_fdopendir(
   _ fd: CInt
 ) -> system_DIRPtr? {
