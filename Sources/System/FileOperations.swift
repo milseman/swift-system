@@ -1293,6 +1293,43 @@ extension FileDescriptor {
       system_posix_fallocate(self.rawValue, _COffT(offset), _COffT(length))
     }
   }
+
+  /// Tells the system how you expect to access a range of the file
+  /// referenced by this file descriptor.
+  ///
+  /// - Parameters:
+  ///   - advice: How you expect to access the data.
+  ///   - offset: The file offset where the range begins.
+  ///     The default is `0`.
+  ///   - length: The length of the range, in bytes,
+  ///     or `0` for a range that extends to the end of the file.
+  ///     The default is `0`.
+  ///
+  /// The system can use the advice to optimize caching and read-ahead,
+  /// or ignore it; it doesn't change the file's contents.
+  ///
+  /// The corresponding C function is `posix_fadvise`.
+  /// - Note: Only available on Linux, Android, FreeBSD, and WASI.
+  @_alwaysEmitIntoClient
+  public func advise(
+    _ advice: Advice,
+    offset: Int64 = 0,
+    length: Int64 = 0
+  ) throws(Errno) {
+    try _advise(advice, offset: offset, length: length).get()
+  }
+
+  @usableFromInline
+  internal func _advise(
+    _ advice: Advice,
+    offset: Int64,
+    length: Int64
+  ) -> Result<(), Errno> {
+    nothingOrReturnedErrno(retryOnInterrupt: false) {
+      system_posix_fadvise(
+        self.rawValue, _COffT(offset), _COffT(length), advice.rawValue)
+    }
+  }
 }
 #endif // os(Linux) || os(Android) || os(FreeBSD) || os(WASI)
 

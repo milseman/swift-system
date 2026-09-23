@@ -682,6 +682,64 @@ internal var _F_FULLFSYNC: CInt { F_FULLFSYNC }
 internal var _F_BARRIERFSYNC: CInt { F_BARRIERFSYNC }
 #endif
 
+// MARK: - posix_fadvise
+
+#if os(Linux) || os(Android) || os(FreeBSD) || os(WASI)
+@_alwaysEmitIntoClient
+internal var _POSIX_FADV_NORMAL: CInt {
+#if os(WASI)
+  _getConst_POSIX_FADV_NORMAL()
+#else
+  POSIX_FADV_NORMAL
+#endif
+}
+
+@_alwaysEmitIntoClient
+internal var _POSIX_FADV_SEQUENTIAL: CInt {
+#if os(WASI)
+  _getConst_POSIX_FADV_SEQUENTIAL()
+#else
+  POSIX_FADV_SEQUENTIAL
+#endif
+}
+
+@_alwaysEmitIntoClient
+internal var _POSIX_FADV_RANDOM: CInt {
+#if os(WASI)
+  _getConst_POSIX_FADV_RANDOM()
+#else
+  POSIX_FADV_RANDOM
+#endif
+}
+
+@_alwaysEmitIntoClient
+internal var _POSIX_FADV_WILLNEED: CInt {
+#if os(WASI)
+  _getConst_POSIX_FADV_WILLNEED()
+#else
+  POSIX_FADV_WILLNEED
+#endif
+}
+
+@_alwaysEmitIntoClient
+internal var _POSIX_FADV_DONTNEED: CInt {
+#if os(WASI)
+  _getConst_POSIX_FADV_DONTNEED()
+#else
+  POSIX_FADV_DONTNEED
+#endif
+}
+
+@_alwaysEmitIntoClient
+internal var _POSIX_FADV_NOREUSE: CInt {
+#if os(WASI)
+  _getConst_POSIX_FADV_NOREUSE()
+#else
+  POSIX_FADV_NOREUSE
+#endif
+}
+#endif // os(Linux) || os(Android) || os(FreeBSD) || os(WASI)
+
 // MARK: - File System
 
 #if !os(Windows)

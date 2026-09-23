@@ -233,7 +233,7 @@ internal func system_fcntl(_ fd: Int32, _ cmd: Int32, _ value: Int32) -> Int32 {
 }
 #endif // !os(Windows)
 
-// Returns an error number rather than setting errno.
+// These return an error number rather than setting errno.
 #if os(Linux) || os(Android) || os(FreeBSD) || os(WASI)
 internal func system_posix_fallocate(
   _ fd: Int32, _ offset: off_t, _ length: off_t
@@ -242,6 +242,15 @@ internal func system_posix_fallocate(
   if mockingEnabled { return _mockReturningErrno(fd, offset, length) }
 #endif
   return posix_fallocate(fd, offset, length)
+}
+
+internal func system_posix_fadvise(
+  _ fd: Int32, _ offset: off_t, _ length: off_t, _ advice: Int32
+) -> Int32 {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mockReturningErrno(fd, offset, length, advice) }
+#endif
+  return posix_fadvise(fd, offset, length, advice)
 }
 #endif // os(Linux) || os(Android) || os(FreeBSD) || os(WASI)
 

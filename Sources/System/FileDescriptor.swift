@@ -623,6 +623,88 @@ extension FileDescriptor {
 }
 #endif // !os(Windows)
 
+#if os(Linux) || os(Android) || os(FreeBSD) || os(WASI)
+@available(System 199, *)
+extension FileDescriptor {
+  /// Advice about how you expect to access a file's data,
+  /// which the system can use to optimize caching and read-ahead.
+  ///
+  /// To give advice, call ``FileDescriptor/advise(_:offset:length:)``.
+  @frozen
+  public struct Advice: RawRepresentable, Sendable, Hashable, Codable {
+    /// The raw C value.
+    @_alwaysEmitIntoClient
+    public var rawValue: CInt
+
+    /// Creates a strongly-typed advice value from a raw C value.
+    @_alwaysEmitIntoClient
+    public init(rawValue: CInt) { self.rawValue = rawValue }
+
+    /// Indicates that you have no advice to give,
+    /// restoring the default behavior.
+    ///
+    /// The corresponding C constant is `POSIX_FADV_NORMAL`.
+    @_alwaysEmitIntoClient
+    public static var normal: Advice { Advice(rawValue: _POSIX_FADV_NORMAL) }
+
+    @_alwaysEmitIntoClient
+    @available(*, unavailable, renamed: "normal")
+    public static var POSIX_FADV_NORMAL: Advice { normal }
+
+    /// Indicates that you expect to access the data sequentially,
+    /// from lower offsets to higher ones.
+    ///
+    /// The corresponding C constant is `POSIX_FADV_SEQUENTIAL`.
+    @_alwaysEmitIntoClient
+    public static var sequential: Advice { Advice(rawValue: _POSIX_FADV_SEQUENTIAL) }
+
+    @_alwaysEmitIntoClient
+    @available(*, unavailable, renamed: "sequential")
+    public static var POSIX_FADV_SEQUENTIAL: Advice { sequential }
+
+    /// Indicates that you expect to access the data in a random order.
+    ///
+    /// The corresponding C constant is `POSIX_FADV_RANDOM`.
+    @_alwaysEmitIntoClient
+    public static var random: Advice { Advice(rawValue: _POSIX_FADV_RANDOM) }
+
+    @_alwaysEmitIntoClient
+    @available(*, unavailable, renamed: "random")
+    public static var POSIX_FADV_RANDOM: Advice { random }
+
+    /// Indicates that you expect to access the data in the near future.
+    ///
+    /// The corresponding C constant is `POSIX_FADV_WILLNEED`.
+    @_alwaysEmitIntoClient
+    public static var willNeed: Advice { Advice(rawValue: _POSIX_FADV_WILLNEED) }
+
+    @_alwaysEmitIntoClient
+    @available(*, unavailable, renamed: "willNeed")
+    public static var POSIX_FADV_WILLNEED: Advice { willNeed }
+
+    /// Indicates that you don't expect to access the data in the near future.
+    ///
+    /// The corresponding C constant is `POSIX_FADV_DONTNEED`.
+    @_alwaysEmitIntoClient
+    public static var dontNeed: Advice { Advice(rawValue: _POSIX_FADV_DONTNEED) }
+
+    @_alwaysEmitIntoClient
+    @available(*, unavailable, renamed: "dontNeed")
+    public static var POSIX_FADV_DONTNEED: Advice { dontNeed }
+
+    /// Indicates that you expect to access the data only once.
+    ///
+    /// The corresponding C constant is `POSIX_FADV_NOREUSE`.
+    @_alwaysEmitIntoClient
+    public static var noReuse: Advice { Advice(rawValue: _POSIX_FADV_NOREUSE) }
+
+    @_alwaysEmitIntoClient
+    @available(*, unavailable, renamed: "noReuse")
+    public static var POSIX_FADV_NOREUSE: Advice { noReuse }
+  }
+}
+#endif // os(Linux) || os(Android) || os(FreeBSD) || os(WASI)
+
 @available(System 0.0.1, *)
 extension FileDescriptor.AccessMode
   : CustomStringConvertible, CustomDebugStringConvertible

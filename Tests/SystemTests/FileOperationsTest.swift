@@ -205,6 +205,21 @@ final class FileOperationsTest: XCTestCase {
       try fd.allocateSpace(offset: 512, length: 4096, retryOnInterrupt: retryOnInterrupt)
     }
     fallocate.runAllTests()
+
+    let fadvise = [
+      MockTestCase(
+        name: "posix_fadvise", .noInterrupt, rawFD, 0, 0, POSIX_FADV_SEQUENTIAL
+      ) { _ in
+        try fd.advise(.sequential)
+      },
+
+      MockTestCase(
+        name: "posix_fadvise", .noInterrupt, rawFD, 512, 4096, POSIX_FADV_DONTNEED
+      ) { _ in
+        try fd.advise(.dontNeed, offset: 512, length: 4096)
+      },
+    ]
+    for test in fadvise { test.runAllTests() }
     #endif // os(Linux) || os(Android) || os(FreeBSD) || os(WASI)
   }
   #endif // ENABLE_MOCKING && !os(WASI) && !os(Windows)
@@ -750,6 +765,37 @@ final class FileOperationsTest: XCTestCase {
         }
       }
     }
+  }
+
+  @available(System 199, *)
+  func testAdvise() throws {
+    try withTemporaryFilePath(basename: "testAdvise") { path in
+      let fd = try FileDescriptor.open(path.appending("\(UUID().uuidString).txt"), .readWrite, options: [.create, .truncate], permissions: .ownerReadWrite)
+      try fd.closeAfter {
+        try fd.writeAll(Array(repeating: UInt8(ascii: "a"), count: 1 << 14))
+        for advice in [
+          FileDescriptor.Advice.sequential, .random, .willNeed, .dontNeed, .noReuse, .normal,
+        ] {
+          try fd.advise(advice)
+          try fd.advise(advice, offset: 4096, length: 4096)
+        }
+        // Advice doesn't change the file.
+        XCTAssertEqual(try fd.stat().size, 1 << 14)
+      }
+    }
+    XCTAssertThrowsError(try FileDescriptor(rawValue: -1).advise(.normal)) {
+      XCTAssertEqual($0 as? Errno, .badFileDescriptor)
+    }
+    #if !os(WASI) // WASI has no pipe
+    let pipe = try FileDescriptor.pipe()
+    try pipe.readEnd.closeAfter {
+      try pipe.writeEnd.closeAfter {
+        XCTAssertThrowsError(try pipe.readEnd.advise(.sequential)) {
+          XCTAssertEqual($0 as? Errno, .illegalSeek)
+        }
+      }
+    }
+    #endif
   }
 #endif // os(Linux) || os(Android) || os(FreeBSD) || os(WASI)
 }
