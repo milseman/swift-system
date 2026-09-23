@@ -360,25 +360,34 @@ final class TerminalTests: XCTestCase {
     var attrs = TerminalAttributes()
 
     // Set some flags that makeRaw should clear
-    attrs.localFlags.insert([.canonical, .echo, .signals])
-    attrs.inputFlags.insert(.breakInterrupt)
+    let local: LocalFlags = [.canonical, .echo, .echoNL, .signals, .extendedInput]
+    let input: InputFlags = [
+      .breakInterrupt, .mapCRToNL, .mapNLToCR, .ignoreCR, .markParityErrors,
+      .stripHighBit, .startStopOutput,
+    ]
+    attrs.localFlags.insert(local)
+    attrs.inputFlags.insert(input)
     attrs.outputFlags.insert(.postProcess)
+    attrs.characterSize = .bits7
+    attrs.parity = .even
 
+    var expected = attrs.rawValue
+    cfmakeraw(&expected)
     attrs.makeRaw()
 
     // Verify raw mode flags are set correctly
-    XCTAssertFalse(attrs.localFlags.contains(.canonical))
-    XCTAssertFalse(attrs.localFlags.contains(.echo))
-    XCTAssertFalse(attrs.localFlags.contains(.signals))
-    XCTAssertFalse(attrs.inputFlags.contains(.breakInterrupt))
+    XCTAssertEqual(attrs.localFlags.intersection(local), [])
+    XCTAssertEqual(attrs.inputFlags.intersection(input), [])
     XCTAssertFalse(attrs.outputFlags.contains(.postProcess))
-
-    // Verify character size is 8 bits
-    XCTAssertTrue(attrs.controlFlags.contains(.characterSize8))
+    XCTAssertEqual(attrs.characterSize, .bits8)
+    XCTAssertEqual(attrs.parity, .none)
 
     // Verify MIN and TIME are set for immediate single-character reads
     XCTAssertEqual(attrs.controlCharacters[.minimum], 1)
     XCTAssertEqual(attrs.controlCharacters[.time], 0)
+
+    // Raw mode is the C library's.
+    XCTAssertEqual(attrs, TerminalAttributes(rawValue: expected))
   }
 
   func testRawMethod() {
@@ -580,6 +589,26 @@ final class TerminalTests: XCTestCase {
       try controller.writeAll("y".utf8)
       XCTAssertFalse(try isReadable(fd, timeout: 100))
       XCTAssertEqual(try readBytes(from: controller, count: 1), Array("y".utf8))
+    }
+  }
+
+  func testRawModeInputIsUnprocessed() throws {
+    try withPseudoterminal { controller, fd in
+      let terminal = try TerminalDescriptor(fd)
+      // Input processing that raw mode turns off, though a new terminal
+      // doesn't have it on: mapping NL to CR, and on Linux, marking parity
+      // errors, which doubles each 0xFF byte.
+      var attributes = try terminal.attributes()
+      attributes.inputFlags.insert([.mapNLToCR, .markParityErrors])
+      try terminal.setAttributes(attributes, when: .now)
+
+      try terminal.withRawMode {
+        // Newline, carriage return, 0xFF, NUL, and the default interrupt
+        // and erase characters all arrive unchanged.
+        let bytes: [UInt8] = [0x0A, 0x0D, 0xFF, 0x00, 0x03, 0x7F]
+        try controller.writeAll(bytes)
+        XCTAssertEqual(try readBytes(from: fd, count: bytes.count), bytes)
+      }
     }
   }
 

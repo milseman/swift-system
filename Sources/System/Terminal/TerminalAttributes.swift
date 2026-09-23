@@ -126,15 +126,16 @@ public struct TerminalAttributes: RawRepresentable, Equatable, Hashable, Sendabl
 
   /// Configures these attributes for raw mode in place.
   ///
-  /// Raw mode configures the terminal for character-at-a-time input with no processing.
+  /// In raw mode, input can be read a byte at a time, as soon as it arrives,
+  /// and passes through unchanged: the terminal doesn't collect it into
+  /// lines, echo it, or treat any character specially.
+  /// Output passes through without postprocessing,
+  /// and characters have 8 bits and no parity.
+  /// Exactly which flags raw mode changes varies by platform.
+  ///
+  /// The corresponding C function is `cfmakeraw`.
   public mutating func makeRaw() {
-    localFlags.subtract([.canonical, .echo, .signals, .extendedInput])
-    inputFlags.subtract([.breakInterrupt, .mapCRToNL, .ignoreCR, .parityCheck, .stripHighBit, .startStopOutput])
-    outputFlags.remove(.postProcess)
-    controlFlags.remove(.characterSizeMask)
-    controlFlags.insert(.characterSize8)
-    controlCharacters[.minimum] = 1
-    controlCharacters[.time] = 0
+    withUnsafeMutablePointer(to: &rawValue) { system_cfmakeraw($0) }
   }
 
   /// Returns a copy of these attributes configured for raw mode.
