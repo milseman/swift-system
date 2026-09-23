@@ -942,6 +942,33 @@ internal func system_getgrnam_r(
 }
 #endif // !os(Windows) && !os(WASI)
 
+// These return -1 without setting errno for a variable with no limit.
+#if !os(Windows) && !os(WASI)
+internal func system_sysconf(_ name: CInt) -> Int {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mockInt(name) }
+#endif
+  return sysconf(name)
+}
+
+internal func system_pathconf(
+  _ path: UnsafePointer<CInterop.PlatformChar>,
+  _ name: CInt
+) -> Int {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mockInt(path: path, name) }
+#endif
+  return pathconf(path, name)
+}
+
+internal func system_fpathconf(_ fd: CInt, _ name: CInt) -> Int {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mockInt(fd, name) }
+#endif
+  return fpathconf(fd, name)
+}
+#endif // !os(Windows) && !os(WASI)
+
 #if !os(Windows) && !os(WASI)
 internal func system_getpid() -> CInterop.ProcessID {
   return getpid()

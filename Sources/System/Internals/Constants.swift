@@ -927,6 +927,159 @@ internal var _F_GETPIPE_SZ: CInt { CSYSTEM_F_GETPIPE_SZ }
 internal var _F_SETPIPE_SZ: CInt { CSYSTEM_F_SETPIPE_SZ }
 #endif
 
+// MARK: - sysconf and pathconf
+
+#if !os(Windows) && !os(WASI)
+// These are macros on some platforms and enumerations on others.
+@_alwaysEmitIntoClient
+internal var __SC_ARG_MAX: CInt { CInt(_SC_ARG_MAX) }
+
+@_alwaysEmitIntoClient
+internal var __SC_CHILD_MAX: CInt { CInt(_SC_CHILD_MAX) }
+
+@_alwaysEmitIntoClient
+internal var __SC_CLK_TCK: CInt { CInt(_SC_CLK_TCK) }
+
+@_alwaysEmitIntoClient
+internal var __SC_IOV_MAX: CInt { CInt(_SC_IOV_MAX) }
+
+@_alwaysEmitIntoClient
+internal var __SC_NGROUPS_MAX: CInt { CInt(_SC_NGROUPS_MAX) }
+
+@_alwaysEmitIntoClient
+internal var __SC_NPROCESSORS_CONF: CInt { CInt(_SC_NPROCESSORS_CONF) }
+
+@_alwaysEmitIntoClient
+internal var __SC_NPROCESSORS_ONLN: CInt { CInt(_SC_NPROCESSORS_ONLN) }
+
+@_alwaysEmitIntoClient
+internal var __SC_OPEN_MAX: CInt { CInt(_SC_OPEN_MAX) }
+
+@_alwaysEmitIntoClient
+internal var __SC_PAGESIZE: CInt { CInt(_SC_PAGESIZE) }
+
+@_alwaysEmitIntoClient
+internal var __SC_STREAM_MAX: CInt { CInt(_SC_STREAM_MAX) }
+
+@_alwaysEmitIntoClient
+internal var __SC_TZNAME_MAX: CInt { CInt(_SC_TZNAME_MAX) }
+
+@_alwaysEmitIntoClient
+internal var __SC_JOB_CONTROL: CInt { CInt(_SC_JOB_CONTROL) }
+
+@_alwaysEmitIntoClient
+internal var __SC_SAVED_IDS: CInt { CInt(_SC_SAVED_IDS) }
+
+@_alwaysEmitIntoClient
+internal var __SC_VERSION: CInt { CInt(_SC_VERSION) }
+
+@_alwaysEmitIntoClient
+internal var __SC_BC_BASE_MAX: CInt { CInt(_SC_BC_BASE_MAX) }
+
+@_alwaysEmitIntoClient
+internal var __SC_BC_DIM_MAX: CInt { CInt(_SC_BC_DIM_MAX) }
+
+@_alwaysEmitIntoClient
+internal var __SC_BC_SCALE_MAX: CInt { CInt(_SC_BC_SCALE_MAX) }
+
+@_alwaysEmitIntoClient
+internal var __SC_BC_STRING_MAX: CInt { CInt(_SC_BC_STRING_MAX) }
+
+@_alwaysEmitIntoClient
+internal var __SC_COLL_WEIGHTS_MAX: CInt { CInt(_SC_COLL_WEIGHTS_MAX) }
+
+@_alwaysEmitIntoClient
+internal var __SC_EXPR_NEST_MAX: CInt { CInt(_SC_EXPR_NEST_MAX) }
+
+@_alwaysEmitIntoClient
+internal var __SC_LINE_MAX: CInt { CInt(_SC_LINE_MAX) }
+
+@_alwaysEmitIntoClient
+internal var __SC_RE_DUP_MAX: CInt { CInt(_SC_RE_DUP_MAX) }
+
+@_alwaysEmitIntoClient
+internal var __SC_2_VERSION: CInt { CInt(_SC_2_VERSION) }
+
+@_alwaysEmitIntoClient
+internal var __SC_2_C_BIND: CInt { CInt(_SC_2_C_BIND) }
+
+@_alwaysEmitIntoClient
+internal var __SC_2_C_DEV: CInt { CInt(_SC_2_C_DEV) }
+
+@_alwaysEmitIntoClient
+internal var __SC_2_CHAR_TERM: CInt { CInt(_SC_2_CHAR_TERM) }
+
+@_alwaysEmitIntoClient
+internal var __SC_2_FORT_DEV: CInt { CInt(_SC_2_FORT_DEV) }
+
+@_alwaysEmitIntoClient
+internal var __SC_2_FORT_RUN: CInt { CInt(_SC_2_FORT_RUN) }
+
+@_alwaysEmitIntoClient
+internal var __SC_2_LOCALEDEF: CInt { CInt(_SC_2_LOCALEDEF) }
+
+@_alwaysEmitIntoClient
+internal var __SC_2_SW_DEV: CInt { CInt(_SC_2_SW_DEV) }
+
+@_alwaysEmitIntoClient
+internal var __SC_2_UPE: CInt { CInt(_SC_2_UPE) }
+
+@_alwaysEmitIntoClient
+internal var __SC_PHYS_PAGES: CInt { CInt(_SC_PHYS_PAGES) }
+
+@_alwaysEmitIntoClient
+internal var __SC_GETPW_R_SIZE_MAX: CInt { CInt(_SC_GETPW_R_SIZE_MAX) }
+
+@_alwaysEmitIntoClient
+internal var __SC_GETGR_R_SIZE_MAX: CInt { CInt(_SC_GETGR_R_SIZE_MAX) }
+
+@_alwaysEmitIntoClient
+internal var __SC_HOST_NAME_MAX: CInt { CInt(_SC_HOST_NAME_MAX) }
+
+@_alwaysEmitIntoClient
+internal var __PC_LINK_MAX: CInt { CInt(_PC_LINK_MAX) }
+
+@_alwaysEmitIntoClient
+internal var __PC_MAX_CANON: CInt { CInt(_PC_MAX_CANON) }
+
+@_alwaysEmitIntoClient
+internal var __PC_MAX_INPUT: CInt { CInt(_PC_MAX_INPUT) }
+
+@_alwaysEmitIntoClient
+internal var __PC_NAME_MAX: CInt { CInt(_PC_NAME_MAX) }
+
+@_alwaysEmitIntoClient
+internal var __PC_PATH_MAX: CInt { CInt(_PC_PATH_MAX) }
+
+@_alwaysEmitIntoClient
+internal var __PC_PIPE_BUF: CInt { CInt(_PC_PIPE_BUF) }
+
+@_alwaysEmitIntoClient
+internal var __PC_CHOWN_RESTRICTED: CInt { CInt(_PC_CHOWN_RESTRICTED) }
+
+@_alwaysEmitIntoClient
+internal var __PC_NO_TRUNC: CInt { CInt(_PC_NO_TRUNC) }
+
+@_alwaysEmitIntoClient
+internal var __PC_VDISABLE: CInt { CInt(_PC_VDISABLE) }
+
+@_alwaysEmitIntoClient
+internal var __PC_FILESIZEBITS: CInt { CInt(_PC_FILESIZEBITS) }
+
+@_alwaysEmitIntoClient
+internal var __PC_SYMLINK_MAX: CInt { CInt(_PC_SYMLINK_MAX) }
+
+#if SYSTEM_PACKAGE_DARWIN
+@_alwaysEmitIntoClient
+internal var __PC_XATTR_SIZE_BITS: CInt { CInt(_PC_XATTR_SIZE_BITS) }
+#endif
+
+#if SYSTEM_PACKAGE_DARWIN || os(FreeBSD)
+@_alwaysEmitIntoClient
+internal var __PC_MIN_HOLE_SIZE: CInt { CInt(_PC_MIN_HOLE_SIZE) }
+#endif
+#endif // !os(Windows) && !os(WASI)
+
 // MARK: - posix_fadvise
 
 #if os(Linux) || os(Android) || os(FreeBSD) || os(WASI)

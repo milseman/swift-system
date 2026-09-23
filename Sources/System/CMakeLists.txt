@@ -22,6 +22,7 @@ add_library(SystemPackage
   OwnedFD.swift
   PlatformString.swift
   ProcessID.swift
+  SystemConfig.swift
   SystemString.swift
   UserDatabase.swift
   Util.swift
