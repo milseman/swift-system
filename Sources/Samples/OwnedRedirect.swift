@@ -32,7 +32,7 @@ struct OwnedRedirect: ParsableCommand {
     // Keep a duplicate of the current standard output, to restore it later.
     // OwnedFD doesn't forward `duplicate()`, which returns a FileDescriptor
     // that has to be adopted.
-    let saved = try OwnedFD.standardOutput.withDescriptor { OwnedFD(try $0.duplicate()) }
+    let saved = try OwnedFD.standardOutput.withDescriptor { OwnedFD(taking: try $0.duplicate()) }
 
     try redirect(OwnedFD.standardOutput, to: file)
     try report(to: OwnedFD.standardOutput, "\(message)\n")

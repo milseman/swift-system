@@ -91,7 +91,7 @@ final class WriteAllInterruptTest: XCTestCase {
       XCTAssertEqual(mocking.trace.dequeue()?.name, "pwrite")
       XCTAssertTrue(mocking.trace.isEmpty)
 
-      let owned = OwnedFD(fd)
+      let owned = OwnedFD(taking: fd)
       mocking.forceErrno = .counted(errno: EINTR, count: 1)
       XCTAssertThrowsError(try bytes.withUnsafeBytes { bytes in
         try owned.writeAll(RawSpan(_unsafeBytes: bytes), retryOnInterrupt: false)

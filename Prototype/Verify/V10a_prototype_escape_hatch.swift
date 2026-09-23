@@ -14,7 +14,7 @@ func closeStandardInputThroughHatch() throws {
 }
 
 func adoptTwice(_ fd: FileDescriptor) {
-  let a = OwnedFD(fd)                         // two owners of one descriptor
-  let b = OwnedFD(fd)
+  let a = OwnedFD(taking: fd)                 // two owners of one descriptor
+  let b = OwnedFD(taking: fd)
   _ = a; _ = b
 }

@@ -48,8 +48,8 @@ struct OwnedPipe: ~Copyable {
     // A tuple can't hold noncopyable values, so `FileDescriptor.pipe()`
     // has no owned equivalent; adopt each end.
     let fds = try FileDescriptor.pipe()
-    readEnd = OwnedFD(fds.readEnd)
-    writeEnd = OwnedFD(fds.writeEnd)
+    readEnd = OwnedFD(taking: fds.readEnd)
+    writeEnd = OwnedFD(taking: fds.writeEnd)
   }
 }
 

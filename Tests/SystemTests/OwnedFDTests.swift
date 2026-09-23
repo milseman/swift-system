@@ -38,7 +38,7 @@ final class OwnedFDTest: XCTestCase {
   func testDeinitClosesOnce() {
     MockingDriver.withMockingEnabled { mocking in
       do {
-        let fd = OwnedFD(FileDescriptor(rawValue: 42))
+        let fd = OwnedFD(taking: FileDescriptor(rawValue: 42))
         _ = fd.withDescriptor { $0.rawValue }
       }
       XCTAssertEqual(drain(mocking), ["close(42)"])
@@ -47,7 +47,7 @@ final class OwnedFDTest: XCTestCase {
 
   func testCloseClosesOnce() throws {
     try MockingDriver.withMockingEnabled { mocking in
-      let fd = OwnedFD(FileDescriptor(rawValue: 42))
+      let fd = OwnedFD(taking: FileDescriptor(rawValue: 42))
       try fd.close()
       XCTAssertEqual(drain(mocking), ["close(42)"])
     }
@@ -56,7 +56,7 @@ final class OwnedFDTest: XCTestCase {
   func testCloseFailureDoesNotCloseAgain() {
     MockingDriver.withMockingEnabled { mocking in
       mocking.forceErrno = .always(errno: EIO)
-      let fd = OwnedFD(FileDescriptor(rawValue: 42))
+      let fd = OwnedFD(taking: FileDescriptor(rawValue: 42))
       do {
         try fd.close()
         XCTFail("close should have thrown")
@@ -70,7 +70,7 @@ final class OwnedFDTest: XCTestCase {
 
   func testRelinquishDoesNotClose() {
     MockingDriver.withMockingEnabled { mocking in
-      let fd = OwnedFD(FileDescriptor(rawValue: 42))
+      let fd = OwnedFD(taking: FileDescriptor(rawValue: 42))
       let raw = fd.relinquish()
       XCTAssertEqual(raw.rawValue, 42)
       XCTAssertEqual(drain(mocking), [])
@@ -90,7 +90,7 @@ final class OwnedFDTest: XCTestCase {
   func testBorrowingUseDoesNotClose() throws {
     try MockingDriver.withMockingEnabled { mocking in
       do {
-        let fd = OwnedFD(FileDescriptor(rawValue: 42))
+        let fd = OwnedFD(taking: FileDescriptor(rawValue: 42))
         try useBorrowed(fd)
         try useBorrowed(fd)
         XCTAssertEqual(
@@ -115,7 +115,7 @@ final class OwnedFDTest: XCTestCase {
     // When a scope exits by throwing, deinit closes and drops the close
     // error. `closeAfter` drops it in the same situation.
     func openThenThrow() throws {
-      let fd = OwnedFD(FileDescriptor(rawValue: 42))
+      let fd = OwnedFD(taking: FileDescriptor(rawValue: 42))
       _ = fd.withDescriptor { $0.rawValue }
       throw BodyError()
     }
@@ -144,9 +144,9 @@ final class OwnedFDTest: XCTestCase {
   #if !os(WASI) // WASI has no pipe
   func testDeinitClosesRealDescriptor() throws {
     let pipe = try FileDescriptor.pipe()
-    let readEnd = OwnedFD(pipe.readEnd)
+    let readEnd = OwnedFD(taking: pipe.readEnd)
     do {
-      let writeEnd = OwnedFD(pipe.writeEnd)
+      let writeEnd = OwnedFD(taking: pipe.writeEnd)
       _ = try writeEnd.writeAll("abc".utf8)
     }
     // The write end is closed, so reading drains "abc" and then sees EOF.
@@ -159,9 +159,9 @@ final class OwnedFDTest: XCTestCase {
 
   func testWithDescriptorCanReturnOwnedFD() throws {
     let pipe = try FileDescriptor.pipe()
-    let readEnd = OwnedFD(pipe.readEnd)
-    let writeEnd = OwnedFD(pipe.writeEnd)
-    let duplicate = try writeEnd.withDescriptor { OwnedFD(try $0.duplicate()) }
+    let readEnd = OwnedFD(taking: pipe.readEnd)
+    let writeEnd = OwnedFD(taking: pipe.writeEnd)
+    let duplicate = try writeEnd.withDescriptor { OwnedFD(taking: try $0.duplicate()) }
     try writeEnd.close()
     _ = try duplicate.writeAll("xy".utf8)
     try duplicate.close()
@@ -173,7 +173,7 @@ final class OwnedFDTest: XCTestCase {
 
   func testCloseReportsError() {
     do {
-      try OwnedFD(FileDescriptor(rawValue: -1)).close()
+      try OwnedFD(taking: FileDescriptor(rawValue: -1)).close()
       XCTFail("close should have thrown")
     } catch {
       XCTAssertEqual(error, .badFileDescriptor)
