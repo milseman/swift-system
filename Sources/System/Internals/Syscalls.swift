@@ -530,6 +530,36 @@ internal func system_faccessat(
   return faccessat(fd, path, mode, flag)
 }
 
+internal func system_getcwd(
+  _ buffer: UnsafeMutablePointer<CInterop.PlatformChar>,
+  _ size: Int
+) -> UnsafeMutablePointer<CInterop.PlatformChar>? {
+#if ENABLE_MOCKING
+  if mockingEnabled {
+    guard _mock(buffer, size) == 0 else { return nil }
+    buffer.initialize(to: 0)
+    return buffer
+  }
+#endif
+  return getcwd(buffer, size)
+}
+
+internal func system_chdir(_ path: UnsafePointer<CInterop.PlatformChar>) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(path: path) }
+#endif
+  return chdir(path)
+}
+
+#if !os(WASI)
+internal func system_fchdir(_ fd: CInt) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(fd) }
+#endif
+  return fchdir(fd)
+}
+#endif // !os(WASI)
+
 #if !os(WASI)
 internal func system_chmod(
   _ path: UnsafePointer<CInterop.PlatformChar>,

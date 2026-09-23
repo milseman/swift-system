@@ -1365,6 +1365,153 @@ extension FilePath {
   }
 }
 
+// MARK: - getcwd, chdir, fchdir
+
+@available(System 199, *)
+extension FilePath {
+  /// Returns the current working directory of the calling process.
+  ///
+  /// - Returns: The absolute path of the current working directory.
+  ///
+  /// The current working directory belongs to the whole process,
+  /// so another thread can change it at any time.
+  ///
+  /// The corresponding C function is `getcwd`.
+  @_alwaysEmitIntoClient
+  public static func currentWorkingDirectory() throws(Errno) -> FilePath {
+    try _currentWorkingDirectory().get()
+  }
+
+  /// The buffer capacity for the first attempt to get the working directory.
+  internal static var _initialWorkingDirectoryCapacity: Int { 1024 }
+
+  @usableFromInline
+  internal static func _currentWorkingDirectory() -> Result<FilePath, Errno> {
+    // Grow the buffer while getcwd reports that it's too small.
+    var capacity = _initialWorkingDirectoryCapacity
+    while true {
+      var result: Result<(), Errno> = .success(())
+      let chars = SystemString.Storage(
+        unsafeUninitializedCapacity: capacity
+      ) { buffer, initializedCount in
+        let length: Int? = buffer.withMemoryRebound(
+          to: CInterop.PlatformChar.self
+        ) { buffer in
+          guard system_getcwd(buffer.baseAddress!, buffer.count) != nil else {
+            return nil
+          }
+          return system_platform_strlen(buffer.baseAddress!)
+        }
+        guard let length else {
+          result = .failure(Errno.current)
+          initializedCount = 0
+          return
+        }
+        // getcwd initialized the path and its null terminator.
+        initializedCount = length + 1
+      }
+
+      switch result {
+      case .success:
+        return .success(FilePath(SystemString(nullTerminated: chars)))
+      case .failure(.outOfRange):
+        capacity *= 2
+      case .failure(let error):
+        return .failure(error)
+      }
+    }
+  }
+
+  /// Changes the current working directory of the calling process.
+  ///
+  /// - Parameters:
+  ///   - path: The new current working directory.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// The current working directory belongs to the whole process,
+  /// so the change affects every thread's relative paths.
+  ///
+  /// The corresponding C function is `chdir`.
+  @_alwaysEmitIntoClient
+  public static func setCurrentWorkingDirectory(
+    _ path: FilePath,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try path.withPlatformString {
+      FilePath._setCurrentWorkingDirectory($0, retryOnInterrupt: retryOnInterrupt)
+    }.get()
+  }
+
+  /// Changes the current working directory of the calling process.
+  ///
+  /// - Parameters:
+  ///   - path: The new current working directory.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// The current working directory belongs to the whole process,
+  /// so the change affects every thread's relative paths.
+  ///
+  /// The corresponding C function is `chdir`.
+  @_alwaysEmitIntoClient
+  public static func setCurrentWorkingDirectory(
+    _ path: UnsafePointer<CChar>,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try _setCurrentWorkingDirectory(path, retryOnInterrupt: retryOnInterrupt).get()
+  }
+
+  @usableFromInline
+  internal static func _setCurrentWorkingDirectory(
+    _ path: UnsafePointer<CChar>,
+    retryOnInterrupt: Bool
+  ) -> Result<(), Errno> {
+    nothingOrErrno(retryOnInterrupt: retryOnInterrupt) {
+      system_chdir(path)
+    }
+  }
+
+  #if !os(WASI)
+  /// Changes the current working directory of the calling process
+  /// to an open directory.
+  ///
+  /// - Parameters:
+  ///   - fd: A file descriptor for the new current working directory.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// The current working directory belongs to the whole process,
+  /// so the change affects every thread's relative paths.
+  ///
+  /// The corresponding C function is `fchdir`.
+  /// - Note: Not available on WASI.
+  @_alwaysEmitIntoClient
+  public static func setCurrentWorkingDirectory(
+    _ fd: FileDescriptor,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try _setCurrentWorkingDirectory(fd, retryOnInterrupt: retryOnInterrupt).get()
+  }
+
+  @usableFromInline
+  internal static func _setCurrentWorkingDirectory(
+    _ fd: FileDescriptor,
+    retryOnInterrupt: Bool
+  ) -> Result<(), Errno> {
+    nothingOrErrno(retryOnInterrupt: retryOnInterrupt) {
+      system_fchdir(fd.rawValue)
+    }
+  }
+  #endif // !os(WASI)
+}
+
 // MARK: - chmod, lchmod, fchmodat
 
 #if !os(WASI)

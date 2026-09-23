@@ -274,6 +274,26 @@ final class FilePathOperationsTest: XCTestCase {
         }
       },
 
+      MockTestCase(
+        name: "getcwd", .noInterrupt, Wildcard(), FilePath._initialWorkingDirectoryCapacity
+      ) { _ in
+        _ = try FilePath.currentWorkingDirectory()
+      },
+
+      MockTestCase(name: "chdir", .interruptable, "a path") { retryOnInterrupt in
+        try FilePath.setCurrentWorkingDirectory(path, retryOnInterrupt: retryOnInterrupt)
+      },
+
+      MockTestCase(name: "chdir", .interruptable, "a path") { retryOnInterrupt in
+        try "a path".withCString {
+          try FilePath.setCurrentWorkingDirectory($0, retryOnInterrupt: retryOnInterrupt)
+        }
+      },
+
+      MockTestCase(name: "fchdir", .interruptable, 42) { retryOnInterrupt in
+        try FilePath.setCurrentWorkingDirectory(dir, retryOnInterrupt: retryOnInterrupt)
+      },
+
       MockTestCase(name: "chmod", .interruptable, "a path", 0o644) { retryOnInterrupt in
         try path.setPermissions(
           [.ownerReadWrite, .groupRead, .otherRead], retryOnInterrupt: retryOnInterrupt)
@@ -907,6 +927,46 @@ final class FilePathOperationsTest: XCTestCase {
         #endif
       }
     }
+  }
+
+  @available(System 199, *)
+  func testCurrentWorkingDirectory() throws {
+    let original = try FilePath.currentWorkingDirectory()
+    XCTAssertTrue(original.isAbsolute)
+    defer { try? FilePath.setCurrentWorkingDirectory(original) }
+
+    // Compare by identity, since the path may differ through symbolic links,
+    // such as /var and /private/var on Darwin.
+    func isCurrent(_ path: FilePath) throws -> Bool {
+      let current = try FilePath.currentWorkingDirectory().stat()
+      let expected = try path.stat()
+      return current.deviceID == expected.deviceID && current.inode == expected.inode
+    }
+
+    try withTemporaryFilePath(basename: "testCurrentWorkingDirectory") { path in
+      try FilePath.setCurrentWorkingDirectory(path)
+      XCTAssertTrue(try isCurrent(path))
+      // Relative paths now resolve against it.
+      try FilePath("sub").makeDirectory(permissions: .ownerReadWriteExecute)
+      XCTAssertEqual(try path.appending("sub").stat().type, .directory)
+
+      try path.appending("sub").withCString { try FilePath.setCurrentWorkingDirectory($0) }
+      XCTAssertTrue(try isCurrent(path.appending("sub")))
+
+      #if !os(WASI) // WASI has no fchdir
+      let dir = try FileDescriptor.open(path, .readOnly, options: .directory)
+      try dir.closeAfter {
+        try FilePath.setCurrentWorkingDirectory(dir)
+        XCTAssertTrue(try isCurrent(path))
+      }
+      #endif
+
+      XCTAssertThrowsError(try FilePath.setCurrentWorkingDirectory(path.appending("missing"))) {
+        XCTAssertEqual($0 as? Errno, .noSuchFileOrDirectory)
+      }
+      try FilePath.setCurrentWorkingDirectory(original)
+    }
+    XCTAssertEqual(try FilePath.currentWorkingDirectory(), original)
   }
 
   #if !os(WASI)
