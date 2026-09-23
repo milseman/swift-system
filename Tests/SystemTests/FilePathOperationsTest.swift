@@ -235,6 +235,16 @@ final class FilePathOperationsTest: XCTestCase {
             $0, relativeTo: dir, retryOnInterrupt: retryOnInterrupt)
         }
       },
+
+      MockTestCase(name: "truncate", .interruptable, "a path", 6) { retryOnInterrupt in
+        try path.resize(to: 6, retryOnInterrupt: retryOnInterrupt)
+      },
+
+      MockTestCase(name: "truncate", .interruptable, "a path", 6) { retryOnInterrupt in
+        try "a path".withCString {
+          try FilePath.resize($0, to: 6, retryOnInterrupt: retryOnInterrupt)
+        }
+      },
     ]
 
     for test in syscallTestCases { test.runAllTests() }
@@ -605,6 +615,39 @@ final class FilePathOperationsTest: XCTestCase {
         XCTAssertThrowsError(try FilePath("missing").readSymbolicLink(relativeTo: dir)) {
           XCTAssertEqual($0 as? Errno, .noSuchFileOrDirectory)
         }
+      }
+    }
+  }
+
+  @available(System 199, *)
+  func testResize() throws {
+    try withTemporaryFilePath(basename: "testResize") { path in
+      let file = path.appending("file")
+      let fd = try FileDescriptor.open(
+        file, .readWrite, options: .create, permissions: .ownerReadWrite)
+      try fd.closeAfter {
+        try fd.writeAll("abc".utf8)
+
+        try file.resize(to: 6)
+        XCTAssertEqual(try fd.stat().size, 6)
+        let extended = try Array<UInt8>(unsafeUninitializedCapacity: 8) { buf, count in
+          count = try fd.read(fromAbsoluteOffset: 0, into: UnsafeMutableRawBufferPointer(buf))
+        }
+        XCTAssertEqual(extended, Array("abc".utf8) + [0, 0, 0])
+
+        try file.withCString { try FilePath.resize($0, to: 2) }
+        XCTAssertEqual(try fd.stat().size, 2)
+        let truncated = try Array<UInt8>(unsafeUninitializedCapacity: 8) { buf, count in
+          count = try fd.read(fromAbsoluteOffset: 0, into: UnsafeMutableRawBufferPointer(buf))
+        }
+        XCTAssertEqual(truncated, Array("ab".utf8))
+      }
+
+      XCTAssertThrowsError(try path.appending("missing").resize(to: 0)) {
+        XCTAssertEqual($0 as? Errno, .noSuchFileOrDirectory)
+      }
+      XCTAssertThrowsError(try path.resize(to: 0)) {
+        XCTAssertEqual($0 as? Errno, .isDirectory)
       }
     }
   }

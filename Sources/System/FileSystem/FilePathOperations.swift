@@ -1086,4 +1086,72 @@ extension FilePath {
   }
 }
 
+// MARK: - truncate
+
+@available(System 199, *)
+extension FilePath {
+  /// Truncates or extends the file at this path.
+  ///
+  /// - Parameters:
+  ///   - newSize: The length in bytes to resize the file to.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// If the current size of the file exceeds `newSize`, any extra data is discarded.
+  /// If the current size of the file is smaller than `newSize`,
+  /// the file is extended and filled with zeros to the provided size.
+  ///
+  /// The file must be writable by the calling process.
+  ///
+  /// The corresponding C function is `truncate`.
+  @_alwaysEmitIntoClient
+  public func resize(
+    to newSize: Int64,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try withPlatformString {
+      FilePath._resize($0, to: newSize, retryOnInterrupt: retryOnInterrupt)
+    }.get()
+  }
+
+  /// Truncates or extends the file at the given path.
+  ///
+  /// - Parameters:
+  ///   - path: The location of the file.
+  ///   - newSize: The length in bytes to resize the file to.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// If the current size of the file exceeds `newSize`, any extra data is discarded.
+  /// If the current size of the file is smaller than `newSize`,
+  /// the file is extended and filled with zeros to the provided size.
+  ///
+  /// The file must be writable by the calling process.
+  ///
+  /// The corresponding C function is `truncate`.
+  @_alwaysEmitIntoClient
+  public static func resize(
+    _ path: UnsafePointer<CChar>,
+    to newSize: Int64,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try _resize(path, to: newSize, retryOnInterrupt: retryOnInterrupt).get()
+  }
+
+  @usableFromInline
+  internal static func _resize(
+    _ path: UnsafePointer<CChar>,
+    to newSize: Int64,
+    retryOnInterrupt: Bool
+  ) -> Result<(), Errno> {
+    nothingOrErrno(retryOnInterrupt: retryOnInterrupt) {
+      system_truncate(path, _COffT(newSize))
+    }
+  }
+}
+
 #endif // !os(Windows)

@@ -407,6 +407,16 @@ internal func system_readlinkat(
   return readlinkat(fd, path, buffer, size)
 }
 
+internal func system_truncate(
+  _ path: UnsafePointer<CInterop.PlatformChar>,
+  _ length: off_t
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(path: path, length) }
+#endif
+  return truncate(path, length)
+}
+
 internal func system_fdopendir(
   _ fd: CInt
 ) -> system_DIRPtr? {
