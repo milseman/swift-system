@@ -193,6 +193,14 @@ internal func _mockOffT(
 ) -> _COffT {
   _COffT(mockImpl(name: name, path: path, args))
 }
+
+// For calls that return an error number directly, rather than returning -1
+// and setting errno: returns the forced error number, or 0.
+internal func _mockReturningErrno(
+  name: String = #function, path: UnsafePointer<CInterop.PlatformChar>? = nil, _ args: AnyHashable...
+) -> CInt {
+  mockImpl(name: name, path: path, args) == -1 ? system_errno : 0
+}
 #endif // ENABLE_MOCKING
 
 // Force paths to be treated as Windows syntactically if `enabled` is
