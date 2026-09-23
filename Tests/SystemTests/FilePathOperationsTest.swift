@@ -202,6 +202,39 @@ final class FilePathOperationsTest: XCTestCase {
           }
         }
       },
+
+      MockTestCase(
+        name: "readlink", .interruptable,
+        "a path", Wildcard(), FilePath._initialSymbolicLinkCapacity
+      ) { retryOnInterrupt in
+        _ = try path.readSymbolicLink(retryOnInterrupt: retryOnInterrupt)
+      },
+
+      MockTestCase(
+        name: "readlink", .interruptable,
+        "a path", Wildcard(), FilePath._initialSymbolicLinkCapacity
+      ) { retryOnInterrupt in
+        _ = try "a path".withCString {
+          try FilePath.readSymbolicLink($0, retryOnInterrupt: retryOnInterrupt)
+        }
+      },
+
+      MockTestCase(
+        name: "readlinkat", .interruptable,
+        42, "a path", Wildcard(), FilePath._initialSymbolicLinkCapacity
+      ) { retryOnInterrupt in
+        _ = try path.readSymbolicLink(relativeTo: dir, retryOnInterrupt: retryOnInterrupt)
+      },
+
+      MockTestCase(
+        name: "readlinkat", .interruptable,
+        42, "a path", Wildcard(), FilePath._initialSymbolicLinkCapacity
+      ) { retryOnInterrupt in
+        _ = try "a path".withCString {
+          try FilePath.readSymbolicLink(
+            $0, relativeTo: dir, retryOnInterrupt: retryOnInterrupt)
+        }
+      },
     ]
 
     for test in syscallTestCases { test.runAllTests() }
@@ -532,6 +565,44 @@ final class FilePathOperationsTest: XCTestCase {
         XCTAssertThrowsError(
           try FilePath("missing/link").makeSymbolicLink(relativeTo: dir, to: "target")
         ) {
+          XCTAssertEqual($0 as? Errno, .noSuchFileOrDirectory)
+        }
+      }
+    }
+  }
+
+  @available(System 199, *)
+  func testReadSymbolicLink() throws {
+    try withTemporaryFilePath(basename: "testReadSymbolicLink") { path in
+      let link = path.appending("link")
+      try link.makeSymbolicLink(to: "target")
+      XCTAssertEqual(try link.readSymbolicLink(), "target")
+      XCTAssertEqual(try link.withCString { try FilePath.readSymbolicLink($0) }, "target")
+
+      // A target longer than the first buffer is read in full.
+      let long = FilePath(
+        repeatElement("component", count: 60).joined(separator: "/"))
+      XCTAssertGreaterThan(long.length, FilePath._initialSymbolicLinkCapacity)
+      try path.appending("long").makeSymbolicLink(to: long)
+      XCTAssertEqual(try path.appending("long").readSymbolicLink(), long)
+
+      try path.appending("absolute").makeSymbolicLink(to: path)
+      XCTAssertEqual(try path.appending("absolute").readSymbolicLink(), path)
+
+      XCTAssertThrowsError(try path.readSymbolicLink()) {
+        XCTAssertEqual($0 as? Errno, .invalidArgument)
+      }
+      XCTAssertThrowsError(try path.appending("missing").readSymbolicLink()) {
+        XCTAssertEqual($0 as? Errno, .noSuchFileOrDirectory)
+      }
+
+      let dir = try FileDescriptor.open(path, .readOnly, options: .directory)
+      try dir.closeAfter {
+        XCTAssertEqual(try FilePath("link").readSymbolicLink(relativeTo: dir), "target")
+        XCTAssertEqual(
+          try "long".withCString { try FilePath.readSymbolicLink($0, relativeTo: dir) },
+          long)
+        XCTAssertThrowsError(try FilePath("missing").readSymbolicLink(relativeTo: dir)) {
           XCTAssertEqual($0 as? Errno, .noSuchFileOrDirectory)
         }
       }

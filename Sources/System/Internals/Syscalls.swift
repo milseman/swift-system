@@ -382,6 +382,31 @@ internal func system_symlinkat(
   return symlinkat(target, fd, path)
 }
 
+internal func system_readlink(
+  _ path: UnsafePointer<CInterop.PlatformChar>,
+  _ buffer: UnsafeMutablePointer<CInterop.PlatformChar>,
+  _ size: Int
+) -> Int {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mockInt(path: path, buffer, size) }
+#endif
+  return readlink(path, buffer, size)
+}
+
+internal func system_readlinkat(
+  _ fd: CInt,
+  _ path: UnsafePointer<CInterop.PlatformChar>,
+  _ buffer: UnsafeMutablePointer<CInterop.PlatformChar>,
+  _ size: Int
+) -> Int {
+#if ENABLE_MOCKING
+  if mockingEnabled {
+    return _mockInt(fd, String(_errorCorrectingPlatformString: path), buffer, size)
+  }
+#endif
+  return readlinkat(fd, path, buffer, size)
+}
+
 internal func system_fdopendir(
   _ fd: CInt
 ) -> system_DIRPtr? {
