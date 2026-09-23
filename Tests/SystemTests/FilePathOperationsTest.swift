@@ -172,6 +172,36 @@ final class FilePathOperationsTest: XCTestCase {
           }
         }
       },
+
+      MockTestCase(name: "symlink", .interruptable, "target", "a path") {
+        retryOnInterrupt in
+        try path.makeSymbolicLink(to: "target", retryOnInterrupt: retryOnInterrupt)
+      },
+
+      MockTestCase(name: "symlink", .interruptable, "target", "a path") {
+        retryOnInterrupt in
+        try "a path".withCString { link in
+          try "target".withCString { target in
+            try FilePath.makeSymbolicLink(link, to: target, retryOnInterrupt: retryOnInterrupt)
+          }
+        }
+      },
+
+      MockTestCase(name: "symlinkat", .interruptable, "target", 42, "a path") {
+        retryOnInterrupt in
+        try path.makeSymbolicLink(
+          relativeTo: dir, to: "target", retryOnInterrupt: retryOnInterrupt)
+      },
+
+      MockTestCase(name: "symlinkat", .interruptable, "target", 42, "a path") {
+        retryOnInterrupt in
+        try "a path".withCString { link in
+          try "target".withCString { target in
+            try FilePath.makeSymbolicLink(
+              link, relativeTo: dir, to: target, retryOnInterrupt: retryOnInterrupt)
+          }
+        }
+      },
     ]
 
     for test in syscallTestCases { test.runAllTests() }
@@ -449,6 +479,61 @@ final class FilePathOperationsTest: XCTestCase {
         let f = try path.appending("f").stat(followTargetSymlink: false)
         XCTAssertEqual(f.type, .regular)
         XCTAssertEqual(f.inode, try a.stat().inode)
+      }
+    }
+  }
+
+  @available(System 199, *)
+  func testMakeSymbolicLink() throws {
+    try withTemporaryFilePath(basename: "testMakeSymbolicLink") { path in
+      // The target doesn't need to exist.
+      let link = path.appending("link")
+      try link.makeSymbolicLink(to: "target")
+      XCTAssertEqual(try link.stat(followTargetSymlink: false).type, .symbolicLink)
+      XCTAssertThrowsError(try link.stat()) {
+        XCTAssertEqual($0 as? Errno, .noSuchFileOrDirectory)
+      }
+
+      // A relative target resolves against the link's directory.
+      let fd = try FileDescriptor.open(
+        path.appending("target"), .writeOnly, options: .create, permissions: .ownerReadWrite)
+      try fd.close()
+      XCTAssertEqual(try link.stat().inode, try path.appending("target").stat().inode)
+
+      XCTAssertThrowsError(try link.makeSymbolicLink(to: "elsewhere")) {
+        XCTAssertEqual($0 as? Errno, .fileExists)
+      }
+
+      try path.appending("c string").withCString { link in
+        try "target".withCString { target in
+          try FilePath.makeSymbolicLink(link, to: target)
+        }
+      }
+      XCTAssertEqual(
+        try path.appending("c string").stat(followTargetSymlink: false).type,
+        .symbolicLink)
+
+      let dir = try FileDescriptor.open(path, .readOnly, options: .directory)
+      try dir.closeAfter {
+        try FilePath("relative").makeSymbolicLink(relativeTo: dir, to: "target")
+        XCTAssertEqual(
+          try path.appending("relative").stat().inode,
+          try path.appending("target").stat().inode)
+
+        try "relative c string".withCString { link in
+          try "target".withCString { target in
+            try FilePath.makeSymbolicLink(link, relativeTo: dir, to: target)
+          }
+        }
+        XCTAssertEqual(
+          try path.appending("relative c string").stat().inode,
+          try path.appending("target").stat().inode)
+
+        XCTAssertThrowsError(
+          try FilePath("missing/link").makeSymbolicLink(relativeTo: dir, to: "target")
+        ) {
+          XCTAssertEqual($0 as? Errno, .noSuchFileOrDirectory)
+        }
       }
     }
   }

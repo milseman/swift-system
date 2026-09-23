@@ -783,4 +783,149 @@ extension FilePath {
   }
 }
 
+// MARK: - symlink, symlinkat
+
+@available(System 199, *)
+extension FilePath {
+  /// Creates a symbolic link at this path that points to the given target.
+  ///
+  /// - Parameters:
+  ///   - target: The path the new link points to.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// The link stores `target` as is. The target doesn't need to exist.
+  /// A relative target is resolved when the link is followed,
+  /// relative to the directory that contains the link.
+  ///
+  /// The corresponding C function is `symlink`.
+  @_alwaysEmitIntoClient
+  public func makeSymbolicLink(
+    to target: FilePath,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try withPlatformString { path in
+      target.withPlatformString { target in
+        FilePath._makeSymbolicLink(path, to: target, retryOnInterrupt: retryOnInterrupt)
+      }
+    }.get()
+  }
+
+  /// Creates a symbolic link at the given path that points to the given target.
+  ///
+  /// - Parameters:
+  ///   - path: The location of the new link.
+  ///   - target: The path the new link points to.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// The link stores `target` as is. The target doesn't need to exist.
+  /// A relative target is resolved when the link is followed,
+  /// relative to the directory that contains the link.
+  ///
+  /// The corresponding C function is `symlink`.
+  @_alwaysEmitIntoClient
+  public static func makeSymbolicLink(
+    _ path: UnsafePointer<CChar>,
+    to target: UnsafePointer<CChar>,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try _makeSymbolicLink(path, to: target, retryOnInterrupt: retryOnInterrupt).get()
+  }
+
+  @usableFromInline
+  internal static func _makeSymbolicLink(
+    _ path: UnsafePointer<CChar>,
+    to target: UnsafePointer<CChar>,
+    retryOnInterrupt: Bool
+  ) -> Result<(), Errno> {
+    nothingOrErrno(retryOnInterrupt: retryOnInterrupt) {
+      system_symlink(target, path)
+    }
+  }
+
+  /// Creates a symbolic link at this path that points to the given target,
+  /// resolving a relative path against a directory.
+  ///
+  /// - Parameters:
+  ///   - fd: The directory against which this path is resolved, if relative.
+  ///   - target: The path the new link points to.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// The link stores `target` as is; `fd` doesn't apply to it.
+  /// The target doesn't need to exist.
+  /// A relative target is resolved when the link is followed,
+  /// relative to the directory that contains the link.
+  ///
+  /// If this path is absolute (starts with a forward slash), then `fd` is ignored.
+  /// If this path is relative, it is resolved against the directory given by `fd`.
+  ///
+  /// The corresponding C function is `symlinkat`.
+  @_alwaysEmitIntoClient
+  public func makeSymbolicLink(
+    relativeTo fd: FileDescriptor,
+    to target: FilePath,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try withPlatformString { path in
+      target.withPlatformString { target in
+        FilePath._makeSymbolicLink(
+          path, relativeTo: fd, to: target, retryOnInterrupt: retryOnInterrupt)
+      }
+    }.get()
+  }
+
+  /// Creates a symbolic link at the given path that points to the given target,
+  /// resolving a relative path against a directory.
+  ///
+  /// - Parameters:
+  ///   - path: The location of the new link.
+  ///   - fd: The directory against which a relative `path` is resolved.
+  ///   - target: The path the new link points to.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// The link stores `target` as is; `fd` doesn't apply to it.
+  /// The target doesn't need to exist.
+  /// A relative target is resolved when the link is followed,
+  /// relative to the directory that contains the link.
+  ///
+  /// If `path` is absolute (starts with a forward slash), then `fd` is ignored.
+  /// If `path` is relative, it is resolved against the directory given by `fd`.
+  ///
+  /// The corresponding C function is `symlinkat`.
+  @_alwaysEmitIntoClient
+  public static func makeSymbolicLink(
+    _ path: UnsafePointer<CChar>,
+    relativeTo fd: FileDescriptor,
+    to target: UnsafePointer<CChar>,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try _makeSymbolicLink(
+      path, relativeTo: fd, to: target, retryOnInterrupt: retryOnInterrupt
+    ).get()
+  }
+
+  @usableFromInline
+  internal static func _makeSymbolicLink(
+    _ path: UnsafePointer<CChar>,
+    relativeTo fd: FileDescriptor,
+    to target: UnsafePointer<CChar>,
+    retryOnInterrupt: Bool
+  ) -> Result<(), Errno> {
+    nothingOrErrno(retryOnInterrupt: retryOnInterrupt) {
+      system_symlinkat(target, fd.rawValue, path)
+    }
+  }
+}
+
 #endif // !os(Windows)

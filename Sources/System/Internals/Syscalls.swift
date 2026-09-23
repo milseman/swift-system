@@ -357,6 +357,31 @@ internal func system_linkat(
   return linkat(existingFD, existing, newFD, new, flag)
 }
 
+internal func system_symlink(
+  _ target: UnsafePointer<CInterop.PlatformChar>,
+  _ path: UnsafePointer<CInterop.PlatformChar>
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled {
+    return _mock(path: target, String(_errorCorrectingPlatformString: path))
+  }
+#endif
+  return symlink(target, path)
+}
+
+internal func system_symlinkat(
+  _ target: UnsafePointer<CInterop.PlatformChar>,
+  _ fd: CInt,
+  _ path: UnsafePointer<CInterop.PlatformChar>
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled {
+    return _mock(path: target, fd, String(_errorCorrectingPlatformString: path))
+  }
+#endif
+  return symlinkat(target, fd, path)
+}
+
 internal func system_fdopendir(
   _ fd: CInt
 ) -> system_DIRPtr? {
