@@ -182,6 +182,15 @@ internal func system_fsync(_ fd: Int32) -> Int32 {
 }
 #endif // !os(Windows)
 
+#if !os(Windows) && !os(WASI)
+internal func system_fchmod(_ fd: Int32, _ mode: CInterop.Mode) -> Int32 {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(fd, mode) }
+#endif
+  return fchmod(fd, mode)
+}
+#endif // !os(Windows) && !os(WASI)
+
 internal func system_mkdir(
     _ path: UnsafePointer<CInterop.PlatformChar>,
     _ mode: CInterop.Mode

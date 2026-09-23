@@ -799,6 +799,38 @@ extension FileDescriptor {
 }
 #endif // !os(Windows)
 
+#if !os(Windows) && !os(WASI)
+extension FileDescriptor {
+  /// Changes the permissions of the file referenced by this file descriptor.
+  ///
+  /// - Parameters:
+  ///   - permissions: The new permissions for the file.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// The corresponding C function is `fchmod`.
+  @_alwaysEmitIntoClient
+  public func setPermissions(
+    _ permissions: FilePermissions,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try _setPermissions(permissions, retryOnInterrupt: retryOnInterrupt).get()
+  }
+
+  @usableFromInline
+  internal func _setPermissions(
+    _ permissions: FilePermissions,
+    retryOnInterrupt: Bool
+  ) -> Result<(), Errno> {
+    nothingOrErrno(retryOnInterrupt: retryOnInterrupt) {
+      system_fchmod(self.rawValue, permissions.rawValue)
+    }
+  }
+}
+#endif // !os(Windows) && !os(WASI)
+
 #if !os(WASI) // WASI has no umask
 extension FilePermissions {
   /// The file creation permission mask (aka "umask").

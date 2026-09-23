@@ -94,6 +94,11 @@ final class FileOperationsTest: XCTestCase {
       MockTestCase(name: "fsync", .interruptable, rawFD) { retryOnInterrupt in
         try fd.synchronize(retryOnInterrupt: retryOnInterrupt)
       },
+
+      MockTestCase(name: "fchmod", .interruptable, rawFD, 0o644) { retryOnInterrupt in
+        try fd.setPermissions(
+          [.ownerReadWrite, .groupRead, .otherRead], retryOnInterrupt: retryOnInterrupt)
+      },
     ]
     #endif // !os(Windows)
 
@@ -402,5 +407,19 @@ final class FileOperationsTest: XCTestCase {
     }
   }
 #endif // !os(Windows)
+
+#if !os(Windows) && !os(WASI)
+  func testSetPermissions() throws {
+    try withTemporaryFilePath(basename: "testSetPermissions") { path in
+      let fd = try FileDescriptor.open(path.appending("\(UUID().uuidString).txt"), .readWrite, options: [.create, .truncate], permissions: .ownerReadWrite)
+      try fd.closeAfter {
+        try fd.setPermissions([.ownerRead, .groupRead])
+        var s = stat()
+        XCTAssertEqual(fstat(fd.rawValue, &s), 0)
+        XCTAssertEqual(FilePermissions(rawValue: s.st_mode & 0o7777), [.ownerRead, .groupRead])
+      }
+    }
+  }
+#endif // !os(Windows) && !os(WASI)
 }
 
