@@ -10,18 +10,6 @@
 import ArgumentParser
 import SystemPackage
 
-#if SYSTEM_PACKAGE_DARWIN
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#elseif canImport(Musl)
-import Musl
-#elseif canImport(Android)
-import Android
-#else
-#error("Unsupported Platform")
-#endif
-
 struct AtomicWrite: ParsableCommand {
   static let configuration = CommandConfiguration(
     commandName: "atomic-write",
@@ -61,9 +49,9 @@ struct AtomicWrite: ParsableCommand {
     try directory.closeAfter {
       // Readers never see a partial file: they see the old one, or the new
       // one once it's complete and renamed into place.
-      let temporary = ".\(name).\(ProcessID.current.rawValue).tmp"
+      let temporary = FilePath(".\(name).\(ProcessID.current.rawValue).tmp")
       let file = try FileDescriptor.open(
-        FilePath(temporary), relativeTo: directory, .writeOnly,
+        temporary, relativeTo: directory, .writeOnly,
         options: [.create, .exclusiveCreate], permissions: .ownerReadWrite)
       print("Created \(temporary) in \(directoryPath)")
       do {
@@ -74,22 +62,32 @@ struct AtomicWrite: ParsableCommand {
           if let group {
             try file.setOwner(group: GroupID(group))
           }
-          try file.synchronize()
+          try flush(file)
         }
         let count = contents.utf8.count
         print("Wrote \(count) \(count == 1 ? "byte" : "bytes"), set its mode to \(permissions)"
           + (group.map { " and its group to \($0)" } ?? "") + ", and flushed it")
 
-        guard renameat(directory.rawValue, temporary, directory.rawValue, name) == 0 else {
-          throw Errno(rawValue: errno)
-        }
+        try temporary.rename(relativeTo: directory, to: FilePath(name), relativeTo: directory)
       } catch {
-        _ = unlinkat(directory.rawValue, temporary, 0)
+        try? temporary.unlink(relativeTo: directory)
         throw error
       }
       // The rename changed the directory; flush that too.
-      try directory.synchronize()
+      try flush(directory)
       print("Renamed it to \(name), and flushed the directory")
     }
   }
+}
+
+/// Flushes a file or directory to storage.
+private func flush(_ fd: FileDescriptor) throws(Errno) {
+  #if SYSTEM_PACKAGE_DARWIN
+  // On Darwin, `synchronize` (fsync) can return while the data is still in
+  // the storage device's cache; `synchronizeFully` (F_FULLFSYNC) waits until
+  // it's on permanent storage. Some file systems don't support that, so fall
+  // back to `synchronize`, as SQLite does.
+  if (try? fd.synchronizeFully()) != nil { return }
+  #endif
+  try fd.synchronize()
 }

@@ -51,7 +51,7 @@ struct PIDFile: ParsableCommand {
           throw ExitCode.failure
         }
         print("Removing \(path), left by process \(owner.rawValue), which is no longer running")
-        try remove(file)
+        try file.unlink()
       }
     }
     print("Wrote \(path)")
@@ -61,7 +61,7 @@ struct PIDFile: ParsableCommand {
     sleep(hold)
     // Remove the file only if it's still this process's.
     if try recordedProcess(in: file) == current {
-      try remove(file)
+      try file.unlink()
       print("Removed \(path)")
     }
   }
@@ -103,10 +103,4 @@ private func isRunning(_ process: ProcessID) -> Bool {
   // Signal 0 checks for the process without sending anything. EPERM means
   // the process exists but belongs to someone else.
   kill(process.rawValue, 0) == 0 || errno == EPERM
-}
-
-private func remove(_ path: FilePath) throws {
-  guard path.withPlatformString({ unlink($0) }) == 0 else {
-    throw Errno(rawValue: errno)
-  }
 }
