@@ -90,16 +90,27 @@ extension TerminalDescriptor {
   }
 
   /// Sets the window size.
+  ///
+  /// - Parameters:
+  ///   - size: The new window size.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// The corresponding C function is `ioctl`, with the `TIOCSWINSZ` request.
   @_alwaysEmitIntoClient
-  public func setWindowSize(_ size: WindowSize) throws(Errno) {
-    try _setWindowSize(size).get()
+  public func setWindowSize(_ size: WindowSize, retryOnInterrupt: Bool = true) throws(Errno) {
+    try _setWindowSize(size, retryOnInterrupt: retryOnInterrupt).get()
   }
 
   @usableFromInline
-  internal func _setWindowSize(_ size: WindowSize) -> Result<Void, Errno> {
+  internal func _setWindowSize(
+    _ size: WindowSize, retryOnInterrupt: Bool
+  ) -> Result<Void, Errno> {
     var ws = size.rawValue
     return withUnsafePointer(to: &ws) { sizePtr in
-      nothingOrErrno(retryOnInterrupt: false) {
+      nothingOrErrno(retryOnInterrupt: retryOnInterrupt) {
         system_tiocswinsz(rawValue, sizePtr)
       }
     }

@@ -81,40 +81,71 @@ extension TerminalDescriptor {
   }
 
   /// Discards data in the specified queue(s).
+  ///
+  /// - Parameters:
+  ///   - queue: The data to discard: input that was received but not read,
+  ///     output that was written but not transmitted, or both.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// The corresponding C function is `tcflush`.
   @_alwaysEmitIntoClient
-  public func flush(_ queue: Queue) throws(Errno) {
-    try _flush(queue).get()
+  public func flush(_ queue: Queue, retryOnInterrupt: Bool = true) throws(Errno) {
+    try _flush(queue, retryOnInterrupt: retryOnInterrupt).get()
   }
 
   @usableFromInline
-  internal func _flush(_ queue: Queue) -> Result<Void, Errno> {
-    nothingOrErrno(retryOnInterrupt: false) {
+  internal func _flush(_ queue: Queue, retryOnInterrupt: Bool) -> Result<Void, Errno> {
+    nothingOrErrno(retryOnInterrupt: retryOnInterrupt) {
       system_tcflush(rawValue, queue.rawValue)
     }
   }
 
   /// Suspends or resumes data transmission or reception.
+  ///
+  /// - Parameters:
+  ///   - action: Whether to suspend or resume output,
+  ///     or to transmit a STOP or START character.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// The corresponding C function is `tcflow`.
   @_alwaysEmitIntoClient
-  public func flow(_ action: FlowAction) throws(Errno) {
-    try _flow(action).get()
+  public func flow(_ action: FlowAction, retryOnInterrupt: Bool = true) throws(Errno) {
+    try _flow(action, retryOnInterrupt: retryOnInterrupt).get()
   }
 
   @usableFromInline
-  internal func _flow(_ action: FlowAction) -> Result<Void, Errno> {
-    nothingOrErrno(retryOnInterrupt: false) {
+  internal func _flow(_ action: FlowAction, retryOnInterrupt: Bool) -> Result<Void, Errno> {
+    nothingOrErrno(retryOnInterrupt: retryOnInterrupt) {
       system_tcflow(rawValue, action.rawValue)
     }
   }
 
   /// Sends a break signal on the terminal.
+  ///
+  /// - Parameters:
+  ///   - duration: The length of the break.
+  ///     Zero sends a break of between 0.25 and 0.5 seconds;
+  ///     the meaning of other values varies by platform.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// The corresponding C function is `tcsendbreak`.
   @_alwaysEmitIntoClient
-  public func sendBreak(duration: CInt = 0) throws(Errno) {
-    try _sendBreak(duration: duration).get()
+  public func sendBreak(duration: CInt = 0, retryOnInterrupt: Bool = true) throws(Errno) {
+    try _sendBreak(duration: duration, retryOnInterrupt: retryOnInterrupt).get()
   }
 
   @usableFromInline
-  internal func _sendBreak(duration: CInt) -> Result<Void, Errno> {
-    nothingOrErrno(retryOnInterrupt: false) {
+  internal func _sendBreak(duration: CInt, retryOnInterrupt: Bool) -> Result<Void, Errno> {
+    nothingOrErrno(retryOnInterrupt: retryOnInterrupt) {
       system_tcsendbreak(rawValue, duration)
     }
   }
