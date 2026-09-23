@@ -109,7 +109,7 @@ final class FileOperationsErrorTest: XCTestCase {
   }
 
   func testChangesToAnotherUsersFileAreNotPermitted() throws {
-    guard geteuid() != 0 else {
+    guard UserID.effective != UserID(rawValue: 0) else {
       throw XCTSkip("A privileged process can change any file")
     }
     // /tmp is owned by root, on a writable file system. (On a read-only
@@ -122,13 +122,13 @@ final class FileOperationsErrorTest: XCTestCase {
     }
     try tmp.closeAfter {
       let status = try tmp.stat()
-      guard status.userID.rawValue != geteuid() else {
+      guard status.userID != UserID.effective else {
         throw XCTSkip("The current user owns /tmp")
       }
       // Even setting the current values requires owning the file.
       check(.notPermitted) { try tmp.setPermissions(status.permissions) }
-      check(.notPermitted) { try tmp.setOwner(group: GroupID(getegid())) }
-      check(.notPermitted) { try tmp.setOwner(user: UserID(geteuid())) }
+      check(.notPermitted) { try tmp.setOwner(group: .effective) }
+      check(.notPermitted) { try tmp.setOwner(user: .effective) }
       // Other processes change /tmp's times, so compare only what the calls
       // would have changed.
       let after = try tmp.stat()
@@ -226,7 +226,7 @@ final class FileOperationsErrorTest: XCTestCase {
 
   func testOpenRelativeToNestedAndParentPaths() throws {
     try withTemporaryFilePath(basename: "testOpenRelativeNested") { path in
-      XCTAssertEqual(path.appending("sub").withPlatformString { mkdir($0, 0o700) }, 0)
+      try path.appending("sub").makeDirectory(permissions: .ownerReadWriteExecute)
       let directory = try FileDescriptor.open(path, .readOnly, options: .directory)
       try directory.closeAfter {
         let created = try FileDescriptor.open(
