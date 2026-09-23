@@ -232,8 +232,37 @@ final class TerminalTests: XCTestCase {
   }
 
   func testControlCharactersDisabled() {
-    let disabled = ControlCharacters.disabled
-    XCTAssertEqual(disabled, 0xFF)  // _POSIX_VDISABLE is typically 0xFF
+    // Each C library's _POSIX_VDISABLE.
+    #if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
+    XCTAssertEqual(ControlCharacters.disabled, 0xFF)
+    #else
+    XCTAssertEqual(ControlCharacters.disabled, 0)
+    #endif
+  }
+
+  func testDisabledControlCharacterIsOrdinaryInput() throws {
+    try withPseudoterminal { controller, fd in
+      let terminal = try TerminalDescriptor(fd)
+      var attributes = Self.withoutEcho(try terminal.attributes())
+      attributes.localFlags.insert([.canonical, .signals])
+      try terminal.setAttributes(attributes, when: .now)
+
+      // The interrupt character is special: the terminal consumes it, and
+      // discards the rest of the line so far. (No process gets the signal,
+      // since this isn't any process's controlling terminal.)
+      let interrupt = attributes.controlCharacters[.interrupt]
+      XCTAssertNotEqual(interrupt, ControlCharacters.disabled)
+      try controller.writeAll([UInt8(ascii: "a"), interrupt] + Array("b\n".utf8))
+      XCTAssertEqual(try readBytes(from: fd, count: 2), Array("b\n".utf8))
+
+      // Once disabled, it's ordinary input. So is the disabling value itself,
+      // which it wouldn't be if it were really another interrupt character.
+      attributes.controlCharacters[.interrupt] = ControlCharacters.disabled
+      try terminal.setAttributes(attributes, when: .now)
+      let line = [ControlCharacters.disabled, interrupt, UInt8(ascii: "\n")]
+      try controller.writeAll(line)
+      XCTAssertEqual(try readBytes(from: fd, count: 3), line)
+    }
   }
 
   func testControlCharactersHashable() {

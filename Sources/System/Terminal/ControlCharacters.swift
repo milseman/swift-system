@@ -107,6 +107,14 @@ public struct ControlCharacters: Sendable {
   @_alwaysEmitIntoClient
   public static var count: Int { Int(_NCCS) }
 
+  /// The value that disables a control character.
+  ///
+  /// Setting a control character to this value turns off its function,
+  /// so no input byte performs it.
+  /// The value is 0xFF on Darwin and 0 on Linux,
+  /// where each is otherwise a rarely typed byte.
+  ///
+  /// The corresponding C constant is `_POSIX_VDISABLE`.
   @_alwaysEmitIntoClient
   public static var disabled: CInterop.ControlCharacterValue { __POSIX_VDISABLE }
 
