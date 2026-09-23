@@ -34,7 +34,7 @@ final class FileOperationsTest: XCTestCase {
     let writeBuf = UnsafeRawBufferPointer(rawBuf)
     let writeBufAddr = writeBuf.baseAddress
 
-    var syscallTestCases: Array<MockTestCase> = [
+    let syscallTestCases: Array<MockTestCase> = [
       MockTestCase(name: "open", .interruptable, "a path", O_RDWR | O_APPEND) {
         retryOnInterrupt in
         _ = try FileDescriptor.open(
@@ -89,8 +89,17 @@ final class FileOperationsTest: XCTestCase {
       },
     ]
 
-    #if !os(Windows)
-    syscallTestCases += [
+    for test in syscallTestCases { test.runAllTests() }
+  }
+  #endif // ENABLE_MOCKING && !os(WASI)
+
+  #if ENABLE_MOCKING && !os(WASI) && !os(Windows)
+  @available(System 199, *)
+  func testUnixSyscalls() {
+    let fd = FileDescriptor(rawValue: 1)
+    let rawFD = fd.rawValue
+
+    let syscallTestCases: Array<MockTestCase> = [
       MockTestCase(name: "fsync", .interruptable, rawFD) { retryOnInterrupt in
         try fd.synchronize(retryOnInterrupt: retryOnInterrupt)
       },
@@ -118,19 +127,18 @@ final class FileOperationsTest: XCTestCase {
           retryOnInterrupt: retryOnInterrupt)
       },
     ]
-    #endif // !os(Windows)
-
-    #if !os(Windows) && !SYSTEM_PACKAGE_DARWIN
-    syscallTestCases += [
-      MockTestCase(name: "fdatasync", .interruptable, rawFD) { retryOnInterrupt in
-        try fd.synchronizeData(retryOnInterrupt: retryOnInterrupt)
-      },
-    ]
-    #endif // !os(Windows) && !SYSTEM_PACKAGE_DARWIN
 
     for test in syscallTestCases { test.runAllTests() }
+
+    #if !SYSTEM_PACKAGE_DARWIN
+    let fdatasync = MockTestCase(name: "fdatasync", .interruptable, rawFD) {
+      retryOnInterrupt in
+      try fd.synchronizeData(retryOnInterrupt: retryOnInterrupt)
+    }
+    fdatasync.runAllTests()
+    #endif // !SYSTEM_PACKAGE_DARWIN
   }
-  #endif // ENABLE_MOCKING && !os(WASI)
+  #endif // ENABLE_MOCKING && !os(WASI) && !os(Windows)
 
   func testWriteFromEmptyBuffer() throws {
     #if os(Windows)
@@ -422,6 +430,7 @@ final class FileOperationsTest: XCTestCase {
   }
 
 #if !os(Windows)
+  @available(System 199, *)
   func testSynchronize() throws {
     try withTemporaryFilePath(basename: "testSynchronize") { path in
       let fd = try FileDescriptor.open(path.appending("\(UUID().uuidString).txt"), .readWrite, options: [.create, .truncate], permissions: .ownerReadWrite)
@@ -434,6 +443,7 @@ final class FileOperationsTest: XCTestCase {
   }
 
 #if !SYSTEM_PACKAGE_DARWIN
+  @available(System 199, *)
   func testSynchronizeData() throws {
     try withTemporaryFilePath(basename: "testSynchronizeData") { path in
       let fd = try FileDescriptor.open(path.appending("\(UUID().uuidString).txt"), .readWrite, options: [.create, .truncate], permissions: .ownerReadWrite)
@@ -446,6 +456,7 @@ final class FileOperationsTest: XCTestCase {
   }
 #endif // !SYSTEM_PACKAGE_DARWIN
 
+  @available(System 199, *)
   func testOpenRelativeTo() throws {
     try withTemporaryFilePath(basename: "testOpenRelativeTo") { path in
       let dir = try FileDescriptor.open(path, .readOnly, options: .directory)
@@ -486,15 +497,13 @@ final class FileOperationsTest: XCTestCase {
 #endif // !os(Windows)
 
 #if !os(Windows) && !os(WASI)
+  @available(System 199, *)
   func testSetPermissions() throws {
     try withTemporaryFilePath(basename: "testSetPermissions") { path in
       let fd = try FileDescriptor.open(path.appending("\(UUID().uuidString).txt"), .readWrite, options: [.create, .truncate], permissions: .ownerReadWrite)
       try fd.closeAfter {
         try fd.setPermissions([.ownerRead, .groupRead])
-        var s = stat()
-        XCTAssertEqual(fstat(fd.rawValue, &s), 0)
-        XCTAssertEqual(
-          FilePermissions(rawValue: numericCast(s.st_mode & 0o7777)), [.ownerRead, .groupRead])
+        XCTAssertEqual(try fd.stat().permissions, [.ownerRead, .groupRead])
       }
     }
   }

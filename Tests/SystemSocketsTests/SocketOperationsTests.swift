@@ -193,6 +193,7 @@ private struct SocketOperationsTests {
 
   // MARK: - Socket Pair Tests
 
+  @available(System 199, *)
   @Test func localStreamPair() throws {
     let (first, second) = try SocketDescriptor.pair(.local, .stream)
     defer {
@@ -246,6 +247,7 @@ private struct SocketOperationsTests {
   }
 
   #if SYSTEM_PACKAGE_DARWIN || os(Linux)
+  @available(System 199, *)
   @Test func tcpKeepAliveOptions() throws {
     let socket = try SocketDescriptor.open(.ipv4, .stream, protocol: .tcp)
     defer { try? socket.close() }

@@ -516,6 +516,7 @@ extension FileDescriptor {
 }
 
 #if !os(Windows)
+@available(System 199, *)
 extension FileDescriptor {
   /// Opens or creates a file for reading or writing,
   /// resolving a relative path against a directory.
@@ -869,6 +870,7 @@ extension FileDescriptor {
 }
 
 #if !os(Windows)
+@available(System 199, *)
 extension FileDescriptor {
   /// Flushes modified data and metadata of the file referenced by this
   /// file descriptor to its storage device.
@@ -900,6 +902,7 @@ extension FileDescriptor {
 #endif // !os(Windows)
 
 #if !os(Windows) && !SYSTEM_PACKAGE_DARWIN
+@available(System 199, *)
 extension FileDescriptor {
   /// Flushes modified data of the file referenced by this file descriptor
   /// to its storage device, along with only the metadata needed
@@ -932,6 +935,7 @@ extension FileDescriptor {
 #endif // !os(Windows) && !SYSTEM_PACKAGE_DARWIN
 
 #if !os(Windows) && !os(WASI)
+@available(System 199, *)
 extension FileDescriptor {
   /// Changes the permissions of the file referenced by this file descriptor.
   ///
