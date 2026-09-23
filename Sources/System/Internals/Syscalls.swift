@@ -236,21 +236,6 @@ internal func system_rmdir(
   return rmdir(path)
 }
 
-#if !os(Windows)
-internal func system_mkdirat(
-  _ fd: CInt,
-  _ path: UnsafePointer<CInterop.PlatformChar>,
-  _ mode: CInterop.Mode
-) -> CInt {
-#if ENABLE_MOCKING
-  if mockingEnabled {
-    return _mock(fd, String(_errorCorrectingPlatformString: path), mode)
-  }
-#endif
-  return mkdirat(fd, path, mode)
-}
-#endif // !os(Windows)
-
 #if SYSTEM_PACKAGE_DARWIN
 internal let SYSTEM_CS_DARWIN_USER_TEMP_DIR = _CS_DARWIN_USER_TEMP_DIR
 
@@ -289,6 +274,73 @@ internal func system_unlinkat(
   }
 #endif
 return unlinkat(fd, path, flag)
+}
+
+internal func system_fdopendir(
+  _ fd: CInt
+) -> system_DIRPtr? {
+  return fdopendir(fd)
+}
+
+internal func system_readdir(
+  _ dir: system_DIRPtr
+) -> UnsafeMutablePointer<system_dirent>? {
+  #if os(WASI)
+  return _system_dirent_from_wasi_dirent(readdir(dir))
+  #else
+  return readdir(dir)
+  #endif
+}
+
+internal func system_rewinddir(
+  _ dir: system_DIRPtr
+) {
+  return rewinddir(dir)
+}
+
+internal func system_closedir(
+  _ dir: system_DIRPtr
+) -> CInt {
+  return closedir(dir)
+}
+
+internal func system_openat(
+  _ fd: CInt,
+  _ path: UnsafePointer<CInterop.PlatformChar>,
+  _ oflag: Int32
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled {
+    return _mock(fd, String(_errorCorrectingPlatformString: path), oflag)
+  }
+#endif
+  return openat(fd, path, oflag)
+}
+
+internal func system_openat(
+  _ fd: CInt,
+  _ path: UnsafePointer<CInterop.PlatformChar>,
+  _ oflag: Int32,
+  _ mode: CInterop.Mode
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled {
+    return _mock(fd, String(_errorCorrectingPlatformString: path), oflag, mode)
+  }
+#endif
+  return openat(fd, path, oflag, mode)
+}
+internal func system_mkdirat(
+  _ fd: CInt,
+  _ path: UnsafePointer<CInterop.PlatformChar>,
+  _ mode: CInterop.Mode
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled {
+    return _mock(fd, String(_errorCorrectingPlatformString: path), mode)
+  }
+#endif
+  return mkdirat(fd, path, mode)
 }
 
 internal func system_unlink(
@@ -496,60 +548,51 @@ internal func system_fchownat(
 }
 #endif // !os(WASI)
 
-internal func system_fdopendir(
-  _ fd: CInt
-) -> system_DIRPtr? {
-  return fdopendir(fd)
-}
-
-internal func system_readdir(
-  _ dir: system_DIRPtr
-) -> UnsafeMutablePointer<system_dirent>? {
-  #if os(WASI)
-  return _system_dirent_from_wasi_dirent(readdir(dir))
-  #else
-  return readdir(dir)
-  #endif
-}
-
-internal func system_rewinddir(
-  _ dir: system_DIRPtr
-) {
-  return rewinddir(dir)
-}
-
-internal func system_closedir(
-  _ dir: system_DIRPtr
+#if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
+internal func system_chflags(
+  _ path: UnsafePointer<CInterop.PlatformChar>,
+  _ flags: UInt32
 ) -> CInt {
-  return closedir(dir)
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(path: path, flags) }
+#endif
+  // The flags parameter is `unsigned long` on FreeBSD.
+  return chflags(path, numericCast(flags))
 }
 
-internal func system_openat(
+internal func system_lchflags(
+  _ path: UnsafePointer<CInterop.PlatformChar>,
+  _ flags: UInt32
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(path: path, flags) }
+#endif
+#if os(OpenBSD)
+  // OpenBSD has no lchflags. This is its equivalent.
+  return chflagsat(AT_FDCWD, path, flags, AT_SYMLINK_NOFOLLOW)
+#else
+  // The flags parameter is `unsigned long` on FreeBSD.
+  return lchflags(path, numericCast(flags))
+#endif
+}
+#endif // SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
+
+#if os(FreeBSD) || os(OpenBSD)
+internal func system_chflagsat(
   _ fd: CInt,
   _ path: UnsafePointer<CInterop.PlatformChar>,
-  _ oflag: Int32
+  _ flags: UInt32,
+  _ atFlag: CInt
 ) -> CInt {
 #if ENABLE_MOCKING
   if mockingEnabled {
-    return _mock(fd, String(_errorCorrectingPlatformString: path), oflag)
+    return _mock(fd, String(_errorCorrectingPlatformString: path), flags, atFlag)
   }
 #endif
-  return openat(fd, path, oflag)
+  // The flags parameter is `unsigned long` on FreeBSD.
+  return chflagsat(fd, path, numericCast(flags), atFlag)
 }
-
-internal func system_openat(
-  _ fd: CInt,
-  _ path: UnsafePointer<CInterop.PlatformChar>,
-  _ oflag: Int32,
-  _ mode: CInterop.Mode
-) -> CInt {
-#if ENABLE_MOCKING
-  if mockingEnabled {
-    return _mock(fd, String(_errorCorrectingPlatformString: path), oflag, mode)
-  }
-#endif
-  return openat(fd, path, oflag, mode)
-}
+#endif // os(FreeBSD) || os(OpenBSD)
 #endif // !os(Windows)
 
 #if !os(WASI) // WASI has no umask

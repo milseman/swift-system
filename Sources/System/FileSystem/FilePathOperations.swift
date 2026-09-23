@@ -1512,4 +1512,193 @@ extension FilePath {
 }
 #endif // !os(WASI)
 
+// MARK: - chflags, lchflags, chflagsat
+
+#if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
+@available(System 199, *)
+extension FilePath {
+  /// Replaces the flags of the file at this path.
+  ///
+  /// - Parameters:
+  ///   - fileFlags: The new flags for the file.
+  ///   - followTargetSymlink: Whether to change the flags
+  ///     of a symbolic link's target, if this path names a symbolic link.
+  ///     The default is `true`.
+  ///     Pass `false` to change the flags of the link itself.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// This method sets all of the file's flags at once.
+  /// To change individual flags,
+  /// start from the file's current flags, given by ``Stat/flags``.
+  /// Some flags can only be changed by the superuser,
+  /// and some can't be changed at all;
+  /// see the documentation for each flag in ``FileFlags``.
+  ///
+  /// The corresponding C function is `chflags`,
+  /// or `lchflags` if `followTargetSymlink` is `false`.
+  /// - Note: Only available on Darwin, FreeBSD, and OpenBSD.
+  @_alwaysEmitIntoClient
+  public func setFileFlags(
+    _ fileFlags: FileFlags,
+    followTargetSymlink: Bool = true,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try withPlatformString {
+      FilePath._setFileFlags(
+        $0, fileFlags, followTargetSymlink: followTargetSymlink,
+        retryOnInterrupt: retryOnInterrupt)
+    }.get()
+  }
+
+  /// Replaces the flags of the file at the given path.
+  ///
+  /// - Parameters:
+  ///   - path: The location of the file.
+  ///   - fileFlags: The new flags for the file.
+  ///   - followTargetSymlink: Whether to change the flags
+  ///     of a symbolic link's target, if `path` names a symbolic link.
+  ///     The default is `true`.
+  ///     Pass `false` to change the flags of the link itself.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// This method sets all of the file's flags at once.
+  /// To change individual flags,
+  /// start from the file's current flags, given by ``Stat/flags``.
+  /// Some flags can only be changed by the superuser,
+  /// and some can't be changed at all;
+  /// see the documentation for each flag in ``FileFlags``.
+  ///
+  /// The corresponding C function is `chflags`,
+  /// or `lchflags` if `followTargetSymlink` is `false`.
+  /// - Note: Only available on Darwin, FreeBSD, and OpenBSD.
+  @_alwaysEmitIntoClient
+  public static func setFileFlags(
+    _ path: UnsafePointer<CChar>,
+    _ fileFlags: FileFlags,
+    followTargetSymlink: Bool = true,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try _setFileFlags(
+      path, fileFlags, followTargetSymlink: followTargetSymlink,
+      retryOnInterrupt: retryOnInterrupt
+    ).get()
+  }
+
+  @usableFromInline
+  internal static func _setFileFlags(
+    _ path: UnsafePointer<CChar>,
+    _ fileFlags: FileFlags,
+    followTargetSymlink: Bool,
+    retryOnInterrupt: Bool
+  ) -> Result<(), Errno> {
+    nothingOrErrno(retryOnInterrupt: retryOnInterrupt) {
+      if followTargetSymlink {
+        system_chflags(path, fileFlags.rawValue)
+      } else {
+        system_lchflags(path, fileFlags.rawValue)
+      }
+    }
+  }
+}
+#endif // SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
+
+#if os(FreeBSD) || os(OpenBSD)
+@available(System 199, *)
+extension FilePath {
+  /// Replaces the flags of the file at this path,
+  /// resolving a relative path against a directory.
+  ///
+  /// - Parameters:
+  ///   - fileFlags: The new flags for the file.
+  ///   - fd: The directory against which a relative path is resolved.
+  ///   - flags: Options that control how the path is resolved.
+  ///     Pass ``ResolutionFlags/symlinkNoFollow``
+  ///     to change the flags of a symbolic link itself.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// This method sets all of the file's flags at once.
+  /// To change individual flags,
+  /// start from the file's current flags, given by ``Stat/flags``.
+  ///
+  /// If this path is absolute (starts with a forward slash), then `fd` is ignored.
+  /// If this path is relative, it is resolved against the directory given by `fd`.
+  ///
+  /// The corresponding C function is `chflagsat`.
+  /// - Note: Only available on FreeBSD and OpenBSD.
+  @_alwaysEmitIntoClient
+  public func setFileFlags(
+    _ fileFlags: FileFlags,
+    relativeTo fd: FileDescriptor,
+    flags: FilePath.ResolutionFlags = [],
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try withPlatformString {
+      FilePath._setFileFlags(
+        $0, fileFlags, relativeTo: fd, flags: flags,
+        retryOnInterrupt: retryOnInterrupt)
+    }.get()
+  }
+
+  /// Replaces the flags of the file at the given path,
+  /// resolving a relative path against a directory.
+  ///
+  /// - Parameters:
+  ///   - path: The location of the file.
+  ///   - fileFlags: The new flags for the file.
+  ///   - fd: The directory against which a relative `path` is resolved.
+  ///   - flags: Options that control how `path` is resolved.
+  ///     Pass ``ResolutionFlags/symlinkNoFollow``
+  ///     to change the flags of a symbolic link itself.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// This method sets all of the file's flags at once.
+  /// To change individual flags,
+  /// start from the file's current flags, given by ``Stat/flags``.
+  ///
+  /// If `path` is absolute (starts with a forward slash), then `fd` is ignored.
+  /// If `path` is relative, it is resolved against the directory given by `fd`.
+  ///
+  /// The corresponding C function is `chflagsat`.
+  /// - Note: Only available on FreeBSD and OpenBSD.
+  @_alwaysEmitIntoClient
+  public static func setFileFlags(
+    _ path: UnsafePointer<CChar>,
+    _ fileFlags: FileFlags,
+    relativeTo fd: FileDescriptor,
+    flags: FilePath.ResolutionFlags = [],
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try _setFileFlags(
+      path, fileFlags, relativeTo: fd, flags: flags,
+      retryOnInterrupt: retryOnInterrupt
+    ).get()
+  }
+
+  @usableFromInline
+  internal static func _setFileFlags(
+    _ path: UnsafePointer<CChar>,
+    _ fileFlags: FileFlags,
+    relativeTo fd: FileDescriptor,
+    flags: FilePath.ResolutionFlags,
+    retryOnInterrupt: Bool
+  ) -> Result<(), Errno> {
+    nothingOrErrno(retryOnInterrupt: retryOnInterrupt) {
+      system_chflagsat(fd.rawValue, path, fileFlags.rawValue, flags.rawValue)
+    }
+  }
+}
+#endif // os(FreeBSD) || os(OpenBSD)
+
 #endif // !os(Windows)

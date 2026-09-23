@@ -356,6 +356,62 @@ final class FilePathOperationsTest: XCTestCase {
 
     for test in resolutionFlagsTestCases { test.runAllTests() }
     #endif // SYSTEM_PACKAGE_DARWIN
+
+    #if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
+    let fileFlags = UInt32(bitPattern: UF_NODUMP | UF_APPEND)
+    var fileFlagsTestCases: Array<MockTestCase> = [
+      MockTestCase(name: "chflags", .interruptable, "a path", fileFlags) {
+        retryOnInterrupt in
+        try path.setFileFlags([.noDump, .userAppend], retryOnInterrupt: retryOnInterrupt)
+      },
+
+      MockTestCase(name: "chflags", .interruptable, "a path", fileFlags) {
+        retryOnInterrupt in
+        try "a path".withCString {
+          try FilePath.setFileFlags(
+            $0, [.noDump, .userAppend], retryOnInterrupt: retryOnInterrupt)
+        }
+      },
+
+      MockTestCase(name: "lchflags", .interruptable, "a path", fileFlags) {
+        retryOnInterrupt in
+        try path.setFileFlags(
+          [.noDump, .userAppend], followTargetSymlink: false,
+          retryOnInterrupt: retryOnInterrupt)
+      },
+
+      MockTestCase(name: "lchflags", .interruptable, "a path", fileFlags) {
+        retryOnInterrupt in
+        try "a path".withCString {
+          try FilePath.setFileFlags(
+            $0, [.noDump, .userAppend], followTargetSymlink: false,
+            retryOnInterrupt: retryOnInterrupt)
+        }
+      },
+    ]
+    #if os(FreeBSD) || os(OpenBSD)
+    fileFlagsTestCases += [
+      MockTestCase(
+        name: "chflagsat", .interruptable, 42, "a path", fileFlags, AT_SYMLINK_NOFOLLOW
+      ) { retryOnInterrupt in
+        try path.setFileFlags(
+          [.noDump, .userAppend], relativeTo: dir, flags: .symlinkNoFollow,
+          retryOnInterrupt: retryOnInterrupt)
+      },
+
+      MockTestCase(name: "chflagsat", .interruptable, 42, "a path", fileFlags, 0) {
+        retryOnInterrupt in
+        try "a path".withCString {
+          try FilePath.setFileFlags(
+            $0, [.noDump, .userAppend], relativeTo: dir,
+            retryOnInterrupt: retryOnInterrupt)
+        }
+      },
+    ]
+    #endif // os(FreeBSD) || os(OpenBSD)
+
+    for test in fileFlagsTestCases { test.runAllTests() }
+    #endif // SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
   }
   #endif // ENABLE_MOCKING && !os(WASI)
 
@@ -863,6 +919,55 @@ final class FilePathOperationsTest: XCTestCase {
     }
   }
   #endif // !os(WASI)
+
+  #if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
+  @available(System 199, *)
+  func testSetFileFlags() throws {
+    try withTemporaryFilePath(basename: "testSetFileFlags") { path in
+      let file = path.appending("file")
+      let fd = try FileDescriptor.open(
+        file, .writeOnly, options: .create, permissions: .ownerReadWrite)
+      try fd.close()
+      let original = try file.stat().flags
+      XCTAssertFalse(original.contains(.noDump))
+
+      try file.setFileFlags(original.union(.noDump))
+      XCTAssertEqual(try file.stat().flags, original.union(.noDump))
+      try file.withCString { try FilePath.setFileFlags($0, original) }
+      XCTAssertEqual(try file.stat().flags, original)
+
+      #if SYSTEM_PACKAGE_DARWIN
+      // By default, a symbolic link's target changes.
+      let link = path.appending("link")
+      try link.makeSymbolicLink(to: "file")
+      let linkOriginal = try link.stat(followTargetSymlink: false).flags
+      try link.setFileFlags(original.union(.noDump))
+      XCTAssertEqual(try file.stat().flags, original.union(.noDump))
+      XCTAssertEqual(try link.stat(followTargetSymlink: false).flags, linkOriginal)
+
+      try link.setFileFlags(linkOriginal.union(.hidden), followTargetSymlink: false)
+      XCTAssertEqual(
+        try link.stat(followTargetSymlink: false).flags, linkOriginal.union(.hidden))
+      XCTAssertEqual(try file.stat().flags, original.union(.noDump))
+      try file.setFileFlags(original)
+      #endif
+
+      XCTAssertThrowsError(try path.appending("missing").setFileFlags(original)) {
+        XCTAssertEqual($0 as? Errno, .noSuchFileOrDirectory)
+      }
+
+      #if os(FreeBSD) || os(OpenBSD)
+      let dir = try FileDescriptor.open(path, .readOnly, options: .directory)
+      try dir.closeAfter {
+        try FilePath("file").setFileFlags(original.union(.noDump), relativeTo: dir)
+        XCTAssertEqual(try file.stat().flags, original.union(.noDump))
+        try "file".withCString { try FilePath.setFileFlags($0, original, relativeTo: dir) }
+        XCTAssertEqual(try file.stat().flags, original)
+      }
+      #endif
+    }
+  }
+  #endif // SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
 }
 
 #endif // !os(Windows)
