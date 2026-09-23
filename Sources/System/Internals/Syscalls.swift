@@ -10,20 +10,16 @@
 import CSystem
 #if SYSTEM_PACKAGE_DARWIN
 import Darwin
-import CSystem
 #elseif canImport(Glibc)
 import Glibc
-import CSystem
 #elseif canImport(Musl)
 import Musl
-import CSystem
 #elseif canImport(WASILibc)
 import WASILibc
 #elseif os(Windows)
 import ucrt
 #elseif canImport(Android)
 import Android
-import CSystem
 #else
 #error("Unsupported Platform")
 #endif
@@ -366,18 +362,6 @@ internal func system_getenv(
 // MARK: - Terminal Control (termios)
 
 #if !os(Windows)
-@usableFromInline
-internal func system_isatty(
-  _ fd: CInt
-) -> CInt {
-#if ENABLE_MOCKING
-  if mockingEnabled {
-    return _mock(fd)
-  }
-#endif
-  return isatty(fd)
-}
-
 internal func system_tcgetattr(
   _ fd: CInt,
   _ termios_p: UnsafeMutablePointer<CInterop.Termios>
