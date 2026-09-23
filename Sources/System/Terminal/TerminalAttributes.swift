@@ -148,20 +148,37 @@ public struct TerminalAttributes: RawRepresentable, Equatable, Hashable, Sendabl
 
   // MARK: - Equatable & Hashable
 
+  /// Returns whether two values have the same flags, control characters,
+  /// and speeds, and on Linux, the same line discipline.
+  ///
+  /// Alignment padding in the C structure isn't compared.
   @_alwaysEmitIntoClient
   public static func == (lhs: TerminalAttributes, rhs: TerminalAttributes) -> Bool {
-    withUnsafeBytes(of: lhs.rawValue) { lhsBytes in
-      withUnsafeBytes(of: rhs.rawValue) { rhsBytes in
-        lhsBytes.elementsEqual(rhsBytes)
-      }
-    }
+    #if os(Linux) || os(Android)
+    guard lhs.rawValue.c_line == rhs.rawValue.c_line else { return false }
+    #endif
+    return lhs.inputFlags == rhs.inputFlags
+      && lhs.outputFlags == rhs.outputFlags
+      && lhs.controlFlags == rhs.controlFlags
+      && lhs.localFlags == rhs.localFlags
+      && lhs.controlCharacters == rhs.controlCharacters
+      && lhs.inputSpeed == rhs.inputSpeed
+      && lhs.outputSpeed == rhs.outputSpeed
   }
 
+  /// Hashes the fields that `==` compares.
   @_alwaysEmitIntoClient
   public func hash(into hasher: inout Hasher) {
-    withUnsafeBytes(of: rawValue) { bytes in
-      hasher.combine(bytes: bytes)
-    }
+    #if os(Linux) || os(Android)
+    hasher.combine(rawValue.c_line)
+    #endif
+    hasher.combine(inputFlags)
+    hasher.combine(outputFlags)
+    hasher.combine(controlFlags)
+    hasher.combine(localFlags)
+    hasher.combine(controlCharacters)
+    hasher.combine(inputSpeed)
+    hasher.combine(outputSpeed)
   }
 }
 

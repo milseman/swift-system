@@ -108,6 +108,46 @@ final class TerminalTests: XCTestCase {
     XCTAssertTrue(set.contains(attrs2))
   }
 
+  func testTerminalAttributesEqualityComparesEachField() {
+    var base = TerminalAttributes()
+    base.localFlags = [.canonical, .echo]
+    base.setSpeed(.b9600)
+
+    let changes: [(String, (inout TerminalAttributes) -> Void)] = [
+      ("inputFlags", { $0.inputFlags.insert(.ignoreCR) }),
+      ("outputFlags", { $0.outputFlags.insert(.postProcess) }),
+      ("controlFlags", { $0.controlFlags.insert(.hangUpOnClose) }),
+      ("localFlags", { $0.localFlags.remove(.echo) }),
+      ("controlCharacters", { $0.controlCharacters[.interrupt] = 0x03 }),
+      ("outputSpeed", { $0.outputSpeed = .b19200 }),
+    ]
+    for (name, change) in changes {
+      var changed = base
+      change(&changed)
+      XCTAssertNotEqual(changed, base, name)
+    }
+  }
+
+  func testTerminalAttributesEqualityIgnoresPadding() throws {
+    // termios pads the end of c_cc to align the speed that follows it.
+    let ccEnd = MemoryLayout<termios>.offset(of: \termios.c_cc)! + ControlCharacters.count
+    #if SYSTEM_PACKAGE_DARWIN || (os(Linux) && canImport(Glibc))
+    let speedStart = MemoryLayout<termios>.offset(of: \termios.c_ispeed)!
+    #else
+    let speedStart = ccEnd
+    #endif
+    guard ccEnd < speedStart else {
+      throw XCTSkip("termios has no padding after c_cc on this platform")
+    }
+
+    var attributes = TerminalAttributes()
+    attributes.localFlags = [.canonical, .echo]
+    var padded = attributes
+    withUnsafeMutableBytes(of: &padded.rawValue) { $0[ccEnd] = 0xA5 }
+    XCTAssertEqual(padded, attributes)
+    XCTAssertEqual(padded.hashValue, attributes.hashValue)
+  }
+
   // MARK: - Flag Tests
 
   func testInputFlags() {
