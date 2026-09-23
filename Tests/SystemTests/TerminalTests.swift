@@ -11,6 +11,18 @@
 
 import XCTest
 
+#if SYSTEM_PACKAGE_DARWIN
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif canImport(Musl)
+import Musl
+#elseif canImport(Android)
+import Android
+#else
+#error("Unsupported Platform")
+#endif
+
 #if SYSTEM_PACKAGE
 import SystemPackage
 #else
@@ -418,110 +430,263 @@ final class TerminalTests: XCTestCase {
     XCTAssertTrue(set.contains(size2))
   }
 
-  // MARK: - Integration Tests (require actual terminal)
+  // MARK: - Pseudoterminal Tests
+  //
+  // These run on a new pseudoterminal rather than on standard input or
+  // output, which aren't terminals under `swift test`.
 
   func testTerminalAttributesRoundtrip() throws {
-    // Only run if we actually have a terminal
-    guard let terminal = FileDescriptor.standardInput.asTerminal else {
-      throw XCTSkip("stdin is not a terminal")
+    try withPseudoterminal { _, fd in
+      let terminal = try TerminalDescriptor(fd)
+      let original = try terminal.attributes()
+      XCTAssertEqual(try terminal.attributes(), original)
+
+      // The attributes are the ones tcgetattr reads.
+      var expected = termios()
+      XCTAssertEqual(tcgetattr(fd.rawValue, &expected), 0)
+      XCTAssertEqual(original.inputFlags.rawValue, expected.c_iflag)
+      XCTAssertEqual(original.outputFlags.rawValue, expected.c_oflag)
+      XCTAssertEqual(original.controlFlags.rawValue, expected.c_cflag)
+      XCTAssertEqual(original.localFlags.rawValue, expected.c_lflag)
+      for index in 0..<ControlCharacters.count {
+        let byte = withUnsafeBytes(of: expected.c_cc) { $0[index] }
+        XCTAssertEqual(original.controlCharacters[rawIndex: index], byte)
+      }
+
+      // A new pseudoterminal reads a line at a time, and echoes it.
+      XCTAssertTrue(original.localFlags.isSuperset(of: [.canonical, .echo]))
     }
-
-    // Get current attributes
-    let original = try terminal.attributes()
-
-    // Verify we can read them back
-    let readBack = try terminal.attributes()
-    XCTAssertEqual(original, readBack)
   }
 
   func testTerminalSetAttributes() throws {
-    guard let terminal = FileDescriptor.standardInput.asTerminal else {
-      throw XCTSkip("stdin is not a terminal")
+    try withPseudoterminal { _, fd in
+      let terminal = try TerminalDescriptor(fd)
+      let original = try terminal.attributes()
+
+      var modified = original
+      modified.localFlags.insert(.echoNL)
+      modified.localFlags.remove(.echo)
+      modified.controlCharacters[.erase] = 0x08
+      modified.setSpeed(.b38400)
+      XCTAssertNotEqual(modified, original)
+
+      // With no input or output pending, each action applies the change.
+      for action: TerminalAttributes.SetAction in [.now, .afterDrain, .afterFlush] {
+        try terminal.setAttributes(original, when: .now)
+        try terminal.setAttributes(modified, when: action)
+        let readBack = try terminal.attributes()
+        XCTAssertTrue(readBack.localFlags.contains(.echoNL))
+        XCTAssertFalse(readBack.localFlags.contains(.echo))
+        XCTAssertEqual(readBack.controlCharacters[.erase], 0x08)
+        XCTAssertEqual(readBack.inputSpeed, .b38400)
+        XCTAssertEqual(readBack.outputSpeed, .b38400)
+      }
     }
-
-    let original = try terminal.attributes()
-    defer {
-      // Always restore original attributes
-      try? terminal.setAttributes(original, when: .now)
-    }
-
-    // Make a modification
-    var modified = original
-    modified.localFlags.insert(.echoNL)
-
-    // Set the modified attributes
-    try terminal.setAttributes(modified, when: .now)
-
-    // Read them back
-    let readBack = try terminal.attributes()
-    XCTAssertTrue(readBack.localFlags.contains(.echoNL))
   }
 
   func testWithAttributes() throws {
-    guard let terminal = FileDescriptor.standardInput.asTerminal else {
-      throw XCTSkip("stdin is not a terminal")
+    try withPseudoterminal { _, fd in
+      let terminal = try TerminalDescriptor(fd)
+      let original = try terminal.attributes()
+
+      // Modify attributes within scope
+      let result = try terminal.withAttributes({ attrs in
+        attrs.localFlags.insert(.echoNL)
+      }) {
+        // Inside the block, attributes should be modified
+        let current = try terminal.attributes()
+        XCTAssertTrue(current.localFlags.contains(.echoNL))
+        return 42
+      }
+      XCTAssertEqual(result, 42)
+
+      // After the block, attributes should be restored
+      XCTAssertEqual(try terminal.attributes(), original)
+
+      // Also when the block throws.
+      struct BodyError: Error {}
+      XCTAssertThrowsError(
+        try terminal.withAttributes({ $0.localFlags.insert(.echoNL) }) {
+          XCTAssertTrue(try terminal.attributes().localFlags.contains(.echoNL))
+          throw BodyError()
+        }
+      ) {
+        XCTAssertTrue($0 is BodyError)
+      }
+      XCTAssertEqual(try terminal.attributes(), original)
     }
-
-    let original = try terminal.attributes()
-
-    // Modify attributes within scope
-    try terminal.withAttributes({ attrs in
-      attrs.localFlags.insert(.echoNL)
-    }) {
-      // Inside the block, attributes should be modified
-      let current = try terminal.attributes()
-      XCTAssertTrue(current.localFlags.contains(.echoNL))
-    }
-
-    // After the block, attributes should be restored
-    let restored = try terminal.attributes()
-    XCTAssertEqual(original.localFlags, restored.localFlags)
   }
 
   func testWithRawMode() throws {
-    guard let terminal = FileDescriptor.standardInput.asTerminal else {
-      throw XCTSkip("stdin is not a terminal")
+    try withPseudoterminal { controller, fd in
+      let terminal = try TerminalDescriptor(fd)
+      let original = try terminal.attributes()
+
+      try terminal.withRawMode {
+        // Inside raw mode
+        let current = try terminal.attributes()
+        XCTAssertFalse(current.localFlags.contains(.canonical))
+        XCTAssertFalse(current.localFlags.contains(.echo))
+
+        // Input can be read a byte at a time, without waiting for a newline.
+        try controller.writeAll("x".utf8)
+        XCTAssertEqual(try readBytes(from: fd, count: 1), Array("x".utf8))
+      }
+
+      // After exiting raw mode. Leaving non-canonical mode can make the driver
+      // set PENDIN, which Darwin does, so ignore the state flags it manages.
+      let restored = try terminal.attributes()
+      let stateFlags: LocalFlags = [.retypePending, .flushingOutput]
+      XCTAssertEqual(
+        original.localFlags.subtracting(stateFlags),
+        restored.localFlags.subtracting(stateFlags))
+      XCTAssertEqual(original.inputFlags, restored.inputFlags)
+      XCTAssertEqual(original.outputFlags, restored.outputFlags)
+      XCTAssertEqual(original.controlFlags, restored.controlFlags)
+      XCTAssertEqual(original.controlCharacters, restored.controlCharacters)
+
+      // In canonical mode, a partial line can't be read yet, and with echo
+      // restored, the controller reads the input back. Reading it also
+      // leaves no output pending, which closing the terminal would wait for.
+      try controller.writeAll("y".utf8)
+      XCTAssertFalse(try isReadable(fd, timeout: 100))
+      XCTAssertEqual(try readBytes(from: controller, count: 1), Array("y".utf8))
     }
-
-    let original = try terminal.attributes()
-
-    try terminal.withRawMode {
-      // Inside raw mode
-      let current = try terminal.attributes()
-      XCTAssertFalse(current.localFlags.contains(.canonical))
-      XCTAssertFalse(current.localFlags.contains(.echo))
-    }
-
-    // After exiting raw mode. Leaving non-canonical mode can make the driver
-    // set PENDIN, which Darwin does, so ignore the state flags it manages.
-    let restored = try terminal.attributes()
-    let stateFlags: LocalFlags = [.retypePending, .flushingOutput]
-    XCTAssertEqual(
-      original.localFlags.subtracting(stateFlags),
-      restored.localFlags.subtracting(stateFlags))
   }
 
   func testWindowSizeOperation() throws {
-    guard let terminal = FileDescriptor.standardOutput.asTerminal else {
-      throw XCTSkip("stdout is not a terminal")
-    }
+    try withPseudoterminal { controller, fd in
+      let terminal = try TerminalDescriptor(fd)
+      let size = TerminalDescriptor.WindowSize(rows: 24, columns: 80)
+      try terminal.setWindowSize(size)
+      XCTAssertEqual(try terminal.windowSize(), size)
 
-    // Just verify we can get window size without crashing
-    let size = try terminal.windowSize()
-    XCTAssertGreaterThan(size.rows, 0)
-    XCTAssertGreaterThan(size.columns, 0)
+      // Both ends share the size.
+      let controllerTerminal = try TerminalDescriptor(controller)
+      XCTAssertEqual(try controllerTerminal.windowSize(), size)
+      let larger = TerminalDescriptor.WindowSize(rows: 50, columns: 132)
+      try controllerTerminal.setWindowSize(larger)
+      XCTAssertEqual(try terminal.windowSize(), larger)
+    }
   }
 
-  func testTerminalOperationsDontCrash() throws {
-    guard let terminal = FileDescriptor.standardOutput.asTerminal else {
-      throw XCTSkip("stdout is not a terminal")
+  func testTerminalOperations() throws {
+    try withPseudoterminal { _, fd in
+      let terminal = try TerminalDescriptor(fd)
+      // With no output pending, draining returns at once.
+      try terminal.drain()
+      try terminal.flush(.input)
+      try terminal.flush(.output)
+      try terminal.flush(.both)
+      try terminal.flow(.suspendOutput)
+      try terminal.flow(.resumeOutput)
+      try terminal.flow(.sendStop)
+      try terminal.flow(.sendStart)
+      try terminal.sendBreak()
     }
+  }
 
-    // These should not crash, though they may fail with errors
-    // We're just testing they're callable
-    try? terminal.drain()
-    try? terminal.flush(.output)
-    try? terminal.flow(.resumeOutput)
+  func testFlushDiscardsPendingData() throws {
+    try withPseudoterminal { controller, fd in
+      let terminal = try TerminalDescriptor(fd)
+      try terminal.setAttributes(Self.withoutEcho(terminal.attributes()), when: .now)
+
+      // Input that the terminal hasn't read. Waiting until the line is
+      // readable makes sure it has reached the terminal.
+      try controller.writeAll("discarded\n".utf8)
+      XCTAssertTrue(try isReadable(fd, timeout: 5_000))
+      try terminal.flush(.input)
+      try controller.writeAll("kept\n".utf8)
+      XCTAssertEqual(try readBytes(from: fd, count: 5), Array("kept\n".utf8))
+
+      #if SYSTEM_PACKAGE_DARWIN
+      // Output that the controller hasn't read. On Linux, a pseudoterminal
+      // moves output to the controller as it's written, which leaves nothing
+      // for the flush to discard once the move is done.
+      try fd.writeAll("discarded".utf8)
+      try terminal.flush(.output)
+      try fd.writeAll("kept".utf8)
+      XCTAssertEqual(try readBytes(from: controller, count: 4), Array("kept".utf8))
+      #endif
+    }
+  }
+
+  func testSetAttributesAfterFlushDiscardsPendingInput() throws {
+    try withPseudoterminal { controller, fd in
+      let terminal = try TerminalDescriptor(fd)
+      let attributes = Self.withoutEcho(try terminal.attributes())
+      try terminal.setAttributes(attributes, when: .now)
+
+      try controller.writeAll("discarded\n".utf8)
+      XCTAssertTrue(try isReadable(fd, timeout: 5_000))
+      try terminal.setAttributes(attributes, when: .afterFlush)
+      try controller.writeAll("kept\n".utf8)
+      XCTAssertEqual(try readBytes(from: fd, count: 5), Array("kept\n".utf8))
+    }
+  }
+
+  func testOperationsOnANonTerminal() throws {
+    let fds = try FileDescriptor.pipe()
+    defer {
+      try? fds.readEnd.close()
+      try? fds.writeEnd.close()
+    }
+    let pipe = TerminalDescriptor(unchecked: fds.readEnd)
+    Self.checkEachOperation(on: pipe, throws: .inappropriateIOCTLForDevice)
+  }
+
+  func testOperationsOnAnInvalidDescriptor() {
+    let invalid = TerminalDescriptor(rawValue: -1)
+    Self.checkEachOperation(on: invalid, throws: .badFileDescriptor)
+  }
+
+  func testInvalidActions() throws {
+    try withPseudoterminal { _, fd in
+      let terminal = try TerminalDescriptor(fd)
+      let attributes = try terminal.attributes()
+      XCTAssertThrowsError(
+        try terminal.setAttributes(attributes, when: .init(rawValue: 99))
+      ) {
+        XCTAssertEqual($0 as? Errno, .invalidArgument)
+      }
+      XCTAssertThrowsError(try terminal.flush(.init(rawValue: 99))) {
+        XCTAssertEqual($0 as? Errno, .invalidArgument)
+      }
+      XCTAssertThrowsError(try terminal.flow(.init(rawValue: 99))) {
+        XCTAssertEqual($0 as? Errno, .invalidArgument)
+      }
+      XCTAssertEqual(try terminal.attributes(), attributes)
+    }
+  }
+
+  /// Returns `attributes` without echo, so that input the controller writes
+  /// leaves no output pending.
+  private static func withoutEcho(_ attributes: TerminalAttributes) -> TerminalAttributes {
+    var attributes = attributes
+    attributes.localFlags.subtract([.echo, .echoNL])
+    return attributes
+  }
+
+  /// Checks that each operation on `terminal` throws `expected`.
+  private static func checkEachOperation(
+    on terminal: TerminalDescriptor, throws expected: Errno,
+    file: StaticString = #filePath, line: UInt = #line
+  ) {
+    let operations: [(String, () throws -> Void)] = [
+      ("attributes", { _ = try terminal.attributes() }),
+      ("setAttributes", { try terminal.setAttributes(TerminalAttributes(), when: .now) }),
+      ("drain", { try terminal.drain() }),
+      ("flush", { try terminal.flush(.both) }),
+      ("flow", { try terminal.flow(.resumeOutput) }),
+      ("sendBreak", { try terminal.sendBreak() }),
+      ("windowSize", { _ = try terminal.windowSize() }),
+      ("setWindowSize", { try terminal.setWindowSize(.init(rows: 24, columns: 80)) }),
+    ]
+    for (name, operation) in operations {
+      XCTAssertThrowsError(try operation(), name, file: file, line: line) {
+        XCTAssertEqual($0 as? Errno, expected, name, file: file, line: line)
+      }
+    }
   }
 }
 
