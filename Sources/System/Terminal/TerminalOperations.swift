@@ -11,7 +11,7 @@
 
 // MARK: - Terminal Operations
 
-@available(System 99, *)
+@available(System 199, *)
 extension TerminalDescriptor {
   /// Returns the current terminal attributes.
   @_alwaysEmitIntoClient
@@ -131,11 +131,11 @@ extension TerminalDescriptor {
 
 // MARK: - Supporting Types
 
-@available(System 99, *)
+@available(System 199, *)
 extension TerminalDescriptor {
   /// Specifies which queue(s) to flush.
   @frozen
-  @available(System 99, *)
+  @available(System 199, *)
   public struct Queue: RawRepresentable, Hashable, Sendable {
     @_alwaysEmitIntoClient
     public var rawValue: CInt
@@ -157,7 +157,7 @@ extension TerminalDescriptor {
 
   /// Flow control actions.
   @frozen
-  @available(System 99, *)
+  @available(System 199, *)
   public struct FlowAction: RawRepresentable, Hashable, Sendable {
     @_alwaysEmitIntoClient
     public var rawValue: CInt

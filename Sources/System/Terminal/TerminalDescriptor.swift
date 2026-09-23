@@ -31,7 +31,7 @@
 ///
 /// - Note: Only available on Unix-like platforms.
 @frozen
-@available(System 99, *)
+@available(System 199, *)
 public struct TerminalDescriptor: RawRepresentable, Hashable, Codable, Sendable {
   /// The raw C file handle.
   @_alwaysEmitIntoClient
@@ -42,7 +42,7 @@ public struct TerminalDescriptor: RawRepresentable, Hashable, Codable, Sendable 
   public init(rawValue: CInt) { self.rawValue = rawValue }
 }
 
-@available(System 99, *)
+@available(System 199, *)
 extension TerminalDescriptor {
   /// The file descriptor for this terminal.
   ///
@@ -87,7 +87,7 @@ extension TerminalDescriptor {
 
 // MARK: - FileDescriptor conveniences
 
-@available(System 99, *)
+@available(System 199, *)
 extension FileDescriptor {
   /// Returns whether this file descriptor refers to a terminal device.
   ///

@@ -14,7 +14,7 @@
 extension TerminalAttributes {
   /// The number of data bits per character.
   @frozen
-  @available(System 99, *)
+  @available(System 199, *)
   public struct CharacterSize: RawRepresentable, Hashable, Sendable {
     @_alwaysEmitIntoClient
     public var rawValue: CInterop.TerminalFlags
@@ -36,7 +36,7 @@ extension TerminalAttributes {
 
   /// The parity mode for error detection.
   @frozen
-  @available(System 99, *)
+  @available(System 199, *)
   public struct Parity: RawRepresentable, Hashable, Sendable {
     @_alwaysEmitIntoClient
     public var rawValue: CInterop.TerminalFlags
@@ -63,7 +63,7 @@ extension TerminalAttributes {
 
   /// The number of stop bits per character.
   @frozen
-  @available(System 99, *)
+  @available(System 199, *)
   public struct StopBits: RawRepresentable, Hashable, Sendable {
     @_alwaysEmitIntoClient
     public var rawValue: CInterop.TerminalFlags

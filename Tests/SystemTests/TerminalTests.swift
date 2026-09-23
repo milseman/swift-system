@@ -12,6 +12,7 @@
 import XCTest
 import SystemPackage
 
+@available(System 199, *)
 final class TerminalTests: XCTestCase {
 
   // MARK: - TerminalDescriptor Initialization Tests

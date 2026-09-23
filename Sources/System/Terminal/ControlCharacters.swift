@@ -11,7 +11,7 @@
 
 /// An index identifying a specific control character.
 @frozen
-@available(System 99, *)
+@available(System 199, *)
 public struct ControlCharacter: RawRepresentable, Hashable, Sendable {
   @_alwaysEmitIntoClient
   public var rawValue: CInt
@@ -85,7 +85,7 @@ public struct ControlCharacter: RawRepresentable, Hashable, Sendable {
 
 /// The control characters for a terminal.
 @frozen
-@available(System 99, *)
+@available(System 199, *)
 public struct ControlCharacters: Sendable {
   #if SYSTEM_PACKAGE_DARWIN
   @usableFromInline
@@ -140,7 +140,7 @@ public struct ControlCharacters: Sendable {
 #endif
 
 // Manual Hashable conformance
-@available(System 99, *)
+@available(System 199, *)
 extension ControlCharacters: Hashable {
   @_alwaysEmitIntoClient
   public static func == (lhs: ControlCharacters, rhs: ControlCharacters) -> Bool {

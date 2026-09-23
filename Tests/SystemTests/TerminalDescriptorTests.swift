@@ -35,6 +35,7 @@ private struct TerminalDescriptorTests {
   // glibc declares posix_openpt(3) and friends only under _XOPEN_SOURCE,
   // which Swift's Glibc module doesn't define.
   #if !(os(Linux) && canImport(Glibc))
+  @available(System 199, *)
   @Test func checkedConversionFromTerminal() throws {
     try withPseudoterminal { terminal in
       let converted = try TerminalDescriptor(terminal)
@@ -44,6 +45,7 @@ private struct TerminalDescriptorTests {
   }
   #endif
 
+  @available(System 199, *)
   @Test func checkedConversionFromNonTerminal() throws {
     let pipe = try FileDescriptor.pipe()
     defer {
@@ -65,6 +67,7 @@ private struct TerminalDescriptorTests {
     }
   }
 
+  @available(System 199, *)
   @Test func checkedConversionFromInvalidDescriptor() {
     #expect(throws: Errno.badFileDescriptor) {
       try TerminalDescriptor(FileDescriptor(rawValue: -1))
@@ -73,6 +76,7 @@ private struct TerminalDescriptorTests {
 
   // Whatever stdin is, converting it either succeeds or throws
   // without disturbing the descriptor.
+  @available(System 199, *)
   @Test func standardInput() throws {
     // Ask the terminal driver directly, rather than through isatty.
     // Only success is compared: tcgetattr's errno can differ from isatty's,

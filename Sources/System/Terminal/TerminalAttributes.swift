@@ -15,7 +15,7 @@
 /// to input modes, output modes, control modes, local modes, control characters,
 /// and baud rates.
 @frozen
-@available(System 99, *)
+@available(System 199, *)
 public struct TerminalAttributes: RawRepresentable, Equatable, Hashable, Sendable {
   @_alwaysEmitIntoClient
   public var rawValue: CInterop.Termios
@@ -156,7 +156,7 @@ public struct TerminalAttributes: RawRepresentable, Equatable, Hashable, Sendabl
 extension TerminalAttributes {
   /// Specifies when to apply terminal attribute changes.
   @frozen
-  @available(System 99, *)
+  @available(System 199, *)
   public struct SetAction: RawRepresentable, Hashable, Sendable {
     @_alwaysEmitIntoClient
     public var rawValue: CInt

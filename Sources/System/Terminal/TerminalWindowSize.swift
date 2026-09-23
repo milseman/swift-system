@@ -11,11 +11,11 @@
 
 // MARK: - Window Size
 
-@available(System 99, *)
+@available(System 199, *)
 extension TerminalDescriptor {
   /// The size of a terminal window in characters.
   @frozen
-  @available(System 99, *)
+  @available(System 199, *)
   public struct WindowSize: RawRepresentable, Hashable, Sendable {
     @_alwaysEmitIntoClient
     public var rawValue: CInterop.WinSize

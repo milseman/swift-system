@@ -115,7 +115,10 @@ extension CInterop {
   #if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
   public typealias FileFlags = UInt32
   #endif
+}
 
+@available(System 199, *)
+extension CInterop {
   /// The C `termios` structure.
   public typealias Termios = termios
 

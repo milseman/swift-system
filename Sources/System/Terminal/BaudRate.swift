@@ -25,7 +25,7 @@
 ///
 /// See also: [POSIX termios.h](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/termios.h.html)
 @frozen
-@available(System 99, *)
+@available(System 199, *)
 public struct BaudRate: RawRepresentable, Hashable, Sendable {
   @_alwaysEmitIntoClient
   public var rawValue: CInterop.SpeedT

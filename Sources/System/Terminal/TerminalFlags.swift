@@ -16,7 +16,7 @@
 /// These flags control preprocessing of input characters before they are
 /// made available to a reading process.
 @frozen
-@available(System 99, *)
+@available(System 199, *)
 public struct InputFlags: OptionSet, Hashable, Sendable {
   @_alwaysEmitIntoClient
   public var rawValue: CInterop.TerminalFlags
@@ -125,7 +125,7 @@ public struct InputFlags: OptionSet, Hashable, Sendable {
 ///
 /// These flags control postprocessing of output characters.
 @frozen
-@available(System 99, *)
+@available(System 199, *)
 public struct OutputFlags: OptionSet, Hashable, Sendable {
   @_alwaysEmitIntoClient
   public var rawValue: CInterop.TerminalFlags
@@ -346,7 +346,7 @@ public struct OutputFlags: OptionSet, Hashable, Sendable {
 ///
 /// These flags control hardware characteristics of the terminal.
 @frozen
-@available(System 99, *)
+@available(System 199, *)
 public struct ControlFlags: OptionSet, Hashable, Sendable {
   @_alwaysEmitIntoClient
   public var rawValue: CInterop.TerminalFlags
@@ -481,7 +481,7 @@ public struct ControlFlags: OptionSet, Hashable, Sendable {
 ///
 /// These flags control terminal functions that affect local processing.
 @frozen
-@available(System 99, *)
+@available(System 199, *)
 public struct LocalFlags: OptionSet, Hashable, Sendable {
   @_alwaysEmitIntoClient
   public var rawValue: CInterop.TerminalFlags
