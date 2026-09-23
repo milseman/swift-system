@@ -27,7 +27,7 @@ final class OwnedFDOwnershipTest: XCTestCase {
   private func withOwnedFD42(
     _ body: (borrowing OwnedFD) throws(Errno) -> Void
   ) throws(Errno) {
-    let fd = OwnedFD(FileDescriptor(rawValue: 42))
+    let fd = OwnedFD(taking: FileDescriptor(rawValue: 42))
     let result = Result { () throws(Errno) in try body(fd) }
     _ = fd.relinquish()
     try result.get()
@@ -84,7 +84,7 @@ final class OwnedFDOwnershipTest: XCTestCase {
         }
       },
       MockTestCase(name: "close", .noInterrupt, 42) { _ in
-        try OwnedFD(FileDescriptor(rawValue: 42)).close()
+        try OwnedFD(taking: FileDescriptor(rawValue: 42)).close()
       },
     ]
     for test in syscallTestCases { test.runAllTests() }
@@ -149,7 +149,7 @@ final class OwnedFDOwnershipTest: XCTestCase {
 
   func testWithDescriptorRethrowsWithoutClosing() throws {
     try MockingDriver.withMockingEnabled { mocking in
-      let fd = OwnedFD(FileDescriptor(rawValue: 42))
+      let fd = OwnedFD(taking: FileDescriptor(rawValue: 42))
       XCTAssertThrowsError(
         try fd.withDescriptor { _ throws(BodyError) in throw BodyError() }
       ) { XCTAssert($0 is BodyError) }
@@ -166,7 +166,7 @@ final class OwnedFDOwnershipTest: XCTestCase {
   }
 
   func testForwardsReportBadFileDescriptor() {
-    let fd = OwnedFD(FileDescriptor(rawValue: -1))
+    let fd = OwnedFD(taking: FileDescriptor(rawValue: -1))
     let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 4, alignment: 1)
     defer { buffer.deallocate() }
     let bytes = UnsafeRawBufferPointer(buffer)
@@ -259,21 +259,21 @@ final class OwnedFDOwnershipTest: XCTestCase {
 
   func testConsumingParameterClosesInCallee() throws {
     let pipe = try FileDescriptor.pipe()
-    let readEnd = OwnedFD(pipe.readEnd)
+    let readEnd = OwnedFD(taking: pipe.readEnd)
     // The callee owns the write end, and closes it when it returns.
-    try send("abc", andDestroy: OwnedFD(pipe.writeEnd))
+    try send("abc", andDestroy: OwnedFD(taking: pipe.writeEnd))
     XCTAssertEqual(try readToEnd(readEnd), "abc")
   }
 
   func testReassignmentClosesPreviousDescriptor() throws {
     let first = try FileDescriptor.pipe()
     let second = try FileDescriptor.pipe()
-    let firstRead = OwnedFD(first.readEnd)
-    let secondRead = OwnedFD(second.readEnd)
+    let firstRead = OwnedFD(taking: first.readEnd)
+    let secondRead = OwnedFD(taking: second.readEnd)
 
-    var writeEnd = OwnedFD(first.writeEnd)
+    var writeEnd = OwnedFD(taking: first.writeEnd)
     try writeEnd.writeAll("1".utf8)
-    writeEnd = OwnedFD(second.writeEnd)
+    writeEnd = OwnedFD(taking: second.writeEnd)
     XCTAssertEqual(try readToEnd(firstRead), "1")
 
     try writeEnd.writeAll("2".utf8)
@@ -283,8 +283,8 @@ final class OwnedFDOwnershipTest: XCTestCase {
 
   func testOptionalSetToNilCloses() throws {
     let pipe = try FileDescriptor.pipe()
-    let readEnd = OwnedFD(pipe.readEnd)
-    var writeEnd: OwnedFD? = OwnedFD(pipe.writeEnd)
+    let readEnd = OwnedFD(taking: pipe.readEnd)
+    var writeEnd: OwnedFD? = OwnedFD(taking: pipe.writeEnd)
     switch writeEnd {
     case .some(let fd): try fd.writeAll("abc".utf8)
     case .none: XCTFail("writeEnd should be non-nil")
@@ -295,8 +295,8 @@ final class OwnedFDOwnershipTest: XCTestCase {
 
   func testRelinquishedDescriptorStaysOpen() throws {
     let pipe = try FileDescriptor.pipe()
-    let readEnd = OwnedFD(pipe.readEnd)
-    let writeEnd = OwnedFD(pipe.writeEnd).relinquish()
+    let readEnd = OwnedFD(taking: pipe.readEnd)
+    let writeEnd = OwnedFD(taking: pipe.writeEnd).relinquish()
     XCTAssertEqual(writeEnd, pipe.writeEnd)
     // The descriptor is still open, and the caller is responsible for it.
     try writeEnd.writeAll("abc".utf8)
@@ -309,8 +309,8 @@ final class OwnedFDOwnershipTest: XCTestCase {
     // Prototype/Verify/V10a_prototype_escape_hatch.swift notes. Then the
     // owner's own close fails.
     let pipe = try FileDescriptor.pipe()
-    let readEnd = OwnedFD(pipe.readEnd)
-    let writeEnd = OwnedFD(pipe.writeEnd)
+    let readEnd = OwnedFD(taking: pipe.readEnd)
+    let writeEnd = OwnedFD(taking: pipe.writeEnd)
     try writeEnd.withDescriptor { try $0.close() }
     XCTAssertEqual(try readToEnd(readEnd), "")
     do {

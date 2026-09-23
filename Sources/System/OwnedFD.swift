@@ -30,7 +30,7 @@ public struct OwnedFD: ~Copyable, Sendable {
   /// The file descriptor is closed at the end of the `OwnedFD` instance's
   /// lifetime, so nothing else may close it.
   @_alwaysEmitIntoClient
-  public init(_ descriptor: FileDescriptor) {
+  public init(taking descriptor: FileDescriptor) {
     self._descriptor = descriptor
   }
 
@@ -46,13 +46,13 @@ extension OwnedFD {
   ///
   /// Static stored properties are never destroyed and can't be consumed,
   /// so this value never closes standard input.
-  public static let standardInput = OwnedFD(.standardInput)
+  public static let standardInput = OwnedFD(taking: .standardInput)
 
   /// The standard output file descriptor, with a numeric value of 1.
-  public static let standardOutput = OwnedFD(.standardOutput)
+  public static let standardOutput = OwnedFD(taking: .standardOutput)
 
   /// The standard error file descriptor, with a numeric value of 2.
-  public static let standardError = OwnedFD(.standardError)
+  public static let standardError = OwnedFD(taking: .standardError)
 }
 
 // Ownership.
@@ -83,7 +83,7 @@ extension OwnedFD {
         retryOnInterrupt: retryOnInterrupt)
     }
     #endif
-    return OwnedFD(try result.get())
+    return OwnedFD(taking: try result.get())
   }
 
   /// Closes the file descriptor.
