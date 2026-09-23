@@ -364,6 +364,41 @@ final class FilePathOperationsTest: XCTestCase {
 
     for test in syscallTestCases { test.runAllTests() }
 
+    let mkfifo = [
+      MockTestCase(name: "mkfifo", .interruptable, "a path", 0o600) { retryOnInterrupt in
+        try path.makeFIFO(permissions: .ownerReadWrite, retryOnInterrupt: retryOnInterrupt)
+      },
+
+      MockTestCase(name: "mkfifo", .interruptable, "a path", 0o600) { retryOnInterrupt in
+        try "a path".withCString {
+          try FilePath.makeFIFO(
+            $0, permissions: .ownerReadWrite, retryOnInterrupt: retryOnInterrupt)
+        }
+      },
+    ]
+    for test in mkfifo { test.runAllTests() }
+
+    if #available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *) {
+      let mkfifoat = [
+        MockTestCase(name: "mkfifoat", .interruptable, 42, "a path", 0o600) {
+          retryOnInterrupt in
+          try path.makeFIFO(
+            relativeTo: dir, permissions: .ownerReadWrite,
+            retryOnInterrupt: retryOnInterrupt)
+        },
+
+        MockTestCase(name: "mkfifoat", .interruptable, 42, "a path", 0o600) {
+          retryOnInterrupt in
+          try "a path".withCString {
+            try FilePath.makeFIFO(
+              $0, relativeTo: dir, permissions: .ownerReadWrite,
+              retryOnInterrupt: retryOnInterrupt)
+          }
+        },
+      ]
+      for test in mkfifoat { test.runAllTests() }
+    }
+
     #if SYSTEM_PACKAGE_DARWIN
     let resolutionFlagsTestCases: Array<MockTestCase> = [
       MockTestCase(
@@ -992,6 +1027,45 @@ final class FilePathOperationsTest: XCTestCase {
           XCTAssertEqual(try file.stat().groupID, GroupID(other))
         }
         XCTAssertThrowsError(try FilePath("missing").setOwner(relativeTo: dir)) {
+          XCTAssertEqual($0 as? Errno, .noSuchFileOrDirectory)
+        }
+      }
+    }
+  }
+
+  @available(System 199, *)
+  func testMakeFIFO() throws {
+    try withTemporaryFilePath(basename: "testMakeFIFO") { path in
+      let fifo = path.appending("fifo")
+      try fifo.makeFIFO(permissions: .ownerReadWrite)
+      XCTAssertEqual(try fifo.stat().type, .fifo)
+      XCTAssertEqual(try fifo.stat().permissions, .ownerReadWrite)
+      XCTAssertThrowsError(try fifo.makeFIFO(permissions: .ownerReadWrite)) {
+        XCTAssertEqual($0 as? Errno, .fileExists)
+      }
+
+      try path.appending("c string").withCString {
+        try FilePath.makeFIFO($0, permissions: .ownerRead)
+      }
+      XCTAssertEqual(try path.appending("c string").stat().type, .fifo)
+      XCTAssertEqual(try path.appending("c string").stat().permissions, .ownerRead)
+
+      guard #available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *) else {
+        throw XCTSkip("mkfifoat requires macOS 13 or newer")
+      }
+      let dir = try FileDescriptor.open(path, .readOnly, options: .directory)
+      try dir.closeAfter {
+        try FilePath("relative").makeFIFO(relativeTo: dir, permissions: .ownerReadWrite)
+        XCTAssertEqual(try path.appending("relative").stat().type, .fifo)
+
+        try "relative c string".withCString {
+          try FilePath.makeFIFO($0, relativeTo: dir, permissions: .ownerReadWrite)
+        }
+        XCTAssertEqual(try path.appending("relative c string").stat().type, .fifo)
+
+        XCTAssertThrowsError(
+          try FilePath("missing/fifo").makeFIFO(relativeTo: dir, permissions: .ownerRead)
+        ) {
           XCTAssertEqual($0 as? Errno, .noSuchFileOrDirectory)
         }
       }

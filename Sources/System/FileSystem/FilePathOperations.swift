@@ -1723,6 +1723,143 @@ extension FilePath {
 }
 #endif // !os(WASI)
 
+// MARK: - mkfifo, mkfifoat
+
+#if !os(WASI)
+@available(System 199, *)
+extension FilePath {
+  /// Creates a FIFO special file, or named pipe, at this path.
+  ///
+  /// - Parameters:
+  ///   - permissions: The permissions for the new FIFO.
+  ///     The process's file creation mask is applied to these permissions.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// The corresponding C function is `mkfifo`.
+  @_alwaysEmitIntoClient
+  public func makeFIFO(
+    permissions: FilePermissions,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try withPlatformString {
+      FilePath._makeFIFO(
+        $0, permissions: permissions, retryOnInterrupt: retryOnInterrupt)
+    }.get()
+  }
+
+  /// Creates a FIFO special file, or named pipe, at the given path.
+  ///
+  /// - Parameters:
+  ///   - path: The location of the new FIFO.
+  ///   - permissions: The permissions for the new FIFO.
+  ///     The process's file creation mask is applied to these permissions.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// The corresponding C function is `mkfifo`.
+  @_alwaysEmitIntoClient
+  public static func makeFIFO(
+    _ path: UnsafePointer<CChar>,
+    permissions: FilePermissions,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try _makeFIFO(
+      path, permissions: permissions, retryOnInterrupt: retryOnInterrupt
+    ).get()
+  }
+
+  @usableFromInline
+  internal static func _makeFIFO(
+    _ path: UnsafePointer<CChar>,
+    permissions: FilePermissions,
+    retryOnInterrupt: Bool
+  ) -> Result<(), Errno> {
+    nothingOrErrno(retryOnInterrupt: retryOnInterrupt) {
+      system_mkfifo(path, permissions.rawValue)
+    }
+  }
+
+  /// Creates a FIFO special file, or named pipe, at this path,
+  /// resolving a relative path against a directory.
+  ///
+  /// - Parameters:
+  ///   - fd: The directory against which a relative path is resolved.
+  ///   - permissions: The permissions for the new FIFO.
+  ///     The process's file creation mask is applied to these permissions.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// If this path is absolute (starts with a forward slash), then `fd` is ignored.
+  /// If this path is relative, it is resolved against the directory given by `fd`.
+  ///
+  /// The corresponding C function is `mkfifoat`.
+  @available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *)
+  @_alwaysEmitIntoClient
+  public func makeFIFO(
+    relativeTo fd: FileDescriptor,
+    permissions: FilePermissions,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try withPlatformString {
+      FilePath._makeFIFO(
+        $0, relativeTo: fd, permissions: permissions,
+        retryOnInterrupt: retryOnInterrupt)
+    }.get()
+  }
+
+  /// Creates a FIFO special file, or named pipe, at the given path,
+  /// resolving a relative path against a directory.
+  ///
+  /// - Parameters:
+  ///   - path: The location of the new FIFO.
+  ///   - fd: The directory against which a relative `path` is resolved.
+  ///   - permissions: The permissions for the new FIFO.
+  ///     The process's file creation mask is applied to these permissions.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// If `path` is absolute (starts with a forward slash), then `fd` is ignored.
+  /// If `path` is relative, it is resolved against the directory given by `fd`.
+  ///
+  /// The corresponding C function is `mkfifoat`.
+  @available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *)
+  @_alwaysEmitIntoClient
+  public static func makeFIFO(
+    _ path: UnsafePointer<CChar>,
+    relativeTo fd: FileDescriptor,
+    permissions: FilePermissions,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try _makeFIFO(
+      path, relativeTo: fd, permissions: permissions,
+      retryOnInterrupt: retryOnInterrupt
+    ).get()
+  }
+
+  @available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *)
+  @usableFromInline
+  internal static func _makeFIFO(
+    _ path: UnsafePointer<CChar>,
+    relativeTo fd: FileDescriptor,
+    permissions: FilePermissions,
+    retryOnInterrupt: Bool
+  ) -> Result<(), Errno> {
+    nothingOrErrno(retryOnInterrupt: retryOnInterrupt) {
+      system_mkfifoat(fd.rawValue, path, permissions.rawValue)
+    }
+  }
+}
+#endif // !os(WASI)
+
 // MARK: - chflags, lchflags, chflagsat
 
 #if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)

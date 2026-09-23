@@ -570,6 +570,30 @@ internal func system_fchownat(
 #endif
   return fchownat(fd, path, owner, group, flag)
 }
+
+internal func system_mkfifo(
+  _ path: UnsafePointer<CInterop.PlatformChar>,
+  _ mode: CInterop.Mode
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(path: path, mode) }
+#endif
+  return mkfifo(path, mode)
+}
+
+@available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *)
+internal func system_mkfifoat(
+  _ fd: CInt,
+  _ path: UnsafePointer<CInterop.PlatformChar>,
+  _ mode: CInterop.Mode
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled {
+    return _mock(fd, String(_errorCorrectingPlatformString: path), mode)
+  }
+#endif
+  return mkfifoat(fd, path, mode)
+}
 #endif // !os(WASI)
 
 #if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
