@@ -674,6 +674,14 @@ internal var _F_SETFL: CInt { F_SETFL }
 internal var _FD_CLOEXEC: CInt { FD_CLOEXEC }
 #endif
 
+#if !os(Windows) && !os(WASI)
+@_alwaysEmitIntoClient
+internal var _F_DUPFD: CInt { F_DUPFD }
+
+@_alwaysEmitIntoClient
+internal var _F_DUPFD_CLOEXEC: CInt { F_DUPFD_CLOEXEC }
+#endif
+
 #if SYSTEM_PACKAGE_DARWIN
 @_alwaysEmitIntoClient
 internal var _F_FULLFSYNC: CInt { F_FULLFSYNC }

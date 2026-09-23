@@ -163,6 +163,14 @@ final class FileOperationsTest: XCTestCase {
       MockTestCase(name: "fcntl", .noInterrupt, rawFD, F_SETFL, O_NONBLOCK | O_APPEND) { _ in
         try fd.setStatusFlags([.nonBlocking, .append])
       },
+
+      MockTestCase(name: "fcntl", .noInterrupt, rawFD, F_DUPFD_CLOEXEC, 0) { _ in
+        _ = try fd.duplicate(closeOnExec: true)
+      },
+
+      MockTestCase(name: "fcntl", .noInterrupt, rawFD, F_DUPFD, 10) { _ in
+        _ = try fd.duplicate(atLeast: FileDescriptor(rawValue: 10), closeOnExec: false)
+      },
     ]
 
     for test in syscallTestCases { test.runAllTests() }
@@ -669,6 +677,45 @@ final class FileOperationsTest: XCTestCase {
       }
     }
     XCTAssertThrowsError(try FileDescriptor(rawValue: -1).descriptorFlags()) {
+      XCTAssertEqual($0 as? Errno, .badFileDescriptor)
+    }
+  }
+
+  @available(System 199, *)
+  func testDuplicateAtLeast() throws {
+    try withTemporaryFilePath(basename: "testDuplicateAtLeast") { path in
+      let fd = try FileDescriptor.open(path.appending("\(UUID().uuidString).txt"), .readWrite, options: [.create, .truncate], permissions: .ownerReadWrite)
+      try fd.closeAfter {
+        let minimum = FileDescriptor(rawValue: 100)
+        let copy = try fd.duplicate(atLeast: minimum, closeOnExec: false)
+        try copy.closeAfter {
+          XCTAssertGreaterThanOrEqual(copy.rawValue, minimum.rawValue)
+          XCTAssertFalse(try copy.descriptorFlags().contains(.closeOnExec))
+          // The copy shares the open file, including its offset.
+          try copy.writeAll("abc".utf8)
+          XCTAssertEqual(try fd.seek(offset: 0, from: .current), 3)
+
+          // The minimum is taken, so the next copy gets a higher descriptor.
+          let next = try fd.duplicate(atLeast: copy, closeOnExec: true)
+          try next.closeAfter {
+            XCTAssertGreaterThan(next.rawValue, copy.rawValue)
+            XCTAssertTrue(try next.descriptorFlags().contains(.closeOnExec))
+          }
+        }
+
+        let lowest = try fd.duplicate(closeOnExec: true)
+        try lowest.closeAfter {
+          XCTAssertTrue(try lowest.descriptorFlags().contains(.closeOnExec))
+        }
+
+        XCTAssertThrowsError(
+          try fd.duplicate(atLeast: FileDescriptor(rawValue: -1), closeOnExec: false)
+        ) {
+          XCTAssertEqual($0 as? Errno, .invalidArgument)
+        }
+      }
+    }
+    XCTAssertThrowsError(try FileDescriptor(rawValue: -1).duplicate(closeOnExec: true)) {
       XCTAssertEqual($0 as? Errno, .badFileDescriptor)
     }
   }

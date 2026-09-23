@@ -748,6 +748,50 @@ extension FileDescriptor {
 }
 #endif // !os(WASI)
 
+#if !os(Windows) && !os(WASI)
+@available(System 199, *)
+extension FileDescriptor {
+  /// Duplicates this file descriptor as the lowest-numbered available
+  /// descriptor that is greater than or equal to a minimum.
+  ///
+  /// - Parameters:
+  ///   - minimum: The lowest descriptor that the copy can be assigned.
+  ///     The default is `0`, which gives the lowest available descriptor.
+  ///   - closeOnExec: Whether the copy has the
+  ///     ``DescriptorFlags/closeOnExec`` flag set.
+  /// - Returns: The new file descriptor.
+  ///
+  /// Unlike ``duplicate(as:retryOnInterrupt:)``,
+  /// this method never closes a descriptor that is already in use.
+  ///
+  /// Setting `closeOnExec` here, rather than by calling
+  /// ``setDescriptorFlags(_:)`` on the copy afterward,
+  /// sets it atomically, so another thread's `exec` can't inherit
+  /// the copy in between.
+  ///
+  /// The corresponding C function is `fcntl`, with the `F_DUPFD` command,
+  /// or `F_DUPFD_CLOEXEC` if `closeOnExec` is `true`.
+  @_alwaysEmitIntoClient
+  public func duplicate(
+    atLeast minimum: FileDescriptor = FileDescriptor(rawValue: 0),
+    closeOnExec: Bool
+  ) throws(Errno) -> FileDescriptor {
+    try _duplicate(atLeast: minimum, closeOnExec: closeOnExec).get()
+  }
+
+  @usableFromInline
+  internal func _duplicate(
+    atLeast minimum: FileDescriptor,
+    closeOnExec: Bool
+  ) -> Result<FileDescriptor, Errno> {
+    valueOrErrno(retryOnInterrupt: false) {
+      system_fcntl(
+        self.rawValue, closeOnExec ? _F_DUPFD_CLOEXEC : _F_DUPFD, minimum.rawValue)
+    }.map(FileDescriptor.init(rawValue:))
+  }
+}
+#endif // !os(Windows) && !os(WASI)
+
 #if !os(WASI)
 @available(System 1.1.0, *)
 extension FileDescriptor {
