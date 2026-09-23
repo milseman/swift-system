@@ -515,6 +515,107 @@ extension FileDescriptor {
   }
 }
 
+#if !os(Windows)
+@available(System 199, *)
+extension FileDescriptor {
+  /// Opens or creates a file for reading or writing,
+  /// resolving a relative path against a directory.
+  ///
+  /// - Parameters:
+  ///   - path: The location of the file to open.
+  ///   - fd: The directory against which a relative `path` is resolved.
+  ///   - mode: The read and write access to use.
+  ///   - options: The behavior for opening the file.
+  ///   - permissions: The file permissions to use for created files.
+  ///     This value must not be `nil` when `options` contains `.create`;
+  ///     passing `nil` in that case is a programmer error and traps at runtime.
+  ///   - retryOnInterrupt: Whether to retry the open operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  /// - Returns: A file descriptor for the open file
+  ///
+  /// If `path` is absolute (starts with a forward slash), then `fd` is ignored.
+  /// If `path` is relative, it is resolved against the directory given by `fd`.
+  ///
+  /// The corresponding C function is `openat`.
+  @_alwaysEmitIntoClient
+  public static func open(
+    _ path: FilePath,
+    relativeTo fd: FileDescriptor,
+    _ mode: FileDescriptor.AccessMode,
+    options: FileDescriptor.OpenOptions = FileDescriptor.OpenOptions(),
+    permissions: FilePermissions? = nil,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) -> FileDescriptor {
+    try path.withPlatformString {
+      FileDescriptor._open(
+        $0, relativeTo: fd, mode, options: options, permissions: permissions,
+        retryOnInterrupt: retryOnInterrupt)
+    }.get()
+  }
+
+  /// Opens or creates a file for reading or writing,
+  /// resolving a relative path against a directory.
+  ///
+  /// - Parameters:
+  ///   - path: The location of the file to open.
+  ///   - fd: The directory against which a relative `path` is resolved.
+  ///   - mode: The read and write access to use.
+  ///   - options: The behavior for opening the file.
+  ///   - permissions: The file permissions to use for created files.
+  ///     This value must not be `nil` when `options` contains `.create`;
+  ///     passing `nil` in that case is a programmer error and traps at runtime.
+  ///   - retryOnInterrupt: Whether to retry the open operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  /// - Returns: A file descriptor for the open file
+  ///
+  /// If `path` is absolute (starts with a forward slash), then `fd` is ignored.
+  /// If `path` is relative, it is resolved against the directory given by `fd`.
+  ///
+  /// The corresponding C function is `openat`.
+  @_alwaysEmitIntoClient
+  public static func open(
+    _ path: UnsafePointer<CChar>,
+    relativeTo fd: FileDescriptor,
+    _ mode: FileDescriptor.AccessMode,
+    options: FileDescriptor.OpenOptions = FileDescriptor.OpenOptions(),
+    permissions: FilePermissions? = nil,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) -> FileDescriptor {
+    try FileDescriptor._open(
+      path, relativeTo: fd, mode, options: options, permissions: permissions,
+      retryOnInterrupt: retryOnInterrupt
+    ).get()
+  }
+
+  @usableFromInline
+  internal static func _open(
+    _ path: UnsafePointer<CChar>,
+    relativeTo fd: FileDescriptor,
+    _ mode: FileDescriptor.AccessMode,
+    options: FileDescriptor.OpenOptions,
+    permissions: FilePermissions?,
+    retryOnInterrupt: Bool
+  ) -> Result<FileDescriptor, Errno> {
+    let oFlag = mode.rawValue | options.rawValue
+    let descOrError: Result<CInt, Errno> = valueOrErrno(retryOnInterrupt: retryOnInterrupt) {
+      if let permissions = permissions {
+        return system_openat(fd.rawValue, path, oFlag, permissions.rawValue)
+      }
+      if options.contains(.create) {
+        fatalError(
+          "FileDescriptor.open: 'permissions' must not be nil when 'options' contains '.create'")
+      }
+      return system_openat(fd.rawValue, path, oFlag)
+    }
+    return descOrError.map { FileDescriptor(rawValue: $0) }
+  }
+}
+#endif // !os(Windows)
+
 #if !os(WASI)
 @available(System 0.0.2, *)
 extension FileDescriptor {
@@ -767,6 +868,190 @@ extension FileDescriptor {
     }
   }
 }
+
+#if !os(Windows)
+@available(System 199, *)
+extension FileDescriptor {
+  /// Flushes modified data and metadata of the file referenced by this
+  /// file descriptor to its storage device.
+  ///
+  /// - Parameters:
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// This method blocks until the storage device reports
+  /// that the transfer has completed.
+  /// What that guarantees about durability varies by platform;
+  /// for more information, see the `fsync(2)` man page.
+  ///
+  /// The corresponding C function is `fsync`.
+  @_alwaysEmitIntoClient
+  public func synchronize(retryOnInterrupt: Bool = true) throws(Errno) {
+    try _synchronize(retryOnInterrupt: retryOnInterrupt).get()
+  }
+
+  @usableFromInline
+  internal func _synchronize(retryOnInterrupt: Bool) -> Result<(), Errno> {
+    nothingOrErrno(retryOnInterrupt: retryOnInterrupt) {
+      system_fsync(self.rawValue)
+    }
+  }
+}
+#endif // !os(Windows)
+
+#if !os(Windows) && !SYSTEM_PACKAGE_DARWIN
+@available(System 199, *)
+extension FileDescriptor {
+  /// Flushes modified data of the file referenced by this file descriptor
+  /// to its storage device, along with only the metadata needed
+  /// to retrieve that data.
+  ///
+  /// - Parameters:
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// Unlike ``synchronize(retryOnInterrupt:)``,
+  /// this method doesn't flush metadata such as the modification time
+  /// unless that metadata is needed to read the data back.
+  ///
+  /// The corresponding C function is `fdatasync`.
+  /// - Note: Not available on Darwin.
+  @_alwaysEmitIntoClient
+  public func synchronizeData(retryOnInterrupt: Bool = true) throws(Errno) {
+    try _synchronizeData(retryOnInterrupt: retryOnInterrupt).get()
+  }
+
+  @usableFromInline
+  internal func _synchronizeData(retryOnInterrupt: Bool) -> Result<(), Errno> {
+    nothingOrErrno(retryOnInterrupt: retryOnInterrupt) {
+      system_fdatasync(self.rawValue)
+    }
+  }
+}
+#endif // !os(Windows) && !SYSTEM_PACKAGE_DARWIN
+
+#if !os(Windows) && !os(WASI)
+@available(System 199, *)
+extension FileDescriptor {
+  /// Changes the permissions of the file referenced by this file descriptor.
+  ///
+  /// - Parameters:
+  ///   - permissions: The new permissions for the file.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// The corresponding C function is `fchmod`.
+  @_alwaysEmitIntoClient
+  public func setPermissions(
+    _ permissions: FilePermissions,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try _setPermissions(permissions, retryOnInterrupt: retryOnInterrupt).get()
+  }
+
+  @usableFromInline
+  internal func _setPermissions(
+    _ permissions: FilePermissions,
+    retryOnInterrupt: Bool
+  ) -> Result<(), Errno> {
+    nothingOrErrno(retryOnInterrupt: retryOnInterrupt) {
+      system_fchmod(self.rawValue, permissions.rawValue)
+    }
+  }
+}
+#endif // !os(Windows) && !os(WASI)
+
+#if !os(Windows) && !os(WASI)
+@available(System 199, *)
+extension FileDescriptor {
+  /// Changes the owner and group of the file referenced by this file descriptor.
+  ///
+  /// - Parameters:
+  ///   - user: The new owner of the file,
+  ///     or `nil` to leave the owner unchanged.
+  ///   - group: The new group of the file,
+  ///     or `nil` to leave the group unchanged.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// Changing the owner typically requires appropriate privileges.
+  /// The owner of a file can change its group
+  /// to any group that the owner is a member of.
+  ///
+  /// The corresponding C function is `fchown`.
+  @_alwaysEmitIntoClient
+  public func setOwner(
+    user: UserID? = nil,
+    group: GroupID? = nil,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try _setOwner(user: user, group: group, retryOnInterrupt: retryOnInterrupt).get()
+  }
+
+  @usableFromInline
+  internal func _setOwner(
+    user: UserID?,
+    group: GroupID?,
+    retryOnInterrupt: Bool
+  ) -> Result<(), Errno> {
+    // An ID of -1 leaves the corresponding value unchanged.
+    let uid = user?.rawValue ?? CInterop.UserID(truncatingIfNeeded: -1)
+    let gid = group?.rawValue ?? CInterop.GroupID(truncatingIfNeeded: -1)
+    return nothingOrErrno(retryOnInterrupt: retryOnInterrupt) {
+      system_fchown(self.rawValue, uid, gid)
+    }
+  }
+}
+#endif // !os(Windows) && !os(WASI)
+
+#if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
+@available(System 199, *)
+extension FileDescriptor {
+  /// Replaces the flags of the file referenced by this file descriptor.
+  ///
+  /// - Parameters:
+  ///   - flags: The new flags for the file.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// This method sets all of the file's flags at once.
+  /// To change individual flags,
+  /// start from the file's current flags, given by ``Stat/flags``.
+  /// Some flags can only be changed by the superuser,
+  /// and some can't be changed at all;
+  /// see the documentation for each flag in ``FileFlags``.
+  ///
+  /// The corresponding C function is `fchflags`.
+  /// - Note: Only available on Darwin, FreeBSD, and OpenBSD.
+  @_alwaysEmitIntoClient
+  public func setFileFlags(
+    _ flags: FileFlags,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try _setFileFlags(flags, retryOnInterrupt: retryOnInterrupt).get()
+  }
+
+  @usableFromInline
+  internal func _setFileFlags(
+    _ flags: FileFlags,
+    retryOnInterrupt: Bool
+  ) -> Result<(), Errno> {
+    nothingOrErrno(retryOnInterrupt: retryOnInterrupt) {
+      system_fchflags(self.rawValue, flags.rawValue)
+    }
+  }
+}
+#endif // SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
 
 #if !os(WASI) // WASI has no umask
 extension FilePermissions {

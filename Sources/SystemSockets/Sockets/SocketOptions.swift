@@ -209,7 +209,7 @@ extension SocketDescriptor {
     }
     #endif
 
-    #if os(Linux)
+    #if SYSTEM_PACKAGE_DARWIN || os(Linux)
     /// Keep alive interval.
     ///
     /// The corresponding C constant is `TCP_KEEPINTVL`.

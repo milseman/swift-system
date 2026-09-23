@@ -173,6 +173,50 @@ internal func system_ftruncate(_ fd: Int32, _ length: off_t) -> Int32 {
   return ftruncate(fd, length)
 }
 
+#if !os(Windows)
+internal func system_fsync(_ fd: Int32) -> Int32 {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(fd) }
+#endif
+  return fsync(fd)
+}
+#endif // !os(Windows)
+
+#if !os(Windows) && !SYSTEM_PACKAGE_DARWIN
+internal func system_fdatasync(_ fd: Int32) -> Int32 {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(fd) }
+#endif
+  return fdatasync(fd)
+}
+#endif // !os(Windows) && !SYSTEM_PACKAGE_DARWIN
+
+#if !os(Windows) && !os(WASI)
+internal func system_fchmod(_ fd: Int32, _ mode: CInterop.Mode) -> Int32 {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(fd, mode) }
+#endif
+  return fchmod(fd, mode)
+}
+
+internal func system_fchown(_ fd: Int32, _ owner: uid_t, _ group: gid_t) -> Int32 {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(fd, owner, group) }
+#endif
+  return fchown(fd, owner, group)
+}
+#endif // !os(Windows) && !os(WASI)
+
+#if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
+internal func system_fchflags(_ fd: Int32, _ flags: UInt32) -> Int32 {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(fd, flags) }
+#endif
+  // The flags parameter is `unsigned long` on FreeBSD.
+  return fchflags(fd, numericCast(flags))
+}
+#endif // SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
+
 internal func system_mkdir(
     _ path: UnsafePointer<CInterop.PlatformChar>,
     _ mode: CInterop.Mode
@@ -265,10 +309,24 @@ internal func system_openat(
 ) -> CInt {
 #if ENABLE_MOCKING
   if mockingEnabled {
-    return _mock(fd, path, oflag)
+    return _mock(fd, String(_errorCorrectingPlatformString: path), oflag)
   }
 #endif
   return openat(fd, path, oflag)
+}
+
+internal func system_openat(
+  _ fd: CInt,
+  _ path: UnsafePointer<CInterop.PlatformChar>,
+  _ oflag: Int32,
+  _ mode: CInterop.Mode
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled {
+    return _mock(fd, String(_errorCorrectingPlatformString: path), oflag, mode)
+  }
+#endif
+  return openat(fd, path, oflag, mode)
 }
 #endif // !os(Windows)
 

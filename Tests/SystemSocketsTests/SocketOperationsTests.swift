@@ -191,6 +191,31 @@ private struct SocketOperationsTests {
     #expect(receivedMessage == message)
   }
 
+  // MARK: - Socket Pair Tests
+
+  @available(System 199, *)
+  @Test func localStreamPair() throws {
+    let (first, second) = try SocketDescriptor.pair(.local, .stream)
+    defer {
+      try? first.close()
+      try? second.close()
+    }
+
+    for (sender, receiver, message) in [(first, second, "ping"), (second, first, "pong")] {
+      let messageBytes = Array(message.utf8)
+      let sent = try messageBytes.withUnsafeBytes { buffer in
+        try sender.send(buffer)
+      }
+      #expect(sent == messageBytes.count)
+
+      var buffer = [UInt8](repeating: 0, count: 16)
+      let received = try buffer.withUnsafeMutableBytes { buffer in
+        try receiver.receive(into: buffer)
+      }
+      #expect(String(decoding: buffer.prefix(received), as: UTF8.self) == message)
+    }
+  }
+
   // MARK: - Socket Options Tests
 
   @available(System 199, *)
@@ -220,6 +245,21 @@ private struct SocketOperationsTests {
     let size = try socket.getSocketOption(SocketDescriptor.SocketOption.receiveBufferSize)
     #expect(size > 0)
   }
+
+  #if SYSTEM_PACKAGE_DARWIN || os(Linux)
+  @available(System 199, *)
+  @Test func tcpKeepAliveOptions() throws {
+    let socket = try SocketDescriptor.open(.ipv4, .stream, protocol: .tcp)
+    defer { try? socket.close() }
+
+    try socket.setTCPOption(.keepAliveIdle, to: 30)
+    #expect(try socket.getTCPOption(.keepAliveIdle) == 30)
+    try socket.setTCPOption(.keepAliveInterval, to: 7)
+    #expect(try socket.getTCPOption(.keepAliveInterval) == 7)
+    try socket.setTCPOption(.keepAliveCount, to: 3)
+    #expect(try socket.getTCPOption(.keepAliveCount) == 3)
+  }
+  #endif
 }
 
 #endif

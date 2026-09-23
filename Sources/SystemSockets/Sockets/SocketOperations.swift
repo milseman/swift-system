@@ -59,6 +59,49 @@ extension SocketDescriptor {
     }.map(SocketDescriptor.init(rawValue:))
   }
 
+  /// Creates a pair of connected sockets.
+  ///
+  /// - Parameters:
+  ///   - domain: The protocol family for communication.
+  ///   - type: The semantics of communication.
+  ///   - protocol: The particular protocol to use. The default is `.default`,
+  ///     which typically selects the appropriate protocol for the domain/type
+  ///     combination.
+  ///   - retryOnInterrupt: Whether to retry if interrupted. The default is `true`.
+  /// - Returns: The pair of socket descriptors.
+  ///
+  /// The two sockets are connected to each other and indistinguishable.
+  /// Which domains are supported varies by platform;
+  /// `.local` is the most widely supported.
+  ///
+  /// The corresponding C function is `socketpair`.
+  @_alwaysEmitIntoClient
+  public static func pair(
+    _ domain: Domain,
+    _ type: ConnectionType,
+    protocol: ProtocolID = .default,
+    retryOnInterrupt: Bool = true
+  ) throws -> (SocketDescriptor, SocketDescriptor) {
+    try _pair(domain, type, protocol: `protocol`, retryOnInterrupt: retryOnInterrupt).get()
+  }
+
+  @usableFromInline
+  internal static func _pair(
+    _ domain: Domain,
+    _ type: ConnectionType,
+    protocol: ProtocolID,
+    retryOnInterrupt: Bool
+  ) -> Result<(SocketDescriptor, SocketDescriptor), Errno> {
+    var fds: (CInt, CInt) = (-1, -1)
+    return withUnsafeMutablePointer(to: &fds) { pointer in
+      pointer.withMemoryRebound(to: CInt.self, capacity: 2) { fds in
+        valueOrErrno(retryOnInterrupt: retryOnInterrupt) {
+          system_socketpair(domain.rawValue, type.rawValue, `protocol`.rawValue, fds)
+        }.map { _ in (SocketDescriptor(rawValue: fds[0]), SocketDescriptor(rawValue: fds[1])) }
+      }
+    }
+  }
+
   /// Closes the socket.
   ///
   /// The corresponding C function is `close`.

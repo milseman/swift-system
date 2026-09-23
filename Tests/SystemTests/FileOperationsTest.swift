@@ -93,6 +93,79 @@ final class FileOperationsTest: XCTestCase {
   }
   #endif // ENABLE_MOCKING && !os(WASI)
 
+  #if ENABLE_MOCKING && !os(WASI) && !os(Windows)
+  @available(System 199, *)
+  func testUnixSyscalls() {
+    let fd = FileDescriptor(rawValue: 1)
+    let rawFD = fd.rawValue
+
+    let syscallTestCases: Array<MockTestCase> = [
+      MockTestCase(name: "fsync", .interruptable, rawFD) { retryOnInterrupt in
+        try fd.synchronize(retryOnInterrupt: retryOnInterrupt)
+      },
+
+      MockTestCase(name: "fchmod", .interruptable, rawFD, 0o644) { retryOnInterrupt in
+        try fd.setPermissions(
+          [.ownerReadWrite, .groupRead, .otherRead], retryOnInterrupt: retryOnInterrupt)
+      },
+
+      MockTestCase(name: "fchown", .interruptable, rawFD, 501, 20) { retryOnInterrupt in
+        try fd.setOwner(
+          user: UserID(501), group: GroupID(20), retryOnInterrupt: retryOnInterrupt)
+      },
+
+      MockTestCase(
+        name: "fchown", .interruptable, rawFD, uid_t(truncatingIfNeeded: -1), 20
+      ) { retryOnInterrupt in
+        try fd.setOwner(group: GroupID(20), retryOnInterrupt: retryOnInterrupt)
+      },
+
+      MockTestCase(
+        name: "fchown", .interruptable, rawFD, 501, gid_t(truncatingIfNeeded: -1)
+      ) { retryOnInterrupt in
+        try fd.setOwner(user: UserID(501), retryOnInterrupt: retryOnInterrupt)
+      },
+
+      MockTestCase(name: "openat", .interruptable, 42, "a path", O_RDWR | O_APPEND) {
+        retryOnInterrupt in
+        _ = try FileDescriptor.open(
+          FilePath("a path"), relativeTo: FileDescriptor(rawValue: 42), .readWrite,
+          options: [.append], retryOnInterrupt: retryOnInterrupt)
+      },
+
+      MockTestCase(
+        name: "openat", .interruptable, 42, "a path", O_WRONLY | O_CREAT | O_APPEND, 0o777
+      ) {
+        retryOnInterrupt in
+        _ = try FileDescriptor.open(
+          "a path", relativeTo: FileDescriptor(rawValue: 42), .writeOnly,
+          options: [.create, .append],
+          permissions: [.groupReadWriteExecute, .ownerReadWriteExecute, .otherReadWriteExecute],
+          retryOnInterrupt: retryOnInterrupt)
+      },
+    ]
+
+    for test in syscallTestCases { test.runAllTests() }
+
+    #if !SYSTEM_PACKAGE_DARWIN
+    let fdatasync = MockTestCase(name: "fdatasync", .interruptable, rawFD) {
+      retryOnInterrupt in
+      try fd.synchronizeData(retryOnInterrupt: retryOnInterrupt)
+    }
+    fdatasync.runAllTests()
+    #endif // !SYSTEM_PACKAGE_DARWIN
+
+    #if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
+    let fchflags = MockTestCase(
+      name: "fchflags", .interruptable, rawFD, UInt32(bitPattern: UF_NODUMP | UF_APPEND)
+    ) { retryOnInterrupt in
+      try fd.setFileFlags([.noDump, .userAppend], retryOnInterrupt: retryOnInterrupt)
+    }
+    fchflags.runAllTests()
+    #endif // SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
+  }
+  #endif // ENABLE_MOCKING && !os(WASI) && !os(Windows)
+
   func testWriteFromEmptyBuffer() throws {
     #if os(Windows)
     let fd = try FileDescriptor.open(FilePath("NUL"), .writeOnly)
@@ -381,5 +454,137 @@ final class FileOperationsTest: XCTestCase {
       }
     }
   }
+
+#if !os(Windows)
+  @available(System 199, *)
+  func testSynchronize() throws {
+    try withTemporaryFilePath(basename: "testSynchronize") { path in
+      let fd = try FileDescriptor.open(path.appending("\(UUID().uuidString).txt"), .readWrite, options: [.create, .truncate], permissions: .ownerReadWrite)
+      try fd.closeAfter {
+        try fd.writeAll("abc".utf8)
+        try fd.synchronize()
+        XCTAssertEqual(try fd.fileSize(), 3)
+      }
+    }
+  }
+
+#if !SYSTEM_PACKAGE_DARWIN
+  @available(System 199, *)
+  func testSynchronizeData() throws {
+    try withTemporaryFilePath(basename: "testSynchronizeData") { path in
+      let fd = try FileDescriptor.open(path.appending("\(UUID().uuidString).txt"), .readWrite, options: [.create, .truncate], permissions: .ownerReadWrite)
+      try fd.closeAfter {
+        try fd.writeAll("abc".utf8)
+        try fd.synchronizeData()
+        XCTAssertEqual(try fd.fileSize(), 3)
+      }
+    }
+  }
+#endif // !SYSTEM_PACKAGE_DARWIN
+
+  @available(System 199, *)
+  func testOpenRelativeTo() throws {
+    try withTemporaryFilePath(basename: "testOpenRelativeTo") { path in
+      let dir = try FileDescriptor.open(path, .readOnly, options: .directory)
+      try dir.closeAfter {
+        let fd = try FileDescriptor.open(
+          "a.txt", relativeTo: dir, .readWrite,
+          options: [.create, .exclusiveCreate], permissions: .ownerReadWrite)
+        try fd.closeAfter {
+          _ = try fd.writeAll("abc".utf8)
+        }
+
+        // The file was created inside the directory.
+        let file = try FileDescriptor.open(path.appending("a.txt"), .readOnly)
+        try file.closeAfter {
+          let readBytes = try Array<UInt8>(unsafeUninitializedCapacity: 3) { buf, count in
+            count = try file.read(into: UnsafeMutableRawBufferPointer(buf))
+          }
+          XCTAssertEqual(readBytes, Array("abc".utf8))
+
+          #if !os(WASI) // WASI resolves paths only beneath the directory
+          // An absolute path ignores the directory argument.
+          let absolute = try FileDescriptor.open(
+            path.appending("a.txt"), relativeTo: file, .readOnly)
+          try absolute.close()
+          #endif
+
+          // A relative path is resolved against the directory argument.
+          XCTAssertThrowsError(try FileDescriptor.open("a.txt", relativeTo: file, .readOnly)) {
+            XCTAssertEqual($0 as? Errno, .notDirectory)
+          }
+        }
+        XCTAssertThrowsError(try FileDescriptor.open("b.txt", relativeTo: dir, .readOnly)) {
+          XCTAssertEqual($0 as? Errno, .noSuchFileOrDirectory)
+        }
+      }
+    }
+  }
+#endif // !os(Windows)
+
+#if !os(Windows) && !os(WASI)
+  @available(System 199, *)
+  func testSetPermissions() throws {
+    try withTemporaryFilePath(basename: "testSetPermissions") { path in
+      let fd = try FileDescriptor.open(path.appending("\(UUID().uuidString).txt"), .readWrite, options: [.create, .truncate], permissions: .ownerReadWrite)
+      try fd.closeAfter {
+        try fd.setPermissions([.ownerRead, .groupRead])
+        XCTAssertEqual(try fd.stat().permissions, [.ownerRead, .groupRead])
+      }
+    }
+  }
+
+  @available(System 199, *)
+  func testSetOwner() throws {
+    try withTemporaryFilePath(basename: "testSetOwner") { path in
+      let fd = try FileDescriptor.open(path.appending("\(UUID().uuidString).txt"), .readWrite, options: [.create, .truncate], permissions: .ownerReadWrite)
+      try fd.closeAfter {
+        let original = try fd.stat()
+
+        // The owner can always pass the file's current IDs, or nil.
+        try fd.setOwner()
+        try fd.setOwner(user: original.userID, group: original.groupID)
+        XCTAssertEqual(try fd.stat().userID, original.userID)
+        XCTAssertEqual(try fd.stat().groupID, original.groupID)
+
+        // The owner can change the group to another group they belong to.
+        let count = getgroups(0, nil)
+        var groups = [gid_t](repeating: 0, count: Int(max(count, 0)))
+        let filled = Int(max(getgroups(count, &groups), 0))
+        if let other = groups.prefix(filled).first(where: { $0 != original.groupID.rawValue }) {
+          try fd.setOwner(group: GroupID(other))
+          XCTAssertEqual(try fd.stat().groupID, GroupID(other))
+          XCTAssertEqual(try fd.stat().userID, original.userID)
+        }
+
+        // Only a privileged process can give the file to another user.
+        if geteuid() != 0 {
+          XCTAssertThrowsError(try fd.setOwner(user: UserID(0))) {
+            XCTAssertEqual($0 as? Errno, .notPermitted)
+          }
+        }
+      }
+    }
+  }
+
+#if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
+  @available(System 199, *)
+  func testSetFileFlags() throws {
+    try withTemporaryFilePath(basename: "testSetFileFlags") { path in
+      let fd = try FileDescriptor.open(path.appending("\(UUID().uuidString).txt"), .readWrite, options: [.create, .truncate], permissions: .ownerReadWrite)
+      try fd.closeAfter {
+        let original = try fd.stat().flags
+        XCTAssertFalse(original.contains(.noDump))
+
+        try fd.setFileFlags(original.union(.noDump))
+        XCTAssertEqual(try fd.stat().flags, original.union(.noDump))
+
+        try fd.setFileFlags(original)
+        XCTAssertEqual(try fd.stat().flags, original)
+      }
+    }
+  }
+#endif // SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
+#endif // !os(Windows) && !os(WASI)
 }
 
