@@ -18,8 +18,13 @@
 /// can read, write, and seek,
 /// but can't close the file descriptor or keep it after returning.
 ///
-/// Destroying an `OwnedFD` closes its file descriptor and ignores any error.
+/// Destroying an `OwnedFD` closes its file descriptor and ignores any error,
+/// as `closeAfter(_:)` does when its closure throws.
 /// To handle an error from closing, call `close()`.
+///
+/// One error from closing isn't ignored:
+/// destroying an `OwnedFD` traps if its file descriptor was already closed
+/// (`EBADF`), because that means something other than its owner closed it.
 @frozen
 public struct OwnedFD: ~Copyable, Sendable {
   @usableFromInline
@@ -35,8 +40,20 @@ public struct OwnedFD: ~Copyable, Sendable {
   }
 
   deinit {
-    // `deinit` can't throw, so an error from closing is dropped here.
-    _ = _descriptor._close()
+    // `deinit` can't throw, so an error from closing is dropped, as it is
+    // when the owner is destroyed while an error propagates. Neither Linux
+    // nor Darwin leaves the descriptor open after a failed close, so there's
+    // nothing to retry. EBADF is the exception: it means the descriptor was
+    // closed behind the owner's back, and if its number had been reused, this
+    // close would have closed an unrelated file. Like Mach.Port's deinit,
+    // this traps in every build: a debug-only check would follow this
+    // module's build configuration, so it would never fire in a release
+    // build of the library. See Prototype/CloseErrors for the alternatives.
+    if case .failure(.badFileDescriptor) = _descriptor._close() {
+      preconditionFailure(
+        "OwnedFD: file descriptor \(_descriptor.rawValue) was already closed, "
+          + "by something other than its owner")
+    }
   }
 }
 
@@ -116,6 +133,9 @@ extension OwnedFD {
   ///
   /// The closure must not close the file descriptor,
   /// and must not use it after returning.
+  /// If the closure closes it, the `OwnedFD` instance's own close fails
+  /// with `EBADF`, which traps if the instance is destroyed
+  /// rather than closed explicitly.
   @_alwaysEmitIntoClient
   public func withDescriptor<R: ~Copyable, E: Error>(
     body: (FileDescriptor) throws(E) -> R
