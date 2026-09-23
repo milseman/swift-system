@@ -37,6 +37,7 @@ struct SystemSamples: ParsableCommand {
       Rename.self,
       FIFO.self,
       ID.self,
+      Touch.self,
     ])
 }
 
