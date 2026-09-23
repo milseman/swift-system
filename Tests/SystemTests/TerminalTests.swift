@@ -10,7 +10,12 @@
 #if !os(Windows) && !os(WASI)
 
 import XCTest
+
+#if SYSTEM_PACKAGE
 import SystemPackage
+#else
+import System
+#endif
 
 @available(System 199, *)
 final class TerminalTests: XCTestCase {
