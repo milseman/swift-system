@@ -26,7 +26,11 @@ import Android
 
 @available(System 199, *)
 extension TerminalDescriptor {
-  /// Returns the current terminal attributes.
+  /// Returns the terminal's current attributes.
+  ///
+  /// - Returns: The terminal's flags, control characters, and speeds.
+  ///
+  /// The corresponding C function is `tcgetattr`.
   @_alwaysEmitIntoClient
   public func attributes() throws(Errno) -> TerminalAttributes {
     try _attributes().get()
@@ -43,7 +47,24 @@ extension TerminalDescriptor {
     return result.map { TerminalAttributes(rawValue: attrs) }
   }
 
-  /// Sets the terminal attributes.
+  /// Changes the terminal's attributes.
+  ///
+  /// - Parameters:
+  ///   - attributes: The new attributes.
+  ///   - action: When to make the change: immediately,
+  ///     after pending output is transmitted,
+  ///     or after that, also discarding unread input.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// This method succeeds if the terminal makes any of the requested changes,
+  /// and a terminal can ignore some settings: on Linux, for example,
+  /// a pseudoterminal keeps 8-bit characters with no parity.
+  /// To check which changes it made, call ``attributes()`` afterward.
+  ///
+  /// The corresponding C function is `tcsetattr`.
   @_alwaysEmitIntoClient
   public func setAttributes(
     _ attributes: TerminalAttributes,
@@ -67,7 +88,18 @@ extension TerminalDescriptor {
     }
   }
 
-  /// Blocks until all output written to the terminal has been transmitted.
+  /// Waits until all output written to the terminal has been transmitted.
+  ///
+  /// - Parameters:
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// On Darwin, output to a pseudoterminal isn't transmitted
+  /// until the controlling end reads it.
+  ///
+  /// The corresponding C function is `tcdrain`.
   @_alwaysEmitIntoClient
   public func drain(retryOnInterrupt: Bool = true) throws(Errno) {
     try _drain(retryOnInterrupt: retryOnInterrupt).get()
@@ -150,7 +182,27 @@ extension TerminalDescriptor {
     }
   }
 
-  /// Executes a closure with modified terminal attributes.
+  /// Changes the terminal's attributes, calls a closure,
+  /// and then restores the original attributes.
+  ///
+  /// - Parameters:
+  ///   - action: When to make the change. The default, `.afterFlush`,
+  ///     makes it after pending output is transmitted,
+  ///     and discards unread input.
+  ///   - retryOnInterrupt: Whether to retry making the change
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///   - modify: A closure that changes a copy of the current attributes.
+  ///   - body: The closure to call with the changed attributes in effect.
+  /// - Returns: The value that `body` returns.
+  ///
+  /// This method restores the original attributes immediately after `body`
+  /// returns or throws. It ignores an error from restoring them.
+  /// If reading or changing the attributes fails,
+  /// or `modify` throws, `body` isn't called.
+  ///
+  /// The corresponding C functions are `tcgetattr` and `tcsetattr`.
   public func withAttributes<T>(
     appliedWhen action: TerminalAttributes.SetAction = .afterFlush,
     retryOnInterrupt: Bool = true,
@@ -167,7 +219,24 @@ extension TerminalDescriptor {
     return try body()
   }
 
-  /// Executes a closure with the terminal in raw mode.
+  /// Puts the terminal in raw mode, calls a closure,
+  /// and then restores the original attributes.
+  ///
+  /// - Parameters:
+  ///   - retryOnInterrupt: Whether to retry the change to raw mode
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///   - body: The closure to call in raw mode.
+  /// - Returns: The value that `body` returns.
+  ///
+  /// This method changes the attributes as
+  /// ``TerminalAttributes/makeRaw()`` does, after pending output is
+  /// transmitted, discarding unread input, and restores them as
+  /// ``withAttributes(appliedWhen:retryOnInterrupt:_:do:)`` does.
+  ///
+  /// The corresponding C functions are `tcgetattr`, `cfmakeraw`,
+  /// and `tcsetattr`.
   public func withRawMode<T>(retryOnInterrupt: Bool = true, do body: () throws -> T) throws -> T {
     try withAttributes(retryOnInterrupt: retryOnInterrupt, { $0.makeRaw() }, do: body)
   }
@@ -177,49 +246,83 @@ extension TerminalDescriptor {
 
 @available(System 199, *)
 extension TerminalDescriptor {
-  /// Specifies which queue(s) to flush.
+  /// Data that ``flush(_:retryOnInterrupt:)`` discards.
   @frozen
   @available(System 199, *)
   public struct Queue: RawRepresentable, Hashable, Sendable {
+    /// The raw C queue selector.
     @_alwaysEmitIntoClient
     public var rawValue: CInt
 
+    /// Creates a strongly-typed queue selector from a raw C queue selector.
     @_alwaysEmitIntoClient
     public init(rawValue: CInt) {
       self.rawValue = rawValue
     }
 
+    /// Input that the terminal has received but that hasn't been read.
+    ///
+    /// The corresponding C constant is `TCIFLUSH`.
     @_alwaysEmitIntoClient
     public static var input: Self { Self(rawValue: _TCIFLUSH) }
 
+    /// Output that has been written but not yet transmitted.
+    ///
+    /// The corresponding C constant is `TCOFLUSH`.
     @_alwaysEmitIntoClient
     public static var output: Self { Self(rawValue: _TCOFLUSH) }
 
+    /// Both unread input and untransmitted output.
+    ///
+    /// The corresponding C constant is `TCIOFLUSH`.
     @_alwaysEmitIntoClient
     public static var both: Self { Self(rawValue: _TCIOFLUSH) }
   }
 
-  /// Flow control actions.
+  /// Actions for ``flow(_:retryOnInterrupt:)``.
   @frozen
   @available(System 199, *)
   public struct FlowAction: RawRepresentable, Hashable, Sendable {
+    /// The raw C flow control action.
     @_alwaysEmitIntoClient
     public var rawValue: CInt
 
+    /// Creates a strongly-typed flow control action
+    /// from a raw C flow control action.
     @_alwaysEmitIntoClient
     public init(rawValue: CInt) {
       self.rawValue = rawValue
     }
 
+    /// Suspends output.
+    ///
+    /// The corresponding C constant is `TCOOFF`.
     @_alwaysEmitIntoClient
     public static var suspendOutput: Self { Self(rawValue: _TCOOFF) }
 
+    /// Resumes suspended output.
+    ///
+    /// The corresponding C constant is `TCOON`.
     @_alwaysEmitIntoClient
     public static var resumeOutput: Self { Self(rawValue: _TCOON) }
 
+    /// Transmits a STOP character,
+    /// which asks the device to stop sending input.
+    ///
+    /// On Darwin, the terminal transmits the character
+    /// only if ``InputFlags/startStopInput`` is set.
+    ///
+    /// The corresponding C constant is `TCIOFF`.
     @_alwaysEmitIntoClient
     public static var sendStop: Self { Self(rawValue: _TCIOFF) }
 
+    /// Transmits a START character,
+    /// which asks the device to resume sending input.
+    ///
+    /// On Darwin, the terminal transmits the character
+    /// only if ``InputFlags/startStopInput`` is set.
+    ///
+    /// The corresponding C constant is `TCION`.
     @_alwaysEmitIntoClient
     public static var sendStart: Self { Self(rawValue: _TCION) }
   }

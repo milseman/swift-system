@@ -30,14 +30,19 @@ extension TerminalDescriptor {
   @frozen
   @available(System 199, *)
   public struct WindowSize: RawRepresentable, Hashable, Sendable {
+    /// The raw C window size,
+    /// which also holds the window's width and height in pixels.
     @_alwaysEmitIntoClient
     public var rawValue: CInterop.WinSize
 
+    /// Creates a strongly-typed window size from a raw C window size.
     @_alwaysEmitIntoClient
     public init(rawValue: CInterop.WinSize) {
       self.rawValue = rawValue
     }
 
+    /// Creates a window size with the given number of rows and columns,
+    /// and a size in pixels of zero, which means unknown.
     @_alwaysEmitIntoClient
     public init(rows: UInt16, columns: UInt16) {
       var size = CInterop.WinSize()
@@ -46,12 +51,14 @@ extension TerminalDescriptor {
       self.rawValue = size
     }
 
+    /// The number of rows, or lines of text.
     @_alwaysEmitIntoClient
     public var rows: UInt16 {
       get { rawValue.ws_row }
       set { rawValue.ws_row = newValue }
     }
 
+    /// The number of columns, or characters per line.
     @_alwaysEmitIntoClient
     public var columns: UInt16 {
       get { rawValue.ws_col }
@@ -60,11 +67,15 @@ extension TerminalDescriptor {
 
     // MARK: - Equatable & Hashable
 
+    /// Returns whether two window sizes have the same rows and columns.
+    ///
+    /// The sizes in pixels aren't compared.
     @_alwaysEmitIntoClient
     public static func == (lhs: WindowSize, rhs: WindowSize) -> Bool {
       lhs.rows == rhs.rows && lhs.columns == rhs.columns
     }
 
+    /// Hashes the rows and columns.
     @_alwaysEmitIntoClient
     public func hash(into hasher: inout Hasher) {
       hasher.combine(rows)
@@ -72,7 +83,12 @@ extension TerminalDescriptor {
     }
   }
 
-  /// Returns the current window size.
+  /// Returns the terminal's window size.
+  ///
+  /// - Returns: The window size, which is zero if nothing has set it,
+  ///   as for a new pseudoterminal.
+  ///
+  /// The corresponding C function is `ioctl`, with the `TIOCGWINSZ` request.
   @_alwaysEmitIntoClient
   public func windowSize() throws(Errno) -> WindowSize {
     try _windowSize().get()
@@ -89,7 +105,7 @@ extension TerminalDescriptor {
     return result.map { _ in WindowSize(rawValue: size) }
   }
 
-  /// Sets the window size.
+  /// Sets the terminal's window size.
   ///
   /// - Parameters:
   ///   - size: The new window size.
@@ -97,6 +113,9 @@ extension TerminalDescriptor {
   ///     if it throws ``Errno/interrupted``.
   ///     The default is `true`.
   ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// If the size changes, the system sends `SIGWINCH`
+  /// to the terminal's foreground process group.
   ///
   /// The corresponding C function is `ioctl`, with the `TIOCSWINSZ` request.
   @_alwaysEmitIntoClient

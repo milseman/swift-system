@@ -30,14 +30,23 @@ import Android
 @frozen
 @available(System 199, *)
 public struct TerminalAttributes: RawRepresentable, Equatable, Hashable, Sendable {
+  /// The raw C terminal attributes.
   @_alwaysEmitIntoClient
   public var rawValue: CInterop.Termios
 
+  /// Creates strongly-typed terminal attributes from raw C terminal attributes.
   @_alwaysEmitIntoClient
   public init(rawValue: CInterop.Termios) {
     self.rawValue = rawValue
   }
 
+  /// Creates terminal attributes with every field zero.
+  ///
+  /// Zero isn't ``ControlCharacters/disabled`` on every platform,
+  /// so on Darwin, applying these attributes makes byte 0
+  /// every control character.
+  /// To change a terminal's attributes, start from its current ones,
+  /// which ``TerminalDescriptor/attributes()`` returns.
   @_alwaysEmitIntoClient
   public init() {
     self.rawValue = CInterop.Termios()
@@ -87,6 +96,13 @@ public struct TerminalAttributes: RawRepresentable, Equatable, Hashable, Sendabl
   }
 
   /// The input baud rate.
+  ///
+  /// Some C libraries on Linux keep a single rate for both directions,
+  /// so setting this property can change ``outputSpeed`` too.
+  /// Setting a rate that the C library doesn't support
+  /// leaves the attributes unchanged.
+  ///
+  /// The corresponding C functions are `cfgetispeed` and `cfsetispeed`.
   @_alwaysEmitIntoClient
   public var inputSpeed: BaudRate {
     get {
@@ -102,6 +118,13 @@ public struct TerminalAttributes: RawRepresentable, Equatable, Hashable, Sendabl
   }
 
   /// The output baud rate.
+  ///
+  /// Applying attributes with an output rate of ``BaudRate/hangUp``
+  /// hangs up the line.
+  /// Setting a rate that the C library doesn't support
+  /// leaves the attributes unchanged.
+  ///
+  /// The corresponding C functions are `cfgetospeed` and `cfsetospeed`.
   @_alwaysEmitIntoClient
   public var outputSpeed: BaudRate {
     get {
@@ -116,7 +139,15 @@ public struct TerminalAttributes: RawRepresentable, Equatable, Hashable, Sendabl
     }
   }
 
-  /// Sets both input and output baud rates simultaneously.
+  /// Sets both the input and the output baud rate.
+  ///
+  /// - Parameters:
+  ///   - speed: The new rate.
+  ///
+  /// A rate that the C library doesn't support
+  /// leaves the attributes unchanged.
+  ///
+  /// The corresponding C function is `cfsetspeed`.
   @_alwaysEmitIntoClient
   public mutating func setSpeed(_ speed: BaudRate) {
     withUnsafeMutablePointer(to: &rawValue) { ptr in
@@ -138,7 +169,10 @@ public struct TerminalAttributes: RawRepresentable, Equatable, Hashable, Sendabl
     withUnsafeMutablePointer(to: &rawValue) { system_cfmakeraw($0) }
   }
 
-  /// Returns a copy of these attributes configured for raw mode.
+  /// Returns a copy of these attributes configured for raw mode,
+  /// as ``makeRaw()`` describes.
+  ///
+  /// The corresponding C function is `cfmakeraw`.
   @_alwaysEmitIntoClient
   public func raw() -> TerminalAttributes {
     var copy = self
@@ -190,9 +224,11 @@ extension TerminalAttributes {
   @frozen
   @available(System 199, *)
   public struct SetAction: RawRepresentable, Hashable, Sendable {
+    /// The raw C action.
     @_alwaysEmitIntoClient
     public var rawValue: CInt
 
+    /// Creates a strongly-typed action from a raw C action.
     @_alwaysEmitIntoClient
     public init(rawValue: CInt) {
       self.rawValue = rawValue
@@ -213,12 +249,24 @@ extension TerminalAttributes {
     /// Apply changes after all pending output has been transmitted,
     /// and discard any unread input.
     ///
+    /// Programs usually enter raw mode this way,
+    /// so that input typed beforehand isn't read in the new mode.
+    ///
     /// The corresponding C constant is `TCSAFLUSH`.
     @_alwaysEmitIntoClient
     public static var afterFlush: Self { Self(rawValue: _TCSAFLUSH) }
 
     #if canImport(Darwin)
-    /// Modifier flag: don't alter hardware state.
+    /// Apply changes immediately,
+    /// except to the hardware settings: the control flags and the speeds.
+    ///
+    /// `TCSASOFT` is a flag that modifies an action. This value combines it
+    /// with `TCSANOW`, whose value is zero. To modify another action,
+    /// combine their raw values:
+    ///
+    ///     let softDrain = TerminalAttributes.SetAction(
+    ///       rawValue: TerminalAttributes.SetAction.afterDrain.rawValue
+    ///         | TerminalAttributes.SetAction.soft.rawValue)
     ///
     /// The corresponding C constant is `TCSASOFT`.
     @_alwaysEmitIntoClient

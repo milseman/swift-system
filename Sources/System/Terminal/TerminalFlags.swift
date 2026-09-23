@@ -18,9 +18,11 @@
 @frozen
 @available(System 199, *)
 public struct InputFlags: OptionSet, Hashable, Sendable {
+  /// The raw C input mode flags.
   @_alwaysEmitIntoClient
   public var rawValue: CInterop.TerminalFlags
 
+  /// Creates a strongly-typed set of input mode flags from raw C flags.
   @_alwaysEmitIntoClient
   public init(rawValue: CInterop.TerminalFlags) {
     self.rawValue = rawValue
@@ -127,9 +129,11 @@ public struct InputFlags: OptionSet, Hashable, Sendable {
 @frozen
 @available(System 199, *)
 public struct OutputFlags: OptionSet, Hashable, Sendable {
+  /// The raw C output mode flags.
   @_alwaysEmitIntoClient
   public var rawValue: CInterop.TerminalFlags
 
+  /// Creates a strongly-typed set of output mode flags from raw C flags.
   @_alwaysEmitIntoClient
   public init(rawValue: CInterop.TerminalFlags) {
     self.rawValue = rawValue
@@ -348,9 +352,11 @@ public struct OutputFlags: OptionSet, Hashable, Sendable {
 @frozen
 @available(System 199, *)
 public struct ControlFlags: OptionSet, Hashable, Sendable {
+  /// The raw C control mode flags.
   @_alwaysEmitIntoClient
   public var rawValue: CInterop.TerminalFlags
 
+  /// Creates a strongly-typed set of control mode flags from raw C flags.
   @_alwaysEmitIntoClient
   public init(rawValue: CInterop.TerminalFlags) {
     self.rawValue = rawValue
@@ -483,9 +489,11 @@ public struct ControlFlags: OptionSet, Hashable, Sendable {
 @frozen
 @available(System 199, *)
 public struct LocalFlags: OptionSet, Hashable, Sendable {
+  /// The raw C local mode flags.
   @_alwaysEmitIntoClient
   public var rawValue: CInterop.TerminalFlags
 
+  /// Creates a strongly-typed set of local mode flags from raw C flags.
   @_alwaysEmitIntoClient
   public init(rawValue: CInterop.TerminalFlags) {
     self.rawValue = rawValue
