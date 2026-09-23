@@ -60,6 +60,29 @@ extension SocketDescriptor {
   public init(unchecked fd: FileDescriptor) {
     self.init(rawValue: fd.rawValue)
   }
+
+  /// Creates a socket descriptor from a file descriptor,
+  /// verifying that the file descriptor refers to a socket.
+  ///
+  /// If `fd` is open but doesn't refer to a socket,
+  /// this initializer throws ``Errno/notSocket`` (`ENOTSOCK`).
+  /// If `fd` isn't open, it throws ``Errno/badFileDescriptor`` (`EBADF`).
+  ///
+  /// The corresponding C function is `getsockopt` with the `SO_TYPE` option.
+  @_alwaysEmitIntoClient
+  public init(_ fd: FileDescriptor) throws(Errno) {
+    try Self._verify(fd).get()
+    self.init(unchecked: fd)
+  }
+
+  @usableFromInline
+  internal static func _verify(_ fd: FileDescriptor) -> Result<(), Errno> {
+    var type: CInt = 0
+    var length = socklen_t(MemoryLayout<CInt>.size)
+    return nothingOrErrno(retryOnInterrupt: false) {
+      system_getsockopt(fd.rawValue, SOL_SOCKET, SO_TYPE, &type, &length)
+    }
+  }
 }
 
 // MARK: - Domain (Protocol Family)
