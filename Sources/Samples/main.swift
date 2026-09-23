@@ -34,6 +34,7 @@ struct SystemSamples: ParsableCommand {
       PIDFile.self,
       AtomicWrite.self,
       SetAttributes.self,
+      Rename.self,
     ])
 }
 
