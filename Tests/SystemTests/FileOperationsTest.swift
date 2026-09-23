@@ -197,6 +197,15 @@ final class FileOperationsTest: XCTestCase {
     ]
     for test in fullSync { test.runAllTests() }
     #endif // SYSTEM_PACKAGE_DARWIN
+
+    #if os(Linux) || os(Android) || os(FreeBSD) || os(WASI)
+    let fallocate = MockTestCase(
+      name: "posix_fallocate", .interruptable, rawFD, 512, 4096
+    ) { retryOnInterrupt in
+      try fd.allocateSpace(offset: 512, length: 4096, retryOnInterrupt: retryOnInterrupt)
+    }
+    fallocate.runAllTests()
+    #endif // os(Linux) || os(Android) || os(FreeBSD) || os(WASI)
   }
   #endif // ENABLE_MOCKING && !os(WASI) && !os(Windows)
 
@@ -705,5 +714,43 @@ final class FileOperationsTest: XCTestCase {
     }
   }
 #endif // !os(Windows)
+
+#if os(Linux) || os(Android) || os(FreeBSD) || os(WASI)
+  @available(System 199, *)
+  func testAllocateSpace() throws {
+    try withTemporaryFilePath(basename: "testAllocateSpace") { path in
+      let fd = try FileDescriptor.open(path.appending("\(UUID().uuidString).txt"), .readWrite, options: [.create, .truncate], permissions: .ownerReadWrite)
+      try fd.closeAfter {
+        try fd.writeAll("abc".utf8)
+        do {
+          try fd.allocateSpace(offset: 0, length: 1 << 16)
+        } catch let error as Errno
+          where [Errno.invalidArgument, .notSupported, .notSupportedOnSocket, .noFunction]
+            .contains(error)
+        {
+          throw XCTSkip("The file system doesn't support preallocation: \(error)")
+        }
+        // The file is extended, its contents are kept, and the offset is unchanged.
+        XCTAssertEqual(try fd.stat().size, 1 << 16)
+        XCTAssertEqual(try fd.seek(offset: 0, from: .current), 3)
+        let bytes = try Array<UInt8>(unsafeUninitializedCapacity: 8) { buf, count in
+          count = try fd.read(fromAbsoluteOffset: 0, into: UnsafeMutableRawBufferPointer(buf))
+        }
+        XCTAssertEqual(bytes, Array("abc".utf8) + [0, 0, 0, 0, 0])
+
+        // A range within the file leaves its size alone.
+        try fd.allocateSpace(offset: 16, length: 16)
+        XCTAssertEqual(try fd.stat().size, 1 << 16)
+      }
+
+      let readOnly = try FileDescriptor.open(path.appending("\(UUID().uuidString).txt"), .readOnly, options: .create, permissions: .ownerReadWrite)
+      try readOnly.closeAfter {
+        XCTAssertThrowsError(try readOnly.allocateSpace(offset: 0, length: 16)) {
+          XCTAssertEqual($0 as? Errno, .badFileDescriptor)
+        }
+      }
+    }
+  }
+#endif // os(Linux) || os(Android) || os(FreeBSD) || os(WASI)
 }
 

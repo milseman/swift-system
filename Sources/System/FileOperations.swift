@@ -1244,6 +1244,58 @@ extension FileDescriptor {
 }
 #endif // SYSTEM_PACKAGE_DARWIN
 
+#if os(Linux) || os(Android) || os(FreeBSD) || os(WASI)
+@available(System 199, *)
+extension FileDescriptor {
+  /// Allocates storage for a range of the file referenced by this
+  /// file descriptor.
+  ///
+  /// - Parameters:
+  ///   - offset: The file offset where the range begins.
+  ///   - length: The length of the range, in bytes.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// After this method returns,
+  /// writes within the range don't fail for lack of storage.
+  /// If the range extends past the end of the file,
+  /// the file is extended to cover it;
+  /// the new bytes read as zeros.
+  /// This method doesn't change the file's existing contents
+  /// or its offset.
+  ///
+  /// The file must be open for writing.
+  /// Some file systems don't support preallocation,
+  /// and throw an error such as ``Errno/invalidArgument``.
+  ///
+  /// The corresponding C function is `posix_fallocate`.
+  /// - Note: Only available on Linux, Android, FreeBSD, and WASI.
+  @_alwaysEmitIntoClient
+  public func allocateSpace(
+    offset: Int64,
+    length: Int64,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try _allocateSpace(
+      offset: offset, length: length, retryOnInterrupt: retryOnInterrupt
+    ).get()
+  }
+
+  @usableFromInline
+  internal func _allocateSpace(
+    offset: Int64,
+    length: Int64,
+    retryOnInterrupt: Bool
+  ) -> Result<(), Errno> {
+    nothingOrReturnedErrno(retryOnInterrupt: retryOnInterrupt) {
+      system_posix_fallocate(self.rawValue, _COffT(offset), _COffT(length))
+    }
+  }
+}
+#endif // os(Linux) || os(Android) || os(FreeBSD) || os(WASI)
+
 #if !os(WASI) // WASI has no umask
 extension FilePermissions {
   /// The file creation permission mask (aka "umask").

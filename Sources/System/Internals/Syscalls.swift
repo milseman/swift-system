@@ -233,6 +233,18 @@ internal func system_fcntl(_ fd: Int32, _ cmd: Int32, _ value: Int32) -> Int32 {
 }
 #endif // !os(Windows)
 
+// Returns an error number rather than setting errno.
+#if os(Linux) || os(Android) || os(FreeBSD) || os(WASI)
+internal func system_posix_fallocate(
+  _ fd: Int32, _ offset: off_t, _ length: off_t
+) -> Int32 {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mockReturningErrno(fd, offset, length) }
+#endif
+  return posix_fallocate(fd, offset, length)
+}
+#endif // os(Linux) || os(Android) || os(FreeBSD) || os(WASI)
+
 internal func system_mkdir(
     _ path: UnsafePointer<CInterop.PlatformChar>,
     _ mode: CInterop.Mode
