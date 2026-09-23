@@ -113,3 +113,11 @@ extern int csystem_renameat2(int olddirfd, const char *oldpath,
   #endif
 }
 #endif // __linux__
+
+#ifdef __linux__
+#include <termios.h>
+
+extern int csystem_tcgetsid(int fd) {
+  return tcgetsid(fd);
+}
+#endif // __linux__

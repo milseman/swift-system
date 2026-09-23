@@ -1033,6 +1033,31 @@ internal func system_tcsendbreak(
   return tcsendbreak(fd, duration)
 }
 
+internal func system_tcgetpgrp(_ fd: CInt) -> pid_t {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(fd) }
+#endif
+  return tcgetpgrp(fd)
+}
+
+internal func system_tcsetpgrp(_ fd: CInt, _ pgrp: pid_t) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(fd, pgrp) }
+#endif
+  return tcsetpgrp(fd, pgrp)
+}
+
+internal func system_tcgetsid(_ fd: CInt) -> pid_t {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(fd) }
+#endif
+#if os(Linux) || os(Android)
+  return csystem_tcgetsid(fd)
+#else
+  return tcgetsid(fd)
+#endif
+}
+
 
 @usableFromInline
 internal func system_cfgetispeed(

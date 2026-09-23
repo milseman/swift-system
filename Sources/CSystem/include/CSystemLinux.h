@@ -48,5 +48,9 @@ extern int csystem_renameat2(int olddirfd, const char *oldpath,
 // _GNU_SOURCE, and Bionic defines as F_LINUX_SPECIFIC_BASE + 7 and + 8.
 #define CSYSTEM_F_SETPIPE_SZ 1031
 #define CSYSTEM_F_GETPIPE_SZ 1032
+
+// tcgetsid, which not every C library declares without feature macros
+// such as _GNU_SOURCE, which can't be defined here; see shims.c.
+extern int csystem_tcgetsid(int fd);
 #endif
 

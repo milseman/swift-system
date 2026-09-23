@@ -95,6 +95,7 @@ target_sources(SystemPackage PRIVATE
   Terminal/TerminalAttributes+Serial.swift
   Terminal/TerminalDescriptor.swift
   Terminal/TerminalFlags.swift
+  Terminal/TerminalJobControl.swift
   Terminal/TerminalOperations.swift
   Terminal/TerminalWindowSize.swift)
 target_link_libraries(SystemPackage PUBLIC
