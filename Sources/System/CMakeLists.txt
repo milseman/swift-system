@@ -59,6 +59,7 @@ target_sources(SystemPackage PRIVATE
 target_sources(SystemPackage PRIVATE
   FileSystem/FileFlags.swift
   FileSystem/FileMode.swift
+  FileSystem/FilePathOperations.swift
   FileSystem/FileType.swift
   FileSystem/Identifiers.swift
   FileSystem/Stat.swift)

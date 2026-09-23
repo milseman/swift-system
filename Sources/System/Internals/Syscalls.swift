@@ -236,6 +236,21 @@ internal func system_rmdir(
   return rmdir(path)
 }
 
+#if !os(Windows)
+internal func system_mkdirat(
+  _ fd: CInt,
+  _ path: UnsafePointer<CInterop.PlatformChar>,
+  _ mode: CInterop.Mode
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled {
+    return _mock(fd, String(_errorCorrectingPlatformString: path), mode)
+  }
+#endif
+  return mkdirat(fd, path, mode)
+}
+#endif // !os(Windows)
+
 #if SYSTEM_PACKAGE_DARWIN
 internal let SYSTEM_CS_DARWIN_USER_TEMP_DIR = _CS_DARWIN_USER_TEMP_DIR
 
