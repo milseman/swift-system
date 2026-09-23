@@ -492,9 +492,13 @@ final class TerminalTests: XCTestCase {
       XCTAssertFalse(current.localFlags.contains(.echo))
     }
 
-    // After exiting raw mode
+    // After exiting raw mode. Leaving non-canonical mode can make the driver
+    // set PENDIN, which Darwin does, so ignore the state flags it manages.
     let restored = try terminal.attributes()
-    XCTAssertEqual(original.localFlags, restored.localFlags)
+    let stateFlags: LocalFlags = [.retypePending, .flushingOutput]
+    XCTAssertEqual(
+      original.localFlags.subtracting(stateFlags),
+      restored.localFlags.subtracting(stateFlags))
   }
 
   func testWindowSizeOperation() throws {
