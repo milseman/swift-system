@@ -328,6 +328,11 @@ internal func system_openat(
 #endif
   return openat(fd, path, oflag, mode)
 }
+
+// Not mockable: isatty returns 1 or 0, not 0 or -1.
+internal func system_isatty(_ fd: CInt) -> CInt {
+  return isatty(fd)
+}
 #endif // !os(Windows)
 
 #if !os(WASI) // WASI has no umask

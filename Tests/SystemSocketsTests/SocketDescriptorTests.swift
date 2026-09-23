@@ -77,6 +77,43 @@ private struct SocketDescriptorTests {
     try socket.close()
   }
 
+  // MARK: - FileDescriptor Conversion Tests
+
+  @Test func checkedConversionFromSocket() throws {
+    for (domain, type) in [
+      (SocketDescriptor.Domain.local, SocketDescriptor.ConnectionType.stream),
+      (.ipv4, .datagram),
+    ] {
+      let socket = try SocketDescriptor.open(domain, type)
+      defer { try? socket.close() }
+
+      let converted = try SocketDescriptor(socket.fileDescriptor)
+      #expect(converted == socket)
+      #expect(converted.fileDescriptor == socket.fileDescriptor)
+      #expect(converted == SocketDescriptor(unchecked: socket.fileDescriptor))
+    }
+  }
+
+  @Test func checkedConversionFromNonSocket() throws {
+    let pipe = try FileDescriptor.pipe()
+    defer {
+      try? pipe.readEnd.close()
+      try? pipe.writeEnd.close()
+    }
+    #expect(throws: Errno.notSocket) { try SocketDescriptor(pipe.readEnd) }
+    #expect(throws: Errno.notSocket) { try SocketDescriptor(pipe.writeEnd) }
+
+    let devNull = try FileDescriptor.open("/dev/null", .readWrite)
+    defer { try? devNull.close() }
+    #expect(throws: Errno.notSocket) { try SocketDescriptor(devNull) }
+  }
+
+  @Test func checkedConversionFromInvalidDescriptor() {
+    #expect(throws: Errno.badFileDescriptor) {
+      try SocketDescriptor(FileDescriptor(rawValue: -1))
+    }
+  }
+
   // MARK: - Shutdown Tests
 
   @Test func shutdownKindValues() {
