@@ -899,6 +899,38 @@ extension FileDescriptor {
 }
 #endif // !os(Windows)
 
+#if !os(Windows) && !SYSTEM_PACKAGE_DARWIN
+extension FileDescriptor {
+  /// Flushes modified data of the file referenced by this file descriptor
+  /// to its storage device, along with only the metadata needed
+  /// to retrieve that data.
+  ///
+  /// - Parameters:
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// Unlike ``synchronize(retryOnInterrupt:)``,
+  /// this method doesn't flush metadata such as the modification time
+  /// unless that metadata is needed to read the data back.
+  ///
+  /// The corresponding C function is `fdatasync`.
+  /// - Note: Not available on Darwin.
+  @_alwaysEmitIntoClient
+  public func synchronizeData(retryOnInterrupt: Bool = true) throws(Errno) {
+    try _synchronizeData(retryOnInterrupt: retryOnInterrupt).get()
+  }
+
+  @usableFromInline
+  internal func _synchronizeData(retryOnInterrupt: Bool) -> Result<(), Errno> {
+    nothingOrErrno(retryOnInterrupt: retryOnInterrupt) {
+      system_fdatasync(self.rawValue)
+    }
+  }
+}
+#endif // !os(Windows) && !SYSTEM_PACKAGE_DARWIN
+
 #if !os(Windows) && !os(WASI)
 extension FileDescriptor {
   /// Changes the permissions of the file referenced by this file descriptor.

@@ -182,6 +182,15 @@ internal func system_fsync(_ fd: Int32) -> Int32 {
 }
 #endif // !os(Windows)
 
+#if !os(Windows) && !SYSTEM_PACKAGE_DARWIN
+internal func system_fdatasync(_ fd: Int32) -> Int32 {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(fd) }
+#endif
+  return fdatasync(fd)
+}
+#endif // !os(Windows) && !SYSTEM_PACKAGE_DARWIN
+
 #if !os(Windows) && !os(WASI)
 internal func system_fchmod(_ fd: Int32, _ mode: CInterop.Mode) -> Int32 {
 #if ENABLE_MOCKING

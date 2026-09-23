@@ -120,6 +120,14 @@ final class FileOperationsTest: XCTestCase {
     ]
     #endif // !os(Windows)
 
+    #if !os(Windows) && !SYSTEM_PACKAGE_DARWIN
+    syscallTestCases += [
+      MockTestCase(name: "fdatasync", .interruptable, rawFD) { retryOnInterrupt in
+        try fd.synchronizeData(retryOnInterrupt: retryOnInterrupt)
+      },
+    ]
+    #endif // !os(Windows) && !SYSTEM_PACKAGE_DARWIN
+
     for test in syscallTestCases { test.runAllTests() }
   }
   #endif // ENABLE_MOCKING && !os(WASI)
@@ -424,6 +432,19 @@ final class FileOperationsTest: XCTestCase {
       }
     }
   }
+
+#if !SYSTEM_PACKAGE_DARWIN
+  func testSynchronizeData() throws {
+    try withTemporaryFilePath(basename: "testSynchronizeData") { path in
+      let fd = try FileDescriptor.open(path.appending("\(UUID().uuidString).txt"), .readWrite, options: [.create, .truncate], permissions: .ownerReadWrite)
+      try fd.closeAfter {
+        try fd.writeAll("abc".utf8)
+        try fd.synchronizeData()
+        XCTAssertEqual(try fd.fileSize(), 3)
+      }
+    }
+  }
+#endif // !SYSTEM_PACKAGE_DARWIN
 
   func testOpenRelativeTo() throws {
     try withTemporaryFilePath(basename: "testOpenRelativeTo") { path in
