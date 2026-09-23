@@ -287,6 +287,51 @@ final class FilePathOperationsTest: XCTestCase {
             $0, .ownerReadWrite, relativeTo: dir, retryOnInterrupt: retryOnInterrupt)
         }
       },
+
+      MockTestCase(name: "chown", .interruptable, "a path", 501, 20) { retryOnInterrupt in
+        try path.setOwner(
+          user: UserID(501), group: GroupID(20), retryOnInterrupt: retryOnInterrupt)
+      },
+
+      MockTestCase(
+        name: "chown", .interruptable, "a path", uid_t(truncatingIfNeeded: -1), 20
+      ) { retryOnInterrupt in
+        try "a path".withCString {
+          try FilePath.setOwner($0, group: GroupID(20), retryOnInterrupt: retryOnInterrupt)
+        }
+      },
+
+      MockTestCase(
+        name: "lchown", .interruptable, "a path", 501, gid_t(truncatingIfNeeded: -1)
+      ) { retryOnInterrupt in
+        try path.setOwner(
+          user: UserID(501), followTargetSymlink: false, retryOnInterrupt: retryOnInterrupt)
+      },
+
+      MockTestCase(name: "lchown", .interruptable, "a path", 501, 20) { retryOnInterrupt in
+        try "a path".withCString {
+          try FilePath.setOwner(
+            $0, user: UserID(501), group: GroupID(20), followTargetSymlink: false,
+            retryOnInterrupt: retryOnInterrupt)
+        }
+      },
+
+      MockTestCase(
+        name: "fchownat", .interruptable, 42, "a path", 501, 20, AT_SYMLINK_NOFOLLOW
+      ) { retryOnInterrupt in
+        try path.setOwner(
+          relativeTo: dir, user: UserID(501), group: GroupID(20), flags: .symlinkNoFollow,
+          retryOnInterrupt: retryOnInterrupt)
+      },
+
+      MockTestCase(
+        name: "fchownat", .interruptable,
+        42, "a path", uid_t(truncatingIfNeeded: -1), gid_t(truncatingIfNeeded: -1), 0
+      ) { retryOnInterrupt in
+        try "a path".withCString {
+          try FilePath.setOwner($0, relativeTo: dir, retryOnInterrupt: retryOnInterrupt)
+        }
+      },
     ]
 
     for test in syscallTestCases { test.runAllTests() }
@@ -749,6 +794,69 @@ final class FilePathOperationsTest: XCTestCase {
         XCTAssertThrowsError(
           try FilePath("missing").setPermissions(.ownerRead, relativeTo: dir)
         ) {
+          XCTAssertEqual($0 as? Errno, .noSuchFileOrDirectory)
+        }
+      }
+    }
+  }
+
+  @available(System 199, *)
+  func testSetOwner() throws {
+    try withTemporaryFilePath(basename: "testSetOwner") { path in
+      let file = path.appending("file")
+      let fd = try FileDescriptor.open(
+        file, .writeOnly, options: .create, permissions: .ownerReadWrite)
+      try fd.close()
+      let link = path.appending("link")
+      try link.makeSymbolicLink(to: "file")
+      let original = try file.stat()
+
+      // The owner can always pass the file's current IDs, or nil.
+      try file.setOwner()
+      try file.setOwner(user: original.userID, group: original.groupID)
+      try link.setOwner(
+        user: original.userID, group: original.groupID, followTargetSymlink: false)
+      try file.withCString {
+        try FilePath.setOwner($0, user: original.userID, group: original.groupID)
+      }
+      XCTAssertEqual(try file.stat().userID, original.userID)
+      XCTAssertEqual(try file.stat().groupID, original.groupID)
+
+      // The owner can change the group to another group they belong to.
+      let count = getgroups(0, nil)
+      var groups = [gid_t](repeating: 0, count: Int(max(count, 0)))
+      let filled = Int(max(getgroups(count, &groups), 0))
+      let other = groups.prefix(filled).first { $0 != original.groupID.rawValue }
+      if let other {
+        // By default, a symbolic link's target changes.
+        try link.setOwner(group: GroupID(other))
+        XCTAssertEqual(try file.stat().groupID, GroupID(other))
+        XCTAssertEqual(try file.stat().userID, original.userID)
+        try file.setOwner(group: original.groupID)
+      }
+
+      // Only a privileged process can give the file to another user.
+      if geteuid() != 0 {
+        XCTAssertThrowsError(try file.setOwner(user: UserID(0))) {
+          XCTAssertEqual($0 as? Errno, .notPermitted)
+        }
+      }
+      XCTAssertThrowsError(try path.appending("missing").setOwner()) {
+        XCTAssertEqual($0 as? Errno, .noSuchFileOrDirectory)
+      }
+
+      let dir = try FileDescriptor.open(path, .readOnly, options: .directory)
+      try dir.closeAfter {
+        try FilePath("file").setOwner(relativeTo: dir, group: original.groupID)
+        try "link".withCString {
+          try FilePath.setOwner(
+            $0, relativeTo: dir, user: original.userID, flags: .symlinkNoFollow)
+        }
+        if let other {
+          try FilePath("link").setOwner(relativeTo: dir, group: GroupID(other))
+          XCTAssertEqual(try file.stat().groupID, GroupID(other))
+        }
+        XCTAssertThrowsError(try FilePath("missing").setOwner(relativeTo: dir)) {
           XCTAssertEqual($0 as? Errno, .noSuchFileOrDirectory)
         }
       }

@@ -457,6 +457,43 @@ internal func system_fchmodat(
 #endif
   return fchmodat(fd, path, mode, flag)
 }
+
+internal func system_chown(
+  _ path: UnsafePointer<CInterop.PlatformChar>,
+  _ owner: uid_t,
+  _ group: gid_t
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(path: path, owner, group) }
+#endif
+  return chown(path, owner, group)
+}
+
+internal func system_lchown(
+  _ path: UnsafePointer<CInterop.PlatformChar>,
+  _ owner: uid_t,
+  _ group: gid_t
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(path: path, owner, group) }
+#endif
+  return lchown(path, owner, group)
+}
+
+internal func system_fchownat(
+  _ fd: CInt,
+  _ path: UnsafePointer<CInterop.PlatformChar>,
+  _ owner: uid_t,
+  _ group: gid_t,
+  _ flag: CInt
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled {
+    return _mock(fd, String(_errorCorrectingPlatformString: path), owner, group, flag)
+  }
+#endif
+  return fchownat(fd, path, owner, group, flag)
+}
 #endif // !os(WASI)
 
 internal func system_fdopendir(

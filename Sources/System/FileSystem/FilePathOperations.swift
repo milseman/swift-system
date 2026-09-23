@@ -1314,4 +1314,202 @@ extension FilePath {
 }
 #endif // !os(WASI)
 
+// MARK: - chown, lchown, fchownat
+
+#if !os(WASI)
+@available(System 199, *)
+extension FilePath {
+  /// Changes the owner and group of the file at this path.
+  ///
+  /// - Parameters:
+  ///   - user: The new owner of the file,
+  ///     or `nil` to leave the owner unchanged.
+  ///   - group: The new group of the file,
+  ///     or `nil` to leave the group unchanged.
+  ///   - followTargetSymlink: Whether to change the owner and group
+  ///     of a symbolic link's target, if this path names a symbolic link.
+  ///     The default is `true`.
+  ///     Pass `false` to change the owner and group of the link itself.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// Changing the owner typically requires appropriate privileges.
+  /// The owner of a file can change its group
+  /// to any group that the owner is a member of.
+  ///
+  /// The corresponding C function is `chown`,
+  /// or `lchown` if `followTargetSymlink` is `false`.
+  @_alwaysEmitIntoClient
+  public func setOwner(
+    user: UserID? = nil,
+    group: GroupID? = nil,
+    followTargetSymlink: Bool = true,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try withPlatformString {
+      FilePath._setOwner(
+        $0, user: user, group: group, followTargetSymlink: followTargetSymlink,
+        retryOnInterrupt: retryOnInterrupt)
+    }.get()
+  }
+
+  /// Changes the owner and group of the file at the given path.
+  ///
+  /// - Parameters:
+  ///   - path: The location of the file.
+  ///   - user: The new owner of the file,
+  ///     or `nil` to leave the owner unchanged.
+  ///   - group: The new group of the file,
+  ///     or `nil` to leave the group unchanged.
+  ///   - followTargetSymlink: Whether to change the owner and group
+  ///     of a symbolic link's target, if `path` names a symbolic link.
+  ///     The default is `true`.
+  ///     Pass `false` to change the owner and group of the link itself.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// Changing the owner typically requires appropriate privileges.
+  /// The owner of a file can change its group
+  /// to any group that the owner is a member of.
+  ///
+  /// The corresponding C function is `chown`,
+  /// or `lchown` if `followTargetSymlink` is `false`.
+  @_alwaysEmitIntoClient
+  public static func setOwner(
+    _ path: UnsafePointer<CChar>,
+    user: UserID? = nil,
+    group: GroupID? = nil,
+    followTargetSymlink: Bool = true,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try _setOwner(
+      path, user: user, group: group, followTargetSymlink: followTargetSymlink,
+      retryOnInterrupt: retryOnInterrupt
+    ).get()
+  }
+
+  @usableFromInline
+  internal static func _setOwner(
+    _ path: UnsafePointer<CChar>,
+    user: UserID?,
+    group: GroupID?,
+    followTargetSymlink: Bool,
+    retryOnInterrupt: Bool
+  ) -> Result<(), Errno> {
+    // An ID of -1 leaves the corresponding value unchanged.
+    let uid = user?.rawValue ?? CInterop.UserID(truncatingIfNeeded: -1)
+    let gid = group?.rawValue ?? CInterop.GroupID(truncatingIfNeeded: -1)
+    return nothingOrErrno(retryOnInterrupt: retryOnInterrupt) {
+      if followTargetSymlink {
+        system_chown(path, uid, gid)
+      } else {
+        system_lchown(path, uid, gid)
+      }
+    }
+  }
+
+  /// Changes the owner and group of the file at this path,
+  /// resolving a relative path against a directory.
+  ///
+  /// - Parameters:
+  ///   - fd: The directory against which a relative path is resolved.
+  ///   - user: The new owner of the file,
+  ///     or `nil` to leave the owner unchanged.
+  ///   - group: The new group of the file,
+  ///     or `nil` to leave the group unchanged.
+  ///   - flags: Options that control how the path is resolved.
+  ///     Pass ``ResolutionFlags/symlinkNoFollow``
+  ///     to change the owner and group of a symbolic link itself.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// Changing the owner typically requires appropriate privileges.
+  /// The owner of a file can change its group
+  /// to any group that the owner is a member of.
+  ///
+  /// If this path is absolute (starts with a forward slash), then `fd` is ignored.
+  /// If this path is relative, it is resolved against the directory given by `fd`.
+  ///
+  /// The corresponding C function is `fchownat`.
+  @_alwaysEmitIntoClient
+  public func setOwner(
+    relativeTo fd: FileDescriptor,
+    user: UserID? = nil,
+    group: GroupID? = nil,
+    flags: FilePath.ResolutionFlags = [],
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try withPlatformString {
+      FilePath._setOwner(
+        $0, relativeTo: fd, user: user, group: group, flags: flags,
+        retryOnInterrupt: retryOnInterrupt)
+    }.get()
+  }
+
+  /// Changes the owner and group of the file at the given path,
+  /// resolving a relative path against a directory.
+  ///
+  /// - Parameters:
+  ///   - path: The location of the file.
+  ///   - fd: The directory against which a relative `path` is resolved.
+  ///   - user: The new owner of the file,
+  ///     or `nil` to leave the owner unchanged.
+  ///   - group: The new group of the file,
+  ///     or `nil` to leave the group unchanged.
+  ///   - flags: Options that control how `path` is resolved.
+  ///     Pass ``ResolutionFlags/symlinkNoFollow``
+  ///     to change the owner and group of a symbolic link itself.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// Changing the owner typically requires appropriate privileges.
+  /// The owner of a file can change its group
+  /// to any group that the owner is a member of.
+  ///
+  /// If `path` is absolute (starts with a forward slash), then `fd` is ignored.
+  /// If `path` is relative, it is resolved against the directory given by `fd`.
+  ///
+  /// The corresponding C function is `fchownat`.
+  @_alwaysEmitIntoClient
+  public static func setOwner(
+    _ path: UnsafePointer<CChar>,
+    relativeTo fd: FileDescriptor,
+    user: UserID? = nil,
+    group: GroupID? = nil,
+    flags: FilePath.ResolutionFlags = [],
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try _setOwner(
+      path, relativeTo: fd, user: user, group: group, flags: flags,
+      retryOnInterrupt: retryOnInterrupt
+    ).get()
+  }
+
+  @usableFromInline
+  internal static func _setOwner(
+    _ path: UnsafePointer<CChar>,
+    relativeTo fd: FileDescriptor,
+    user: UserID?,
+    group: GroupID?,
+    flags: FilePath.ResolutionFlags,
+    retryOnInterrupt: Bool
+  ) -> Result<(), Errno> {
+    // An ID of -1 leaves the corresponding value unchanged.
+    let uid = user?.rawValue ?? CInterop.UserID(truncatingIfNeeded: -1)
+    let gid = group?.rawValue ?? CInterop.GroupID(truncatingIfNeeded: -1)
+    return nothingOrErrno(retryOnInterrupt: retryOnInterrupt) {
+      system_fchownat(fd.rawValue, path, uid, gid, flags.rawValue)
+    }
+  }
+}
+#endif // !os(WASI)
+
 #endif // !os(Windows)
