@@ -817,6 +817,16 @@ internal func system_getgid() -> CInterop.GroupID {
 internal func system_getegid() -> CInterop.GroupID {
   return getegid()
 }
+
+internal func system_getgroups(
+  _ size: CInt,
+  _ list: UnsafeMutablePointer<gid_t>
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(size, list) }
+#endif
+  return getgroups(size, list)
+}
 #endif // !os(Windows) && !os(WASI)
 
 // These return an error number rather than setting errno.

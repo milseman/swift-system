@@ -47,6 +47,15 @@ private struct IdentifiersTests {
   }
 
   @available(System 199, *)
+  @Test func supplementaryGroupIDs() throws {
+    let count = getgroups(0, nil)
+    var groups = [gid_t](repeating: 0, count: Int(max(count, 0)))
+    let filled = Int(max(getgroups(count, &groups), 0))
+    let supplementary = try GroupID.supplementary()
+    #expect(supplementary.map(\.rawValue).sorted() == groups.prefix(filled).sorted())
+  }
+
+  @available(System 199, *)
   @Test func newFilesUseEffectiveUserID() throws {
     try withTemporaryFilePath(basename: "Identifiers_newFiles") { path in
       let file = path.appending("file")

@@ -59,6 +59,26 @@ final class UserDatabaseTest: XCTestCase {
   }
 
   @available(System 199, *)
+  func testSupplementaryGroupsSyscall() throws {
+    let getgroups = MockTestCase(
+      name: "getgroups", .noInterrupt, GroupID._initialSupplementaryCapacity, Wildcard()
+    ) { _ in
+      _ = try GroupID.supplementary()
+    }
+    getgroups.runAllTests()
+
+    // EINVAL means the buffer was too small, so it retries with a larger one.
+    try MockingDriver.withMockingEnabled { mocking in
+      mocking.forceErrno = .counted(errno: EINVAL, count: 1)
+      XCTAssertEqual(try GroupID.supplementary(), [])
+      let capacity = GroupID._initialSupplementaryCapacity
+      XCTAssertEqual(mocking.trace.dequeue()?.arguments[0], AnyHashable(capacity))
+      XCTAssertEqual(mocking.trace.dequeue()?.arguments[0], AnyHashable(capacity * 4))
+      XCTAssertNil(mocking.trace.dequeue())
+    }
+  }
+
+  @available(System 199, *)
   func testBufferGrowth() throws {
     // ERANGE means the buffer was too small, so the lookup retries with
     // a larger one until it reaches the maximum.
