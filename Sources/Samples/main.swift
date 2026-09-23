@@ -18,6 +18,11 @@ struct SystemSamples: ParsableCommand {
       ReverseResolve.self,
       Connect.self,
       Listen.self,
+      OwnedCat.self,
+      OwnedCopy.self,
+      OwnedRedirect.self,
+      OwnedPoll.self,
+      OwnedLines.self,
     ])
 }
 
