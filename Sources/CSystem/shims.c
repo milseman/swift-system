@@ -21,13 +21,14 @@
 #ifdef __linux__
 #define _GNU_SOURCE
 #include <CSystemLinux.h>
+#include <sys/ioctl.h>
 
 // Terminal ioctl shims for Linux
-int _system_ioctl_TIOCGWINSZ(int fd, struct winsize *ws) {
+int _system_ioctl_TIOCGWINSZ(int fd, void *ws) {
   return ioctl(fd, TIOCGWINSZ, ws);
 }
 
-int _system_ioctl_TIOCSWINSZ(int fd, const struct winsize *ws) {
+int _system_ioctl_TIOCSWINSZ(int fd, const void *ws) {
   return ioctl(fd, TIOCSWINSZ, ws);
 }
 
