@@ -25,6 +25,7 @@ struct SystemSamples: ParsableCommand {
       OwnedLines.self,
       PIDFile.self,
       SocketPair.self,
+      AtomicWrite.self,
     ])
 }
 
