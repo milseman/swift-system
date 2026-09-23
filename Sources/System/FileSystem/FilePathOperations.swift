@@ -471,4 +471,148 @@ extension FilePath {
   }
 }
 
+// MARK: - rename, renameat
+
+@available(System 199, *)
+extension FilePath {
+  /// Renames the file at this path.
+  ///
+  /// - Parameters:
+  ///   - newPath: The new location of the file.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// If a file already exists at `newPath`, it is replaced.
+  /// Both paths must be on the same file system.
+  ///
+  /// The corresponding C function is `rename`.
+  @_alwaysEmitIntoClient
+  public func rename(
+    to newPath: FilePath,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try withPlatformString { old in
+      newPath.withPlatformString { new in
+        FilePath._rename(old, to: new, retryOnInterrupt: retryOnInterrupt)
+      }
+    }.get()
+  }
+
+  /// Renames the file at the given path.
+  ///
+  /// - Parameters:
+  ///   - oldPath: The current location of the file.
+  ///   - newPath: The new location of the file.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// If a file already exists at `newPath`, it is replaced.
+  /// Both paths must be on the same file system.
+  ///
+  /// The corresponding C function is `rename`.
+  @_alwaysEmitIntoClient
+  public static func rename(
+    _ oldPath: UnsafePointer<CChar>,
+    to newPath: UnsafePointer<CChar>,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try _rename(oldPath, to: newPath, retryOnInterrupt: retryOnInterrupt).get()
+  }
+
+  @usableFromInline
+  internal static func _rename(
+    _ oldPath: UnsafePointer<CChar>,
+    to newPath: UnsafePointer<CChar>,
+    retryOnInterrupt: Bool
+  ) -> Result<(), Errno> {
+    nothingOrErrno(retryOnInterrupt: retryOnInterrupt) {
+      system_rename(oldPath, newPath)
+    }
+  }
+
+  /// Renames the file at this path,
+  /// resolving relative paths against directories.
+  ///
+  /// - Parameters:
+  ///   - fd: The directory against which this path is resolved, if relative.
+  ///   - newPath: The new location of the file.
+  ///   - newFD: The directory against which `newPath` is resolved, if relative.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// If a file already exists at `newPath`, it is replaced.
+  /// Both paths must be on the same file system.
+  ///
+  /// An absolute path ignores its directory argument.
+  ///
+  /// The corresponding C function is `renameat`.
+  @_alwaysEmitIntoClient
+  public func rename(
+    relativeTo fd: FileDescriptor,
+    to newPath: FilePath,
+    relativeTo newFD: FileDescriptor,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try withPlatformString { old in
+      newPath.withPlatformString { new in
+        FilePath._rename(
+          old, relativeTo: fd, to: new, relativeTo: newFD,
+          retryOnInterrupt: retryOnInterrupt)
+      }
+    }.get()
+  }
+
+  /// Renames the file at the given path,
+  /// resolving relative paths against directories.
+  ///
+  /// - Parameters:
+  ///   - oldPath: The current location of the file.
+  ///   - fd: The directory against which `oldPath` is resolved, if relative.
+  ///   - newPath: The new location of the file.
+  ///   - newFD: The directory against which `newPath` is resolved, if relative.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// If a file already exists at `newPath`, it is replaced.
+  /// Both paths must be on the same file system.
+  ///
+  /// An absolute path ignores its directory argument.
+  ///
+  /// The corresponding C function is `renameat`.
+  @_alwaysEmitIntoClient
+  public static func rename(
+    _ oldPath: UnsafePointer<CChar>,
+    relativeTo fd: FileDescriptor,
+    to newPath: UnsafePointer<CChar>,
+    relativeTo newFD: FileDescriptor,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try _rename(
+      oldPath, relativeTo: fd, to: newPath, relativeTo: newFD,
+      retryOnInterrupt: retryOnInterrupt
+    ).get()
+  }
+
+  @usableFromInline
+  internal static func _rename(
+    _ oldPath: UnsafePointer<CChar>,
+    relativeTo fd: FileDescriptor,
+    to newPath: UnsafePointer<CChar>,
+    relativeTo newFD: FileDescriptor,
+    retryOnInterrupt: Bool
+  ) -> Result<(), Errno> {
+    nothingOrErrno(retryOnInterrupt: retryOnInterrupt) {
+      system_renameat(fd.rawValue, oldPath, newFD.rawValue, newPath)
+    }
+  }
+}
+
 #endif // !os(Windows)

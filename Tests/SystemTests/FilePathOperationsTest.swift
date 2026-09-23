@@ -107,6 +107,38 @@ final class FilePathOperationsTest: XCTestCase {
           try FilePath.unlink($0, relativeTo: dir, retryOnInterrupt: retryOnInterrupt)
         }
       },
+
+      MockTestCase(name: "rename", .interruptable, "a path", "new path") {
+        retryOnInterrupt in
+        try path.rename(to: "new path", retryOnInterrupt: retryOnInterrupt)
+      },
+
+      MockTestCase(name: "rename", .interruptable, "a path", "new path") {
+        retryOnInterrupt in
+        try "a path".withCString { old in
+          try "new path".withCString { new in
+            try FilePath.rename(old, to: new, retryOnInterrupt: retryOnInterrupt)
+          }
+        }
+      },
+
+      MockTestCase(name: "renameat", .interruptable, 42, "a path", 43, "new path") {
+        retryOnInterrupt in
+        try path.rename(
+          relativeTo: dir, to: "new path", relativeTo: FileDescriptor(rawValue: 43),
+          retryOnInterrupt: retryOnInterrupt)
+      },
+
+      MockTestCase(name: "renameat", .interruptable, 42, "a path", 43, "new path") {
+        retryOnInterrupt in
+        try "a path".withCString { old in
+          try "new path".withCString { new in
+            try FilePath.rename(
+              old, relativeTo: dir, to: new, relativeTo: FileDescriptor(rawValue: 43),
+              retryOnInterrupt: retryOnInterrupt)
+          }
+        }
+      },
     ]
 
     for test in syscallTestCases { test.runAllTests() }
@@ -263,6 +295,76 @@ final class FilePathOperationsTest: XCTestCase {
           XCTAssertEqual($0 as? Errno, Errno(rawValue: ENOTCAPABLE))
         }
         #endif
+      }
+    }
+  }
+
+  @available(System 199, *)
+  func testRename() throws {
+    try withTemporaryFilePath(basename: "testRename") { path in
+      func write(_ contents: String, to name: String) throws {
+        let fd = try FileDescriptor.open(
+          path.appending(name), .writeOnly, options: [.create, .truncate],
+          permissions: .ownerReadWrite)
+        try fd.closeAfter { _ = try fd.writeAll(contents.utf8) }
+      }
+      func contents(of name: String) throws -> String {
+        let fd = try FileDescriptor.open(path.appending(name), .readOnly)
+        return try fd.closeAfter {
+          let bytes = try Array<UInt8>(unsafeUninitializedCapacity: 16) { buf, count in
+            count = try fd.read(into: UnsafeMutableRawBufferPointer(buf))
+          }
+          return String(decoding: bytes, as: UTF8.self)
+        }
+      }
+      func exists(_ name: String) -> Bool {
+        (try? path.appending(name).stat(followTargetSymlink: false)) != nil
+      }
+
+      try write("a", to: "a")
+      try path.appending("a").rename(to: path.appending("b"))
+      XCTAssertFalse(exists("a"))
+      XCTAssertEqual(try contents(of: "b"), "a")
+
+      // Renaming replaces an existing file.
+      try write("c", to: "c")
+      try path.appending("c").withCString { old in
+        try path.appending("b").withCString { new in
+          try FilePath.rename(old, to: new)
+        }
+      }
+      XCTAssertFalse(exists("c"))
+      XCTAssertEqual(try contents(of: "b"), "c")
+
+      XCTAssertThrowsError(try path.appending("a").rename(to: path.appending("d"))) {
+        XCTAssertEqual($0 as? Errno, .noSuchFileOrDirectory)
+      }
+
+      try path.appending("one").makeDirectory(permissions: .ownerReadWriteExecute)
+      try path.appending("two").makeDirectory(permissions: .ownerReadWriteExecute)
+      let one = try FileDescriptor.open(path.appending("one"), .readOnly, options: .directory)
+      try one.closeAfter {
+        let two = try FileDescriptor.open(path.appending("two"), .readOnly, options: .directory)
+        try two.closeAfter {
+          try write("e", to: "one/e")
+          try FilePath("e").rename(relativeTo: one, to: "f", relativeTo: two)
+          XCTAssertFalse(exists("one/e"))
+          XCTAssertEqual(try contents(of: "two/f"), "e")
+
+          try "f".withCString { old in
+            try "g".withCString { new in
+              try FilePath.rename(old, relativeTo: two, to: new, relativeTo: one)
+            }
+          }
+          XCTAssertFalse(exists("two/f"))
+          XCTAssertEqual(try contents(of: "one/g"), "e")
+
+          XCTAssertThrowsError(
+            try FilePath("f").rename(relativeTo: two, to: "h", relativeTo: one)
+          ) {
+            XCTAssertEqual($0 as? Errno, .noSuchFileOrDirectory)
+          }
+        }
       }
     }
   }

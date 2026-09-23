@@ -300,6 +300,34 @@ internal func system_unlink(
   return unlink(path)
 }
 
+internal func system_rename(
+  _ old: UnsafePointer<CInterop.PlatformChar>,
+  _ new: UnsafePointer<CInterop.PlatformChar>
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled {
+    return _mock(path: old, String(_errorCorrectingPlatformString: new))
+  }
+#endif
+  return rename(old, new)
+}
+
+internal func system_renameat(
+  _ oldFD: CInt,
+  _ old: UnsafePointer<CInterop.PlatformChar>,
+  _ newFD: CInt,
+  _ new: UnsafePointer<CInterop.PlatformChar>
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled {
+    return _mock(
+      oldFD, String(_errorCorrectingPlatformString: old),
+      newFD, String(_errorCorrectingPlatformString: new))
+  }
+#endif
+  return renameat(oldFD, old, newFD, new)
+}
+
 internal func system_fdopendir(
   _ fd: CInt
 ) -> system_DIRPtr? {
