@@ -166,6 +166,7 @@ public struct TerminalAttributes: RawRepresentable, Equatable, Hashable, Sendabl
 
 // MARK: - SetAction
 
+@available(System 199, *)
 extension TerminalAttributes {
   /// Specifies when to apply terminal attribute changes.
   @frozen

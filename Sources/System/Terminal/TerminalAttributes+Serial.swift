@@ -11,6 +11,7 @@
 
 // MARK: - Serial Port Conveniences
 
+@available(System 199, *)
 extension TerminalAttributes {
   /// The number of data bits per character.
   @frozen
