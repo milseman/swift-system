@@ -24,6 +24,7 @@ struct SystemSamples: ParsableCommand {
       OwnedPoll.self,
       OwnedLines.self,
       PIDFile.self,
+      SocketPair.self,
     ])
 }
 
