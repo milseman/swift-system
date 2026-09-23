@@ -782,6 +782,14 @@ internal var _W_OK: CInt { W_OK }
 @_alwaysEmitIntoClient
 internal var _X_OK: CInt { X_OK }
 
+// MARK: - File Times
+
+@_alwaysEmitIntoClient
+internal var _UTIME_NOW: Int { Int(UTIME_NOW) }
+
+@_alwaysEmitIntoClient
+internal var _UTIME_OMIT: Int { Int(UTIME_OMIT) }
+
 // MARK: - Rename Flags
 
 #if SYSTEM_PACKAGE_DARWIN

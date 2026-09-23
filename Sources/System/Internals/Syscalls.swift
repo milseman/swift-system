@@ -581,6 +581,37 @@ internal func system_faccessat(
   return faccessat(fd, path, mode, flag)
 }
 
+@available(macOS 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *)
+internal func system_futimens(
+  _ fd: CInt,
+  _ times: UnsafePointer<timespec>
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled {
+    return _mock(
+      fd, times[0].tv_sec, times[0].tv_nsec, times[1].tv_sec, times[1].tv_nsec)
+  }
+#endif
+  return futimens(fd, times)
+}
+
+@available(macOS 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *)
+internal func system_utimensat(
+  _ fd: CInt,
+  _ path: UnsafePointer<CInterop.PlatformChar>,
+  _ times: UnsafePointer<timespec>,
+  _ flag: CInt
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled {
+    return _mock(
+      fd, String(_errorCorrectingPlatformString: path),
+      times[0].tv_sec, times[0].tv_nsec, times[1].tv_sec, times[1].tv_nsec, flag)
+  }
+#endif
+  return utimensat(fd, path, times, flag)
+}
+
 internal func system_getcwd(
   _ buffer: UnsafeMutablePointer<CInterop.PlatformChar>,
   _ size: Int
