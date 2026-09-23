@@ -673,6 +673,9 @@ internal var _AT_SYMLINK_FOLLOW: CInt { AT_SYMLINK_FOLLOW }
 @_alwaysEmitIntoClient
 internal var _AT_REMOVEDIR: CInt { AT_REMOVEDIR }
 
+@_alwaysEmitIntoClient
+internal var _AT_EACCESS: CInt { AT_EACCESS }
+
 #if SYSTEM_PACKAGE_DARWIN
 @_alwaysEmitIntoClient
 internal var _AT_SYMLINK_NOFOLLOW_ANY: CInt { AT_SYMLINK_NOFOLLOW_ANY }
@@ -682,6 +685,17 @@ internal var _AT_SYMLINK_NOFOLLOW_ANY: CInt { AT_SYMLINK_NOFOLLOW_ANY }
 @_alwaysEmitIntoClient
 internal var _AT_RESOLVE_BENEATH: CInt { AT_RESOLVE_BENEATH }
 #endif
+
+// MARK: - access Modes
+
+@_alwaysEmitIntoClient
+internal var _R_OK: CInt { R_OK }
+
+@_alwaysEmitIntoClient
+internal var _W_OK: CInt { W_OK }
+
+@_alwaysEmitIntoClient
+internal var _X_OK: CInt { X_OK }
 
 // MARK: - File Mode / File Type
 

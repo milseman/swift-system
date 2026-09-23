@@ -469,6 +469,30 @@ internal func system_truncate(
   return truncate(path, length)
 }
 
+internal func system_access(
+  _ path: UnsafePointer<CInterop.PlatformChar>,
+  _ mode: CInt
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(path: path, mode) }
+#endif
+  return access(path, mode)
+}
+
+internal func system_faccessat(
+  _ fd: CInt,
+  _ path: UnsafePointer<CInterop.PlatformChar>,
+  _ mode: CInt,
+  _ flag: CInt
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled {
+    return _mock(fd, String(_errorCorrectingPlatformString: path), mode, flag)
+  }
+#endif
+  return faccessat(fd, path, mode, flag)
+}
+
 #if !os(WASI)
 internal func system_chmod(
   _ path: UnsafePointer<CInterop.PlatformChar>,

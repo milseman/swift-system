@@ -246,6 +246,34 @@ final class FilePathOperationsTest: XCTestCase {
         }
       },
 
+      MockTestCase(name: "access", .interruptable, "a path", R_OK | W_OK) {
+        retryOnInterrupt in
+        try path.checkAccess([.read, .write], retryOnInterrupt: retryOnInterrupt)
+      },
+
+      MockTestCase(name: "access", .interruptable, "a path", F_OK) { retryOnInterrupt in
+        try "a path".withCString {
+          try FilePath.checkAccess($0, retryOnInterrupt: retryOnInterrupt)
+        }
+      },
+
+      MockTestCase(
+        name: "faccessat", .interruptable,
+        42, "a path", X_OK, AT_EACCESS | AT_SYMLINK_NOFOLLOW
+      ) { retryOnInterrupt in
+        try path.checkAccess(
+          .execute, relativeTo: dir, flags: .symlinkNoFollow, useEffectiveIDs: true,
+          retryOnInterrupt: retryOnInterrupt)
+      },
+
+      MockTestCase(name: "faccessat", .interruptable, 42, "a path", R_OK, 0) {
+        retryOnInterrupt in
+        try "a path".withCString {
+          try FilePath.checkAccess(
+            $0, .read, relativeTo: dir, retryOnInterrupt: retryOnInterrupt)
+        }
+      },
+
       MockTestCase(name: "chmod", .interruptable, "a path", 0o644) { retryOnInterrupt in
         try path.setPermissions(
           [.ownerReadWrite, .groupRead, .otherRead], retryOnInterrupt: retryOnInterrupt)
@@ -791,6 +819,57 @@ final class FilePathOperationsTest: XCTestCase {
       }
       XCTAssertThrowsError(try path.resize(to: 0)) {
         XCTAssertEqual($0 as? Errno, .isDirectory)
+      }
+    }
+  }
+
+  @available(System 199, *)
+  func testCheckAccess() throws {
+    XCTAssertEqual(FilePath.Access.read.rawValue, R_OK)
+    XCTAssertEqual(FilePath.Access.write.rawValue, W_OK)
+    XCTAssertEqual(FilePath.Access.execute.rawValue, X_OK)
+    XCTAssertEqual(FilePath.Access().rawValue, F_OK)
+
+    try withTemporaryFilePath(basename: "testCheckAccess") { path in
+      let file = path.appending("file")
+      let fd = try FileDescriptor.open(
+        file, .writeOnly, options: .create, permissions: .ownerReadWrite)
+      try fd.close()
+
+      try file.checkAccess()
+      try file.checkAccess(.read)
+      try file.withCString { try FilePath.checkAccess($0, [.read, .write]) }
+      try path.checkAccess([.read, .write, .execute])
+      XCTAssertThrowsError(try path.appending("missing").checkAccess()) {
+        XCTAssertEqual($0 as? Errno, .noSuchFileOrDirectory)
+      }
+      #if !os(WASI) // WASI has no permissions
+      // Even root needs an execute bit to execute a file.
+      XCTAssertThrowsError(try file.checkAccess(.execute)) {
+        XCTAssertEqual($0 as? Errno, .permissionDenied)
+      }
+      #endif
+
+      let dir = try FileDescriptor.open(path, .readOnly, options: .directory)
+      try dir.closeAfter {
+        try FilePath("file").checkAccess(relativeTo: dir)
+        try FilePath("file").checkAccess(
+          [.read, .write], relativeTo: dir, useEffectiveIDs: true)
+        try "file".withCString {
+          try FilePath.checkAccess($0, .read, relativeTo: dir)
+        }
+        XCTAssertThrowsError(try FilePath("missing").checkAccess(relativeTo: dir)) {
+          XCTAssertEqual($0 as? Errno, .noSuchFileOrDirectory)
+        }
+
+        // A dangling symbolic link exists only if it isn't followed.
+        try path.appending("dangling").makeSymbolicLink(to: "missing")
+        XCTAssertThrowsError(try FilePath("dangling").checkAccess(relativeTo: dir)) {
+          XCTAssertEqual($0 as? Errno, .noSuchFileOrDirectory)
+        }
+        #if SYSTEM_PACKAGE_DARWIN
+        try FilePath("dangling").checkAccess(relativeTo: dir, flags: .symlinkNoFollow)
+        #endif
       }
     }
   }

@@ -1154,6 +1154,217 @@ extension FilePath {
   }
 }
 
+// MARK: - access, faccessat
+
+@available(System 199, *)
+extension FilePath {
+  /// The kinds of access to a file that can be checked.
+  ///
+  /// The empty set checks only that the file exists.
+  /// The corresponding C constant is `F_OK`.
+  @frozen
+  public struct Access: OptionSet, Sendable, Hashable, Codable {
+    /// The raw C access mode.
+    @_alwaysEmitIntoClient
+    public let rawValue: CInt
+
+    /// Creates a strongly-typed `FilePath.Access` from a raw C access mode.
+    @_alwaysEmitIntoClient
+    public init(rawValue: CInt) { self.rawValue = rawValue }
+
+    /// Permission to read the file.
+    ///
+    /// The corresponding C constant is `R_OK`.
+    @_alwaysEmitIntoClient
+    public static var read: Access { Access(rawValue: _R_OK) }
+
+    /// Permission to write to the file.
+    ///
+    /// The corresponding C constant is `W_OK`.
+    @_alwaysEmitIntoClient
+    public static var write: Access { Access(rawValue: _W_OK) }
+
+    /// Permission to execute the file or, for a directory, to search it.
+    ///
+    /// The corresponding C constant is `X_OK`.
+    @_alwaysEmitIntoClient
+    public static var execute: Access { Access(rawValue: _X_OK) }
+  }
+
+  /// Checks whether the calling process can access the file at this path.
+  ///
+  /// - Parameters:
+  ///   - access: The kinds of access to check for.
+  ///     The default, an empty set, checks only that the file exists.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// This method returns normally if every requested kind of access
+  /// is allowed, and otherwise throws the reason it isn't,
+  /// such as ``Errno/permissionDenied`` or ``Errno/noSuchFileOrDirectory``.
+  ///
+  /// The check uses the process's real user and group IDs,
+  /// not its effective ones.
+  /// The result can be out of date as soon as this method returns;
+  /// to avoid a race, attempt the operation itself and handle its error.
+  ///
+  /// The corresponding C function is `access`.
+  @_alwaysEmitIntoClient
+  public func checkAccess(
+    _ access: FilePath.Access = [],
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try withPlatformString {
+      FilePath._checkAccess($0, access, retryOnInterrupt: retryOnInterrupt)
+    }.get()
+  }
+
+  /// Checks whether the calling process can access the file at the given path.
+  ///
+  /// - Parameters:
+  ///   - path: The location of the file.
+  ///   - access: The kinds of access to check for.
+  ///     The default, an empty set, checks only that the file exists.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// This method returns normally if every requested kind of access
+  /// is allowed, and otherwise throws the reason it isn't,
+  /// such as ``Errno/permissionDenied`` or ``Errno/noSuchFileOrDirectory``.
+  ///
+  /// The check uses the process's real user and group IDs,
+  /// not its effective ones.
+  /// The result can be out of date as soon as this method returns;
+  /// to avoid a race, attempt the operation itself and handle its error.
+  ///
+  /// The corresponding C function is `access`.
+  @_alwaysEmitIntoClient
+  public static func checkAccess(
+    _ path: UnsafePointer<CChar>,
+    _ access: FilePath.Access = [],
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try _checkAccess(path, access, retryOnInterrupt: retryOnInterrupt).get()
+  }
+
+  @usableFromInline
+  internal static func _checkAccess(
+    _ path: UnsafePointer<CChar>,
+    _ access: FilePath.Access,
+    retryOnInterrupt: Bool
+  ) -> Result<(), Errno> {
+    nothingOrErrno(retryOnInterrupt: retryOnInterrupt) {
+      system_access(path, access.rawValue)
+    }
+  }
+
+  /// Checks whether the calling process can access the file at this path,
+  /// resolving a relative path against a directory.
+  ///
+  /// - Parameters:
+  ///   - access: The kinds of access to check for.
+  ///     The default, an empty set, checks only that the file exists.
+  ///   - fd: The directory against which a relative path is resolved.
+  ///   - flags: Options that control how the path is resolved.
+  ///   - useEffectiveIDs: Whether to check using the process's
+  ///     effective user and group IDs, rather than its real ones.
+  ///     The default is `false`.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// This method returns normally if every requested kind of access
+  /// is allowed, and otherwise throws the reason it isn't,
+  /// such as ``Errno/permissionDenied`` or ``Errno/noSuchFileOrDirectory``.
+  ///
+  /// The result can be out of date as soon as this method returns;
+  /// to avoid a race, attempt the operation itself and handle its error.
+  ///
+  /// If this path is absolute (starts with a forward slash), then `fd` is ignored.
+  /// If this path is relative, it is resolved against the directory given by `fd`.
+  ///
+  /// The corresponding C function is `faccessat`.
+  /// Passing `true` for `useEffectiveIDs` passes the `AT_EACCESS` flag.
+  @_alwaysEmitIntoClient
+  public func checkAccess(
+    _ access: FilePath.Access = [],
+    relativeTo fd: FileDescriptor,
+    flags: FilePath.ResolutionFlags = [],
+    useEffectiveIDs: Bool = false,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try withPlatformString {
+      FilePath._checkAccess(
+        $0, access, relativeTo: fd, flags: flags, useEffectiveIDs: useEffectiveIDs,
+        retryOnInterrupt: retryOnInterrupt)
+    }.get()
+  }
+
+  /// Checks whether the calling process can access the file at the given path,
+  /// resolving a relative path against a directory.
+  ///
+  /// - Parameters:
+  ///   - path: The location of the file.
+  ///   - access: The kinds of access to check for.
+  ///     The default, an empty set, checks only that the file exists.
+  ///   - fd: The directory against which a relative `path` is resolved.
+  ///   - flags: Options that control how `path` is resolved.
+  ///   - useEffectiveIDs: Whether to check using the process's
+  ///     effective user and group IDs, rather than its real ones.
+  ///     The default is `false`.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// This method returns normally if every requested kind of access
+  /// is allowed, and otherwise throws the reason it isn't,
+  /// such as ``Errno/permissionDenied`` or ``Errno/noSuchFileOrDirectory``.
+  ///
+  /// The result can be out of date as soon as this method returns;
+  /// to avoid a race, attempt the operation itself and handle its error.
+  ///
+  /// If `path` is absolute (starts with a forward slash), then `fd` is ignored.
+  /// If `path` is relative, it is resolved against the directory given by `fd`.
+  ///
+  /// The corresponding C function is `faccessat`.
+  /// Passing `true` for `useEffectiveIDs` passes the `AT_EACCESS` flag.
+  @_alwaysEmitIntoClient
+  public static func checkAccess(
+    _ path: UnsafePointer<CChar>,
+    _ access: FilePath.Access = [],
+    relativeTo fd: FileDescriptor,
+    flags: FilePath.ResolutionFlags = [],
+    useEffectiveIDs: Bool = false,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try _checkAccess(
+      path, access, relativeTo: fd, flags: flags, useEffectiveIDs: useEffectiveIDs,
+      retryOnInterrupt: retryOnInterrupt
+    ).get()
+  }
+
+  @usableFromInline
+  internal static func _checkAccess(
+    _ path: UnsafePointer<CChar>,
+    _ access: FilePath.Access,
+    relativeTo fd: FileDescriptor,
+    flags: FilePath.ResolutionFlags,
+    useEffectiveIDs: Bool,
+    retryOnInterrupt: Bool
+  ) -> Result<(), Errno> {
+    let flag = useEffectiveIDs ? flags.rawValue | _AT_EACCESS : flags.rawValue
+    return nothingOrErrno(retryOnInterrupt: retryOnInterrupt) {
+      system_faccessat(fd.rawValue, path, access.rawValue, flag)
+    }
+  }
+}
+
 // MARK: - chmod, lchmod, fchmodat
 
 #if !os(WASI)
