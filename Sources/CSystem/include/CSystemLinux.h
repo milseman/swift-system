@@ -11,6 +11,7 @@
 
 #include <sys/epoll.h>
 #include <sys/eventfd.h>
+#include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/sysinfo.h>
 #include <sys/timerfd.h>
@@ -18,7 +19,13 @@
 #include <errno.h>
 #include <pthread.h>
 #include <sched.h>
+#include <termios.h>
 #include <unistd.h>
 #include "io_uring.h"
+
+// Terminal ioctl shims
+int _system_ioctl_TIOCGWINSZ(int fd, struct winsize *ws);
+int _system_ioctl_TIOCSWINSZ(int fd, const struct winsize *ws);
+
 #endif
 
