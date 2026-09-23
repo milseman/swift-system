@@ -195,7 +195,11 @@ extension SocketDescriptor {
     public static var maxSegmentSize: TCPOption { TCPOption(rawValue: TCP_MAXSEG) }
 
     #if SYSTEM_PACKAGE_DARWIN || os(Linux)
-    /// Keep alive idle time.
+    /// The time a connection is idle, in seconds,
+    /// before TCP sends the first keepalive probe.
+    ///
+    /// The keepalive options take effect
+    /// when ``SocketDescriptor/SocketOption/keepAlive`` is enabled.
     ///
     /// The corresponding C constant is `TCP_KEEPIDLE` on Linux
     /// or `TCP_KEEPALIVE` on Darwin.
@@ -210,13 +214,18 @@ extension SocketDescriptor {
     #endif
 
     #if SYSTEM_PACKAGE_DARWIN || os(Linux)
-    /// Keep alive interval.
+    /// The time between keepalive probes, in seconds,
+    /// while the peer doesn't answer.
     ///
     /// The corresponding C constant is `TCP_KEEPINTVL`.
     @_alwaysEmitIntoClient
     public static var keepAliveInterval: TCPOption { TCPOption(rawValue: TCP_KEEPINTVL) }
 
-    /// Keep alive probe count.
+    /// The number of unanswered keepalive probes
+    /// after which TCP drops the connection.
+    ///
+    /// The valid range varies by platform;
+    /// Darwin and Linux both reject a negative value.
     ///
     /// The corresponding C constant is `TCP_KEEPCNT`.
     @_alwaysEmitIntoClient

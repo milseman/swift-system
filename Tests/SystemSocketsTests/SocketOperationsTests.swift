@@ -32,7 +32,7 @@ private struct SocketOperationsTests {
   // MARK: - Bind Tests
 
   @available(System 199, *)
-  @Test func bindToAnyPort() throws {
+  @Test(.requiresSocketBinding) func bindToAnyPort() throws {
     let socket = try SocketDescriptor.open(.ipv4, .stream, protocol: .tcp)
     defer { try? socket.close() }
 
@@ -47,7 +47,7 @@ private struct SocketOperationsTests {
   }
 
   @available(System 199, *)
-  @Test func bindToLoopback() throws {
+  @Test(.requiresSocketBinding) func bindToLoopback() throws {
     let socket = try SocketDescriptor.open(.ipv4, .stream, protocol: .tcp)
     defer { try? socket.close() }
 
@@ -62,7 +62,7 @@ private struct SocketOperationsTests {
   // MARK: - Listen Tests
 
   @available(System 199, *)
-  @Test func listenWithDefaultBacklog() throws {
+  @Test(.requiresSocketBinding) func listenWithDefaultBacklog() throws {
     let socket = try SocketDescriptor.open(.ipv4, .stream, protocol: .tcp)
     defer { try? socket.close() }
 
@@ -74,7 +74,7 @@ private struct SocketOperationsTests {
   // MARK: - Connect and Accept Tests
 
   @available(System 199, *)
-  @Test func tcpConnectAndAccept() throws {
+  @Test(.requiresSocketBinding) func tcpConnectAndAccept() throws {
     // Create server socket
     let server = try SocketDescriptor.open(.ipv4, .stream, protocol: .tcp)
     defer { try? server.close() }
@@ -107,7 +107,7 @@ private struct SocketOperationsTests {
   // MARK: - Send and Receive Tests
 
   @available(System 199, *)
-  @Test func tcpSendReceive() throws {
+  @Test(.requiresSocketBinding) func tcpSendReceive() throws {
     // Create server socket
     let server = try SocketDescriptor.open(.ipv4, .stream, protocol: .tcp)
     defer { try? server.close() }
@@ -153,7 +153,7 @@ private struct SocketOperationsTests {
   // MARK: - UDP Tests
 
   @available(System 199, *)
-  @Test func udpSendReceive() throws {
+  @Test(.requiresSocketBinding) func udpSendReceive() throws {
     // Create receiver socket
     let receiver = try SocketDescriptor.open(.ipv4, .datagram, protocol: .udp)
     defer { try? receiver.close() }

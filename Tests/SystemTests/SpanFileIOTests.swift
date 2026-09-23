@@ -386,9 +386,12 @@ private struct SpanFileIOTests {
 
   @available(macOS 15, iOS 18, watchOS 11, tvOS 18, visionOS 2, *)
   @Test func errorHandling() throws {
-    // Test 1: Reading from closed FD
-    let fd1 = try FileDescriptor.open(FilePath("/dev/null"), .readOnly)
-    try fd1.close()
+    // Tests 1 and 2 use an invalid FD rather than a closed one: Swift Testing
+    // runs tests in parallel, so another test can open a descriptor that
+    // reuses a closed FD's number, and then the read or write reaches it.
+
+    // Test 1: Reading from an invalid FD
+    let fd1 = FileDescriptor(rawValue: -1)
 
     #expect(throws: Errno.badFileDescriptor) {
       let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 10, alignment: 1)
@@ -397,9 +400,8 @@ private struct SpanFileIOTests {
       _ = try fd1.read(into: &output)
     }
 
-    // Test 2: Writing to closed FD
-    let fd2 = try FileDescriptor.open(FilePath("/dev/null"), .writeOnly)
-    try fd2.close()
+    // Test 2: Writing to an invalid FD
+    let fd2 = FileDescriptor(rawValue: -1)
 
     let data: [UInt8] = [0x61, 0x62, 0x63]
     #expect(throws: Errno.badFileDescriptor) {

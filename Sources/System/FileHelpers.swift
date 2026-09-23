@@ -68,12 +68,13 @@ extension FileDescriptor {
 
   @_alwaysEmitIntoClient
   internal func _writeAllBuffer(
-    _ buffer: UnsafeRawBufferPointer
+    _ buffer: UnsafeRawBufferPointer,
+    retryOnInterrupt: Bool = true
   ) -> Result<Int, Errno> {
     var idx = 0
     while idx < buffer.count {
       switch _write(
-        UnsafeRawBufferPointer(rebasing: buffer[idx...]), retryOnInterrupt: true
+        UnsafeRawBufferPointer(rebasing: buffer[idx...]), retryOnInterrupt: retryOnInterrupt
       ) {
       case .success(let numBytes): idx += numBytes
       case .failure(let err): return .failure(err)
@@ -117,14 +118,15 @@ extension FileDescriptor {
 
   @_alwaysEmitIntoClient
   internal func _writeAllBuffer(
-    toAbsoluteOffset offset: Int64, _ buffer: UnsafeRawBufferPointer
+    toAbsoluteOffset offset: Int64, _ buffer: UnsafeRawBufferPointer,
+    retryOnInterrupt: Bool = true
   ) -> Result<Int, Errno> {
     var idx = 0
     while idx < buffer.count {
       switch _write(
         toAbsoluteOffset: offset + Int64(idx),
         UnsafeRawBufferPointer(rebasing: buffer[idx...]),
-        retryOnInterrupt: true
+        retryOnInterrupt: retryOnInterrupt
       ) {
       case .success(let numBytes): idx += numBytes
       case .failure(let err): return .failure(err)
@@ -157,7 +159,7 @@ extension FileDescriptor {
     retryOnInterrupt: Bool = true
   ) throws(Errno) -> Int {
     try data.withUnsafeBytes { buffer throws(Errno) -> Int in
-      try _writeAllBuffer(buffer).get()
+      try _writeAllBuffer(buffer, retryOnInterrupt: retryOnInterrupt).get()
     }
   }
 
@@ -185,7 +187,9 @@ extension FileDescriptor {
     retryOnInterrupt: Bool = true
   ) throws(Errno) -> Int {
     try data.withUnsafeBytes { buffer throws(Errno) -> Int in
-      try _writeAllBuffer(toAbsoluteOffset: offset, buffer).get()
+      try _writeAllBuffer(
+        toAbsoluteOffset: offset, buffer, retryOnInterrupt: retryOnInterrupt
+      ).get()
     }
   }
 

@@ -19,6 +19,7 @@ struct SystemSamples: ParsableCommand {
       ReverseResolve.self,
       Connect.self,
       Listen.self,
+      SocketPair.self,
       // Owned descriptor samples
       OwnedCat.self,
       OwnedCopy.self,
@@ -29,6 +30,10 @@ struct SystemSamples: ParsableCommand {
       PasswordReader.self,
       TerminalSize.self,
       RawMode.self,
+      // File and process samples
+      PIDFile.self,
+      AtomicWrite.self,
+      SetAttributes.self,
     ])
 }
 

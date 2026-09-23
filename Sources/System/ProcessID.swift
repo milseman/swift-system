@@ -31,13 +31,18 @@ public struct ProcessID: RawRepresentable, Sendable, Hashable, Codable {
 extension ProcessID {
   /// The process ID of the calling process.
   ///
-  /// The corresponding C function is `getpid()`.
+  /// The corresponding C function is `getpid`.
   @_alwaysEmitIntoClient
   public static var current: ProcessID { ProcessID(rawValue: _getpid()) }
 
   /// The process ID of the parent of the calling process.
   ///
-  /// The corresponding C function is `getppid()`.
+  /// If the parent process exits,
+  /// the system gives the calling process a new parent,
+  /// typically the system's init process,
+  /// so this value can change over the life of the process.
+  ///
+  /// The corresponding C function is `getppid`.
   @_alwaysEmitIntoClient
   public static var parent: ProcessID { ProcessID(rawValue: _getppid()) }
 
