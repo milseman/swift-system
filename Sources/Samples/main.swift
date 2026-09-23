@@ -35,6 +35,7 @@ struct SystemSamples: ParsableCommand {
       AtomicWrite.self,
       SetAttributes.self,
       Rename.self,
+      FIFO.self,
     ])
 }
 
