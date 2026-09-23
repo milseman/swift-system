@@ -493,7 +493,8 @@ final class FileOperationsTest: XCTestCase {
         try fd.setPermissions([.ownerRead, .groupRead])
         var s = stat()
         XCTAssertEqual(fstat(fd.rawValue, &s), 0)
-        XCTAssertEqual(FilePermissions(rawValue: s.st_mode & 0o7777), [.ownerRead, .groupRead])
+        XCTAssertEqual(
+          FilePermissions(rawValue: numericCast(s.st_mode & 0o7777)), [.ownerRead, .groupRead])
       }
     }
   }
