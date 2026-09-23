@@ -1080,6 +1080,17 @@ internal var __PC_MIN_HOLE_SIZE: CInt { CInt(_PC_MIN_HOLE_SIZE) }
 #endif
 #endif // !os(Windows) && !os(WASI)
 
+// MARK: - Process information
+
+// libproc is only in the macOS SDK.
+#if os(macOS)
+@_alwaysEmitIntoClient
+internal var _RUSAGE_INFO_V6: CInt { RUSAGE_INFO_V6 }
+
+@_alwaysEmitIntoClient
+internal var _PROC_PIDTASKINFO: CInt { PROC_PIDTASKINFO }
+#endif
+
 // MARK: - posix_fadvise
 
 #if os(Linux) || os(Android) || os(FreeBSD) || os(WASI)

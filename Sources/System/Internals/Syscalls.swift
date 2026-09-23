@@ -985,6 +985,34 @@ internal func system_getenv(
   return getenv(name)
 }
 
+// MARK: - Process information
+
+// libproc is only in the macOS SDK.
+#if os(macOS)
+internal func system_proc_pid_rusage(
+  _ pid: pid_t, _ flavor: CInt, _ buffer: UnsafeMutableRawPointer
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(pid, flavor, buffer) }
+#endif
+  // The C parameter is a `rusage_info_t *`, but the call fills the buffer
+  // it points to with the structure for `flavor`.
+  return proc_pid_rusage(pid, flavor, UnsafeMutablePointer(OpaquePointer(buffer)))
+}
+
+// Returns the number of bytes it fills, or 0 on failure, with errno set.
+internal func system_proc_pidinfo(
+  _ pid: pid_t, _ flavor: CInt, _ argument: UInt64,
+  _ buffer: UnsafeMutableRawPointer, _ size: CInt
+) -> CInt {
+#if ENABLE_MOCKING
+  // Reports success the way the call does, as filling the buffer.
+  if mockingEnabled { return _mock(pid, flavor, argument, buffer, size) == 0 ? size : 0 }
+#endif
+  return proc_pidinfo(pid, flavor, argument, buffer, size)
+}
+#endif // os(macOS)
+
 // MARK: - Terminal Control (termios)
 
 #if !os(Windows) && !os(WASI)

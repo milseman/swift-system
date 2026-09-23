@@ -22,8 +22,10 @@ add_library(SystemPackage
   OwnedFD.swift
   PlatformString.swift
   ProcessID.swift
+  ResourceUsageInfo.swift
   SystemConfig.swift
   SystemString.swift
+  TaskInfo.swift
   UserDatabase.swift
   Util.swift
   Util+StringArray.swift
