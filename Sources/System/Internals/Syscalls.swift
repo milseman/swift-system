@@ -280,6 +280,16 @@ internal func system_umask(
 }
 #endif // !os(WASI)
 
+#if !os(Windows) && !os(WASI)
+internal func system_getpid() -> CInterop.ProcessID {
+  return getpid()
+}
+
+internal func system_getppid() -> CInterop.ProcessID {
+  return getppid()
+}
+#endif // !os(Windows) && !os(WASI)
+
 internal func system_getenv(
   _ name: UnsafePointer<CChar>
 ) -> UnsafeMutablePointer<CChar>? {

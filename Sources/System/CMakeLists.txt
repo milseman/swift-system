@@ -16,6 +16,7 @@ add_library(SystemPackage
   FilePermissions.swift
   MachPort.swift
   PlatformString.swift
+  ProcessID.swift
   SystemString.swift
   Util.swift
   Util+StringArray.swift
