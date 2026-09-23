@@ -30,6 +30,13 @@ static inline int32_t _getConst_O_WRONLY(void) { return O_WRONLY; }
 static inline int32_t _getConst_EWOULDBLOCK(void) { return EWOULDBLOCK; }
 static inline int32_t _getConst_EOPNOTSUPP(void) { return EOPNOTSUPP; }
 
+static inline int32_t _getConst_POSIX_FADV_NORMAL(void) { return POSIX_FADV_NORMAL; }
+static inline int32_t _getConst_POSIX_FADV_SEQUENTIAL(void) { return POSIX_FADV_SEQUENTIAL; }
+static inline int32_t _getConst_POSIX_FADV_RANDOM(void) { return POSIX_FADV_RANDOM; }
+static inline int32_t _getConst_POSIX_FADV_WILLNEED(void) { return POSIX_FADV_WILLNEED; }
+static inline int32_t _getConst_POSIX_FADV_DONTNEED(void) { return POSIX_FADV_DONTNEED; }
+static inline int32_t _getConst_POSIX_FADV_NOREUSE(void) { return POSIX_FADV_NOREUSE; }
+
 static inline uint8_t _getConst_DT_DIR(void) { return DT_DIR; }
 
 // Modified dirent struct that can be imported to Swift

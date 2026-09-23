@@ -86,4 +86,60 @@ class UtilTests: XCTestCase {
     }
     check(girls) // UTF-16 Cocoa strings
   }
+
+  @available(System 0.0.1, *)
+  func testNothingOrReturnedErrno() {
+    // A call that returns 0 succeeds, once.
+    var calls = 0
+    XCTAssertNoThrow(try nothingOrReturnedErrno(retryOnInterrupt: true) {
+      calls += 1
+      return 0
+    }.get())
+    XCTAssertEqual(calls, 1)
+
+    // A nonzero return is the error, and errno is ignored.
+    calls = 0
+    Errno.current = .notPermitted
+    XCTAssertThrowsError(try nothingOrReturnedErrno(retryOnInterrupt: true) {
+      calls += 1
+      return Errno.permissionDenied.rawValue
+    }.get()) {
+      XCTAssertEqual($0 as? Errno, .permissionDenied)
+    }
+    XCTAssertEqual(calls, 1)
+
+    // A returned EINTR is retried only when asked.
+    func interruptedTwice() -> CInt {
+      calls += 1
+      return calls <= 2 ? Errno.interrupted.rawValue : 0
+    }
+    calls = 0
+    XCTAssertNoThrow(
+      try nothingOrReturnedErrno(retryOnInterrupt: true, interruptedTwice).get())
+    XCTAssertEqual(calls, 3)
+
+    calls = 0
+    XCTAssertThrowsError(
+      try nothingOrReturnedErrno(retryOnInterrupt: false, interruptedTwice).get()
+    ) {
+      XCTAssertEqual($0 as? Errno, .interrupted)
+    }
+    XCTAssertEqual(calls, 1)
+  }
+
+  #if ENABLE_MOCKING
+  @available(System 0.0.1, *)
+  func testMockReturningErrno() {
+    // The mocking driver forces errors by returning them, and checks that
+    // EINTR is retried only when asked, as it does for errno-setting calls.
+    func system_returnsErrno(_ value: CInt) -> CInt {
+      _mockReturningErrno(value)
+    }
+    MockTestCase(name: "returnsErrno", .interruptable, 42) { retryOnInterrupt in
+      try nothingOrReturnedErrno(retryOnInterrupt: retryOnInterrupt) {
+        system_returnsErrno(42)
+      }.get()
+    }.runAllTests()
+  }
+  #endif // ENABLE_MOCKING
 }

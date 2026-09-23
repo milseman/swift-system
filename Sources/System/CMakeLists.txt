@@ -20,6 +20,7 @@ add_library(SystemPackage
   ProcessID.swift
   SystemString.swift
   TerminalDescriptor.swift
+  UserDatabase.swift
   Util.swift
   Util+StringArray.swift
   UtilConsumers.swift
@@ -62,6 +63,8 @@ target_sources(SystemPackage PRIVATE
 target_sources(SystemPackage PRIVATE
   FileSystem/FileFlags.swift
   FileSystem/FileMode.swift
+  FileSystem/FilePathOperations.swift
+  FileSystem/FileTimes.swift
   FileSystem/FileType.swift
   FileSystem/Identifiers.swift
   FileSystem/Stat.swift)

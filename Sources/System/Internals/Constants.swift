@@ -655,6 +655,115 @@ internal var _SEEK_HOLE: CInt { SEEK_HOLE }
 internal var _SEEK_DATA: CInt { SEEK_DATA }
 #endif
 
+// MARK: - fcntl
+
+#if !os(Windows)
+@_alwaysEmitIntoClient
+internal var _F_GETFD: CInt { F_GETFD }
+
+@_alwaysEmitIntoClient
+internal var _F_SETFD: CInt { F_SETFD }
+
+@_alwaysEmitIntoClient
+internal var _F_GETFL: CInt { F_GETFL }
+
+@_alwaysEmitIntoClient
+internal var _F_SETFL: CInt { F_SETFL }
+
+@_alwaysEmitIntoClient
+internal var _FD_CLOEXEC: CInt { FD_CLOEXEC }
+#endif
+
+#if !os(Windows) && !os(WASI)
+@_alwaysEmitIntoClient
+internal var _F_DUPFD: CInt { F_DUPFD }
+
+@_alwaysEmitIntoClient
+internal var _F_DUPFD_CLOEXEC: CInt { F_DUPFD_CLOEXEC }
+#endif
+
+// MARK: - flock
+
+#if !os(Windows) && !os(WASI)
+@_alwaysEmitIntoClient
+internal var _LOCK_SH: CInt { LOCK_SH }
+
+@_alwaysEmitIntoClient
+internal var _LOCK_EX: CInt { LOCK_EX }
+
+@_alwaysEmitIntoClient
+internal var _LOCK_NB: CInt { LOCK_NB }
+
+@_alwaysEmitIntoClient
+internal var _LOCK_UN: CInt { LOCK_UN }
+#endif
+
+#if SYSTEM_PACKAGE_DARWIN
+@_alwaysEmitIntoClient
+internal var _F_FULLFSYNC: CInt { F_FULLFSYNC }
+
+@_alwaysEmitIntoClient
+internal var _F_BARRIERFSYNC: CInt { F_BARRIERFSYNC }
+#endif
+
+// MARK: - posix_fadvise
+
+#if os(Linux) || os(Android) || os(FreeBSD) || os(WASI)
+@_alwaysEmitIntoClient
+internal var _POSIX_FADV_NORMAL: CInt {
+#if os(WASI)
+  _getConst_POSIX_FADV_NORMAL()
+#else
+  POSIX_FADV_NORMAL
+#endif
+}
+
+@_alwaysEmitIntoClient
+internal var _POSIX_FADV_SEQUENTIAL: CInt {
+#if os(WASI)
+  _getConst_POSIX_FADV_SEQUENTIAL()
+#else
+  POSIX_FADV_SEQUENTIAL
+#endif
+}
+
+@_alwaysEmitIntoClient
+internal var _POSIX_FADV_RANDOM: CInt {
+#if os(WASI)
+  _getConst_POSIX_FADV_RANDOM()
+#else
+  POSIX_FADV_RANDOM
+#endif
+}
+
+@_alwaysEmitIntoClient
+internal var _POSIX_FADV_WILLNEED: CInt {
+#if os(WASI)
+  _getConst_POSIX_FADV_WILLNEED()
+#else
+  POSIX_FADV_WILLNEED
+#endif
+}
+
+@_alwaysEmitIntoClient
+internal var _POSIX_FADV_DONTNEED: CInt {
+#if os(WASI)
+  _getConst_POSIX_FADV_DONTNEED()
+#else
+  POSIX_FADV_DONTNEED
+#endif
+}
+
+@_alwaysEmitIntoClient
+internal var _POSIX_FADV_NOREUSE: CInt {
+#if os(WASI)
+  _getConst_POSIX_FADV_NOREUSE()
+#else
+  POSIX_FADV_NOREUSE
+#endif
+}
+#endif // os(Linux) || os(Android) || os(FreeBSD) || os(WASI)
+
 // MARK: - File System
 
 #if !os(Windows)
@@ -662,10 +771,19 @@ internal var _SEEK_DATA: CInt { SEEK_DATA }
 @_alwaysEmitIntoClient
 internal var _AT_FDCWD: CInt { AT_FDCWD }
 
-// MARK: - fstatat Flags
+// MARK: - *at Flags
 
 @_alwaysEmitIntoClient
 internal var _AT_SYMLINK_NOFOLLOW: CInt { AT_SYMLINK_NOFOLLOW }
+
+@_alwaysEmitIntoClient
+internal var _AT_SYMLINK_FOLLOW: CInt { AT_SYMLINK_FOLLOW }
+
+@_alwaysEmitIntoClient
+internal var _AT_REMOVEDIR: CInt { AT_REMOVEDIR }
+
+@_alwaysEmitIntoClient
+internal var _AT_EACCESS: CInt { AT_EACCESS }
 
 #if SYSTEM_PACKAGE_DARWIN
 @_alwaysEmitIntoClient
@@ -675,6 +793,41 @@ internal var _AT_SYMLINK_NOFOLLOW_ANY: CInt { AT_SYMLINK_NOFOLLOW_ANY }
 #if canImport(Darwin, _version: 346) || os(FreeBSD)
 @_alwaysEmitIntoClient
 internal var _AT_RESOLVE_BENEATH: CInt { AT_RESOLVE_BENEATH }
+#endif
+
+// MARK: - access Modes
+
+@_alwaysEmitIntoClient
+internal var _R_OK: CInt { R_OK }
+
+@_alwaysEmitIntoClient
+internal var _W_OK: CInt { W_OK }
+
+@_alwaysEmitIntoClient
+internal var _X_OK: CInt { X_OK }
+
+// MARK: - File Times
+
+@_alwaysEmitIntoClient
+internal var _UTIME_NOW: Int { Int(UTIME_NOW) }
+
+@_alwaysEmitIntoClient
+internal var _UTIME_OMIT: Int { Int(UTIME_OMIT) }
+
+// MARK: - Rename Flags
+
+#if SYSTEM_PACKAGE_DARWIN
+@_alwaysEmitIntoClient
+internal var _RENAME_EXCL: CUnsignedInt { CUnsignedInt(RENAME_EXCL) }
+
+@_alwaysEmitIntoClient
+internal var _RENAME_SWAP: CUnsignedInt { CUnsignedInt(RENAME_SWAP) }
+#elseif os(Linux) || os(Android)
+@_alwaysEmitIntoClient
+internal var _RENAME_NOREPLACE: CUnsignedInt { CUnsignedInt(CSYSTEM_RENAME_NOREPLACE) }
+
+@_alwaysEmitIntoClient
+internal var _RENAME_EXCHANGE: CUnsignedInt { CUnsignedInt(CSYSTEM_RENAME_EXCHANGE) }
 #endif
 
 // MARK: - File Mode / File Type
