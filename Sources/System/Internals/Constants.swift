@@ -655,6 +655,33 @@ internal var _SEEK_HOLE: CInt { SEEK_HOLE }
 internal var _SEEK_DATA: CInt { SEEK_DATA }
 #endif
 
+// MARK: - fcntl
+
+#if !os(Windows)
+@_alwaysEmitIntoClient
+internal var _F_GETFD: CInt { F_GETFD }
+
+@_alwaysEmitIntoClient
+internal var _F_SETFD: CInt { F_SETFD }
+
+@_alwaysEmitIntoClient
+internal var _F_GETFL: CInt { F_GETFL }
+
+@_alwaysEmitIntoClient
+internal var _F_SETFL: CInt { F_SETFL }
+
+@_alwaysEmitIntoClient
+internal var _FD_CLOEXEC: CInt { FD_CLOEXEC }
+#endif
+
+#if SYSTEM_PACKAGE_DARWIN
+@_alwaysEmitIntoClient
+internal var _F_FULLFSYNC: CInt { F_FULLFSYNC }
+
+@_alwaysEmitIntoClient
+internal var _F_BARRIERFSYNC: CInt { F_BARRIERFSYNC }
+#endif
+
 // MARK: - File System
 
 #if !os(Windows)

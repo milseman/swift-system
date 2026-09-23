@@ -217,6 +217,22 @@ internal func system_fchflags(_ fd: Int32, _ flags: UInt32) -> Int32 {
 }
 #endif // SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
 
+#if !os(Windows)
+internal func system_fcntl(_ fd: Int32, _ cmd: Int32) -> Int32 {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(fd, cmd) }
+#endif
+  return fcntl(fd, cmd)
+}
+
+internal func system_fcntl(_ fd: Int32, _ cmd: Int32, _ value: Int32) -> Int32 {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(fd, cmd, value) }
+#endif
+  return fcntl(fd, cmd, value)
+}
+#endif // !os(Windows)
+
 internal func system_mkdir(
     _ path: UnsafePointer<CInterop.PlatformChar>,
     _ mode: CInterop.Mode

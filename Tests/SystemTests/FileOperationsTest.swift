@@ -143,6 +143,26 @@ final class FileOperationsTest: XCTestCase {
           permissions: [.groupReadWriteExecute, .ownerReadWriteExecute, .otherReadWriteExecute],
           retryOnInterrupt: retryOnInterrupt)
       },
+
+      MockTestCase(name: "fcntl", .noInterrupt, rawFD, F_GETFD) { _ in
+        _ = try fd.descriptorFlags()
+      },
+
+      MockTestCase(name: "fcntl", .noInterrupt, rawFD, F_SETFD, FD_CLOEXEC) { _ in
+        try fd.setDescriptorFlags(.closeOnExec)
+      },
+
+      MockTestCase(name: "fcntl", .noInterrupt, rawFD, F_GETFL) { _ in
+        _ = try fd.statusFlags()
+      },
+
+      MockTestCase(name: "fcntl", .noInterrupt, rawFD, F_GETFL) { _ in
+        _ = try fd.accessMode()
+      },
+
+      MockTestCase(name: "fcntl", .noInterrupt, rawFD, F_SETFL, O_NONBLOCK | O_APPEND) { _ in
+        try fd.setStatusFlags([.nonBlocking, .append])
+      },
     ]
 
     for test in syscallTestCases { test.runAllTests() }
@@ -163,6 +183,20 @@ final class FileOperationsTest: XCTestCase {
     }
     fchflags.runAllTests()
     #endif // SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
+
+    #if SYSTEM_PACKAGE_DARWIN
+    let fullSync = [
+      MockTestCase(name: "fcntl", .interruptable, rawFD, F_FULLFSYNC) { retryOnInterrupt in
+        try fd.synchronizeFully(retryOnInterrupt: retryOnInterrupt)
+      },
+
+      MockTestCase(name: "fcntl", .interruptable, rawFD, F_BARRIERFSYNC) {
+        retryOnInterrupt in
+        try fd.synchronizeWithBarrier(retryOnInterrupt: retryOnInterrupt)
+      },
+    ]
+    for test in fullSync { test.runAllTests() }
+    #endif // SYSTEM_PACKAGE_DARWIN
   }
   #endif // ENABLE_MOCKING && !os(WASI) && !os(Windows)
 
@@ -585,6 +619,91 @@ final class FileOperationsTest: XCTestCase {
     }
   }
 #endif // SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
+
+  @available(System 199, *)
+  func testDescriptorFlags() throws {
+    try withTemporaryFilePath(basename: "testDescriptorFlags") { path in
+      let fd = try FileDescriptor.open(path.appending("\(UUID().uuidString).txt"), .readWrite, options: [.create, .truncate], permissions: .ownerReadWrite)
+      try fd.closeAfter {
+        XCTAssertFalse(try fd.descriptorFlags().contains(.closeOnExec))
+        try fd.setDescriptorFlags(fd.descriptorFlags().union(.closeOnExec))
+        XCTAssertTrue(try fd.descriptorFlags().contains(.closeOnExec))
+
+        // Each descriptor has its own flags.
+        let duplicate = try fd.duplicate()
+        try duplicate.closeAfter {
+          XCTAssertFalse(try duplicate.descriptorFlags().contains(.closeOnExec))
+        }
+
+        try fd.setDescriptorFlags([])
+        XCTAssertEqual(try fd.descriptorFlags(), [])
+      }
+
+      let closeOnExec = try FileDescriptor.open(path.appending("\(UUID().uuidString).txt"), .readWrite, options: [.create, .closeOnExec], permissions: .ownerReadWrite)
+      try closeOnExec.closeAfter {
+        XCTAssertTrue(try closeOnExec.descriptorFlags().contains(.closeOnExec))
+      }
+    }
+    XCTAssertThrowsError(try FileDescriptor(rawValue: -1).descriptorFlags()) {
+      XCTAssertEqual($0 as? Errno, .badFileDescriptor)
+    }
+  }
+
+#if SYSTEM_PACKAGE_DARWIN
+  @available(System 199, *)
+  func testSynchronizeFully() throws {
+    try withTemporaryFilePath(basename: "testSynchronizeFully") { path in
+      let fd = try FileDescriptor.open(path.appending("\(UUID().uuidString).txt"), .readWrite, options: [.create, .truncate], permissions: .ownerReadWrite)
+      try fd.closeAfter {
+        try fd.writeAll("abc".utf8)
+        try fd.synchronizeFully()
+        try fd.writeAll("def".utf8)
+        try fd.synchronizeWithBarrier()
+        XCTAssertEqual(try fd.fileSize(), 6)
+      }
+    }
+  }
+#endif // SYSTEM_PACKAGE_DARWIN
 #endif // !os(Windows) && !os(WASI)
+
+#if !os(Windows)
+  @available(System 199, *)
+  func testStatusFlags() throws {
+    try withTemporaryFilePath(basename: "testStatusFlags") { path in
+      let fd = try FileDescriptor.open(path.appending("\(UUID().uuidString).txt"), .writeOnly, options: [.create, .append], permissions: .ownerReadWrite)
+      try fd.closeAfter {
+        XCTAssertEqual(try fd.accessMode(), .writeOnly)
+        XCTAssertTrue(try fd.statusFlags().contains(.append))
+        XCTAssertFalse(try fd.statusFlags().contains(.nonBlocking))
+
+        try fd.setStatusFlags(fd.statusFlags().union(.nonBlocking))
+        XCTAssertTrue(try fd.statusFlags().contains(.nonBlocking))
+        XCTAssertTrue(try fd.statusFlags().contains(.append))
+        XCTAssertEqual(try fd.accessMode(), .writeOnly)
+
+        #if !os(WASI) // WASI has no dup
+        // Duplicates share the open file, and so its status flags.
+        let duplicate = try fd.duplicate()
+        try duplicate.closeAfter {
+          XCTAssertTrue(try duplicate.statusFlags().contains(.nonBlocking))
+          try duplicate.setStatusFlags(duplicate.statusFlags().subtracting(.nonBlocking))
+        }
+        XCTAssertFalse(try fd.statusFlags().contains(.nonBlocking))
+        #endif
+      }
+
+      let readWrite = try FileDescriptor.open(path.appending("\(UUID().uuidString).txt"), .readWrite, options: [.create, .nonBlocking], permissions: .ownerReadWrite)
+      try readWrite.closeAfter {
+        XCTAssertEqual(try readWrite.accessMode(), .readWrite)
+        // Linux can report flags with no name here, such as O_LARGEFILE.
+        XCTAssertTrue(try readWrite.statusFlags().contains(.nonBlocking))
+        XCTAssertFalse(try readWrite.statusFlags().contains(.append))
+      }
+    }
+    XCTAssertThrowsError(try FileDescriptor(rawValue: -1).statusFlags()) {
+      XCTAssertEqual($0 as? Errno, .badFileDescriptor)
+    }
+  }
+#endif // !os(Windows)
 }
 
