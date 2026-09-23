@@ -19,24 +19,19 @@ import Synchronization
 @testable import System
 #endif
 
-// Tests for bugs in merged source. Each one checks the documented behavior,
-// and expects the failure, or is skipped, until the bug is fixed.
-//
 // FileDescriptor.writeAll(_: RawSpan, retryOnInterrupt:) and
-// writeAll(toAbsoluteOffset:_: RawSpan, retryOnInterrupt:) document that
-// `retryOnInterrupt: false` throws `Errno.interrupted` instead of retrying,
-// but they ignore the argument: `_writeAllBuffer` always passes
-// `retryOnInterrupt: true` to `_write` (Sources/System/FileHelpers.swift).
-// The OwnedFD methods of the same names forward the argument to them.
+// writeAll(toAbsoluteOffset:_: RawSpan, retryOnInterrupt:) retry an
+// interrupted write only when `retryOnInterrupt` is true, and the OwnedFD
+// methods of the same names forward the argument to them.
 //
 // These are XCTest tests, which run one at a time: the first installs a
 // signal handler for the process, and keeps a full pipe that another test
 // could drain by using a closed descriptor.
-final class KnownIssueTest: XCTestCase {
+final class WriteAllInterruptTest: XCTestCase {
   #if SYSTEM_PACKAGE_DARWIN
   // Signal handling needs sigaction, whose handler field has a different name
   // in each C library; this test spells Darwin's.
-  func testSpanWriteAllRetriesAnInterruptedWrite() throws {
+  func testSpanWriteAllRetriesOnlyWhenAsked() throws {
     guard #available(macOS 15, iOS 18, watchOS 11, tvOS 18, visionOS 2, *) else {
       throw XCTSkip("Span-based I/O requires macOS 15 or later")
     }
@@ -49,26 +44,30 @@ final class KnownIssueTest: XCTestCase {
       XCTAssertEqual($0 as? Errno, .interrupted)
     }
 
-    let result = try writeOneByteToAFullPipe { fd, bytes in
+    let notRetried = try writeOneByteToAFullPipe { fd, bytes in
       try fd.writeAll(RawSpan(_unsafeBytes: bytes), retryOnInterrupt: false)
     }
-    try XCTExpectFailure("writeAll(_: RawSpan, retryOnInterrupt:) ignores retryOnInterrupt") {
-      XCTAssertThrowsError(try result.get()) {
-        XCTAssertEqual($0 as? Errno, .interrupted)
-      }
+    XCTAssertThrowsError(try notRetried.get()) {
+      XCTAssertEqual($0 as? Errno, .interrupted)
     }
+
+    // By default, the write is retried after each interruption, and
+    // finishes once the pipe is drained.
+    let retried = try writeOneByteToAFullPipe { fd, bytes in
+      try fd.writeAll(RawSpan(_unsafeBytes: bytes))
+    }
+    XCTAssertEqual(try retried.get(), 1)
   }
   #endif // SYSTEM_PACKAGE_DARWIN
 
   #if ENABLE_MOCKING && !os(WASI)
-  // This covers the positioned variant too, which can't block.
+  // This covers the positioned variant too, which can't block. It checks
+  // only `retryOnInterrupt: false`: when a mocked write is retried, it
+  // returns 0 bytes, and writeAll retries that forever.
   func testSpanWriteAllThrowsOnInterruptWhenNotRetrying() throws {
     guard #available(macOS 15, iOS 18, watchOS 11, tvOS 18, visionOS 2, *) else {
       throw XCTSkip("Span-based I/O requires macOS 15 or later")
     }
-    // With the bug, this test never returns: after the forced EINTR, the
-    // retried write returns 0 bytes, and writeAll retries that forever.
-    try XCTSkipIf(true, "writeAll(_: RawSpan, retryOnInterrupt:) ignores retryOnInterrupt")
 
     let bytes: [UInt8] = [1, 2, 3]
     let fd = FileDescriptor(rawValue: 42)
@@ -91,6 +90,17 @@ final class KnownIssueTest: XCTestCase {
       }
       XCTAssertEqual(mocking.trace.dequeue()?.name, "pwrite")
       XCTAssertTrue(mocking.trace.isEmpty)
+
+      let owned = OwnedFD(fd)
+      mocking.forceErrno = .counted(errno: EINTR, count: 1)
+      XCTAssertThrowsError(try bytes.withUnsafeBytes { bytes in
+        try owned.writeAll(RawSpan(_unsafeBytes: bytes), retryOnInterrupt: false)
+      }) {
+        XCTAssertEqual($0 as? Errno, .interrupted)
+      }
+      XCTAssertEqual(mocking.trace.dequeue()?.name, "write")
+      XCTAssertTrue(mocking.trace.isEmpty)
+      _ = owned.relinquish()
     }
   }
   #endif // ENABLE_MOCKING && !os(WASI)
