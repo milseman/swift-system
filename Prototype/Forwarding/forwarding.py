@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Inventory FileDescriptor's API, and generate OwnedFD forwards for all of it.
 
-  forwarding.py inventory [ROOT]         the public members of FileDescriptor
-                                         extensions in ROOT/Sources, with their
-                                         availability and #if conditions
+  forwarding.py inventory [ROOT] [TYPE]  the public members of FileDescriptor
+                                         (or TYPE) extensions in ROOT/Sources,
+                                         with availability and #if conditions
   forwarding.py generate [ROOT] > file   an `extension OwnedFD` forward for
                                          every instance member that doesn't
                                          change ownership
@@ -44,6 +44,8 @@ def brace_delta(line):
 class Member:
     def __init__(self, **kw): self.__dict__.update(kw)
 
+TYPE = "FileDescriptor"
+
 def parse_file(path, rel):
     lines = open(path).read().split("\n")
     members = []
@@ -63,7 +65,7 @@ def parse_file(path, rel):
             conditions.pop(); i += 1; continue
         if line.startswith("@") and not raw.startswith(" "):
             pending_attrs.append(line); i += 1; continue
-        if re.match(r"^extension FileDescriptor(\s*\{|\s*:|\s+where)", line):
+        if re.match(r"^extension %s(\s*\{|\s*:|\s+where)" % TYPE, line):
             ext_attrs = pending_attrs
             pending_attrs = []
             ext_conditions = list(conditions)
@@ -122,7 +124,7 @@ def parse_file(path, rel):
 
 def all_members(root):
     # `rawValue` is declared in the struct itself, not in an extension.
-    members = [Member(
+    members = [] if TYPE != "FileDescriptor" else [Member(
         file="Sources/System/FileDescriptor.swift", line=21, body="",
         decl="public let rawValue: CInt", attrs=["@_alwaysEmitIntoClient"],
         ext_attrs=["@available(System 0.0.1, *)"], conditions=[])]
@@ -309,4 +311,5 @@ def generate(root):
 if __name__ == "__main__":
     command = sys.argv[1] if len(sys.argv) > 1 else "inventory"
     root = sys.argv[2] if len(sys.argv) > 2 else os.path.join(os.path.dirname(__file__), "..", "..")
+    if len(sys.argv) > 3: TYPE = sys.argv[3]
     {"inventory": inventory, "generate": generate}[command](os.path.abspath(root))
