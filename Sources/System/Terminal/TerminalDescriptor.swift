@@ -110,4 +110,4 @@ extension FileDescriptor {
   }
 }
 
-#endif
+#endif // !os(Windows) && !os(WASI)

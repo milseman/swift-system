@@ -7,7 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-#if !os(Windows)
+#if !os(Windows) && !os(WASI)
 
 import ArgumentParser
 import SystemPackage
@@ -105,4 +105,4 @@ struct TerminalSize: ParsableCommand {
   }
 }
 
-#endif
+#endif // !os(Windows) && !os(WASI)

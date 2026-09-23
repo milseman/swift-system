@@ -7,7 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
  */
 
-#if !os(Windows)
+#if !os(Windows) && !os(WASI)
 
 /// An index identifying a specific control character.
 @frozen
@@ -137,8 +137,6 @@ public struct ControlCharacters: Sendable {
   }
 }
 
-#endif
-
 // Manual Hashable conformance
 @available(System 199, *)
 extension ControlCharacters: Hashable {
@@ -158,3 +156,5 @@ extension ControlCharacters: Hashable {
     }
   }
 }
+
+#endif // !os(Windows) && !os(WASI)

@@ -361,7 +361,7 @@ internal func system_getenv(
 
 // MARK: - Terminal Control (termios)
 
-#if !os(Windows)
+#if !os(Windows) && !os(WASI)
 internal func system_tcgetattr(
   _ fd: CInt,
   _ termios_p: UnsafeMutablePointer<CInterop.Termios>
@@ -518,4 +518,4 @@ internal func system_tiocswinsz(
 #endif
   return _system_ioctl_TIOCSWINSZ(fd, winsize_p)
 }
-#endif
+#endif // !os(Windows) && !os(WASI)

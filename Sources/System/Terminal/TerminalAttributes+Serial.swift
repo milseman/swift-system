@@ -7,7 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
  */
 
-#if !os(Windows)
+#if !os(Windows) && !os(WASI)
 
 // MARK: - Serial Port Conveniences
 
@@ -124,4 +124,4 @@ extension TerminalAttributes {
   }
 }
 
-#endif
+#endif // !os(Windows) && !os(WASI)

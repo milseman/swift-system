@@ -7,7 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
  */
 
-#if !os(Windows)
+#if !os(Windows) && !os(WASI)
 
 // MARK: - InputFlags
 
@@ -604,4 +604,4 @@ public struct LocalFlags: OptionSet, Hashable, Sendable {
   #endif
 }
 
-#endif
+#endif // !os(Windows) && !os(WASI)

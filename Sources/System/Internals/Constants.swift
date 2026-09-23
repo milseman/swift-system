@@ -798,6 +798,7 @@ internal var _SF_SNAPSHOT: UInt32 { UInt32(bitPattern: SF_SNAPSHOT) }
 
 // MARK: - Terminal Control (termios)
 
+#if !os(WASI)
 // Special values
 @_alwaysEmitIntoClient
 internal var _NCCS: CInt { CInt(NCCS) }
@@ -1293,5 +1294,6 @@ internal var _TCIOFF: CInt { CInt(TCIOFF) }
 
 @_alwaysEmitIntoClient
 internal var _TCION: CInt { CInt(TCION) }
+#endif // !os(WASI)
 
 #endif // !os(Windows)

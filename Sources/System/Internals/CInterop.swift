@@ -117,6 +117,7 @@ extension CInterop {
   #endif
 }
 
+#if !os(WASI)
 @available(System 199, *)
 extension CInterop {
   /// The C `termios` structure.
@@ -134,6 +135,7 @@ extension CInterop {
   /// The C `winsize` structure for terminal window dimensions.
   public typealias WinSize = winsize
 }
+#endif // !os(WASI)
 
 extension CInterop {
   public typealias ProcessID = pid_t

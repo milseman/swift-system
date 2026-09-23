@@ -7,7 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
  */
 
-#if !os(Windows)
+#if !os(Windows) && !os(WASI)
 
 import XCTest
 import SystemPackage
@@ -516,4 +516,4 @@ final class TerminalTests: XCTestCase {
   }
 }
 
-#endif
+#endif // !os(Windows) && !os(WASI)

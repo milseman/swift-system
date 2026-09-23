@@ -7,7 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
  */
 
-#if !os(Windows)
+#if !os(Windows) && !os(WASI)
 
 /// A terminal baud rate.
 ///
@@ -260,4 +260,4 @@ public struct BaudRate: RawRepresentable, Hashable, Sendable {
   #endif
 }
 
-#endif
+#endif // !os(Windows) && !os(WASI)
