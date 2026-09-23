@@ -967,6 +967,51 @@ extension FileDescriptor {
 }
 #endif // !os(Windows) && !os(WASI)
 
+#if !os(Windows) && !os(WASI)
+@available(System 199, *)
+extension FileDescriptor {
+  /// Changes the owner and group of the file referenced by this file descriptor.
+  ///
+  /// - Parameters:
+  ///   - user: The new owner of the file,
+  ///     or `nil` to leave the owner unchanged.
+  ///   - group: The new group of the file,
+  ///     or `nil` to leave the group unchanged.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// Changing the owner typically requires appropriate privileges.
+  /// The owner of a file can change its group
+  /// to any group that the owner is a member of.
+  ///
+  /// The corresponding C function is `fchown`.
+  @_alwaysEmitIntoClient
+  public func setOwner(
+    user: UserID? = nil,
+    group: GroupID? = nil,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try _setOwner(user: user, group: group, retryOnInterrupt: retryOnInterrupt).get()
+  }
+
+  @usableFromInline
+  internal func _setOwner(
+    user: UserID?,
+    group: GroupID?,
+    retryOnInterrupt: Bool
+  ) -> Result<(), Errno> {
+    // An ID of -1 leaves the corresponding value unchanged.
+    let uid = user?.rawValue ?? CInterop.UserID(truncatingIfNeeded: -1)
+    let gid = group?.rawValue ?? CInterop.GroupID(truncatingIfNeeded: -1)
+    return nothingOrErrno(retryOnInterrupt: retryOnInterrupt) {
+      system_fchown(self.rawValue, uid, gid)
+    }
+  }
+}
+#endif // !os(Windows) && !os(WASI)
+
 #if !os(WASI) // WASI has no umask
 extension FilePermissions {
   /// The file creation permission mask (aka "umask").

@@ -109,6 +109,23 @@ final class FileOperationsTest: XCTestCase {
           [.ownerReadWrite, .groupRead, .otherRead], retryOnInterrupt: retryOnInterrupt)
       },
 
+      MockTestCase(name: "fchown", .interruptable, rawFD, 501, 20) { retryOnInterrupt in
+        try fd.setOwner(
+          user: UserID(501), group: GroupID(20), retryOnInterrupt: retryOnInterrupt)
+      },
+
+      MockTestCase(
+        name: "fchown", .interruptable, rawFD, uid_t(truncatingIfNeeded: -1), 20
+      ) { retryOnInterrupt in
+        try fd.setOwner(group: GroupID(20), retryOnInterrupt: retryOnInterrupt)
+      },
+
+      MockTestCase(
+        name: "fchown", .interruptable, rawFD, 501, gid_t(truncatingIfNeeded: -1)
+      ) { retryOnInterrupt in
+        try fd.setOwner(user: UserID(501), retryOnInterrupt: retryOnInterrupt)
+      },
+
       MockTestCase(name: "openat", .interruptable, 42, "a path", O_RDWR | O_APPEND) {
         retryOnInterrupt in
         _ = try FileDescriptor.open(
@@ -504,6 +521,39 @@ final class FileOperationsTest: XCTestCase {
       try fd.closeAfter {
         try fd.setPermissions([.ownerRead, .groupRead])
         XCTAssertEqual(try fd.stat().permissions, [.ownerRead, .groupRead])
+      }
+    }
+  }
+
+  @available(System 199, *)
+  func testSetOwner() throws {
+    try withTemporaryFilePath(basename: "testSetOwner") { path in
+      let fd = try FileDescriptor.open(path.appending("\(UUID().uuidString).txt"), .readWrite, options: [.create, .truncate], permissions: .ownerReadWrite)
+      try fd.closeAfter {
+        let original = try fd.stat()
+
+        // The owner can always pass the file's current IDs, or nil.
+        try fd.setOwner()
+        try fd.setOwner(user: original.userID, group: original.groupID)
+        XCTAssertEqual(try fd.stat().userID, original.userID)
+        XCTAssertEqual(try fd.stat().groupID, original.groupID)
+
+        // The owner can change the group to another group they belong to.
+        let count = getgroups(0, nil)
+        var groups = [gid_t](repeating: 0, count: Int(max(count, 0)))
+        let filled = Int(max(getgroups(count, &groups), 0))
+        if let other = groups.prefix(filled).first(where: { $0 != original.groupID.rawValue }) {
+          try fd.setOwner(group: GroupID(other))
+          XCTAssertEqual(try fd.stat().groupID, GroupID(other))
+          XCTAssertEqual(try fd.stat().userID, original.userID)
+        }
+
+        // Only a privileged process can give the file to another user.
+        if geteuid() != 0 {
+          XCTAssertThrowsError(try fd.setOwner(user: UserID(0))) {
+            XCTAssertEqual($0 as? Errno, .notPermitted)
+          }
+        }
       }
     }
   }

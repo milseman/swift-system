@@ -198,6 +198,13 @@ internal func system_fchmod(_ fd: Int32, _ mode: CInterop.Mode) -> Int32 {
 #endif
   return fchmod(fd, mode)
 }
+
+internal func system_fchown(_ fd: Int32, _ owner: uid_t, _ group: gid_t) -> Int32 {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(fd, owner, group) }
+#endif
+  return fchown(fd, owner, group)
+}
 #endif // !os(Windows) && !os(WASI)
 
 internal func system_mkdir(
