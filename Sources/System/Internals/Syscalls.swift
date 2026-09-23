@@ -376,6 +376,7 @@ internal func system_openat(
 #endif
   return openat(fd, path, oflag, mode)
 }
+
 internal func system_mkdirat(
   _ fd: CInt,
   _ path: UnsafePointer<CInterop.PlatformChar>,
@@ -799,6 +800,11 @@ internal func system_chflagsat(
   return chflagsat(fd, path, numericCast(flags), atFlag)
 }
 #endif // os(FreeBSD) || os(OpenBSD)
+
+// Not mockable: isatty returns 1 or 0, not 0 or -1.
+internal func system_isatty(_ fd: CInt) -> CInt {
+  return isatty(fd)
+}
 #endif // !os(Windows)
 
 #if !os(WASI) // WASI has no umask
@@ -894,6 +900,16 @@ internal func system_getgrnam_r(
   }
 #endif
   return getgrnam_r(name, entry, buffer, size, result)
+}
+#endif // !os(Windows) && !os(WASI)
+
+#if !os(Windows) && !os(WASI)
+internal func system_getpid() -> CInterop.ProcessID {
+  return getpid()
+}
+
+internal func system_getppid() -> CInterop.ProcessID {
+  return getppid()
 }
 #endif // !os(Windows) && !os(WASI)
 

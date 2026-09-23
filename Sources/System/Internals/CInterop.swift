@@ -116,4 +116,8 @@ extension CInterop {
   public typealias FileFlags = UInt32
   #endif
 }
+
+extension CInterop {
+  public typealias ProcessID = pid_t
+}
 #endif

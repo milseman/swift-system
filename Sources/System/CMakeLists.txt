@@ -15,8 +15,11 @@ add_library(SystemPackage
   FileOperations.swift
   FilePermissions.swift
   MachPort.swift
+  OwnedFD.swift
   PlatformString.swift
+  ProcessID.swift
   SystemString.swift
+  TerminalDescriptor.swift
   UserDatabase.swift
   Util.swift
   Util+StringArray.swift
