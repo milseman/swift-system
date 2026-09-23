@@ -804,7 +804,7 @@ internal var _SF_SNAPSHOT: UInt32 { UInt32(bitPattern: SF_SNAPSHOT) }
 internal var _NCCS: CInt { CInt(NCCS) }
 
 @_alwaysEmitIntoClient
-internal var __POSIX_VDISABLE: CInterop.ControlCharacterValue {
+internal var __POSIX_VDISABLE: cc_t {
   // _POSIX_VDISABLE is typically 0xFF (255) on POSIX systems
   // On Darwin and Linux, it's defined as 0xFF
   0xFF
@@ -812,277 +812,277 @@ internal var __POSIX_VDISABLE: CInterop.ControlCharacterValue {
 
 // Input flags (c_iflag)
 @_alwaysEmitIntoClient
-internal var _BRKINT: CInterop.TerminalFlags { CInterop.TerminalFlags(BRKINT) }
+internal var _BRKINT: tcflag_t { tcflag_t(BRKINT) }
 
 @_alwaysEmitIntoClient
-internal var _ICRNL: CInterop.TerminalFlags { CInterop.TerminalFlags(ICRNL) }
+internal var _ICRNL: tcflag_t { tcflag_t(ICRNL) }
 
 @_alwaysEmitIntoClient
-internal var _IGNBRK: CInterop.TerminalFlags { CInterop.TerminalFlags(IGNBRK) }
+internal var _IGNBRK: tcflag_t { tcflag_t(IGNBRK) }
 
 @_alwaysEmitIntoClient
-internal var _IGNCR: CInterop.TerminalFlags { CInterop.TerminalFlags(IGNCR) }
+internal var _IGNCR: tcflag_t { tcflag_t(IGNCR) }
 
 @_alwaysEmitIntoClient
-internal var _IGNPAR: CInterop.TerminalFlags { CInterop.TerminalFlags(IGNPAR) }
+internal var _IGNPAR: tcflag_t { tcflag_t(IGNPAR) }
 
 @_alwaysEmitIntoClient
-internal var _INLCR: CInterop.TerminalFlags { CInterop.TerminalFlags(INLCR) }
+internal var _INLCR: tcflag_t { tcflag_t(INLCR) }
 
 @_alwaysEmitIntoClient
-internal var _INPCK: CInterop.TerminalFlags { CInterop.TerminalFlags(INPCK) }
+internal var _INPCK: tcflag_t { tcflag_t(INPCK) }
 
 @_alwaysEmitIntoClient
-internal var _ISTRIP: CInterop.TerminalFlags { CInterop.TerminalFlags(ISTRIP) }
+internal var _ISTRIP: tcflag_t { tcflag_t(ISTRIP) }
 
 @_alwaysEmitIntoClient
-internal var _IXANY: CInterop.TerminalFlags { CInterop.TerminalFlags(IXANY) }
+internal var _IXANY: tcflag_t { tcflag_t(IXANY) }
 
 @_alwaysEmitIntoClient
-internal var _IXOFF: CInterop.TerminalFlags { CInterop.TerminalFlags(IXOFF) }
+internal var _IXOFF: tcflag_t { tcflag_t(IXOFF) }
 
 @_alwaysEmitIntoClient
-internal var _IXON: CInterop.TerminalFlags { CInterop.TerminalFlags(IXON) }
+internal var _IXON: tcflag_t { tcflag_t(IXON) }
 
 @_alwaysEmitIntoClient
-internal var _PARMRK: CInterop.TerminalFlags { CInterop.TerminalFlags(PARMRK) }
+internal var _PARMRK: tcflag_t { tcflag_t(PARMRK) }
 
 @_alwaysEmitIntoClient
-internal var _IMAXBEL: CInterop.TerminalFlags { CInterop.TerminalFlags(IMAXBEL) }
+internal var _IMAXBEL: tcflag_t { tcflag_t(IMAXBEL) }
 
 @_alwaysEmitIntoClient
-internal var _IUTF8: CInterop.TerminalFlags { CInterop.TerminalFlags(IUTF8) }
+internal var _IUTF8: tcflag_t { tcflag_t(IUTF8) }
 
 #if os(Linux)
 @_alwaysEmitIntoClient
-internal var _IUCLC: CInterop.TerminalFlags { CInterop.TerminalFlags(IUCLC) }
+internal var _IUCLC: tcflag_t { tcflag_t(IUCLC) }
 #endif
 
 // Output flags (c_oflag)
 @_alwaysEmitIntoClient
-internal var _OPOST: CInterop.TerminalFlags { CInterop.TerminalFlags(OPOST) }
+internal var _OPOST: tcflag_t { tcflag_t(OPOST) }
 
 @_alwaysEmitIntoClient
-internal var _ONLCR: CInterop.TerminalFlags { CInterop.TerminalFlags(ONLCR) }
+internal var _ONLCR: tcflag_t { tcflag_t(ONLCR) }
 
 @_alwaysEmitIntoClient
-internal var _OCRNL: CInterop.TerminalFlags { CInterop.TerminalFlags(OCRNL) }
+internal var _OCRNL: tcflag_t { tcflag_t(OCRNL) }
 
 @_alwaysEmitIntoClient
-internal var _ONOCR: CInterop.TerminalFlags { CInterop.TerminalFlags(ONOCR) }
+internal var _ONOCR: tcflag_t { tcflag_t(ONOCR) }
 
 @_alwaysEmitIntoClient
-internal var _ONLRET: CInterop.TerminalFlags { CInterop.TerminalFlags(ONLRET) }
+internal var _ONLRET: tcflag_t { tcflag_t(ONLRET) }
 
 @_alwaysEmitIntoClient
-internal var _OFILL: CInterop.TerminalFlags { CInterop.TerminalFlags(OFILL) }
+internal var _OFILL: tcflag_t { tcflag_t(OFILL) }
 
 @_alwaysEmitIntoClient
-internal var _OFDEL: CInterop.TerminalFlags { CInterop.TerminalFlags(OFDEL) }
+internal var _OFDEL: tcflag_t { tcflag_t(OFDEL) }
 
 @_alwaysEmitIntoClient
-internal var _NLDLY: CInterop.TerminalFlags { CInterop.TerminalFlags(NLDLY) }
+internal var _NLDLY: tcflag_t { tcflag_t(NLDLY) }
 
 @_alwaysEmitIntoClient
-internal var _NL0: CInterop.TerminalFlags { CInterop.TerminalFlags(NL0) }
+internal var _NL0: tcflag_t { tcflag_t(NL0) }
 
 @_alwaysEmitIntoClient
-internal var _NL1: CInterop.TerminalFlags { CInterop.TerminalFlags(NL1) }
+internal var _NL1: tcflag_t { tcflag_t(NL1) }
 
 @_alwaysEmitIntoClient
-internal var _CRDLY: CInterop.TerminalFlags { CInterop.TerminalFlags(CRDLY) }
+internal var _CRDLY: tcflag_t { tcflag_t(CRDLY) }
 
 @_alwaysEmitIntoClient
-internal var _CR0: CInterop.TerminalFlags { CInterop.TerminalFlags(CR0) }
+internal var _CR0: tcflag_t { tcflag_t(CR0) }
 
 @_alwaysEmitIntoClient
-internal var _CR1: CInterop.TerminalFlags { CInterop.TerminalFlags(CR1) }
+internal var _CR1: tcflag_t { tcflag_t(CR1) }
 
 @_alwaysEmitIntoClient
-internal var _CR2: CInterop.TerminalFlags { CInterop.TerminalFlags(CR2) }
+internal var _CR2: tcflag_t { tcflag_t(CR2) }
 
 @_alwaysEmitIntoClient
-internal var _CR3: CInterop.TerminalFlags { CInterop.TerminalFlags(CR3) }
+internal var _CR3: tcflag_t { tcflag_t(CR3) }
 
 @_alwaysEmitIntoClient
-internal var _TABDLY: CInterop.TerminalFlags { CInterop.TerminalFlags(TABDLY) }
+internal var _TABDLY: tcflag_t { tcflag_t(TABDLY) }
 
 @_alwaysEmitIntoClient
-internal var _TAB0: CInterop.TerminalFlags { CInterop.TerminalFlags(TAB0) }
+internal var _TAB0: tcflag_t { tcflag_t(TAB0) }
 
 @_alwaysEmitIntoClient
-internal var _TAB1: CInterop.TerminalFlags { CInterop.TerminalFlags(TAB1) }
+internal var _TAB1: tcflag_t { tcflag_t(TAB1) }
 
 @_alwaysEmitIntoClient
-internal var _TAB2: CInterop.TerminalFlags { CInterop.TerminalFlags(TAB2) }
+internal var _TAB2: tcflag_t { tcflag_t(TAB2) }
 
 #if SYSTEM_PACKAGE_DARWIN
 @_alwaysEmitIntoClient
-internal var _TAB3: CInterop.TerminalFlags { CInterop.TerminalFlags(TAB3) }
+internal var _TAB3: tcflag_t { tcflag_t(TAB3) }
 #elseif os(Linux)
 @_alwaysEmitIntoClient
-internal var _XTABS: CInterop.TerminalFlags { CInterop.TerminalFlags(XTABS) }
+internal var _XTABS: tcflag_t { tcflag_t(XTABS) }
 #endif
 
 @_alwaysEmitIntoClient
-internal var _BSDLY: CInterop.TerminalFlags { CInterop.TerminalFlags(BSDLY) }
+internal var _BSDLY: tcflag_t { tcflag_t(BSDLY) }
 
 @_alwaysEmitIntoClient
-internal var _BS0: CInterop.TerminalFlags { CInterop.TerminalFlags(BS0) }
+internal var _BS0: tcflag_t { tcflag_t(BS0) }
 
 @_alwaysEmitIntoClient
-internal var _BS1: CInterop.TerminalFlags { CInterop.TerminalFlags(BS1) }
+internal var _BS1: tcflag_t { tcflag_t(BS1) }
 
 @_alwaysEmitIntoClient
-internal var _VTDLY: CInterop.TerminalFlags { CInterop.TerminalFlags(VTDLY) }
+internal var _VTDLY: tcflag_t { tcflag_t(VTDLY) }
 
 @_alwaysEmitIntoClient
-internal var _VT0: CInterop.TerminalFlags { CInterop.TerminalFlags(VT0) }
+internal var _VT0: tcflag_t { tcflag_t(VT0) }
 
 @_alwaysEmitIntoClient
-internal var _VT1: CInterop.TerminalFlags { CInterop.TerminalFlags(VT1) }
+internal var _VT1: tcflag_t { tcflag_t(VT1) }
 
 @_alwaysEmitIntoClient
-internal var _FFDLY: CInterop.TerminalFlags { CInterop.TerminalFlags(FFDLY) }
+internal var _FFDLY: tcflag_t { tcflag_t(FFDLY) }
 
 @_alwaysEmitIntoClient
-internal var _FF0: CInterop.TerminalFlags { CInterop.TerminalFlags(FF0) }
+internal var _FF0: tcflag_t { tcflag_t(FF0) }
 
 @_alwaysEmitIntoClient
-internal var _FF1: CInterop.TerminalFlags { CInterop.TerminalFlags(FF1) }
+internal var _FF1: tcflag_t { tcflag_t(FF1) }
 
 #if canImport(Darwin)
 @_alwaysEmitIntoClient
-internal var _OXTABS: CInterop.TerminalFlags { CInterop.TerminalFlags(OXTABS) }
+internal var _OXTABS: tcflag_t { tcflag_t(OXTABS) }
 
 @_alwaysEmitIntoClient
-internal var _ONOEOT: CInterop.TerminalFlags { CInterop.TerminalFlags(ONOEOT) }
+internal var _ONOEOT: tcflag_t { tcflag_t(ONOEOT) }
 #endif
 
 #if os(Linux)
 @_alwaysEmitIntoClient
-internal var _OLCUC: CInterop.TerminalFlags { CInterop.TerminalFlags(OLCUC) }
+internal var _OLCUC: tcflag_t { tcflag_t(OLCUC) }
 #endif
 
 // Control flags (c_cflag)
 @_alwaysEmitIntoClient
-internal var _CREAD: CInterop.TerminalFlags { CInterop.TerminalFlags(CREAD) }
+internal var _CREAD: tcflag_t { tcflag_t(CREAD) }
 
 @_alwaysEmitIntoClient
-internal var _CSTOPB: CInterop.TerminalFlags { CInterop.TerminalFlags(CSTOPB) }
+internal var _CSTOPB: tcflag_t { tcflag_t(CSTOPB) }
 
 @_alwaysEmitIntoClient
-internal var _HUPCL: CInterop.TerminalFlags { CInterop.TerminalFlags(HUPCL) }
+internal var _HUPCL: tcflag_t { tcflag_t(HUPCL) }
 
 @_alwaysEmitIntoClient
-internal var _CLOCAL: CInterop.TerminalFlags { CInterop.TerminalFlags(CLOCAL) }
+internal var _CLOCAL: tcflag_t { tcflag_t(CLOCAL) }
 
 @_alwaysEmitIntoClient
-internal var _PARENB: CInterop.TerminalFlags { CInterop.TerminalFlags(PARENB) }
+internal var _PARENB: tcflag_t { tcflag_t(PARENB) }
 
 @_alwaysEmitIntoClient
-internal var _PARODD: CInterop.TerminalFlags { CInterop.TerminalFlags(PARODD) }
+internal var _PARODD: tcflag_t { tcflag_t(PARODD) }
 
 @_alwaysEmitIntoClient
-internal var _CSIZE: CInterop.TerminalFlags { CInterop.TerminalFlags(CSIZE) }
+internal var _CSIZE: tcflag_t { tcflag_t(CSIZE) }
 
 @_alwaysEmitIntoClient
-internal var _CS5: CInterop.TerminalFlags { CInterop.TerminalFlags(CS5) }
+internal var _CS5: tcflag_t { tcflag_t(CS5) }
 
 @_alwaysEmitIntoClient
-internal var _CS6: CInterop.TerminalFlags { CInterop.TerminalFlags(CS6) }
+internal var _CS6: tcflag_t { tcflag_t(CS6) }
 
 @_alwaysEmitIntoClient
-internal var _CS7: CInterop.TerminalFlags { CInterop.TerminalFlags(CS7) }
+internal var _CS7: tcflag_t { tcflag_t(CS7) }
 
 @_alwaysEmitIntoClient
-internal var _CS8: CInterop.TerminalFlags { CInterop.TerminalFlags(CS8) }
+internal var _CS8: tcflag_t { tcflag_t(CS8) }
 
 #if canImport(Darwin)
 @_alwaysEmitIntoClient
-internal var _CCTS_OFLOW: CInterop.TerminalFlags { CInterop.TerminalFlags(CCTS_OFLOW) }
+internal var _CCTS_OFLOW: tcflag_t { tcflag_t(CCTS_OFLOW) }
 
 @_alwaysEmitIntoClient
-internal var _CRTS_IFLOW: CInterop.TerminalFlags { CInterop.TerminalFlags(CRTS_IFLOW) }
+internal var _CRTS_IFLOW: tcflag_t { tcflag_t(CRTS_IFLOW) }
 
 @_alwaysEmitIntoClient
-internal var _CDTR_IFLOW: CInterop.TerminalFlags { CInterop.TerminalFlags(CDTR_IFLOW) }
+internal var _CDTR_IFLOW: tcflag_t { tcflag_t(CDTR_IFLOW) }
 
 @_alwaysEmitIntoClient
-internal var _CDSR_OFLOW: CInterop.TerminalFlags { CInterop.TerminalFlags(CDSR_OFLOW) }
+internal var _CDSR_OFLOW: tcflag_t { tcflag_t(CDSR_OFLOW) }
 
 @_alwaysEmitIntoClient
-internal var _CCAR_OFLOW: CInterop.TerminalFlags { CInterop.TerminalFlags(CCAR_OFLOW) }
+internal var _CCAR_OFLOW: tcflag_t { tcflag_t(CCAR_OFLOW) }
 
 @_alwaysEmitIntoClient
-internal var _CRTSCTS: CInterop.TerminalFlags { CInterop.TerminalFlags(CRTSCTS) }
+internal var _CRTSCTS: tcflag_t { tcflag_t(CRTSCTS) }
 #endif
 
 #if os(Linux)
 @_alwaysEmitIntoClient
-internal var _CRTSCTS: CInterop.TerminalFlags { CInterop.TerminalFlags(CRTSCTS) }
+internal var _CRTSCTS: tcflag_t { tcflag_t(CRTSCTS) }
 
 @_alwaysEmitIntoClient
-internal var _CMSPAR: CInterop.TerminalFlags { CInterop.TerminalFlags(CMSPAR) }
+internal var _CMSPAR: tcflag_t { tcflag_t(CMSPAR) }
 #endif
 
 // Local flags (c_lflag)
 @_alwaysEmitIntoClient
-internal var _ECHO: CInterop.TerminalFlags { CInterop.TerminalFlags(ECHO) }
+internal var _ECHO: tcflag_t { tcflag_t(ECHO) }
 
 @_alwaysEmitIntoClient
-internal var _ECHOE: CInterop.TerminalFlags { CInterop.TerminalFlags(ECHOE) }
+internal var _ECHOE: tcflag_t { tcflag_t(ECHOE) }
 
 @_alwaysEmitIntoClient
-internal var _ECHOK: CInterop.TerminalFlags { CInterop.TerminalFlags(ECHOK) }
+internal var _ECHOK: tcflag_t { tcflag_t(ECHOK) }
 
 @_alwaysEmitIntoClient
-internal var _ECHONL: CInterop.TerminalFlags { CInterop.TerminalFlags(ECHONL) }
+internal var _ECHONL: tcflag_t { tcflag_t(ECHONL) }
 
 @_alwaysEmitIntoClient
-internal var _ICANON: CInterop.TerminalFlags { CInterop.TerminalFlags(ICANON) }
+internal var _ICANON: tcflag_t { tcflag_t(ICANON) }
 
 @_alwaysEmitIntoClient
-internal var _IEXTEN: CInterop.TerminalFlags { CInterop.TerminalFlags(IEXTEN) }
+internal var _IEXTEN: tcflag_t { tcflag_t(IEXTEN) }
 
 @_alwaysEmitIntoClient
-internal var _ISIG: CInterop.TerminalFlags { CInterop.TerminalFlags(ISIG) }
+internal var _ISIG: tcflag_t { tcflag_t(ISIG) }
 
 @_alwaysEmitIntoClient
-internal var _NOFLSH: CInterop.TerminalFlags { CInterop.TerminalFlags(NOFLSH) }
+internal var _NOFLSH: tcflag_t { tcflag_t(NOFLSH) }
 
 @_alwaysEmitIntoClient
-internal var _TOSTOP: CInterop.TerminalFlags { CInterop.TerminalFlags(TOSTOP) }
+internal var _TOSTOP: tcflag_t { tcflag_t(TOSTOP) }
 
 @_alwaysEmitIntoClient
-internal var _ECHOCTL: CInterop.TerminalFlags { CInterop.TerminalFlags(ECHOCTL) }
+internal var _ECHOCTL: tcflag_t { tcflag_t(ECHOCTL) }
 
 @_alwaysEmitIntoClient
-internal var _ECHOKE: CInterop.TerminalFlags { CInterop.TerminalFlags(ECHOKE) }
+internal var _ECHOKE: tcflag_t { tcflag_t(ECHOKE) }
 
 @_alwaysEmitIntoClient
-internal var _ECHOPRT: CInterop.TerminalFlags { CInterop.TerminalFlags(ECHOPRT) }
+internal var _ECHOPRT: tcflag_t { tcflag_t(ECHOPRT) }
 
 @_alwaysEmitIntoClient
-internal var _FLUSHO: CInterop.TerminalFlags { CInterop.TerminalFlags(FLUSHO) }
+internal var _FLUSHO: tcflag_t { tcflag_t(FLUSHO) }
 
 @_alwaysEmitIntoClient
-internal var _PENDIN: CInterop.TerminalFlags { CInterop.TerminalFlags(PENDIN) }
+internal var _PENDIN: tcflag_t { tcflag_t(PENDIN) }
 
 #if canImport(Darwin)
 @_alwaysEmitIntoClient
-internal var _ALTWERASE: CInterop.TerminalFlags { CInterop.TerminalFlags(ALTWERASE) }
+internal var _ALTWERASE: tcflag_t { tcflag_t(ALTWERASE) }
 
 @_alwaysEmitIntoClient
-internal var _EXTPROC: CInterop.TerminalFlags { CInterop.TerminalFlags(EXTPROC) }
+internal var _EXTPROC: tcflag_t { tcflag_t(EXTPROC) }
 
 @_alwaysEmitIntoClient
-internal var _NOKERNINFO: CInterop.TerminalFlags { CInterop.TerminalFlags(NOKERNINFO) }
+internal var _NOKERNINFO: tcflag_t { tcflag_t(NOKERNINFO) }
 #endif
 
 #if os(Linux)
 @_alwaysEmitIntoClient
-internal var _EXTPROC: CInterop.TerminalFlags { CInterop.TerminalFlags(EXTPROC) }
+internal var _EXTPROC: tcflag_t { tcflag_t(EXTPROC) }
 #endif
 
 // Control characters (c_cc indices)
@@ -1149,112 +1149,112 @@ internal var _VSWTC: CInt { CInt(VSWTC) }
 
 // Baud rates
 @_alwaysEmitIntoClient
-internal var _B0: CInterop.SpeedT { CInterop.SpeedT(B0) }
+internal var _B0: speed_t { speed_t(B0) }
 
 @_alwaysEmitIntoClient
-internal var _B50: CInterop.SpeedT { CInterop.SpeedT(B50) }
+internal var _B50: speed_t { speed_t(B50) }
 
 @_alwaysEmitIntoClient
-internal var _B75: CInterop.SpeedT { CInterop.SpeedT(B75) }
+internal var _B75: speed_t { speed_t(B75) }
 
 @_alwaysEmitIntoClient
-internal var _B110: CInterop.SpeedT { CInterop.SpeedT(B110) }
+internal var _B110: speed_t { speed_t(B110) }
 
 @_alwaysEmitIntoClient
-internal var _B134: CInterop.SpeedT { CInterop.SpeedT(B134) }
+internal var _B134: speed_t { speed_t(B134) }
 
 @_alwaysEmitIntoClient
-internal var _B150: CInterop.SpeedT { CInterop.SpeedT(B150) }
+internal var _B150: speed_t { speed_t(B150) }
 
 @_alwaysEmitIntoClient
-internal var _B200: CInterop.SpeedT { CInterop.SpeedT(B200) }
+internal var _B200: speed_t { speed_t(B200) }
 
 @_alwaysEmitIntoClient
-internal var _B300: CInterop.SpeedT { CInterop.SpeedT(B300) }
+internal var _B300: speed_t { speed_t(B300) }
 
 @_alwaysEmitIntoClient
-internal var _B600: CInterop.SpeedT { CInterop.SpeedT(B600) }
+internal var _B600: speed_t { speed_t(B600) }
 
 @_alwaysEmitIntoClient
-internal var _B1200: CInterop.SpeedT { CInterop.SpeedT(B1200) }
+internal var _B1200: speed_t { speed_t(B1200) }
 
 @_alwaysEmitIntoClient
-internal var _B1800: CInterop.SpeedT { CInterop.SpeedT(B1800) }
+internal var _B1800: speed_t { speed_t(B1800) }
 
 @_alwaysEmitIntoClient
-internal var _B2400: CInterop.SpeedT { CInterop.SpeedT(B2400) }
+internal var _B2400: speed_t { speed_t(B2400) }
 
 @_alwaysEmitIntoClient
-internal var _B4800: CInterop.SpeedT { CInterop.SpeedT(B4800) }
+internal var _B4800: speed_t { speed_t(B4800) }
 
 @_alwaysEmitIntoClient
-internal var _B9600: CInterop.SpeedT { CInterop.SpeedT(B9600) }
+internal var _B9600: speed_t { speed_t(B9600) }
 
 @_alwaysEmitIntoClient
-internal var _B19200: CInterop.SpeedT { CInterop.SpeedT(B19200) }
+internal var _B19200: speed_t { speed_t(B19200) }
 
 @_alwaysEmitIntoClient
-internal var _B38400: CInterop.SpeedT { CInterop.SpeedT(B38400) }
+internal var _B38400: speed_t { speed_t(B38400) }
 
 @_alwaysEmitIntoClient
-internal var _B57600: CInterop.SpeedT { CInterop.SpeedT(B57600) }
+internal var _B57600: speed_t { speed_t(B57600) }
 
 @_alwaysEmitIntoClient
-internal var _B115200: CInterop.SpeedT { CInterop.SpeedT(B115200) }
+internal var _B115200: speed_t { speed_t(B115200) }
 
 @_alwaysEmitIntoClient
-internal var _B230400: CInterop.SpeedT { CInterop.SpeedT(B230400) }
+internal var _B230400: speed_t { speed_t(B230400) }
 
 #if canImport(Darwin)
 @_alwaysEmitIntoClient
-internal var _B7200: CInterop.SpeedT { CInterop.SpeedT(B7200) }
+internal var _B7200: speed_t { speed_t(B7200) }
 
 @_alwaysEmitIntoClient
-internal var _B14400: CInterop.SpeedT { CInterop.SpeedT(B14400) }
+internal var _B14400: speed_t { speed_t(B14400) }
 
 @_alwaysEmitIntoClient
-internal var _B28800: CInterop.SpeedT { CInterop.SpeedT(B28800) }
+internal var _B28800: speed_t { speed_t(B28800) }
 
 @_alwaysEmitIntoClient
-internal var _B76800: CInterop.SpeedT { CInterop.SpeedT(B76800) }
+internal var _B76800: speed_t { speed_t(B76800) }
 #endif
 
 #if os(Linux)
 @_alwaysEmitIntoClient
-internal var _B460800: CInterop.SpeedT { CInterop.SpeedT(B460800) }
+internal var _B460800: speed_t { speed_t(B460800) }
 
 @_alwaysEmitIntoClient
-internal var _B500000: CInterop.SpeedT { CInterop.SpeedT(B500000) }
+internal var _B500000: speed_t { speed_t(B500000) }
 
 @_alwaysEmitIntoClient
-internal var _B576000: CInterop.SpeedT { CInterop.SpeedT(B576000) }
+internal var _B576000: speed_t { speed_t(B576000) }
 
 @_alwaysEmitIntoClient
-internal var _B921600: CInterop.SpeedT { CInterop.SpeedT(B921600) }
+internal var _B921600: speed_t { speed_t(B921600) }
 
 @_alwaysEmitIntoClient
-internal var _B1000000: CInterop.SpeedT { CInterop.SpeedT(B1000000) }
+internal var _B1000000: speed_t { speed_t(B1000000) }
 
 @_alwaysEmitIntoClient
-internal var _B1152000: CInterop.SpeedT { CInterop.SpeedT(B1152000) }
+internal var _B1152000: speed_t { speed_t(B1152000) }
 
 @_alwaysEmitIntoClient
-internal var _B1500000: CInterop.SpeedT { CInterop.SpeedT(B1500000) }
+internal var _B1500000: speed_t { speed_t(B1500000) }
 
 @_alwaysEmitIntoClient
-internal var _B2000000: CInterop.SpeedT { CInterop.SpeedT(B2000000) }
+internal var _B2000000: speed_t { speed_t(B2000000) }
 
 @_alwaysEmitIntoClient
-internal var _B2500000: CInterop.SpeedT { CInterop.SpeedT(B2500000) }
+internal var _B2500000: speed_t { speed_t(B2500000) }
 
 @_alwaysEmitIntoClient
-internal var _B3000000: CInterop.SpeedT { CInterop.SpeedT(B3000000) }
+internal var _B3000000: speed_t { speed_t(B3000000) }
 
 @_alwaysEmitIntoClient
-internal var _B3500000: CInterop.SpeedT { CInterop.SpeedT(B3500000) }
+internal var _B3500000: speed_t { speed_t(B3500000) }
 
 @_alwaysEmitIntoClient
-internal var _B4000000: CInterop.SpeedT { CInterop.SpeedT(B4000000) }
+internal var _B4000000: speed_t { speed_t(B4000000) }
 #endif
 
 // SetAction constants

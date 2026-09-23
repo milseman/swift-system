@@ -364,7 +364,7 @@ internal func system_getenv(
 #if !os(Windows) && !os(WASI)
 internal func system_tcgetattr(
   _ fd: CInt,
-  _ termios_p: UnsafeMutablePointer<CInterop.Termios>
+  _ termios_p: UnsafeMutablePointer<termios>
 ) -> CInt {
 #if ENABLE_MOCKING
   if mockingEnabled {
@@ -377,7 +377,7 @@ internal func system_tcgetattr(
 internal func system_tcsetattr(
   _ fd: CInt,
   _ optional_actions: CInt,
-  _ termios_p: UnsafePointer<CInterop.Termios>
+  _ termios_p: UnsafePointer<termios>
 ) -> CInt {
 #if ENABLE_MOCKING
   if mockingEnabled {
@@ -437,24 +437,24 @@ internal func system_tcsendbreak(
 
 @usableFromInline
 internal func system_cfgetispeed(
-  _ termios_p: UnsafePointer<CInterop.Termios>
-) -> CInterop.SpeedT {
+  _ termios_p: UnsafePointer<termios>
+) -> speed_t {
   return cfgetispeed(termios_p)
 }
 
 
 @usableFromInline
 internal func system_cfgetospeed(
-  _ termios_p: UnsafePointer<CInterop.Termios>
-) -> CInterop.SpeedT {
+  _ termios_p: UnsafePointer<termios>
+) -> speed_t {
   return cfgetospeed(termios_p)
 }
 
 
 @usableFromInline
 internal func system_cfsetispeed(
-  _ termios_p: UnsafeMutablePointer<CInterop.Termios>,
-  _ speed: CInterop.SpeedT
+  _ termios_p: UnsafeMutablePointer<termios>,
+  _ speed: speed_t
 ) -> CInt {
   return cfsetispeed(termios_p, speed)
 }
@@ -462,8 +462,8 @@ internal func system_cfsetispeed(
 
 @usableFromInline
 internal func system_cfsetospeed(
-  _ termios_p: UnsafeMutablePointer<CInterop.Termios>,
-  _ speed: CInterop.SpeedT
+  _ termios_p: UnsafeMutablePointer<termios>,
+  _ speed: speed_t
 ) -> CInt {
   return cfsetospeed(termios_p, speed)
 }
@@ -471,8 +471,8 @@ internal func system_cfsetospeed(
 
 @usableFromInline
 internal func system_cfsetspeed(
-  _ termios_p: UnsafeMutablePointer<CInterop.Termios>,
-  _ speed: CInterop.SpeedT
+  _ termios_p: UnsafeMutablePointer<termios>,
+  _ speed: speed_t
 ) -> CInt {
 #if ENABLE_MOCKING
   if mockingEnabled {
@@ -485,7 +485,7 @@ internal func system_cfsetspeed(
 
 @usableFromInline
 internal func system_cfmakeraw(
-  _ termios_p: UnsafeMutablePointer<CInterop.Termios>
+  _ termios_p: UnsafeMutablePointer<termios>
 ) {
   cfmakeraw(termios_p)
 }
@@ -495,7 +495,7 @@ internal func system_cfmakeraw(
 @usableFromInline
 internal func system_tiocgwinsz(
   _ fd: CInt,
-  _ winsize_p: UnsafeMutablePointer<CInterop.WinSize>
+  _ winsize_p: UnsafeMutablePointer<winsize>
 ) -> CInt {
 #if ENABLE_MOCKING
   if mockingEnabled {
@@ -509,7 +509,7 @@ internal func system_tiocgwinsz(
 @usableFromInline
 internal func system_tiocswinsz(
   _ fd: CInt,
-  _ winsize_p: UnsafePointer<CInterop.WinSize>
+  _ winsize_p: UnsafePointer<winsize>
 ) -> CInt {
 #if ENABLE_MOCKING
   if mockingEnabled {
