@@ -651,6 +651,25 @@ internal func system_umask(
 }
 #endif // !os(WASI)
 
+// Not mockable: these return an ID and can't fail.
+#if !os(Windows) && !os(WASI)
+internal func system_getuid() -> CInterop.UserID {
+  return getuid()
+}
+
+internal func system_geteuid() -> CInterop.UserID {
+  return geteuid()
+}
+
+internal func system_getgid() -> CInterop.GroupID {
+  return getgid()
+}
+
+internal func system_getegid() -> CInterop.GroupID {
+  return getegid()
+}
+#endif // !os(Windows) && !os(WASI)
+
 internal func system_getenv(
   _ name: UnsafePointer<CChar>
 ) -> UnsafeMutablePointer<CChar>? {

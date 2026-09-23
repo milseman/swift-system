@@ -81,4 +81,71 @@ public struct Inode: RawRepresentable, Sendable, Hashable, Codable {
   @_alwaysEmitIntoClient
   public init(_ rawValue: CInterop.Inode) { self.rawValue = rawValue }
 }
+
+#if !os(WASI)
+@available(System 199, *)
+extension UserID {
+  /// The real user ID of the calling process.
+  ///
+  /// The real user ID identifies the user who started the process.
+  /// Permission checks use the effective user ID, ``effective``, instead;
+  /// the two differ in a set-user-ID program.
+  ///
+  /// The corresponding C function is `getuid`.
+  @_alwaysEmitIntoClient
+  public static var real: UserID { UserID(rawValue: _getuid()) }
+
+  /// The effective user ID of the calling process.
+  ///
+  /// The effective user ID determines the process's permissions.
+  /// It differs from the real user ID, ``real``, in a set-user-ID program.
+  ///
+  /// The corresponding C function is `geteuid`.
+  @_alwaysEmitIntoClient
+  public static var effective: UserID { UserID(rawValue: _geteuid()) }
+
+  @usableFromInline
+  internal static func _getuid() -> CInterop.UserID {
+    system_getuid()
+  }
+
+  @usableFromInline
+  internal static func _geteuid() -> CInterop.UserID {
+    system_geteuid()
+  }
+}
+
+@available(System 199, *)
+extension GroupID {
+  /// The real group ID of the calling process.
+  ///
+  /// The real group ID identifies the group of the user who started the process.
+  /// Permission checks use the effective group ID, ``effective``, instead;
+  /// the two differ in a set-group-ID program.
+  ///
+  /// The corresponding C function is `getgid`.
+  @_alwaysEmitIntoClient
+  public static var real: GroupID { GroupID(rawValue: _getgid()) }
+
+  /// The effective group ID of the calling process.
+  ///
+  /// The effective group ID determines the process's permissions,
+  /// along with its supplementary groups.
+  /// It differs from the real group ID, ``real``, in a set-group-ID program.
+  ///
+  /// The corresponding C function is `getegid`.
+  @_alwaysEmitIntoClient
+  public static var effective: GroupID { GroupID(rawValue: _getegid()) }
+
+  @usableFromInline
+  internal static func _getgid() -> CInterop.GroupID {
+    system_getgid()
+  }
+
+  @usableFromInline
+  internal static func _getegid() -> CInterop.GroupID {
+    system_getegid()
+  }
+}
+#endif // !os(WASI)
 #endif // !os(Windows)
