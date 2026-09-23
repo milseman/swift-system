@@ -154,6 +154,15 @@ final class FileOperationsTest: XCTestCase {
     }
     fdatasync.runAllTests()
     #endif // !SYSTEM_PACKAGE_DARWIN
+
+    #if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
+    let fchflags = MockTestCase(
+      name: "fchflags", .interruptable, rawFD, UInt32(bitPattern: UF_NODUMP | UF_APPEND)
+    ) { retryOnInterrupt in
+      try fd.setFileFlags([.noDump, .userAppend], retryOnInterrupt: retryOnInterrupt)
+    }
+    fchflags.runAllTests()
+    #endif // SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
   }
   #endif // ENABLE_MOCKING && !os(WASI) && !os(Windows)
 
@@ -557,6 +566,25 @@ final class FileOperationsTest: XCTestCase {
       }
     }
   }
+
+#if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
+  @available(System 199, *)
+  func testSetFileFlags() throws {
+    try withTemporaryFilePath(basename: "testSetFileFlags") { path in
+      let fd = try FileDescriptor.open(path.appending("\(UUID().uuidString).txt"), .readWrite, options: [.create, .truncate], permissions: .ownerReadWrite)
+      try fd.closeAfter {
+        let original = try fd.stat().flags
+        XCTAssertFalse(original.contains(.noDump))
+
+        try fd.setFileFlags(original.union(.noDump))
+        XCTAssertEqual(try fd.stat().flags, original.union(.noDump))
+
+        try fd.setFileFlags(original)
+        XCTAssertEqual(try fd.stat().flags, original)
+      }
+    }
+  }
+#endif // SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
 #endif // !os(Windows) && !os(WASI)
 }
 

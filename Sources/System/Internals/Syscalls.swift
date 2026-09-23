@@ -207,6 +207,16 @@ internal func system_fchown(_ fd: Int32, _ owner: uid_t, _ group: gid_t) -> Int3
 }
 #endif // !os(Windows) && !os(WASI)
 
+#if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
+internal func system_fchflags(_ fd: Int32, _ flags: UInt32) -> Int32 {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(fd, flags) }
+#endif
+  // The flags parameter is `unsigned long` on FreeBSD.
+  return fchflags(fd, numericCast(flags))
+}
+#endif // SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
+
 internal func system_mkdir(
     _ path: UnsafePointer<CInterop.PlatformChar>,
     _ mode: CInterop.Mode

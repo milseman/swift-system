@@ -1012,6 +1012,47 @@ extension FileDescriptor {
 }
 #endif // !os(Windows) && !os(WASI)
 
+#if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
+@available(System 199, *)
+extension FileDescriptor {
+  /// Replaces the flags of the file referenced by this file descriptor.
+  ///
+  /// - Parameters:
+  ///   - flags: The new flags for the file.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// This method sets all of the file's flags at once.
+  /// To change individual flags,
+  /// start from the file's current flags, given by ``Stat/flags``.
+  /// Some flags can only be changed by the superuser,
+  /// and some can't be changed at all;
+  /// see the documentation for each flag in ``FileFlags``.
+  ///
+  /// The corresponding C function is `fchflags`.
+  /// - Note: Only available on Darwin, FreeBSD, and OpenBSD.
+  @_alwaysEmitIntoClient
+  public func setFileFlags(
+    _ flags: FileFlags,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try _setFileFlags(flags, retryOnInterrupt: retryOnInterrupt).get()
+  }
+
+  @usableFromInline
+  internal func _setFileFlags(
+    _ flags: FileFlags,
+    retryOnInterrupt: Bool
+  ) -> Result<(), Errno> {
+    nothingOrErrno(retryOnInterrupt: retryOnInterrupt) {
+      system_fchflags(self.rawValue, flags.rawValue)
+    }
+  }
+}
+#endif // SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
+
 #if !os(WASI) // WASI has no umask
 extension FilePermissions {
   /// The file creation permission mask (aka "umask").
