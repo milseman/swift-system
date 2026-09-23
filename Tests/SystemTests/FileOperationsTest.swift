@@ -454,20 +454,26 @@ final class FileOperationsTest: XCTestCase {
           "a.txt", relativeTo: dir, .readWrite,
           options: [.create, .exclusiveCreate], permissions: .ownerReadWrite)
         try fd.closeAfter {
-          try fd.writeAll("abc".utf8)
+          _ = try fd.writeAll("abc".utf8)
+        }
 
+        // The file was created inside the directory.
+        let file = try FileDescriptor.open(path.appending("a.txt"), .readOnly)
+        try file.closeAfter {
+          let readBytes = try Array<UInt8>(unsafeUninitializedCapacity: 3) { buf, count in
+            count = try file.read(into: UnsafeMutableRawBufferPointer(buf))
+          }
+          XCTAssertEqual(readBytes, Array("abc".utf8))
+
+          #if !os(WASI) // WASI resolves paths only beneath the directory
           // An absolute path ignores the directory argument.
           let absolute = try FileDescriptor.open(
-            path.appending("a.txt"), relativeTo: fd, .readOnly)
-          try absolute.closeAfter {
-            let readBytes = try Array<UInt8>(unsafeUninitializedCapacity: 3) { buf, count in
-              count = try absolute.read(into: UnsafeMutableRawBufferPointer(buf))
-            }
-            XCTAssertEqual(readBytes, Array("abc".utf8))
-          }
+            path.appending("a.txt"), relativeTo: file, .readOnly)
+          try absolute.close()
+          #endif
 
           // A relative path is resolved against the directory argument.
-          XCTAssertThrowsError(try FileDescriptor.open("a.txt", relativeTo: fd, .readOnly)) {
+          XCTAssertThrowsError(try FileDescriptor.open("a.txt", relativeTo: file, .readOnly)) {
             XCTAssertEqual($0 as? Errno, .notDirectory)
           }
         }
