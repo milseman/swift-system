@@ -23,6 +23,7 @@ struct SystemSamples: ParsableCommand {
       OwnedRedirect.self,
       OwnedPoll.self,
       OwnedLines.self,
+      PIDFile.self,
     ])
 }
 
