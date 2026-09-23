@@ -662,10 +662,16 @@ internal var _SEEK_DATA: CInt { SEEK_DATA }
 @_alwaysEmitIntoClient
 internal var _AT_FDCWD: CInt { AT_FDCWD }
 
-// MARK: - fstatat Flags
+// MARK: - *at Flags
 
 @_alwaysEmitIntoClient
 internal var _AT_SYMLINK_NOFOLLOW: CInt { AT_SYMLINK_NOFOLLOW }
+
+@_alwaysEmitIntoClient
+internal var _AT_SYMLINK_FOLLOW: CInt { AT_SYMLINK_FOLLOW }
+
+@_alwaysEmitIntoClient
+internal var _AT_REMOVEDIR: CInt { AT_REMOVEDIR }
 
 #if SYSTEM_PACKAGE_DARWIN
 @_alwaysEmitIntoClient

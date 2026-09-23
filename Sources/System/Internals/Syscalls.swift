@@ -284,9 +284,20 @@ internal func system_unlinkat(
   _ flag: CInt
 ) -> CInt {
 #if ENABLE_MOCKING
-  if mockingEnabled { return _mock(fd, path, flag) }
+  if mockingEnabled {
+    return _mock(fd, String(_errorCorrectingPlatformString: path), flag)
+  }
 #endif
 return unlinkat(fd, path, flag)
+}
+
+internal func system_unlink(
+  _ path: UnsafePointer<CInterop.PlatformChar>
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(path: path) }
+#endif
+  return unlink(path)
 }
 
 internal func system_fdopendir(
