@@ -8,6 +8,7 @@
 */
 
 import XCTest
+import Dispatch
 
 #if SYSTEM_PACKAGE
 @testable import SystemPackage
