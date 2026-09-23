@@ -244,6 +244,20 @@ private struct SocketOperationsTests {
     let size = try socket.getSocketOption(SocketDescriptor.SocketOption.receiveBufferSize)
     #expect(size > 0)
   }
+
+  #if SYSTEM_PACKAGE_DARWIN || os(Linux)
+  @Test func tcpKeepAliveOptions() throws {
+    let socket = try SocketDescriptor.open(.ipv4, .stream, protocol: .tcp)
+    defer { try? socket.close() }
+
+    try socket.setTCPOption(.keepAliveIdle, to: 30)
+    #expect(try socket.getTCPOption(.keepAliveIdle) == 30)
+    try socket.setTCPOption(.keepAliveInterval, to: 7)
+    #expect(try socket.getTCPOption(.keepAliveInterval) == 7)
+    try socket.setTCPOption(.keepAliveCount, to: 3)
+    #expect(try socket.getTCPOption(.keepAliveCount) == 3)
+  }
+  #endif
 }
 
 #endif
