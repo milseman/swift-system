@@ -17,6 +17,7 @@ add_library(SystemPackage
   MachPort.swift
   OwnedFD.swift
   PlatformString.swift
+  ProcessID.swift
   SystemString.swift
   TerminalDescriptor.swift
   Util.swift
