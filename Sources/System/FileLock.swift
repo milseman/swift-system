@@ -388,7 +388,9 @@ extension FileDescriptor {
   ) -> Result<Bool, Errno> {
     var lock = FileLock(kind: kind, start: start, length: length)
     let result = nothingOrErrno(retryOnInterrupt: retryOnInterrupt) {
-      system_fcntl(self.rawValue, command, &lock.rawValue)
+      withUnsafeMutablePointer(to: &lock.rawValue) {
+        system_fcntl(self.rawValue, command, $0)
+      }
     }
     switch result {
     case .success:
@@ -409,7 +411,9 @@ extension FileDescriptor {
   ) -> Result<(), Errno> {
     var lock = FileLock(kind: .none, start: start, length: length)
     return nothingOrErrno(retryOnInterrupt: retryOnInterrupt) {
-      system_fcntl(self.rawValue, _F_OFD_SETLK, &lock.rawValue)
+      withUnsafeMutablePointer(to: &lock.rawValue) {
+        system_fcntl(self.rawValue, _F_OFD_SETLK, $0)
+      }
     }
   }
 }
@@ -491,7 +495,9 @@ extension FileDescriptor {
       fl: FileLock(kind: kind, start: start, length: length).rawValue,
       timeout: timespec(tv_sec: timeoutSeconds, tv_nsec: timeoutNanoseconds))
     let result = nothingOrErrno(retryOnInterrupt: retryOnInterrupt) {
-      system_fcntl(self.rawValue, _F_OFD_SETLKWTIMEOUT, &lock)
+      withUnsafeMutablePointer(to: &lock) {
+        system_fcntl(self.rawValue, _F_OFD_SETLKWTIMEOUT, $0)
+      }
     }
     switch result {
     case .success:

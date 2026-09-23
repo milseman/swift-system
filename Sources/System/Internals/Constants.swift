@@ -756,6 +756,177 @@ internal var _F_OFD_SETLKW: CInt {
 internal var _F_OFD_SETLKWTIMEOUT: CInt { F_OFD_SETLKWTIMEOUT }
 #endif
 
+// MARK: - fcntl commands
+
+#if !os(Windows) && !os(WASI)
+@_alwaysEmitIntoClient
+internal var _F_GETOWN: CInt { F_GETOWN }
+
+@_alwaysEmitIntoClient
+internal var _F_SETOWN: CInt { F_SETOWN }
+
+@_alwaysEmitIntoClient
+internal var _F_GETLK: CInt { F_GETLK }
+
+@_alwaysEmitIntoClient
+internal var _F_SETLK: CInt { F_SETLK }
+
+@_alwaysEmitIntoClient
+internal var _F_SETLKW: CInt { F_SETLKW }
+#endif
+
+#if SYSTEM_PACKAGE_DARWIN
+@_alwaysEmitIntoClient
+internal var _F_SETLKWTIMEOUT: CInt { F_SETLKWTIMEOUT }
+
+@_alwaysEmitIntoClient
+internal var _F_FLUSH_DATA: CInt { F_FLUSH_DATA }
+
+@_alwaysEmitIntoClient
+internal var _F_CHKCLEAN: CInt { F_CHKCLEAN }
+
+@_alwaysEmitIntoClient
+internal var _F_PREALLOCATE: CInt { F_PREALLOCATE }
+
+@_alwaysEmitIntoClient
+internal var _F_SETSIZE: CInt { F_SETSIZE }
+
+@_alwaysEmitIntoClient
+internal var _F_RDADVISE: CInt { F_RDADVISE }
+
+@_alwaysEmitIntoClient
+internal var _F_RDAHEAD: CInt { F_RDAHEAD }
+
+@_alwaysEmitIntoClient
+internal var _F_NOCACHE: CInt { F_NOCACHE }
+
+@_alwaysEmitIntoClient
+internal var _F_LOG2PHYS: CInt { F_LOG2PHYS }
+
+@_alwaysEmitIntoClient
+internal var _F_GETPATH: CInt { F_GETPATH }
+
+@_alwaysEmitIntoClient
+internal var _F_PATHPKG_CHECK: CInt { F_PATHPKG_CHECK }
+
+@_alwaysEmitIntoClient
+internal var _F_FREEZE_FS: CInt { F_FREEZE_FS }
+
+@_alwaysEmitIntoClient
+internal var _F_THAW_FS: CInt { F_THAW_FS }
+
+@_alwaysEmitIntoClient
+internal var _F_GLOBAL_NOCACHE: CInt { F_GLOBAL_NOCACHE }
+
+@_alwaysEmitIntoClient
+internal var _F_ADDSIGS: CInt { F_ADDSIGS }
+
+@_alwaysEmitIntoClient
+internal var _F_ADDFILESIGS: CInt { F_ADDFILESIGS }
+
+@_alwaysEmitIntoClient
+internal var _F_NODIRECT: CInt { F_NODIRECT }
+
+@_alwaysEmitIntoClient
+internal var _F_GETPROTECTIONCLASS: CInt { F_GETPROTECTIONCLASS }
+
+@_alwaysEmitIntoClient
+internal var _F_SETPROTECTIONCLASS: CInt { F_SETPROTECTIONCLASS }
+
+@_alwaysEmitIntoClient
+internal var _F_LOG2PHYS_EXT: CInt { F_LOG2PHYS_EXT }
+
+@_alwaysEmitIntoClient
+internal var _F_GETLKPID: CInt { F_GETLKPID }
+
+@_alwaysEmitIntoClient
+internal var _F_SETBACKINGSTORE: CInt { F_SETBACKINGSTORE }
+
+@_alwaysEmitIntoClient
+internal var _F_GETPATH_MTMINFO: CInt { F_GETPATH_MTMINFO }
+
+@_alwaysEmitIntoClient
+internal var _F_GETCODEDIR: CInt { F_GETCODEDIR }
+
+@_alwaysEmitIntoClient
+internal var _F_SETNOSIGPIPE: CInt { F_SETNOSIGPIPE }
+
+@_alwaysEmitIntoClient
+internal var _F_GETNOSIGPIPE: CInt { F_GETNOSIGPIPE }
+
+@_alwaysEmitIntoClient
+internal var _F_TRANSCODEKEY: CInt { F_TRANSCODEKEY }
+
+@_alwaysEmitIntoClient
+internal var _F_SINGLE_WRITER: CInt { F_SINGLE_WRITER }
+
+@_alwaysEmitIntoClient
+internal var _F_GETPROTECTIONLEVEL: CInt { F_GETPROTECTIONLEVEL }
+
+@_alwaysEmitIntoClient
+internal var _F_FINDSIGS: CInt { F_FINDSIGS }
+
+@_alwaysEmitIntoClient
+internal var _F_ADDFILESIGS_FOR_DYLD_SIM: CInt { F_ADDFILESIGS_FOR_DYLD_SIM }
+
+@_alwaysEmitIntoClient
+internal var _F_ADDFILESIGS_RETURN: CInt { F_ADDFILESIGS_RETURN }
+
+@_alwaysEmitIntoClient
+internal var _F_CHECK_LV: CInt { F_CHECK_LV }
+
+@_alwaysEmitIntoClient
+internal var _F_PUNCHHOLE: CInt { F_PUNCHHOLE }
+
+@_alwaysEmitIntoClient
+internal var _F_TRIM_ACTIVE_FILE: CInt { F_TRIM_ACTIVE_FILE }
+
+@_alwaysEmitIntoClient
+internal var _F_SPECULATIVE_READ: CInt { F_SPECULATIVE_READ }
+
+@_alwaysEmitIntoClient
+internal var _F_GETPATH_NOFIRMLINK: CInt { F_GETPATH_NOFIRMLINK }
+
+@_alwaysEmitIntoClient
+internal var _F_ADDFILESIGS_INFO: CInt { F_ADDFILESIGS_INFO }
+
+@_alwaysEmitIntoClient
+internal var _F_ADDFILESUPPL: CInt { F_ADDFILESUPPL }
+
+@_alwaysEmitIntoClient
+internal var _F_GETSIGSINFO: CInt { F_GETSIGSINFO }
+
+// `fst_flags` is an `unsigned int`.
+@_alwaysEmitIntoClient
+internal var _F_ALLOCATECONTIG: UInt32 { UInt32(F_ALLOCATECONTIG) }
+
+@_alwaysEmitIntoClient
+internal var _F_ALLOCATEALL: UInt32 { UInt32(F_ALLOCATEALL) }
+
+@_alwaysEmitIntoClient
+internal var _F_ALLOCATEPERSIST: UInt32 { UInt32(F_ALLOCATEPERSIST) }
+
+@_alwaysEmitIntoClient
+internal var _F_PEOFPOSMODE: CInt { F_PEOFPOSMODE }
+
+@_alwaysEmitIntoClient
+internal var _F_VOLPOSMODE: CInt { F_VOLPOSMODE }
+
+// The size of the buffer that F_GETPATH fills.
+@_alwaysEmitIntoClient
+internal var _MAXPATHLEN: Int { Int(MAXPATHLEN) }
+#endif
+
+// glibc declares these only with _GNU_SOURCE, and Bionic defines them with
+// an expression Swift can't import, so they come from CSystemLinux.h.
+#if os(Linux) || os(Android)
+@_alwaysEmitIntoClient
+internal var _F_GETPIPE_SZ: CInt { CSYSTEM_F_GETPIPE_SZ }
+
+@_alwaysEmitIntoClient
+internal var _F_SETPIPE_SZ: CInt { CSYSTEM_F_SETPIPE_SZ }
+#endif
+
 // MARK: - posix_fadvise
 
 #if os(Linux) || os(Android) || os(FreeBSD) || os(WASI)

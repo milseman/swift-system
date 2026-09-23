@@ -234,6 +234,15 @@ internal func system_fcntl(_ fd: Int32, _ cmd: Int32, _ value: Int32) -> Int32 {
 #endif // !os(Windows)
 
 #if !os(Windows) && !os(WASI)
+internal func system_fcntl(
+  _ fd: Int32, _ cmd: Int32, _ pointer: UnsafeMutableRawPointer
+) -> Int32 {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(fd, cmd, pointer) }
+#endif
+  return fcntl(fd, cmd, pointer)
+}
+
 internal func system_flock(_ fd: Int32, _ operation: Int32) -> Int32 {
 #if ENABLE_MOCKING
   if mockingEnabled { return _mock(fd, operation) }

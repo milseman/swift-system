@@ -43,5 +43,10 @@ extern int csystem_renameat2(int olddirfd, const char *oldpath,
 #define CSYSTEM_F_OFD_GETLK 36
 #define CSYSTEM_F_OFD_SETLK 37
 #define CSYSTEM_F_OFD_SETLKW 38
+
+// The pipe capacity commands for fcntl, which glibc also declares only with
+// _GNU_SOURCE, and Bionic defines as F_LINUX_SPECIFIC_BASE + 7 and + 8.
+#define CSYSTEM_F_SETPIPE_SZ 1031
+#define CSYSTEM_F_GETPIPE_SZ 1032
 #endif
 

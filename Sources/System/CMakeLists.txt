@@ -10,6 +10,9 @@ See https://swift.org/LICENSE.txt for license information
 add_library(SystemPackage
   Errno.swift
   ErrnoWindows.swift
+  FileControl.swift
+  FileControlCommand.swift
+  FileControlTypes.swift
   FileDescriptor.swift
   FileHelpers.swift
   FileLock.swift
