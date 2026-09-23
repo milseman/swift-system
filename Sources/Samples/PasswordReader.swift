@@ -22,7 +22,7 @@ struct PasswordReader: ParsableCommand {
 
   func run() throws {
     // Only works if stdin is a terminal
-    guard let terminal = TerminalDescriptor(.standardInput) else {
+    guard let terminal = FileDescriptor.standardInput.asTerminal else {
       complain("Error: stdin is not a terminal")
       throw ExitCode.failure
     }

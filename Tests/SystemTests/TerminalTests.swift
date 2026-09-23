@@ -24,9 +24,9 @@ final class TerminalTests: XCTestCase {
       try? fds.writeEnd.close()
     }
 
-    // Should return nil for non-terminal file descriptors
-    XCTAssertNil(TerminalDescriptor(fds.readEnd))
-    XCTAssertNil(TerminalDescriptor(fds.writeEnd))
+    // Should throw for non-terminal file descriptors
+    XCTAssertThrowsError(try TerminalDescriptor(fds.readEnd))
+    XCTAssertThrowsError(try TerminalDescriptor(fds.writeEnd))
     XCTAssertFalse(fds.readEnd.isTerminal)
     XCTAssertFalse(fds.writeEnd.isTerminal)
   }
@@ -416,7 +416,7 @@ final class TerminalTests: XCTestCase {
 
   func testTerminalAttributesRoundtrip() throws {
     // Only run if we actually have a terminal
-    guard let terminal = TerminalDescriptor(.standardInput) else {
+    guard let terminal = FileDescriptor.standardInput.asTerminal else {
       throw XCTSkip("stdin is not a terminal")
     }
 
@@ -429,7 +429,7 @@ final class TerminalTests: XCTestCase {
   }
 
   func testTerminalSetAttributes() throws {
-    guard let terminal = TerminalDescriptor(.standardInput) else {
+    guard let terminal = FileDescriptor.standardInput.asTerminal else {
       throw XCTSkip("stdin is not a terminal")
     }
 
@@ -452,7 +452,7 @@ final class TerminalTests: XCTestCase {
   }
 
   func testWithAttributes() throws {
-    guard let terminal = TerminalDescriptor(.standardInput) else {
+    guard let terminal = FileDescriptor.standardInput.asTerminal else {
       throw XCTSkip("stdin is not a terminal")
     }
 
@@ -473,7 +473,7 @@ final class TerminalTests: XCTestCase {
   }
 
   func testWithRawMode() throws {
-    guard let terminal = TerminalDescriptor(.standardInput) else {
+    guard let terminal = FileDescriptor.standardInput.asTerminal else {
       throw XCTSkip("stdin is not a terminal")
     }
 
@@ -492,7 +492,7 @@ final class TerminalTests: XCTestCase {
   }
 
   func testWindowSizeOperation() throws {
-    guard let terminal = TerminalDescriptor(.standardOutput) else {
+    guard let terminal = FileDescriptor.standardOutput.asTerminal else {
       throw XCTSkip("stdout is not a terminal")
     }
 
@@ -503,7 +503,7 @@ final class TerminalTests: XCTestCase {
   }
 
   func testTerminalOperationsDontCrash() throws {
-    guard let terminal = TerminalDescriptor(.standardOutput) else {
+    guard let terminal = FileDescriptor.standardOutput.asTerminal else {
       throw XCTSkip("stdout is not a terminal")
     }
 

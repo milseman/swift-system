@@ -30,7 +30,7 @@ struct TerminalSize: ParsableCommand {
   var setColumns: UInt16?
 
   func run() throws {
-    guard let terminal = TerminalDescriptor(.standardOutput) else {
+    guard let terminal = FileDescriptor.standardOutput.asTerminal else {
       complain("Error: stdout is not a terminal")
       throw ExitCode.failure
     }

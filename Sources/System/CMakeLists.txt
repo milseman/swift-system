@@ -19,7 +19,6 @@ add_library(SystemPackage
   PlatformString.swift
   ProcessID.swift
   SystemString.swift
-  TerminalDescriptor.swift
   Util.swift
   Util+StringArray.swift
   UtilConsumers.swift
@@ -82,6 +81,8 @@ target_sources(SystemPackage PRIVATE
   Internals/RawBuffer.swift
   Internals/Syscalls.swift
   Internals/WindowsSyscallAdapters.swift)
+target_sources(SystemPackage PRIVATE
+  Terminal/TerminalDescriptor.swift)
 target_link_libraries(SystemPackage PUBLIC
   CSystem)
 

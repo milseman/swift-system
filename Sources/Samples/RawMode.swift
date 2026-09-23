@@ -18,7 +18,7 @@ struct RawMode: ParsableCommand {
   )
 
   func run() throws {
-    guard let terminal = TerminalDescriptor(.standardInput) else {
+    guard let terminal = FileDescriptor.standardInput.asTerminal else {
       complain("Error: stdin is not a terminal")
       throw ExitCode.failure
     }
