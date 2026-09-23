@@ -14,17 +14,24 @@ struct SystemSamples: ParsableCommand {
     commandName: "system-samples",
     abstract: "A collection of little programs exercising some System features.",
     subcommands: [
+      // Socket samples
       Resolve.self,
       ReverseResolve.self,
       Connect.self,
       Listen.self,
+      SocketPair.self,
+      // Owned descriptor samples
       OwnedCat.self,
       OwnedCopy.self,
       OwnedRedirect.self,
       OwnedPoll.self,
       OwnedLines.self,
+      // Terminal samples
+      PasswordReader.self,
+      TerminalSize.self,
+      RawMode.self,
+      // File and process samples
       PIDFile.self,
-      SocketPair.self,
       AtomicWrite.self,
       SetAttributes.self,
     ])

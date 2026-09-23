@@ -17,4 +17,11 @@
 #define COMPATIBILITY_O_CLOFORK 0
 #endif
 
+#include <sys/ioctl.h>
+#include <termios.h>
+
+// Terminal ioctl shims
+int _system_ioctl_TIOCGWINSZ(int fd, struct winsize *ws);
+int _system_ioctl_TIOCSWINSZ(int fd, const struct winsize *ws);
+
 #endif // defined(__APPLE__)

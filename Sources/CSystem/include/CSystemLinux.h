@@ -20,5 +20,21 @@
 #include <sched.h>
 #include <unistd.h>
 #include "io_uring.h"
+
+// Terminal ioctl shims. `ws` points to a struct winsize. It's untyped so that
+// this header needn't include <sys/ioctl.h>: members of a C type defined
+// through a CSystem header can be attributed to CSystem, which clients don't
+// import, so MemberImportVisibility hides those members from them (#320).
+int _system_ioctl_TIOCGWINSZ(int fd, void *ws);
+int _system_ioctl_TIOCSWINSZ(int fd, const void *ws);
+
+// The flags for renameat2. glibc only declares them, and renameat2 itself,
+// with _GNU_SOURCE, which can't be defined here; see shims.c.
+#define CSYSTEM_RENAME_NOREPLACE (1 << 0)
+#define CSYSTEM_RENAME_EXCHANGE (1 << 1)
+
+extern int csystem_renameat2(int olddirfd, const char *oldpath,
+                             int newdirfd, const char *newpath,
+                             unsigned int flags);
 #endif
 

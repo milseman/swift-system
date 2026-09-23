@@ -748,6 +748,113 @@ extension FileDescriptor {
 }
 #endif // !os(WASI)
 
+#if !os(Windows) && !os(WASI)
+@available(System 199, *)
+extension FileDescriptor {
+  /// Duplicates this file descriptor as the lowest-numbered available
+  /// descriptor that is greater than or equal to a minimum.
+  ///
+  /// - Parameters:
+  ///   - minimum: The lowest descriptor that the copy can be assigned.
+  ///     The default is `0`, which gives the lowest available descriptor.
+  ///   - closeOnExec: Whether the copy has the
+  ///     ``DescriptorFlags/closeOnExec`` flag set.
+  /// - Returns: The new file descriptor.
+  ///
+  /// Unlike ``duplicate(as:retryOnInterrupt:)``,
+  /// this method never closes a descriptor that is already in use.
+  ///
+  /// Setting `closeOnExec` here, rather than by calling
+  /// ``setDescriptorFlags(_:)`` on the copy afterward,
+  /// sets it atomically, so another thread's `exec` can't inherit
+  /// the copy in between.
+  ///
+  /// The corresponding C function is `fcntl`, with the `F_DUPFD` command,
+  /// or `F_DUPFD_CLOEXEC` if `closeOnExec` is `true`.
+  @_alwaysEmitIntoClient
+  public func duplicate(
+    atLeast minimum: FileDescriptor = FileDescriptor(rawValue: 0),
+    closeOnExec: Bool
+  ) throws(Errno) -> FileDescriptor {
+    try _duplicate(atLeast: minimum, closeOnExec: closeOnExec).get()
+  }
+
+  @usableFromInline
+  internal func _duplicate(
+    atLeast minimum: FileDescriptor,
+    closeOnExec: Bool
+  ) -> Result<FileDescriptor, Errno> {
+    valueOrErrno(retryOnInterrupt: false) {
+      system_fcntl(
+        self.rawValue, closeOnExec ? _F_DUPFD_CLOEXEC : _F_DUPFD, minimum.rawValue)
+    }.map(FileDescriptor.init(rawValue:))
+  }
+}
+#endif // !os(Windows) && !os(WASI)
+
+#if !os(Windows) && !os(WASI)
+@available(System 199, *)
+extension FileDescriptor {
+  /// Places an advisory lock on the open file that this file descriptor
+  /// refers to.
+  ///
+  /// - Parameters:
+  ///   - shared: Whether to place a shared lock, which several open files
+  ///     can hold at once, rather than an exclusive lock, which only one can.
+  ///     The default is `false`.
+  ///   - nonBlocking: Whether to throw ``Errno/wouldBlock``
+  ///     if another open file holds a conflicting lock,
+  ///     rather than waiting for it to be released.
+  ///     The default is `false`.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// The lock is advisory:
+  /// it only excludes others that also lock the file.
+  /// It belongs to the open file, rather than to this file descriptor,
+  /// so descriptors duplicated from this one share it.
+  /// The lock is released by ``unlock(retryOnInterrupt:)``,
+  /// or when the last descriptor for the open file is closed.
+  /// Locking a file that this open file has already locked
+  /// converts the lock to the requested kind.
+  ///
+  /// The corresponding C function is `flock`.
+  @_alwaysEmitIntoClient
+  public func lock(
+    shared: Bool = false,
+    nonBlocking: Bool = false,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    let operation = (shared ? _LOCK_SH : _LOCK_EX) | (nonBlocking ? _LOCK_NB : 0)
+    try _flock(operation, retryOnInterrupt: retryOnInterrupt).get()
+  }
+
+  /// Removes the advisory lock from the open file that this file descriptor
+  /// refers to.
+  ///
+  /// - Parameters:
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// The corresponding C function is `flock`, with `LOCK_UN`.
+  @_alwaysEmitIntoClient
+  public func unlock(retryOnInterrupt: Bool = true) throws(Errno) {
+    try _flock(_LOCK_UN, retryOnInterrupt: retryOnInterrupt).get()
+  }
+
+  @usableFromInline
+  internal func _flock(_ operation: CInt, retryOnInterrupt: Bool) -> Result<(), Errno> {
+    nothingOrErrno(retryOnInterrupt: retryOnInterrupt) {
+      system_flock(self.rawValue, operation)
+    }
+  }
+}
+#endif // !os(Windows) && !os(WASI)
+
 #if !os(WASI)
 @available(System 1.1.0, *)
 extension FileDescriptor {
@@ -1052,6 +1159,286 @@ extension FileDescriptor {
   }
 }
 #endif // SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
+
+#if !os(Windows) && !os(WASI)
+@available(System 199, *)
+extension FileDescriptor {
+  /// Returns the flags of this file descriptor.
+  ///
+  /// - Returns: The file descriptor's flags,
+  ///   such as ``DescriptorFlags/closeOnExec``.
+  ///
+  /// The corresponding C function is `fcntl`, with the `F_GETFD` command.
+  @_alwaysEmitIntoClient
+  public func descriptorFlags() throws(Errno) -> DescriptorFlags {
+    try _descriptorFlags().get()
+  }
+
+  @usableFromInline
+  internal func _descriptorFlags() -> Result<DescriptorFlags, Errno> {
+    valueOrErrno(retryOnInterrupt: false) {
+      system_fcntl(self.rawValue, _F_GETFD)
+    }.map(DescriptorFlags.init(rawValue:))
+  }
+
+  /// Replaces the flags of this file descriptor.
+  ///
+  /// - Parameters:
+  ///   - flags: The new flags for the file descriptor.
+  ///
+  /// This method sets all of the file descriptor's flags at once.
+  /// To change one flag, start from the current flags:
+  ///
+  ///     try fd.setDescriptorFlags(fd.descriptorFlags().union(.closeOnExec))
+  ///
+  /// The corresponding C function is `fcntl`, with the `F_SETFD` command.
+  @_alwaysEmitIntoClient
+  public func setDescriptorFlags(_ flags: DescriptorFlags) throws(Errno) {
+    try _setDescriptorFlags(flags).get()
+  }
+
+  @usableFromInline
+  internal func _setDescriptorFlags(_ flags: DescriptorFlags) -> Result<(), Errno> {
+    nothingOrErrno(retryOnInterrupt: false) {
+      system_fcntl(self.rawValue, _F_SETFD, flags.rawValue)
+    }
+  }
+}
+#endif // !os(Windows) && !os(WASI)
+
+#if !os(Windows)
+@available(System 199, *)
+extension FileDescriptor {
+  /// Returns the status flags of the open file that this file descriptor
+  /// refers to.
+  ///
+  /// - Returns: The open file's status flags,
+  ///   such as ``StatusFlags/nonBlocking``.
+  ///
+  /// All the file descriptors that refer to the same open file
+  /// share its status flags.
+  ///
+  /// The corresponding C function is `fcntl`, with the `F_GETFL` command.
+  /// The access mode, which that command also returns,
+  /// is given by ``accessMode()``.
+  @_alwaysEmitIntoClient
+  public func statusFlags() throws(Errno) -> StatusFlags {
+    try _statusFlags().get()
+  }
+
+  @usableFromInline
+  internal func _statusFlags() -> Result<StatusFlags, Errno> {
+    _fileStatus().map { StatusFlags(rawValue: $0 & ~_O_ACCMODE) }
+  }
+
+  /// Replaces the status flags of the open file that this file descriptor
+  /// refers to.
+  ///
+  /// - Parameters:
+  ///   - flags: The new status flags for the open file.
+  ///
+  /// This method sets all of the open file's status flags at once.
+  /// To change one flag, start from the current flags:
+  ///
+  ///     try fd.setStatusFlags(fd.statusFlags().union(.nonBlocking))
+  ///
+  /// All the file descriptors that refer to the same open file
+  /// share its status flags, so the change affects all of them,
+  /// including descriptors in other processes.
+  /// Not every flag can be changed after a file is opened;
+  /// the system ignores changes it doesn't support.
+  ///
+  /// The corresponding C function is `fcntl`, with the `F_SETFL` command.
+  @_alwaysEmitIntoClient
+  public func setStatusFlags(_ flags: StatusFlags) throws(Errno) {
+    try _setStatusFlags(flags).get()
+  }
+
+  @usableFromInline
+  internal func _setStatusFlags(_ flags: StatusFlags) -> Result<(), Errno> {
+    nothingOrErrno(retryOnInterrupt: false) {
+      system_fcntl(self.rawValue, _F_SETFL, flags.rawValue)
+    }
+  }
+
+  /// Returns the read and write access that the open file that this
+  /// file descriptor refers to was opened with.
+  ///
+  /// - Returns: The open file's access mode.
+  ///
+  /// The corresponding C function is `fcntl`, with the `F_GETFL` command.
+  @_alwaysEmitIntoClient
+  public func accessMode() throws(Errno) -> AccessMode {
+    try _accessMode().get()
+  }
+
+  @usableFromInline
+  internal func _accessMode() -> Result<AccessMode, Errno> {
+    _fileStatus().map { AccessMode(rawValue: $0 & _O_ACCMODE) }
+  }
+
+  internal func _fileStatus() -> Result<CInt, Errno> {
+    valueOrErrno(retryOnInterrupt: false) {
+      system_fcntl(self.rawValue, _F_GETFL)
+    }
+  }
+}
+#endif // !os(Windows)
+
+#if SYSTEM_PACKAGE_DARWIN
+@available(System 199, *)
+extension FileDescriptor {
+  /// Flushes modified data and metadata of the file referenced by this
+  /// file descriptor to its storage device,
+  /// and asks the device to write its cache to permanent storage.
+  ///
+  /// - Parameters:
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// ``synchronize(retryOnInterrupt:)`` can return
+  /// while the data is still in the storage device's cache.
+  /// This method waits until the device reports
+  /// that the data is on permanent storage,
+  /// which can take much longer.
+  /// Some file systems don't support it, and throw an error.
+  ///
+  /// The corresponding C function is `fcntl`, with the `F_FULLFSYNC` command.
+  /// - Note: Only available on Darwin.
+  @_alwaysEmitIntoClient
+  public func synchronizeFully(retryOnInterrupt: Bool = true) throws(Errno) {
+    try _synchronizeFully(retryOnInterrupt: retryOnInterrupt).get()
+  }
+
+  @usableFromInline
+  internal func _synchronizeFully(retryOnInterrupt: Bool) -> Result<(), Errno> {
+    nothingOrErrno(retryOnInterrupt: retryOnInterrupt) {
+      system_fcntl(self.rawValue, _F_FULLFSYNC)
+    }
+  }
+
+  /// Flushes modified data and metadata of the file referenced by this
+  /// file descriptor to its storage device,
+  /// and asks the device to write it to permanent storage
+  /// before any data written later.
+  ///
+  /// - Parameters:
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// This method orders writes without waiting for them
+  /// to reach permanent storage,
+  /// so it is cheaper than ``synchronizeFully(retryOnInterrupt:)``.
+  /// Some file systems don't support it, and throw an error.
+  ///
+  /// The corresponding C function is `fcntl`, with the `F_BARRIERFSYNC` command.
+  /// - Note: Only available on Darwin.
+  @_alwaysEmitIntoClient
+  public func synchronizeWithBarrier(retryOnInterrupt: Bool = true) throws(Errno) {
+    try _synchronizeWithBarrier(retryOnInterrupt: retryOnInterrupt).get()
+  }
+
+  @usableFromInline
+  internal func _synchronizeWithBarrier(retryOnInterrupt: Bool) -> Result<(), Errno> {
+    nothingOrErrno(retryOnInterrupt: retryOnInterrupt) {
+      system_fcntl(self.rawValue, _F_BARRIERFSYNC)
+    }
+  }
+}
+#endif // SYSTEM_PACKAGE_DARWIN
+
+#if os(Linux) || os(Android) || os(FreeBSD) || os(WASI)
+@available(System 199, *)
+extension FileDescriptor {
+  /// Allocates storage for a range of the file referenced by this
+  /// file descriptor.
+  ///
+  /// - Parameters:
+  ///   - offset: The file offset where the range begins.
+  ///   - length: The length of the range, in bytes.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// After this method returns,
+  /// writes within the range don't fail for lack of storage.
+  /// If the range extends past the end of the file,
+  /// the file is extended to cover it;
+  /// the new bytes read as zeros.
+  /// This method doesn't change the file's existing contents
+  /// or its offset.
+  ///
+  /// The file must be open for writing.
+  /// Some file systems don't support preallocation,
+  /// and throw an error such as ``Errno/invalidArgument``.
+  ///
+  /// The corresponding C function is `posix_fallocate`.
+  /// - Note: Only available on Linux, Android, FreeBSD, and WASI.
+  @_alwaysEmitIntoClient
+  public func allocateSpace(
+    offset: Int64,
+    length: Int64,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try _allocateSpace(
+      offset: offset, length: length, retryOnInterrupt: retryOnInterrupt
+    ).get()
+  }
+
+  @usableFromInline
+  internal func _allocateSpace(
+    offset: Int64,
+    length: Int64,
+    retryOnInterrupt: Bool
+  ) -> Result<(), Errno> {
+    nothingOrReturnedErrno(retryOnInterrupt: retryOnInterrupt) {
+      system_posix_fallocate(self.rawValue, _COffT(offset), _COffT(length))
+    }
+  }
+
+  /// Tells the system how you expect to access a range of the file
+  /// referenced by this file descriptor.
+  ///
+  /// - Parameters:
+  ///   - advice: How you expect to access the data.
+  ///   - offset: The file offset where the range begins.
+  ///     The default is `0`.
+  ///   - length: The length of the range, in bytes,
+  ///     or `0` for a range that extends to the end of the file.
+  ///     The default is `0`.
+  ///
+  /// The system can use the advice to optimize caching and read-ahead,
+  /// or ignore it; it doesn't change the file's contents.
+  ///
+  /// The corresponding C function is `posix_fadvise`.
+  /// - Note: Only available on Linux, Android, FreeBSD, and WASI.
+  @_alwaysEmitIntoClient
+  public func advise(
+    _ advice: Advice,
+    offset: Int64 = 0,
+    length: Int64 = 0
+  ) throws(Errno) {
+    try _advise(advice, offset: offset, length: length).get()
+  }
+
+  @usableFromInline
+  internal func _advise(
+    _ advice: Advice,
+    offset: Int64,
+    length: Int64
+  ) -> Result<(), Errno> {
+    nothingOrReturnedErrno(retryOnInterrupt: false) {
+      system_posix_fadvise(
+        self.rawValue, _COffT(offset), _COffT(length), advice.rawValue)
+    }
+  }
+}
+#endif // os(Linux) || os(Android) || os(FreeBSD) || os(WASI)
 
 #if !os(WASI) // WASI has no umask
 extension FilePermissions {

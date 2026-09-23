@@ -655,6 +655,115 @@ internal var _SEEK_HOLE: CInt { SEEK_HOLE }
 internal var _SEEK_DATA: CInt { SEEK_DATA }
 #endif
 
+// MARK: - fcntl
+
+#if !os(Windows)
+@_alwaysEmitIntoClient
+internal var _F_GETFD: CInt { F_GETFD }
+
+@_alwaysEmitIntoClient
+internal var _F_SETFD: CInt { F_SETFD }
+
+@_alwaysEmitIntoClient
+internal var _F_GETFL: CInt { F_GETFL }
+
+@_alwaysEmitIntoClient
+internal var _F_SETFL: CInt { F_SETFL }
+
+@_alwaysEmitIntoClient
+internal var _FD_CLOEXEC: CInt { FD_CLOEXEC }
+#endif
+
+#if !os(Windows) && !os(WASI)
+@_alwaysEmitIntoClient
+internal var _F_DUPFD: CInt { F_DUPFD }
+
+@_alwaysEmitIntoClient
+internal var _F_DUPFD_CLOEXEC: CInt { F_DUPFD_CLOEXEC }
+#endif
+
+// MARK: - flock
+
+#if !os(Windows) && !os(WASI)
+@_alwaysEmitIntoClient
+internal var _LOCK_SH: CInt { LOCK_SH }
+
+@_alwaysEmitIntoClient
+internal var _LOCK_EX: CInt { LOCK_EX }
+
+@_alwaysEmitIntoClient
+internal var _LOCK_NB: CInt { LOCK_NB }
+
+@_alwaysEmitIntoClient
+internal var _LOCK_UN: CInt { LOCK_UN }
+#endif
+
+#if SYSTEM_PACKAGE_DARWIN
+@_alwaysEmitIntoClient
+internal var _F_FULLFSYNC: CInt { F_FULLFSYNC }
+
+@_alwaysEmitIntoClient
+internal var _F_BARRIERFSYNC: CInt { F_BARRIERFSYNC }
+#endif
+
+// MARK: - posix_fadvise
+
+#if os(Linux) || os(Android) || os(FreeBSD) || os(WASI)
+@_alwaysEmitIntoClient
+internal var _POSIX_FADV_NORMAL: CInt {
+#if os(WASI)
+  _getConst_POSIX_FADV_NORMAL()
+#else
+  POSIX_FADV_NORMAL
+#endif
+}
+
+@_alwaysEmitIntoClient
+internal var _POSIX_FADV_SEQUENTIAL: CInt {
+#if os(WASI)
+  _getConst_POSIX_FADV_SEQUENTIAL()
+#else
+  POSIX_FADV_SEQUENTIAL
+#endif
+}
+
+@_alwaysEmitIntoClient
+internal var _POSIX_FADV_RANDOM: CInt {
+#if os(WASI)
+  _getConst_POSIX_FADV_RANDOM()
+#else
+  POSIX_FADV_RANDOM
+#endif
+}
+
+@_alwaysEmitIntoClient
+internal var _POSIX_FADV_WILLNEED: CInt {
+#if os(WASI)
+  _getConst_POSIX_FADV_WILLNEED()
+#else
+  POSIX_FADV_WILLNEED
+#endif
+}
+
+@_alwaysEmitIntoClient
+internal var _POSIX_FADV_DONTNEED: CInt {
+#if os(WASI)
+  _getConst_POSIX_FADV_DONTNEED()
+#else
+  POSIX_FADV_DONTNEED
+#endif
+}
+
+@_alwaysEmitIntoClient
+internal var _POSIX_FADV_NOREUSE: CInt {
+#if os(WASI)
+  _getConst_POSIX_FADV_NOREUSE()
+#else
+  POSIX_FADV_NOREUSE
+#endif
+}
+#endif // os(Linux) || os(Android) || os(FreeBSD) || os(WASI)
+
 // MARK: - File System
 
 #if !os(Windows)
@@ -662,10 +771,19 @@ internal var _SEEK_DATA: CInt { SEEK_DATA }
 @_alwaysEmitIntoClient
 internal var _AT_FDCWD: CInt { AT_FDCWD }
 
-// MARK: - fstatat Flags
+// MARK: - *at Flags
 
 @_alwaysEmitIntoClient
 internal var _AT_SYMLINK_NOFOLLOW: CInt { AT_SYMLINK_NOFOLLOW }
+
+@_alwaysEmitIntoClient
+internal var _AT_SYMLINK_FOLLOW: CInt { AT_SYMLINK_FOLLOW }
+
+@_alwaysEmitIntoClient
+internal var _AT_REMOVEDIR: CInt { AT_REMOVEDIR }
+
+@_alwaysEmitIntoClient
+internal var _AT_EACCESS: CInt { AT_EACCESS }
 
 #if SYSTEM_PACKAGE_DARWIN
 @_alwaysEmitIntoClient
@@ -675,6 +793,41 @@ internal var _AT_SYMLINK_NOFOLLOW_ANY: CInt { AT_SYMLINK_NOFOLLOW_ANY }
 #if canImport(Darwin, _version: 346) || os(FreeBSD)
 @_alwaysEmitIntoClient
 internal var _AT_RESOLVE_BENEATH: CInt { AT_RESOLVE_BENEATH }
+#endif
+
+// MARK: - access Modes
+
+@_alwaysEmitIntoClient
+internal var _R_OK: CInt { R_OK }
+
+@_alwaysEmitIntoClient
+internal var _W_OK: CInt { W_OK }
+
+@_alwaysEmitIntoClient
+internal var _X_OK: CInt { X_OK }
+
+// MARK: - File Times
+
+@_alwaysEmitIntoClient
+internal var _UTIME_NOW: Int { Int(UTIME_NOW) }
+
+@_alwaysEmitIntoClient
+internal var _UTIME_OMIT: Int { Int(UTIME_OMIT) }
+
+// MARK: - Rename Flags
+
+#if SYSTEM_PACKAGE_DARWIN
+@_alwaysEmitIntoClient
+internal var _RENAME_EXCL: CUnsignedInt { CUnsignedInt(RENAME_EXCL) }
+
+@_alwaysEmitIntoClient
+internal var _RENAME_SWAP: CUnsignedInt { CUnsignedInt(RENAME_SWAP) }
+#elseif os(Linux) || os(Android)
+@_alwaysEmitIntoClient
+internal var _RENAME_NOREPLACE: CUnsignedInt { CUnsignedInt(CSYSTEM_RENAME_NOREPLACE) }
+
+@_alwaysEmitIntoClient
+internal var _RENAME_EXCHANGE: CUnsignedInt { CUnsignedInt(CSYSTEM_RENAME_EXCHANGE) }
 #endif
 
 // MARK: - File Mode / File Type
@@ -795,5 +948,505 @@ internal var _UF_SYSTEM: UInt32 { UInt32(bitPattern: UF_SYSTEM) }
 @_alwaysEmitIntoClient
 internal var _SF_SNAPSHOT: UInt32 { UInt32(bitPattern: SF_SNAPSHOT) }
 #endif
+
+// MARK: - Terminal Control (termios)
+
+#if !os(WASI)
+// Special values
+@_alwaysEmitIntoClient
+internal var _NCCS: CInt { CInt(NCCS) }
+
+@_alwaysEmitIntoClient
+internal var __POSIX_VDISABLE: cc_t {
+  // _POSIX_VDISABLE is typically 0xFF (255) on POSIX systems
+  // On Darwin and Linux, it's defined as 0xFF
+  0xFF
+}
+
+// Input flags (c_iflag)
+@_alwaysEmitIntoClient
+internal var _BRKINT: tcflag_t { tcflag_t(BRKINT) }
+
+@_alwaysEmitIntoClient
+internal var _ICRNL: tcflag_t { tcflag_t(ICRNL) }
+
+@_alwaysEmitIntoClient
+internal var _IGNBRK: tcflag_t { tcflag_t(IGNBRK) }
+
+@_alwaysEmitIntoClient
+internal var _IGNCR: tcflag_t { tcflag_t(IGNCR) }
+
+@_alwaysEmitIntoClient
+internal var _IGNPAR: tcflag_t { tcflag_t(IGNPAR) }
+
+@_alwaysEmitIntoClient
+internal var _INLCR: tcflag_t { tcflag_t(INLCR) }
+
+@_alwaysEmitIntoClient
+internal var _INPCK: tcflag_t { tcflag_t(INPCK) }
+
+@_alwaysEmitIntoClient
+internal var _ISTRIP: tcflag_t { tcflag_t(ISTRIP) }
+
+@_alwaysEmitIntoClient
+internal var _IXANY: tcflag_t { tcflag_t(IXANY) }
+
+@_alwaysEmitIntoClient
+internal var _IXOFF: tcflag_t { tcflag_t(IXOFF) }
+
+@_alwaysEmitIntoClient
+internal var _IXON: tcflag_t { tcflag_t(IXON) }
+
+@_alwaysEmitIntoClient
+internal var _PARMRK: tcflag_t { tcflag_t(PARMRK) }
+
+@_alwaysEmitIntoClient
+internal var _IMAXBEL: tcflag_t { tcflag_t(IMAXBEL) }
+
+@_alwaysEmitIntoClient
+internal var _IUTF8: tcflag_t { tcflag_t(IUTF8) }
+
+#if os(Linux)
+@_alwaysEmitIntoClient
+internal var _IUCLC: tcflag_t { tcflag_t(IUCLC) }
+#endif
+
+// Output flags (c_oflag)
+@_alwaysEmitIntoClient
+internal var _OPOST: tcflag_t { tcflag_t(OPOST) }
+
+@_alwaysEmitIntoClient
+internal var _ONLCR: tcflag_t { tcflag_t(ONLCR) }
+
+@_alwaysEmitIntoClient
+internal var _OCRNL: tcflag_t { tcflag_t(OCRNL) }
+
+@_alwaysEmitIntoClient
+internal var _ONOCR: tcflag_t { tcflag_t(ONOCR) }
+
+@_alwaysEmitIntoClient
+internal var _ONLRET: tcflag_t { tcflag_t(ONLRET) }
+
+@_alwaysEmitIntoClient
+internal var _OFILL: tcflag_t { tcflag_t(OFILL) }
+
+@_alwaysEmitIntoClient
+internal var _OFDEL: tcflag_t { tcflag_t(OFDEL) }
+
+@_alwaysEmitIntoClient
+internal var _NLDLY: tcflag_t { tcflag_t(NLDLY) }
+
+@_alwaysEmitIntoClient
+internal var _NL0: tcflag_t { tcflag_t(NL0) }
+
+@_alwaysEmitIntoClient
+internal var _NL1: tcflag_t { tcflag_t(NL1) }
+
+@_alwaysEmitIntoClient
+internal var _CRDLY: tcflag_t { tcflag_t(CRDLY) }
+
+@_alwaysEmitIntoClient
+internal var _CR0: tcflag_t { tcflag_t(CR0) }
+
+@_alwaysEmitIntoClient
+internal var _CR1: tcflag_t { tcflag_t(CR1) }
+
+@_alwaysEmitIntoClient
+internal var _CR2: tcflag_t { tcflag_t(CR2) }
+
+@_alwaysEmitIntoClient
+internal var _CR3: tcflag_t { tcflag_t(CR3) }
+
+@_alwaysEmitIntoClient
+internal var _TABDLY: tcflag_t { tcflag_t(TABDLY) }
+
+@_alwaysEmitIntoClient
+internal var _TAB0: tcflag_t { tcflag_t(TAB0) }
+
+@_alwaysEmitIntoClient
+internal var _TAB1: tcflag_t { tcflag_t(TAB1) }
+
+@_alwaysEmitIntoClient
+internal var _TAB2: tcflag_t { tcflag_t(TAB2) }
+
+#if SYSTEM_PACKAGE_DARWIN
+@_alwaysEmitIntoClient
+internal var _TAB3: tcflag_t { tcflag_t(TAB3) }
+#elseif os(Linux)
+@_alwaysEmitIntoClient
+internal var _XTABS: tcflag_t { tcflag_t(XTABS) }
+#endif
+
+@_alwaysEmitIntoClient
+internal var _BSDLY: tcflag_t { tcflag_t(BSDLY) }
+
+@_alwaysEmitIntoClient
+internal var _BS0: tcflag_t { tcflag_t(BS0) }
+
+@_alwaysEmitIntoClient
+internal var _BS1: tcflag_t { tcflag_t(BS1) }
+
+@_alwaysEmitIntoClient
+internal var _VTDLY: tcflag_t { tcflag_t(VTDLY) }
+
+@_alwaysEmitIntoClient
+internal var _VT0: tcflag_t { tcflag_t(VT0) }
+
+@_alwaysEmitIntoClient
+internal var _VT1: tcflag_t { tcflag_t(VT1) }
+
+@_alwaysEmitIntoClient
+internal var _FFDLY: tcflag_t { tcflag_t(FFDLY) }
+
+@_alwaysEmitIntoClient
+internal var _FF0: tcflag_t { tcflag_t(FF0) }
+
+@_alwaysEmitIntoClient
+internal var _FF1: tcflag_t { tcflag_t(FF1) }
+
+#if canImport(Darwin)
+@_alwaysEmitIntoClient
+internal var _OXTABS: tcflag_t { tcflag_t(OXTABS) }
+
+@_alwaysEmitIntoClient
+internal var _ONOEOT: tcflag_t { tcflag_t(ONOEOT) }
+#endif
+
+#if os(Linux)
+@_alwaysEmitIntoClient
+internal var _OLCUC: tcflag_t { tcflag_t(OLCUC) }
+#endif
+
+// Control flags (c_cflag)
+@_alwaysEmitIntoClient
+internal var _CREAD: tcflag_t { tcflag_t(CREAD) }
+
+@_alwaysEmitIntoClient
+internal var _CSTOPB: tcflag_t { tcflag_t(CSTOPB) }
+
+@_alwaysEmitIntoClient
+internal var _HUPCL: tcflag_t { tcflag_t(HUPCL) }
+
+@_alwaysEmitIntoClient
+internal var _CLOCAL: tcflag_t { tcflag_t(CLOCAL) }
+
+@_alwaysEmitIntoClient
+internal var _PARENB: tcflag_t { tcflag_t(PARENB) }
+
+@_alwaysEmitIntoClient
+internal var _PARODD: tcflag_t { tcflag_t(PARODD) }
+
+@_alwaysEmitIntoClient
+internal var _CSIZE: tcflag_t { tcflag_t(CSIZE) }
+
+@_alwaysEmitIntoClient
+internal var _CS5: tcflag_t { tcflag_t(CS5) }
+
+@_alwaysEmitIntoClient
+internal var _CS6: tcflag_t { tcflag_t(CS6) }
+
+@_alwaysEmitIntoClient
+internal var _CS7: tcflag_t { tcflag_t(CS7) }
+
+@_alwaysEmitIntoClient
+internal var _CS8: tcflag_t { tcflag_t(CS8) }
+
+#if canImport(Darwin)
+@_alwaysEmitIntoClient
+internal var _CCTS_OFLOW: tcflag_t { tcflag_t(CCTS_OFLOW) }
+
+@_alwaysEmitIntoClient
+internal var _CRTS_IFLOW: tcflag_t { tcflag_t(CRTS_IFLOW) }
+
+@_alwaysEmitIntoClient
+internal var _CDTR_IFLOW: tcflag_t { tcflag_t(CDTR_IFLOW) }
+
+@_alwaysEmitIntoClient
+internal var _CDSR_OFLOW: tcflag_t { tcflag_t(CDSR_OFLOW) }
+
+@_alwaysEmitIntoClient
+internal var _CCAR_OFLOW: tcflag_t { tcflag_t(CCAR_OFLOW) }
+
+@_alwaysEmitIntoClient
+internal var _CRTSCTS: tcflag_t { tcflag_t(CRTSCTS) }
+#endif
+
+#if os(Linux)
+@_alwaysEmitIntoClient
+internal var _CRTSCTS: tcflag_t { tcflag_t(CRTSCTS) }
+
+@_alwaysEmitIntoClient
+internal var _CMSPAR: tcflag_t { tcflag_t(CMSPAR) }
+#endif
+
+// Local flags (c_lflag)
+@_alwaysEmitIntoClient
+internal var _ECHO: tcflag_t { tcflag_t(ECHO) }
+
+@_alwaysEmitIntoClient
+internal var _ECHOE: tcflag_t { tcflag_t(ECHOE) }
+
+@_alwaysEmitIntoClient
+internal var _ECHOK: tcflag_t { tcflag_t(ECHOK) }
+
+@_alwaysEmitIntoClient
+internal var _ECHONL: tcflag_t { tcflag_t(ECHONL) }
+
+@_alwaysEmitIntoClient
+internal var _ICANON: tcflag_t { tcflag_t(ICANON) }
+
+@_alwaysEmitIntoClient
+internal var _IEXTEN: tcflag_t { tcflag_t(IEXTEN) }
+
+@_alwaysEmitIntoClient
+internal var _ISIG: tcflag_t { tcflag_t(ISIG) }
+
+@_alwaysEmitIntoClient
+internal var _NOFLSH: tcflag_t { tcflag_t(NOFLSH) }
+
+@_alwaysEmitIntoClient
+internal var _TOSTOP: tcflag_t { tcflag_t(TOSTOP) }
+
+@_alwaysEmitIntoClient
+internal var _ECHOCTL: tcflag_t { tcflag_t(ECHOCTL) }
+
+@_alwaysEmitIntoClient
+internal var _ECHOKE: tcflag_t { tcflag_t(ECHOKE) }
+
+@_alwaysEmitIntoClient
+internal var _ECHOPRT: tcflag_t { tcflag_t(ECHOPRT) }
+
+@_alwaysEmitIntoClient
+internal var _FLUSHO: tcflag_t { tcflag_t(FLUSHO) }
+
+@_alwaysEmitIntoClient
+internal var _PENDIN: tcflag_t { tcflag_t(PENDIN) }
+
+#if canImport(Darwin)
+@_alwaysEmitIntoClient
+internal var _ALTWERASE: tcflag_t { tcflag_t(ALTWERASE) }
+
+@_alwaysEmitIntoClient
+internal var _EXTPROC: tcflag_t { tcflag_t(EXTPROC) }
+
+@_alwaysEmitIntoClient
+internal var _NOKERNINFO: tcflag_t { tcflag_t(NOKERNINFO) }
+#endif
+
+#if os(Linux)
+@_alwaysEmitIntoClient
+internal var _EXTPROC: tcflag_t { tcflag_t(EXTPROC) }
+#endif
+
+// Control characters (c_cc indices)
+@_alwaysEmitIntoClient
+internal var _VEOF: CInt { CInt(VEOF) }
+
+@_alwaysEmitIntoClient
+internal var _VEOL: CInt { CInt(VEOL) }
+
+@_alwaysEmitIntoClient
+internal var _VERASE: CInt { CInt(VERASE) }
+
+@_alwaysEmitIntoClient
+internal var _VINTR: CInt { CInt(VINTR) }
+
+@_alwaysEmitIntoClient
+internal var _VKILL: CInt { CInt(VKILL) }
+
+@_alwaysEmitIntoClient
+internal var _VMIN: CInt { CInt(VMIN) }
+
+@_alwaysEmitIntoClient
+internal var _VQUIT: CInt { CInt(VQUIT) }
+
+@_alwaysEmitIntoClient
+internal var _VSTART: CInt { CInt(VSTART) }
+
+@_alwaysEmitIntoClient
+internal var _VSTOP: CInt { CInt(VSTOP) }
+
+@_alwaysEmitIntoClient
+internal var _VSUSP: CInt { CInt(VSUSP) }
+
+@_alwaysEmitIntoClient
+internal var _VTIME: CInt { CInt(VTIME) }
+
+@_alwaysEmitIntoClient
+internal var _VEOL2: CInt { CInt(VEOL2) }
+
+@_alwaysEmitIntoClient
+internal var _VWERASE: CInt { CInt(VWERASE) }
+
+@_alwaysEmitIntoClient
+internal var _VREPRINT: CInt { CInt(VREPRINT) }
+
+@_alwaysEmitIntoClient
+internal var _VDISCARD: CInt { CInt(VDISCARD) }
+
+@_alwaysEmitIntoClient
+internal var _VLNEXT: CInt { CInt(VLNEXT) }
+
+#if canImport(Darwin)
+@_alwaysEmitIntoClient
+internal var _VSTATUS: CInt { CInt(VSTATUS) }
+
+@_alwaysEmitIntoClient
+internal var _VDSUSP: CInt { CInt(VDSUSP) }
+#endif
+
+#if os(Linux)
+@_alwaysEmitIntoClient
+internal var _VSWTC: CInt { CInt(VSWTC) }
+#endif
+
+// Baud rates
+@_alwaysEmitIntoClient
+internal var _B0: speed_t { speed_t(B0) }
+
+@_alwaysEmitIntoClient
+internal var _B50: speed_t { speed_t(B50) }
+
+@_alwaysEmitIntoClient
+internal var _B75: speed_t { speed_t(B75) }
+
+@_alwaysEmitIntoClient
+internal var _B110: speed_t { speed_t(B110) }
+
+@_alwaysEmitIntoClient
+internal var _B134: speed_t { speed_t(B134) }
+
+@_alwaysEmitIntoClient
+internal var _B150: speed_t { speed_t(B150) }
+
+@_alwaysEmitIntoClient
+internal var _B200: speed_t { speed_t(B200) }
+
+@_alwaysEmitIntoClient
+internal var _B300: speed_t { speed_t(B300) }
+
+@_alwaysEmitIntoClient
+internal var _B600: speed_t { speed_t(B600) }
+
+@_alwaysEmitIntoClient
+internal var _B1200: speed_t { speed_t(B1200) }
+
+@_alwaysEmitIntoClient
+internal var _B1800: speed_t { speed_t(B1800) }
+
+@_alwaysEmitIntoClient
+internal var _B2400: speed_t { speed_t(B2400) }
+
+@_alwaysEmitIntoClient
+internal var _B4800: speed_t { speed_t(B4800) }
+
+@_alwaysEmitIntoClient
+internal var _B9600: speed_t { speed_t(B9600) }
+
+@_alwaysEmitIntoClient
+internal var _B19200: speed_t { speed_t(B19200) }
+
+@_alwaysEmitIntoClient
+internal var _B38400: speed_t { speed_t(B38400) }
+
+@_alwaysEmitIntoClient
+internal var _B57600: speed_t { speed_t(B57600) }
+
+@_alwaysEmitIntoClient
+internal var _B115200: speed_t { speed_t(B115200) }
+
+@_alwaysEmitIntoClient
+internal var _B230400: speed_t { speed_t(B230400) }
+
+#if canImport(Darwin)
+@_alwaysEmitIntoClient
+internal var _B7200: speed_t { speed_t(B7200) }
+
+@_alwaysEmitIntoClient
+internal var _B14400: speed_t { speed_t(B14400) }
+
+@_alwaysEmitIntoClient
+internal var _B28800: speed_t { speed_t(B28800) }
+
+@_alwaysEmitIntoClient
+internal var _B76800: speed_t { speed_t(B76800) }
+#endif
+
+#if os(Linux)
+@_alwaysEmitIntoClient
+internal var _B460800: speed_t { speed_t(B460800) }
+
+@_alwaysEmitIntoClient
+internal var _B500000: speed_t { speed_t(B500000) }
+
+@_alwaysEmitIntoClient
+internal var _B576000: speed_t { speed_t(B576000) }
+
+@_alwaysEmitIntoClient
+internal var _B921600: speed_t { speed_t(B921600) }
+
+@_alwaysEmitIntoClient
+internal var _B1000000: speed_t { speed_t(B1000000) }
+
+@_alwaysEmitIntoClient
+internal var _B1152000: speed_t { speed_t(B1152000) }
+
+@_alwaysEmitIntoClient
+internal var _B1500000: speed_t { speed_t(B1500000) }
+
+@_alwaysEmitIntoClient
+internal var _B2000000: speed_t { speed_t(B2000000) }
+
+@_alwaysEmitIntoClient
+internal var _B2500000: speed_t { speed_t(B2500000) }
+
+@_alwaysEmitIntoClient
+internal var _B3000000: speed_t { speed_t(B3000000) }
+
+@_alwaysEmitIntoClient
+internal var _B3500000: speed_t { speed_t(B3500000) }
+
+@_alwaysEmitIntoClient
+internal var _B4000000: speed_t { speed_t(B4000000) }
+#endif
+
+// SetAction constants
+@_alwaysEmitIntoClient
+internal var _TCSANOW: CInt { CInt(TCSANOW) }
+
+@_alwaysEmitIntoClient
+internal var _TCSADRAIN: CInt { CInt(TCSADRAIN) }
+
+@_alwaysEmitIntoClient
+internal var _TCSAFLUSH: CInt { CInt(TCSAFLUSH) }
+
+#if canImport(Darwin)
+@_alwaysEmitIntoClient
+internal var _TCSASOFT: CInt { CInt(TCSASOFT) }
+#endif
+
+// Queue constants
+@_alwaysEmitIntoClient
+internal var _TCIFLUSH: CInt { CInt(TCIFLUSH) }
+
+@_alwaysEmitIntoClient
+internal var _TCOFLUSH: CInt { CInt(TCOFLUSH) }
+
+@_alwaysEmitIntoClient
+internal var _TCIOFLUSH: CInt { CInt(TCIOFLUSH) }
+
+// Flow action constants
+@_alwaysEmitIntoClient
+internal var _TCOOFF: CInt { CInt(TCOOFF) }
+
+@_alwaysEmitIntoClient
+internal var _TCOON: CInt { CInt(TCOON) }
+
+@_alwaysEmitIntoClient
+internal var _TCIOFF: CInt { CInt(TCIOFF) }
+
+@_alwaysEmitIntoClient
+internal var _TCION: CInt { CInt(TCION) }
+#endif // !os(WASI)
 
 #endif // !os(Windows)

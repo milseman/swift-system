@@ -21,6 +21,32 @@
 #ifdef __linux__
 #define _GNU_SOURCE
 #include <CSystemLinux.h>
+#include <sys/ioctl.h>
+
+// Terminal ioctl shims for Linux
+int _system_ioctl_TIOCGWINSZ(int fd, void *ws) {
+  return ioctl(fd, TIOCGWINSZ, ws);
+}
+
+int _system_ioctl_TIOCSWINSZ(int fd, const void *ws) {
+  return ioctl(fd, TIOCSWINSZ, ws);
+}
+
+#endif
+
+#if defined(__APPLE__)
+
+#include <CSystemDarwin.h>
+
+// Terminal ioctl shims for Darwin
+int _system_ioctl_TIOCGWINSZ(int fd, struct winsize *ws) {
+  return ioctl(fd, TIOCGWINSZ, ws);
+}
+
+int _system_ioctl_TIOCSWINSZ(int fd, const struct winsize *ws) {
+  return ioctl(fd, TIOCSWINSZ, ws);
+}
+
 #endif
 
 #if defined(_WIN32)
@@ -70,3 +96,20 @@ extern int csystem_posix_dup3(int fildes, int fildes2, int flag) {
   return -1;
   #endif
 }
+
+#ifdef __linux__
+#include <sys/syscall.h>
+
+extern int csystem_renameat2(int olddirfd, const char *oldpath,
+                             int newdirfd, const char *newpath,
+                             unsigned int flags) {
+  // Call the kernel directly, since not every libc declares renameat2:
+  // glibc only added it in 2.28, and older Android releases lack it.
+  #ifdef SYS_renameat2
+  return (int)syscall(SYS_renameat2, olddirfd, oldpath, newdirfd, newpath, flags);
+  #else
+  errno = ENOSYS;
+  return -1;
+  #endif
+}
+#endif // __linux__
