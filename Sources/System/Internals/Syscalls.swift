@@ -240,7 +240,37 @@ internal func system_flock(_ fd: Int32, _ operation: Int32) -> Int32 {
 #endif
   return flock(fd, operation)
 }
+
+// Records the lock's fields by value, rather than the pointer.
+internal func system_fcntl(
+  _ fd: Int32, _ cmd: Int32, _ lock: UnsafeMutablePointer<flock>
+) -> Int32 {
+#if ENABLE_MOCKING
+  if mockingEnabled {
+    let l = lock.pointee
+    return _mock(fd, cmd, l.l_type, l.l_whence, l.l_start, l.l_len, l.l_pid)
+  }
+#endif
+  return fcntl(fd, cmd, lock)
+}
 #endif // !os(Windows) && !os(WASI)
+
+#if SYSTEM_PACKAGE_DARWIN
+// Records the lock's fields and the timeout by value, rather than the pointer.
+internal func system_fcntl(
+  _ fd: Int32, _ cmd: Int32, _ lock: UnsafeMutablePointer<flocktimeout>
+) -> Int32 {
+#if ENABLE_MOCKING
+  if mockingEnabled {
+    let l = lock.pointee.fl
+    let t = lock.pointee.timeout
+    return _mock(
+      fd, cmd, l.l_type, l.l_whence, l.l_start, l.l_len, l.l_pid, t.tv_sec, t.tv_nsec)
+  }
+#endif
+  return fcntl(fd, cmd, lock)
+}
+#endif // SYSTEM_PACKAGE_DARWIN
 
 // These return an error number rather than setting errno.
 #if os(Linux) || os(Android) || os(FreeBSD) || os(WASI)

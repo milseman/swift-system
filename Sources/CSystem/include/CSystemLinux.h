@@ -36,5 +36,12 @@ int _system_ioctl_TIOCSWINSZ(int fd, const void *ws);
 extern int csystem_renameat2(int olddirfd, const char *oldpath,
                              int newdirfd, const char *newpath,
                              unsigned int flags);
+
+// The open file description lock commands for fcntl. glibc only declares
+// them with _GNU_SOURCE, which can't be defined here; see shims.c. They have
+// these values on every architecture.
+#define CSYSTEM_F_OFD_GETLK 36
+#define CSYSTEM_F_OFD_SETLK 37
+#define CSYSTEM_F_OFD_SETLKW 38
 #endif
 

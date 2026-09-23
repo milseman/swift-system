@@ -173,16 +173,16 @@ final class FileOperationsTest: XCTestCase {
       },
 
       MockTestCase(name: "flock", .interruptable, rawFD, LOCK_EX) { retryOnInterrupt in
-        try fd.lock(retryOnInterrupt: retryOnInterrupt)
+        try fd.lockWholeFile(retryOnInterrupt: retryOnInterrupt)
       },
 
       MockTestCase(name: "flock", .interruptable, rawFD, LOCK_SH | LOCK_NB) {
         retryOnInterrupt in
-        try fd.lock(shared: true, nonBlocking: true, retryOnInterrupt: retryOnInterrupt)
+        try fd.lockWholeFile(shared: true, nonBlocking: true, retryOnInterrupt: retryOnInterrupt)
       },
 
       MockTestCase(name: "flock", .interruptable, rawFD, LOCK_UN) { retryOnInterrupt in
-        try fd.unlock(retryOnInterrupt: retryOnInterrupt)
+        try fd.unlockWholeFile(retryOnInterrupt: retryOnInterrupt)
       },
     ]
 
@@ -743,34 +743,34 @@ final class FileOperationsTest: XCTestCase {
       try first.closeAfter {
         let second = try FileDescriptor.open(file, .readWrite)
         try second.closeAfter {
-          try first.lock()
-          XCTAssertThrowsError(try second.lock(nonBlocking: true)) {
+          try first.lockWholeFile()
+          XCTAssertThrowsError(try second.lockWholeFile(nonBlocking: true)) {
             XCTAssertEqual($0 as? Errno, .wouldBlock)
           }
-          XCTAssertThrowsError(try second.lock(shared: true, nonBlocking: true)) {
+          XCTAssertThrowsError(try second.lockWholeFile(shared: true, nonBlocking: true)) {
             XCTAssertEqual($0 as? Errno, .wouldBlock)
           }
 
           // A duplicate shares the lock, so it can release it.
           let duplicate = try first.duplicate()
-          try duplicate.closeAfter { try duplicate.unlock() }
-          try second.lock(nonBlocking: true)
-          try second.unlock()
+          try duplicate.closeAfter { try duplicate.unlockWholeFile() }
+          try second.lockWholeFile(nonBlocking: true)
+          try second.unlockWholeFile()
 
           // Shared locks coexist, and exclude an exclusive one.
-          try first.lock(shared: true, nonBlocking: true)
-          try second.lock(shared: true, nonBlocking: true)
-          XCTAssertThrowsError(try first.lock(nonBlocking: true)) {
+          try first.lockWholeFile(shared: true, nonBlocking: true)
+          try second.lockWholeFile(shared: true, nonBlocking: true)
+          XCTAssertThrowsError(try first.lockWholeFile(nonBlocking: true)) {
             XCTAssertEqual($0 as? Errno, .wouldBlock)
           }
-          try second.unlock()
+          try second.unlockWholeFile()
           // With the other shared lock gone, the shared lock can become exclusive.
-          try first.lock(nonBlocking: true)
-          try first.unlock()
+          try first.lockWholeFile(nonBlocking: true)
+          try first.unlockWholeFile()
         }
       }
     }
-    XCTAssertThrowsError(try FileDescriptor(rawValue: -1).lock()) {
+    XCTAssertThrowsError(try FileDescriptor(rawValue: -1).lockWholeFile()) {
       XCTAssertEqual($0 as? Errno, .badFileDescriptor)
     }
   }

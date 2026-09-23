@@ -792,8 +792,8 @@ extension FileDescriptor {
 #if !os(Windows) && !os(WASI)
 @available(System 199, *)
 extension FileDescriptor {
-  /// Places an advisory lock on the open file that this file descriptor
-  /// refers to.
+  /// Places an advisory lock on the whole open file
+  /// that this file descriptor refers to.
   ///
   /// - Parameters:
   ///   - shared: Whether to place a shared lock, which several open files
@@ -812,14 +812,23 @@ extension FileDescriptor {
   /// it only excludes others that also lock the file.
   /// It belongs to the open file, rather than to this file descriptor,
   /// so descriptors duplicated from this one share it.
-  /// The lock is released by ``unlock(retryOnInterrupt:)``,
+  /// The lock is released by ``unlockWholeFile(retryOnInterrupt:)``,
   /// or when the last descriptor for the open file is closed.
   /// Locking a file that this open file has already locked
   /// converts the lock to the requested kind.
   ///
+  /// These whole-file locks aren't the record locks that
+  /// ``lock(_:byteRange:retryOnInterrupt:)`` places,
+  /// which can cover part of a file.
+  /// On Darwin the two kinds of lock conflict with each other;
+  /// on Linux they're independent.
+  /// This kind of lock is the one that the
+  /// ``OpenOptions/sharedLock`` and ``OpenOptions/exclusiveLock``
+  /// options place, where they're available.
+  ///
   /// The corresponding C function is `flock`.
   @_alwaysEmitIntoClient
-  public func lock(
+  public func lockWholeFile(
     shared: Bool = false,
     nonBlocking: Bool = false,
     retryOnInterrupt: Bool = true
@@ -828,8 +837,8 @@ extension FileDescriptor {
     try _flock(operation, retryOnInterrupt: retryOnInterrupt).get()
   }
 
-  /// Removes the advisory lock from the open file that this file descriptor
-  /// refers to.
+  /// Removes the advisory whole-file lock from the open file
+  /// that this file descriptor refers to.
   ///
   /// - Parameters:
   ///   - retryOnInterrupt: Whether to retry the operation
@@ -837,9 +846,12 @@ extension FileDescriptor {
   ///     The default is `true`.
   ///     Pass `false` to try only once and throw an error upon interruption.
   ///
+  /// This method removes the lock that
+  /// ``lockWholeFile(shared:nonBlocking:retryOnInterrupt:)`` places.
+  ///
   /// The corresponding C function is `flock`, with `LOCK_UN`.
   @_alwaysEmitIntoClient
-  public func unlock(retryOnInterrupt: Bool = true) throws(Errno) {
+  public func unlockWholeFile(retryOnInterrupt: Bool = true) throws(Errno) {
     try _flock(_LOCK_UN, retryOnInterrupt: retryOnInterrupt).get()
   }
 

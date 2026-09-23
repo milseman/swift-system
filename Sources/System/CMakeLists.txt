@@ -12,6 +12,7 @@ add_library(SystemPackage
   ErrnoWindows.swift
   FileDescriptor.swift
   FileHelpers.swift
+  FileLock.swift
   FileOperations.swift
   FilePermissions.swift
   MachPort.swift

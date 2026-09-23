@@ -706,6 +706,56 @@ internal var _F_FULLFSYNC: CInt { F_FULLFSYNC }
 internal var _F_BARRIERFSYNC: CInt { F_BARRIERFSYNC }
 #endif
 
+// MARK: - Record locks
+
+#if !os(Windows) && !os(WASI)
+// `l_type` is a `short`.
+@_alwaysEmitIntoClient
+internal var _F_RDLCK: CShort { CShort(F_RDLCK) }
+
+@_alwaysEmitIntoClient
+internal var _F_WRLCK: CShort { CShort(F_WRLCK) }
+
+@_alwaysEmitIntoClient
+internal var _F_UNLCK: CShort { CShort(F_UNLCK) }
+#endif
+
+// glibc declares the OFD commands only with _GNU_SOURCE, so on Linux they
+// come from CSystemLinux.h.
+#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
+@_alwaysEmitIntoClient
+internal var _F_OFD_GETLK: CInt {
+#if SYSTEM_PACKAGE_DARWIN
+  F_OFD_GETLK
+#else
+  CSYSTEM_F_OFD_GETLK
+#endif
+}
+
+@_alwaysEmitIntoClient
+internal var _F_OFD_SETLK: CInt {
+#if SYSTEM_PACKAGE_DARWIN
+  F_OFD_SETLK
+#else
+  CSYSTEM_F_OFD_SETLK
+#endif
+}
+
+@_alwaysEmitIntoClient
+internal var _F_OFD_SETLKW: CInt {
+#if SYSTEM_PACKAGE_DARWIN
+  F_OFD_SETLKW
+#else
+  CSYSTEM_F_OFD_SETLKW
+#endif
+}
+#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
+
+#if SYSTEM_PACKAGE_DARWIN
+@_alwaysEmitIntoClient
+internal var _F_OFD_SETLKWTIMEOUT: CInt { F_OFD_SETLKWTIMEOUT }
+#endif
+
 // MARK: - posix_fadvise
 
 #if os(Linux) || os(Android) || os(FreeBSD) || os(WASI)
