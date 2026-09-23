@@ -143,6 +143,70 @@ extension OwnedFD {
   public var fileDescriptor: FileDescriptor { _descriptor }
 }
 
+#if !os(WASI)
+// Pipes.
+extension OwnedFD {
+  /// Both ends of a pipe, each owned by an `OwnedFD`.
+  ///
+  /// A tuple can't hold noncopyable values,
+  /// so where `FileDescriptor.pipe()` returns a tuple,
+  /// `OwnedFD.pipe()` returns this structure, with the same member names.
+  /// Destroying a `Pipe` closes both ends.
+  /// To take the ends apart, consume each one:
+  ///
+  ///     let pipe = try OwnedFD.pipe()
+  ///     let readEnd = pipe.readEnd
+  ///     try send(message, andClose: pipe.writeEnd)
+  ///
+  /// `Pipe` has no deinitializer of its own, and is frozen,
+  /// so code outside this module can consume its ends separately.
+  /// Once one end is consumed, a closure can't capture the pipe
+  /// to use the other end, so take both ends apart first
+  /// if a closure needs one of them.
+  @frozen
+  public struct Pipe: ~Copyable, Sendable {
+    /// The end of the pipe that reads data written to `writeEnd`.
+    public var readEnd: OwnedFD
+
+    /// The end of the pipe that writes data for `readEnd` to read.
+    public var writeEnd: OwnedFD
+
+    /// Creates a pipe from its two ends, taking ownership of both.
+    @_alwaysEmitIntoClient
+    public init(readEnd: consuming OwnedFD, writeEnd: consuming OwnedFD) {
+      self.readEnd = readEnd
+      self.writeEnd = writeEnd
+    }
+  }
+
+  /// Creates a unidirectional data channel.
+  ///
+  /// See `FileDescriptor.pipe()`.
+  ///
+  /// The corresponding C function is `pipe`.
+  @_alwaysEmitIntoClient
+  public static func pipe() throws(Errno) -> Pipe {
+    let ends = try FileDescriptor._pipe().get()
+    return Pipe(
+      readEnd: OwnedFD(taking: ends.readEnd), writeEnd: OwnedFD(taking: ends.writeEnd))
+  }
+
+  /// Creates a unidirectional data channel with the given options,
+  /// such as closing both ends on `exec`, atomically.
+  ///
+  /// See `FileDescriptor.pipe(options:)`.
+  ///
+  /// The corresponding C function is `pipe2`.
+  @_alwaysEmitIntoClient
+  @available(macOS 27.0, iOS 27.0, watchOS 27.0, tvOS 27.0, visionOS 27.0, *)
+  public static func pipe(options: FileDescriptor.PipeOptions) throws(Errno) -> Pipe {
+    let ends = try FileDescriptor._pipe(options: options.rawValue).get()
+    return Pipe(
+      readEnd: OwnedFD(taking: ends.readEnd), writeEnd: OwnedFD(taking: ends.writeEnd))
+  }
+}
+#endif // !os(WASI)
+
 // Forwarded I/O. Each method calls the `FileDescriptor` method of the same
 // name; see that method for documentation. OwnedFD forwards reading, writing,
 // and seeking, which borrowing code does most, and throws Errno even where the
