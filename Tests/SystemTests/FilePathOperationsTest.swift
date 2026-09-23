@@ -495,6 +495,63 @@ final class FilePathOperationsTest: XCTestCase {
 
     for test in fileFlagsTestCases { test.runAllTests() }
     #endif // SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
+
+    #if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
+    let other = FileDescriptor(rawValue: 43)
+    #if SYSTEM_PACKAGE_DARWIN
+    let renameTestCases: Array<MockTestCase> = [
+      MockTestCase(
+        name: "renamex_np", .interruptable, "a path", "new path", UInt32(RENAME_EXCL)
+      ) { retryOnInterrupt in
+        try path.rename(to: "new path", options: .exclusive, retryOnInterrupt: retryOnInterrupt)
+      },
+
+      MockTestCase(
+        name: "renamex_np", .interruptable, "a path", "new path", UInt32(RENAME_SWAP)
+      ) { retryOnInterrupt in
+        try "a path".withCString { old in
+          try "new path".withCString { new in
+            try FilePath.rename(
+              old, to: new, options: .swap, retryOnInterrupt: retryOnInterrupt)
+          }
+        }
+      },
+
+      MockTestCase(
+        name: "renameatx_np", .interruptable,
+        42, "a path", 43, "new path", UInt32(RENAME_EXCL | RENAME_SWAP)
+      ) { retryOnInterrupt in
+        try path.rename(
+          relativeTo: dir, to: "new path", relativeTo: other, options: [.exclusive, .swap],
+          retryOnInterrupt: retryOnInterrupt)
+      },
+    ]
+    #else
+    let renameTestCases: Array<MockTestCase> = [
+      // The kernel's RENAME_NOREPLACE and RENAME_EXCHANGE.
+      MockTestCase(
+        name: "renameat2", .interruptable, AT_FDCWD, "a path", AT_FDCWD, "new path",
+        UInt32(1 << 0)
+      ) { retryOnInterrupt in
+        try path.rename(to: "new path", options: .exclusive, retryOnInterrupt: retryOnInterrupt)
+      },
+
+      MockTestCase(
+        name: "renameat2", .interruptable, 42, "a path", 43, "new path",
+        UInt32(1 << 1)
+      ) { retryOnInterrupt in
+        try "a path".withCString { old in
+          try "new path".withCString { new in
+            try FilePath.rename(
+              old, relativeTo: dir, to: new, relativeTo: other, options: .swap,
+              retryOnInterrupt: retryOnInterrupt)
+          }
+        }
+      },
+    ]
+    #endif
+    for test in renameTestCases { test.runAllTests() }
+    #endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
   }
   #endif // ENABLE_MOCKING && !os(WASI)
 
@@ -700,6 +757,81 @@ final class FilePathOperationsTest: XCTestCase {
       }
     }
   }
+
+  #if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
+  @available(System 199, *)
+  func testRenameWithOptions() throws {
+    try withTemporaryFilePath(basename: "testRenameWithOptions") { path in
+      func write(_ contents: String, to name: String) throws {
+        let fd = try FileDescriptor.open(
+          path.appending(name), .writeOnly, options: [.create, .truncate],
+          permissions: .ownerReadWrite)
+        try fd.closeAfter { _ = try fd.writeAll(contents.utf8) }
+      }
+      func contents(of name: String) throws -> String {
+        let fd = try FileDescriptor.open(path.appending(name), .readOnly)
+        return try fd.closeAfter {
+          let bytes = try Array<UInt8>(unsafeUninitializedCapacity: 16) { buf, count in
+            count = try fd.read(into: UnsafeMutableRawBufferPointer(buf))
+          }
+          return String(decoding: bytes, as: UTF8.self)
+        }
+      }
+
+      try write("a", to: "a")
+      try write("b", to: "b")
+      do {
+        try path.appending("a").rename(to: path.appending("c"), options: .exclusive)
+      } catch Errno.invalidArgument {
+        throw XCTSkip("The file system doesn't support exclusive renames")
+      }
+      XCTAssertEqual(try contents(of: "c"), "a")
+
+      // An exclusive rename doesn't replace an existing file.
+      XCTAssertThrowsError(
+        try path.appending("c").rename(to: path.appending("b"), options: .exclusive)
+      ) {
+        XCTAssertEqual($0 as? Errno, .fileExists)
+      }
+      XCTAssertEqual(try contents(of: "b"), "b")
+
+      // A swap exchanges two files, which must both exist.
+      try path.appending("c").withCString { old in
+        try path.appending("b").withCString { new in
+          try FilePath.rename(old, to: new, options: .swap)
+        }
+      }
+      XCTAssertEqual(try contents(of: "c"), "b")
+      XCTAssertEqual(try contents(of: "b"), "a")
+      XCTAssertThrowsError(
+        try path.appending("c").rename(to: path.appending("missing"), options: .swap)
+      ) {
+        XCTAssertEqual($0 as? Errno, .noSuchFileOrDirectory)
+      }
+
+      let dir = try FileDescriptor.open(path, .readOnly, options: .directory)
+      try dir.closeAfter {
+        try FilePath("b").rename(relativeTo: dir, to: "c", relativeTo: dir, options: .swap)
+        XCTAssertEqual(try contents(of: "c"), "a")
+        XCTAssertEqual(try contents(of: "b"), "b")
+
+        try "c".withCString { old in
+          try "d".withCString { new in
+            try FilePath.rename(
+              old, relativeTo: dir, to: new, relativeTo: dir, options: .exclusive)
+          }
+        }
+        XCTAssertEqual(try contents(of: "d"), "a")
+        XCTAssertThrowsError(
+          try FilePath("d").rename(
+            relativeTo: dir, to: "b", relativeTo: dir, options: .exclusive)
+        ) {
+          XCTAssertEqual($0 as? Errno, .fileExists)
+        }
+      }
+    }
+  }
+  #endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
 
   @available(System 199, *)
   func testMakeHardLink() throws {

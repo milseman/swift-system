@@ -782,6 +782,22 @@ internal var _W_OK: CInt { W_OK }
 @_alwaysEmitIntoClient
 internal var _X_OK: CInt { X_OK }
 
+// MARK: - Rename Flags
+
+#if SYSTEM_PACKAGE_DARWIN
+@_alwaysEmitIntoClient
+internal var _RENAME_EXCL: CUnsignedInt { CUnsignedInt(RENAME_EXCL) }
+
+@_alwaysEmitIntoClient
+internal var _RENAME_SWAP: CUnsignedInt { CUnsignedInt(RENAME_SWAP) }
+#elseif os(Linux) || os(Android)
+@_alwaysEmitIntoClient
+internal var _RENAME_NOREPLACE: CUnsignedInt { CUnsignedInt(CSYSTEM_RENAME_NOREPLACE) }
+
+@_alwaysEmitIntoClient
+internal var _RENAME_EXCHANGE: CUnsignedInt { CUnsignedInt(CSYSTEM_RENAME_EXCHANGE) }
+#endif
+
 // MARK: - File Mode / File Type
 
 @_alwaysEmitIntoClient

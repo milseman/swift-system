@@ -417,6 +417,57 @@ internal func system_renameat(
   return renameat(oldFD, old, newFD, new)
 }
 
+#if SYSTEM_PACKAGE_DARWIN
+@available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+internal func system_renamex_np(
+  _ old: UnsafePointer<CInterop.PlatformChar>,
+  _ new: UnsafePointer<CInterop.PlatformChar>,
+  _ flags: CUnsignedInt
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled {
+    return _mock(path: old, String(_errorCorrectingPlatformString: new), flags)
+  }
+#endif
+  return renamex_np(old, new, flags)
+}
+
+@available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+internal func system_renameatx_np(
+  _ oldFD: CInt,
+  _ old: UnsafePointer<CInterop.PlatformChar>,
+  _ newFD: CInt,
+  _ new: UnsafePointer<CInterop.PlatformChar>,
+  _ flags: CUnsignedInt
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled {
+    return _mock(
+      oldFD, String(_errorCorrectingPlatformString: old),
+      newFD, String(_errorCorrectingPlatformString: new), flags)
+  }
+#endif
+  return renameatx_np(oldFD, old, newFD, new, flags)
+}
+#elseif os(Linux) || os(Android)
+internal func system_renameat2(
+  _ oldFD: CInt,
+  _ old: UnsafePointer<CInterop.PlatformChar>,
+  _ newFD: CInt,
+  _ new: UnsafePointer<CInterop.PlatformChar>,
+  _ flags: CUnsignedInt
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled {
+    return _mock(
+      oldFD, String(_errorCorrectingPlatformString: old),
+      newFD, String(_errorCorrectingPlatformString: new), flags)
+  }
+#endif
+  return csystem_renameat2(oldFD, old, newFD, new, flags)
+}
+#endif
+
 internal func system_link(
   _ existing: UnsafePointer<CInterop.PlatformChar>,
   _ new: UnsafePointer<CInterop.PlatformChar>

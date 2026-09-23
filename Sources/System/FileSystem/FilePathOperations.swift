@@ -615,6 +615,235 @@ extension FilePath {
   }
 }
 
+// MARK: - renamex_np, renameatx_np, renameat2
+
+#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
+@available(System 199, *)
+extension FilePath {
+  /// Options that change how a file is renamed.
+  ///
+  /// - Note: Only available on Darwin, Linux, and Android.
+  @frozen
+  public struct RenameOptions: OptionSet, Sendable, Hashable, Codable {
+    /// The raw C flags.
+    @_alwaysEmitIntoClient
+    public let rawValue: CUnsignedInt
+
+    /// Creates a strongly-typed `FilePath.RenameOptions` from raw C flags.
+    @_alwaysEmitIntoClient
+    public init(rawValue: CUnsignedInt) { self.rawValue = rawValue }
+
+    /// Throws ``Errno/fileExists`` if a file exists at the new path,
+    /// rather than replacing it.
+    ///
+    /// The corresponding C constant is `RENAME_EXCL` on Darwin,
+    /// and `RENAME_NOREPLACE` on Linux and Android.
+    @_alwaysEmitIntoClient
+    public static var exclusive: RenameOptions {
+      #if SYSTEM_PACKAGE_DARWIN
+      RenameOptions(rawValue: _RENAME_EXCL)
+      #else
+      RenameOptions(rawValue: _RENAME_NOREPLACE)
+      #endif
+    }
+
+    /// Atomically exchanges the files at the two paths,
+    /// which must both exist.
+    ///
+    /// The corresponding C constant is `RENAME_SWAP` on Darwin,
+    /// and `RENAME_EXCHANGE` on Linux and Android.
+    @_alwaysEmitIntoClient
+    public static var swap: RenameOptions {
+      #if SYSTEM_PACKAGE_DARWIN
+      RenameOptions(rawValue: _RENAME_SWAP)
+      #else
+      RenameOptions(rawValue: _RENAME_EXCHANGE)
+      #endif
+    }
+  }
+
+  /// Renames the file at this path, with options.
+  ///
+  /// - Parameters:
+  ///   - newPath: The new location of the file.
+  ///   - options: Options that change how the file is renamed.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// Both paths must be on the same file system.
+  /// Not every file system supports every option;
+  /// one that doesn't throws an error, such as ``Errno/invalidArgument``.
+  ///
+  /// The corresponding C function is `renamex_np` on Darwin,
+  /// and `renameat2` on Linux and Android.
+  /// - Note: Only available on Darwin, Linux, and Android.
+  @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+  @_alwaysEmitIntoClient
+  public func rename(
+    to newPath: FilePath,
+    options: RenameOptions,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try withPlatformString { old in
+      newPath.withPlatformString { new in
+        FilePath._rename(
+          old, to: new, options: options, retryOnInterrupt: retryOnInterrupt)
+      }
+    }.get()
+  }
+
+  /// Renames the file at the given path, with options.
+  ///
+  /// - Parameters:
+  ///   - oldPath: The current location of the file.
+  ///   - newPath: The new location of the file.
+  ///   - options: Options that change how the file is renamed.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// Both paths must be on the same file system.
+  /// Not every file system supports every option;
+  /// one that doesn't throws an error, such as ``Errno/invalidArgument``.
+  ///
+  /// The corresponding C function is `renamex_np` on Darwin,
+  /// and `renameat2` on Linux and Android.
+  /// - Note: Only available on Darwin, Linux, and Android.
+  @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+  @_alwaysEmitIntoClient
+  public static func rename(
+    _ oldPath: UnsafePointer<CChar>,
+    to newPath: UnsafePointer<CChar>,
+    options: RenameOptions,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try _rename(
+      oldPath, to: newPath, options: options, retryOnInterrupt: retryOnInterrupt
+    ).get()
+  }
+
+  @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+  @usableFromInline
+  internal static func _rename(
+    _ oldPath: UnsafePointer<CChar>,
+    to newPath: UnsafePointer<CChar>,
+    options: RenameOptions,
+    retryOnInterrupt: Bool
+  ) -> Result<(), Errno> {
+    nothingOrErrno(retryOnInterrupt: retryOnInterrupt) {
+      #if SYSTEM_PACKAGE_DARWIN
+      system_renamex_np(oldPath, newPath, options.rawValue)
+      #else
+      system_renameat2(_AT_FDCWD, oldPath, _AT_FDCWD, newPath, options.rawValue)
+      #endif
+    }
+  }
+
+  /// Renames the file at this path, with options,
+  /// resolving relative paths against directories.
+  ///
+  /// - Parameters:
+  ///   - fd: The directory against which this path is resolved, if relative.
+  ///   - newPath: The new location of the file.
+  ///   - newFD: The directory against which `newPath` is resolved, if relative.
+  ///   - options: Options that change how the file is renamed.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// Both paths must be on the same file system.
+  /// Not every file system supports every option;
+  /// one that doesn't throws an error, such as ``Errno/invalidArgument``.
+  ///
+  /// An absolute path ignores its directory argument.
+  ///
+  /// The corresponding C function is `renameatx_np` on Darwin,
+  /// and `renameat2` on Linux and Android.
+  /// - Note: Only available on Darwin, Linux, and Android.
+  @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+  @_alwaysEmitIntoClient
+  public func rename(
+    relativeTo fd: FileDescriptor,
+    to newPath: FilePath,
+    relativeTo newFD: FileDescriptor,
+    options: RenameOptions,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try withPlatformString { old in
+      newPath.withPlatformString { new in
+        FilePath._rename(
+          old, relativeTo: fd, to: new, relativeTo: newFD, options: options,
+          retryOnInterrupt: retryOnInterrupt)
+      }
+    }.get()
+  }
+
+  /// Renames the file at the given path, with options,
+  /// resolving relative paths against directories.
+  ///
+  /// - Parameters:
+  ///   - oldPath: The current location of the file.
+  ///   - fd: The directory against which `oldPath` is resolved, if relative.
+  ///   - newPath: The new location of the file.
+  ///   - newFD: The directory against which `newPath` is resolved, if relative.
+  ///   - options: Options that change how the file is renamed.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// Both paths must be on the same file system.
+  /// Not every file system supports every option;
+  /// one that doesn't throws an error, such as ``Errno/invalidArgument``.
+  ///
+  /// An absolute path ignores its directory argument.
+  ///
+  /// The corresponding C function is `renameatx_np` on Darwin,
+  /// and `renameat2` on Linux and Android.
+  /// - Note: Only available on Darwin, Linux, and Android.
+  @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+  @_alwaysEmitIntoClient
+  public static func rename(
+    _ oldPath: UnsafePointer<CChar>,
+    relativeTo fd: FileDescriptor,
+    to newPath: UnsafePointer<CChar>,
+    relativeTo newFD: FileDescriptor,
+    options: RenameOptions,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try _rename(
+      oldPath, relativeTo: fd, to: newPath, relativeTo: newFD, options: options,
+      retryOnInterrupt: retryOnInterrupt
+    ).get()
+  }
+
+  @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+  @usableFromInline
+  internal static func _rename(
+    _ oldPath: UnsafePointer<CChar>,
+    relativeTo fd: FileDescriptor,
+    to newPath: UnsafePointer<CChar>,
+    relativeTo newFD: FileDescriptor,
+    options: RenameOptions,
+    retryOnInterrupt: Bool
+  ) -> Result<(), Errno> {
+    nothingOrErrno(retryOnInterrupt: retryOnInterrupt) {
+      #if SYSTEM_PACKAGE_DARWIN
+      system_renameatx_np(
+        fd.rawValue, oldPath, newFD.rawValue, newPath, options.rawValue)
+      #else
+      system_renameat2(
+        fd.rawValue, oldPath, newFD.rawValue, newPath, options.rawValue)
+      #endif
+    }
+  }
+}
+#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
+
 // MARK: - link, linkat
 
 @available(System 199, *)
