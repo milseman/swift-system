@@ -28,5 +28,13 @@
 int _system_ioctl_TIOCGWINSZ(int fd, void *ws);
 int _system_ioctl_TIOCSWINSZ(int fd, const void *ws);
 
+// The flags for renameat2. glibc only declares them, and renameat2 itself,
+// with _GNU_SOURCE, which can't be defined here; see shims.c.
+#define CSYSTEM_RENAME_NOREPLACE (1 << 0)
+#define CSYSTEM_RENAME_EXCHANGE (1 << 1)
+
+extern int csystem_renameat2(int olddirfd, const char *oldpath,
+                             int newdirfd, const char *newpath,
+                             unsigned int flags);
 #endif
 

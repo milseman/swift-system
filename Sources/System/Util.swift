@@ -43,6 +43,21 @@ internal func nothingOrErrno<I: FixedWidthInteger>(
   valueOrErrno(retryOnInterrupt: retryOnInterrupt, f).map { _ in () }
 }
 
+// For calls that return an error number directly, rather than returning -1
+// and setting errno, such as posix_fallocate and getpwuid_r. Results in the
+// returned error number if it's nonzero.
+@available(System 0.0.1, *)
+internal func nothingOrReturnedErrno(
+  retryOnInterrupt: Bool, _ f: () -> CInt
+) -> Result<(), Errno> {
+  repeat {
+    let error = f()
+    guard error != 0 else { return .success(()) }
+    let err = Errno(rawValue: error)
+    guard retryOnInterrupt && err == .interrupted else { return .failure(err) }
+  } while true
+}
+
 // Run a precondition for debug client builds
 internal func _debugPrecondition(
   _ condition: @autoclosure () -> Bool,

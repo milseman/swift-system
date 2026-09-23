@@ -143,6 +143,47 @@ final class FileOperationsTest: XCTestCase {
           permissions: [.groupReadWriteExecute, .ownerReadWriteExecute, .otherReadWriteExecute],
           retryOnInterrupt: retryOnInterrupt)
       },
+
+      MockTestCase(name: "fcntl", .noInterrupt, rawFD, F_GETFD) { _ in
+        _ = try fd.descriptorFlags()
+      },
+
+      MockTestCase(name: "fcntl", .noInterrupt, rawFD, F_SETFD, FD_CLOEXEC) { _ in
+        try fd.setDescriptorFlags(.closeOnExec)
+      },
+
+      MockTestCase(name: "fcntl", .noInterrupt, rawFD, F_GETFL) { _ in
+        _ = try fd.statusFlags()
+      },
+
+      MockTestCase(name: "fcntl", .noInterrupt, rawFD, F_GETFL) { _ in
+        _ = try fd.accessMode()
+      },
+
+      MockTestCase(name: "fcntl", .noInterrupt, rawFD, F_SETFL, O_NONBLOCK | O_APPEND) { _ in
+        try fd.setStatusFlags([.nonBlocking, .append])
+      },
+
+      MockTestCase(name: "fcntl", .noInterrupt, rawFD, F_DUPFD_CLOEXEC, 0) { _ in
+        _ = try fd.duplicate(closeOnExec: true)
+      },
+
+      MockTestCase(name: "fcntl", .noInterrupt, rawFD, F_DUPFD, 10) { _ in
+        _ = try fd.duplicate(atLeast: FileDescriptor(rawValue: 10), closeOnExec: false)
+      },
+
+      MockTestCase(name: "flock", .interruptable, rawFD, LOCK_EX) { retryOnInterrupt in
+        try fd.lock(retryOnInterrupt: retryOnInterrupt)
+      },
+
+      MockTestCase(name: "flock", .interruptable, rawFD, LOCK_SH | LOCK_NB) {
+        retryOnInterrupt in
+        try fd.lock(shared: true, nonBlocking: true, retryOnInterrupt: retryOnInterrupt)
+      },
+
+      MockTestCase(name: "flock", .interruptable, rawFD, LOCK_UN) { retryOnInterrupt in
+        try fd.unlock(retryOnInterrupt: retryOnInterrupt)
+      },
     ]
 
     for test in syscallTestCases { test.runAllTests() }
@@ -163,6 +204,44 @@ final class FileOperationsTest: XCTestCase {
     }
     fchflags.runAllTests()
     #endif // SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
+
+    #if SYSTEM_PACKAGE_DARWIN
+    let fullSync = [
+      MockTestCase(name: "fcntl", .interruptable, rawFD, F_FULLFSYNC) { retryOnInterrupt in
+        try fd.synchronizeFully(retryOnInterrupt: retryOnInterrupt)
+      },
+
+      MockTestCase(name: "fcntl", .interruptable, rawFD, F_BARRIERFSYNC) {
+        retryOnInterrupt in
+        try fd.synchronizeWithBarrier(retryOnInterrupt: retryOnInterrupt)
+      },
+    ]
+    for test in fullSync { test.runAllTests() }
+    #endif // SYSTEM_PACKAGE_DARWIN
+
+    #if os(Linux) || os(Android) || os(FreeBSD) || os(WASI)
+    let fallocate = MockTestCase(
+      name: "posix_fallocate", .interruptable, rawFD, 512, 4096
+    ) { retryOnInterrupt in
+      try fd.allocateSpace(offset: 512, length: 4096, retryOnInterrupt: retryOnInterrupt)
+    }
+    fallocate.runAllTests()
+
+    let fadvise = [
+      MockTestCase(
+        name: "posix_fadvise", .noInterrupt, rawFD, 0, 0, POSIX_FADV_SEQUENTIAL
+      ) { _ in
+        try fd.advise(.sequential)
+      },
+
+      MockTestCase(
+        name: "posix_fadvise", .noInterrupt, rawFD, 512, 4096, POSIX_FADV_DONTNEED
+      ) { _ in
+        try fd.advise(.dontNeed, offset: 512, length: 4096)
+      },
+    ]
+    for test in fadvise { test.runAllTests() }
+    #endif // os(Linux) || os(Android) || os(FreeBSD) || os(WASI)
   }
   #endif // ENABLE_MOCKING && !os(WASI) && !os(Windows)
 
@@ -585,6 +664,241 @@ final class FileOperationsTest: XCTestCase {
     }
   }
 #endif // SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
+
+  @available(System 199, *)
+  func testDescriptorFlags() throws {
+    try withTemporaryFilePath(basename: "testDescriptorFlags") { path in
+      let fd = try FileDescriptor.open(path.appending("\(UUID().uuidString).txt"), .readWrite, options: [.create, .truncate], permissions: .ownerReadWrite)
+      try fd.closeAfter {
+        XCTAssertFalse(try fd.descriptorFlags().contains(.closeOnExec))
+        try fd.setDescriptorFlags(fd.descriptorFlags().union(.closeOnExec))
+        XCTAssertTrue(try fd.descriptorFlags().contains(.closeOnExec))
+
+        // Each descriptor has its own flags.
+        let duplicate = try fd.duplicate()
+        try duplicate.closeAfter {
+          XCTAssertFalse(try duplicate.descriptorFlags().contains(.closeOnExec))
+        }
+
+        try fd.setDescriptorFlags([])
+        XCTAssertEqual(try fd.descriptorFlags(), [])
+      }
+
+      let closeOnExec = try FileDescriptor.open(path.appending("\(UUID().uuidString).txt"), .readWrite, options: [.create, .closeOnExec], permissions: .ownerReadWrite)
+      try closeOnExec.closeAfter {
+        XCTAssertTrue(try closeOnExec.descriptorFlags().contains(.closeOnExec))
+      }
+    }
+    XCTAssertThrowsError(try FileDescriptor(rawValue: -1).descriptorFlags()) {
+      XCTAssertEqual($0 as? Errno, .badFileDescriptor)
+    }
+  }
+
+  @available(System 199, *)
+  func testDuplicateAtLeast() throws {
+    try withTemporaryFilePath(basename: "testDuplicateAtLeast") { path in
+      let fd = try FileDescriptor.open(path.appending("\(UUID().uuidString).txt"), .readWrite, options: [.create, .truncate], permissions: .ownerReadWrite)
+      try fd.closeAfter {
+        let minimum = FileDescriptor(rawValue: 100)
+        let copy = try fd.duplicate(atLeast: minimum, closeOnExec: false)
+        try copy.closeAfter {
+          XCTAssertGreaterThanOrEqual(copy.rawValue, minimum.rawValue)
+          XCTAssertFalse(try copy.descriptorFlags().contains(.closeOnExec))
+          // The copy shares the open file, including its offset.
+          try copy.writeAll("abc".utf8)
+          XCTAssertEqual(try fd.seek(offset: 0, from: .current), 3)
+
+          // The minimum is taken, so the next copy gets a higher descriptor.
+          let next = try fd.duplicate(atLeast: copy, closeOnExec: true)
+          try next.closeAfter {
+            XCTAssertGreaterThan(next.rawValue, copy.rawValue)
+            XCTAssertTrue(try next.descriptorFlags().contains(.closeOnExec))
+          }
+        }
+
+        let lowest = try fd.duplicate(closeOnExec: true)
+        try lowest.closeAfter {
+          XCTAssertTrue(try lowest.descriptorFlags().contains(.closeOnExec))
+        }
+
+        XCTAssertThrowsError(
+          try fd.duplicate(atLeast: FileDescriptor(rawValue: -1), closeOnExec: false)
+        ) {
+          XCTAssertEqual($0 as? Errno, .invalidArgument)
+        }
+      }
+    }
+    XCTAssertThrowsError(try FileDescriptor(rawValue: -1).duplicate(closeOnExec: true)) {
+      XCTAssertEqual($0 as? Errno, .badFileDescriptor)
+    }
+  }
+
+  @available(System 199, *)
+  func testLock() throws {
+    try withTemporaryFilePath(basename: "testLock") { path in
+      let file = path.appending("\(UUID().uuidString).txt")
+      // Locks belong to open files, so two opens of one file conflict,
+      // even in one process.
+      let first = try FileDescriptor.open(file, .readWrite, options: .create, permissions: .ownerReadWrite)
+      try first.closeAfter {
+        let second = try FileDescriptor.open(file, .readWrite)
+        try second.closeAfter {
+          try first.lock()
+          XCTAssertThrowsError(try second.lock(nonBlocking: true)) {
+            XCTAssertEqual($0 as? Errno, .wouldBlock)
+          }
+          XCTAssertThrowsError(try second.lock(shared: true, nonBlocking: true)) {
+            XCTAssertEqual($0 as? Errno, .wouldBlock)
+          }
+
+          // A duplicate shares the lock, so it can release it.
+          let duplicate = try first.duplicate()
+          try duplicate.closeAfter { try duplicate.unlock() }
+          try second.lock(nonBlocking: true)
+          try second.unlock()
+
+          // Shared locks coexist, and exclude an exclusive one.
+          try first.lock(shared: true, nonBlocking: true)
+          try second.lock(shared: true, nonBlocking: true)
+          XCTAssertThrowsError(try first.lock(nonBlocking: true)) {
+            XCTAssertEqual($0 as? Errno, .wouldBlock)
+          }
+          try second.unlock()
+          // With the other shared lock gone, the shared lock can become exclusive.
+          try first.lock(nonBlocking: true)
+          try first.unlock()
+        }
+      }
+    }
+    XCTAssertThrowsError(try FileDescriptor(rawValue: -1).lock()) {
+      XCTAssertEqual($0 as? Errno, .badFileDescriptor)
+    }
+  }
+
+#if SYSTEM_PACKAGE_DARWIN
+  @available(System 199, *)
+  func testSynchronizeFully() throws {
+    try withTemporaryFilePath(basename: "testSynchronizeFully") { path in
+      let fd = try FileDescriptor.open(path.appending("\(UUID().uuidString).txt"), .readWrite, options: [.create, .truncate], permissions: .ownerReadWrite)
+      try fd.closeAfter {
+        try fd.writeAll("abc".utf8)
+        try fd.synchronizeFully()
+        try fd.writeAll("def".utf8)
+        try fd.synchronizeWithBarrier()
+        XCTAssertEqual(try fd.fileSize(), 6)
+      }
+    }
+  }
+#endif // SYSTEM_PACKAGE_DARWIN
 #endif // !os(Windows) && !os(WASI)
+
+#if !os(Windows)
+  @available(System 199, *)
+  func testStatusFlags() throws {
+    try withTemporaryFilePath(basename: "testStatusFlags") { path in
+      let fd = try FileDescriptor.open(path.appending("\(UUID().uuidString).txt"), .writeOnly, options: [.create, .append], permissions: .ownerReadWrite)
+      try fd.closeAfter {
+        XCTAssertEqual(try fd.accessMode(), .writeOnly)
+        XCTAssertTrue(try fd.statusFlags().contains(.append))
+        XCTAssertFalse(try fd.statusFlags().contains(.nonBlocking))
+
+        try fd.setStatusFlags(fd.statusFlags().union(.nonBlocking))
+        XCTAssertTrue(try fd.statusFlags().contains(.nonBlocking))
+        XCTAssertTrue(try fd.statusFlags().contains(.append))
+        XCTAssertEqual(try fd.accessMode(), .writeOnly)
+
+        #if !os(WASI) // WASI has no dup
+        // Duplicates share the open file, and so its status flags.
+        let duplicate = try fd.duplicate()
+        try duplicate.closeAfter {
+          XCTAssertTrue(try duplicate.statusFlags().contains(.nonBlocking))
+          try duplicate.setStatusFlags(duplicate.statusFlags().subtracting(.nonBlocking))
+        }
+        XCTAssertFalse(try fd.statusFlags().contains(.nonBlocking))
+        #endif
+      }
+
+      let readWrite = try FileDescriptor.open(path.appending("\(UUID().uuidString).txt"), .readWrite, options: [.create, .nonBlocking], permissions: .ownerReadWrite)
+      try readWrite.closeAfter {
+        XCTAssertEqual(try readWrite.accessMode(), .readWrite)
+        // Linux can report flags with no name here, such as O_LARGEFILE.
+        XCTAssertTrue(try readWrite.statusFlags().contains(.nonBlocking))
+        XCTAssertFalse(try readWrite.statusFlags().contains(.append))
+      }
+    }
+    XCTAssertThrowsError(try FileDescriptor(rawValue: -1).statusFlags()) {
+      XCTAssertEqual($0 as? Errno, .badFileDescriptor)
+    }
+  }
+#endif // !os(Windows)
+
+#if os(Linux) || os(Android) || os(FreeBSD) || os(WASI)
+  @available(System 199, *)
+  func testAllocateSpace() throws {
+    try withTemporaryFilePath(basename: "testAllocateSpace") { path in
+      let fd = try FileDescriptor.open(path.appending("\(UUID().uuidString).txt"), .readWrite, options: [.create, .truncate], permissions: .ownerReadWrite)
+      try fd.closeAfter {
+        try fd.writeAll("abc".utf8)
+        do {
+          try fd.allocateSpace(offset: 0, length: 1 << 16)
+        } catch let error as Errno
+          where [Errno.invalidArgument, .notSupported, .notSupportedOnSocket, .noFunction]
+            .contains(error)
+        {
+          throw XCTSkip("The file system doesn't support preallocation: \(error)")
+        }
+        // The file is extended, its contents are kept, and the offset is unchanged.
+        XCTAssertEqual(try fd.stat().size, 1 << 16)
+        XCTAssertEqual(try fd.seek(offset: 0, from: .current), 3)
+        let bytes = try Array<UInt8>(unsafeUninitializedCapacity: 8) { buf, count in
+          count = try fd.read(fromAbsoluteOffset: 0, into: UnsafeMutableRawBufferPointer(buf))
+        }
+        XCTAssertEqual(bytes, Array("abc".utf8) + [0, 0, 0, 0, 0])
+
+        // A range within the file leaves its size alone.
+        try fd.allocateSpace(offset: 16, length: 16)
+        XCTAssertEqual(try fd.stat().size, 1 << 16)
+      }
+
+      let readOnly = try FileDescriptor.open(path.appending("\(UUID().uuidString).txt"), .readOnly, options: .create, permissions: .ownerReadWrite)
+      try readOnly.closeAfter {
+        XCTAssertThrowsError(try readOnly.allocateSpace(offset: 0, length: 16)) {
+          XCTAssertEqual($0 as? Errno, .badFileDescriptor)
+        }
+      }
+    }
+  }
+
+  @available(System 199, *)
+  func testAdvise() throws {
+    try withTemporaryFilePath(basename: "testAdvise") { path in
+      let fd = try FileDescriptor.open(path.appending("\(UUID().uuidString).txt"), .readWrite, options: [.create, .truncate], permissions: .ownerReadWrite)
+      try fd.closeAfter {
+        try fd.writeAll(Array(repeating: UInt8(ascii: "a"), count: 1 << 14))
+        for advice in [
+          FileDescriptor.Advice.sequential, .random, .willNeed, .dontNeed, .noReuse, .normal,
+        ] {
+          try fd.advise(advice)
+          try fd.advise(advice, offset: 4096, length: 4096)
+        }
+        // Advice doesn't change the file.
+        XCTAssertEqual(try fd.stat().size, 1 << 14)
+      }
+    }
+    XCTAssertThrowsError(try FileDescriptor(rawValue: -1).advise(.normal)) {
+      XCTAssertEqual($0 as? Errno, .badFileDescriptor)
+    }
+    #if !os(WASI) // WASI has no pipe
+    let pipe = try FileDescriptor.pipe()
+    try pipe.readEnd.closeAfter {
+      try pipe.writeEnd.closeAfter {
+        XCTAssertThrowsError(try pipe.readEnd.advise(.sequential)) {
+          XCTAssertEqual($0 as? Errno, .illegalSeek)
+        }
+      }
+    }
+    #endif
+  }
+#endif // os(Linux) || os(Android) || os(FreeBSD) || os(WASI)
 }
 

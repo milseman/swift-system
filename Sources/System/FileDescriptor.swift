@@ -527,6 +527,184 @@ extension FileDescriptor {
   }
 }
 
+#if !os(Windows)
+@available(System 199, *)
+extension FileDescriptor {
+  /// Flags that belong to a file descriptor,
+  /// rather than to the open file it refers to.
+  ///
+  /// Each file descriptor has its own descriptor flags,
+  /// even when duplicated descriptors refer to the same open file.
+  /// To read and change them, call ``FileDescriptor/descriptorFlags()``
+  /// and ``FileDescriptor/setDescriptorFlags(_:)``.
+  @frozen
+  public struct DescriptorFlags: OptionSet, Sendable, Hashable, Codable {
+    /// The raw C flags.
+    @_alwaysEmitIntoClient
+    public var rawValue: CInt
+
+    /// Creates a strongly-typed flags value from raw C flags.
+    @_alwaysEmitIntoClient
+    public init(rawValue: CInt) { self.rawValue = rawValue }
+
+    /// Indicates that executing a program closes the file descriptor.
+    ///
+    /// Normally, file descriptors remain open
+    /// across calls to the `exec(2)` family of functions.
+    /// If this flag is set, the system closes the file descriptor
+    /// when replacing this process with another process.
+    ///
+    /// The corresponding C constant is `FD_CLOEXEC`.
+    @_alwaysEmitIntoClient
+    public static var closeOnExec: DescriptorFlags {
+      DescriptorFlags(rawValue: _FD_CLOEXEC)
+    }
+
+    @_alwaysEmitIntoClient
+    @available(*, unavailable, renamed: "closeOnExec")
+    public static var FD_CLOEXEC: DescriptorFlags { closeOnExec }
+  }
+
+  /// Flags that belong to the open file that a file descriptor refers to.
+  ///
+  /// All the file descriptors that refer to the same open file
+  /// share its status flags.
+  /// That includes duplicated descriptors,
+  /// and descriptors that other processes inherited,
+  /// such as a standard input shared with a parent process.
+  /// To read and change them, call ``FileDescriptor/statusFlags()``
+  /// and ``FileDescriptor/setStatusFlags(_:)``.
+  @frozen
+  public struct StatusFlags: OptionSet, Sendable, Hashable, Codable {
+    /// The raw C flags.
+    @_alwaysEmitIntoClient
+    public var rawValue: CInt
+
+    /// Creates a strongly-typed flags value from raw C flags.
+    @_alwaysEmitIntoClient
+    public init(rawValue: CInt) { self.rawValue = rawValue }
+
+    /// Indicates that input and output operations on the file don't wait
+    /// for the file or device to become ready.
+    ///
+    /// An operation that would block throws ``Errno/wouldBlock`` instead.
+    ///
+    /// The corresponding C constant is `O_NONBLOCK`.
+    @_alwaysEmitIntoClient
+    public static var nonBlocking: StatusFlags { StatusFlags(rawValue: _O_NONBLOCK) }
+
+    @_alwaysEmitIntoClient
+    @available(*, unavailable, renamed: "nonBlocking")
+    public static var O_NONBLOCK: StatusFlags { nonBlocking }
+
+    /// Indicates that each write operation appends to the file.
+    ///
+    /// The corresponding C constant is `O_APPEND`.
+    @_alwaysEmitIntoClient
+    public static var append: StatusFlags { StatusFlags(rawValue: _O_APPEND) }
+
+    @_alwaysEmitIntoClient
+    @available(*, unavailable, renamed: "append")
+    public static var O_APPEND: StatusFlags { append }
+
+#if !os(WASI)
+    /// Indicates that the process receives a signal
+    /// when input or output becomes possible on the file.
+    ///
+    /// The corresponding C constant is `O_ASYNC`.
+    @_alwaysEmitIntoClient
+    public static var async: StatusFlags { StatusFlags(rawValue: _O_ASYNC) }
+
+    @_alwaysEmitIntoClient
+    @available(*, unavailable, renamed: "async")
+    public static var O_ASYNC: StatusFlags { async }
+#endif
+  }
+}
+#endif // !os(Windows)
+
+#if os(Linux) || os(Android) || os(FreeBSD) || os(WASI)
+@available(System 199, *)
+extension FileDescriptor {
+  /// Advice about how you expect to access a file's data,
+  /// which the system can use to optimize caching and read-ahead.
+  ///
+  /// To give advice, call ``FileDescriptor/advise(_:offset:length:)``.
+  @frozen
+  public struct Advice: RawRepresentable, Sendable, Hashable, Codable {
+    /// The raw C value.
+    @_alwaysEmitIntoClient
+    public var rawValue: CInt
+
+    /// Creates a strongly-typed advice value from a raw C value.
+    @_alwaysEmitIntoClient
+    public init(rawValue: CInt) { self.rawValue = rawValue }
+
+    /// Indicates that you have no advice to give,
+    /// restoring the default behavior.
+    ///
+    /// The corresponding C constant is `POSIX_FADV_NORMAL`.
+    @_alwaysEmitIntoClient
+    public static var normal: Advice { Advice(rawValue: _POSIX_FADV_NORMAL) }
+
+    @_alwaysEmitIntoClient
+    @available(*, unavailable, renamed: "normal")
+    public static var POSIX_FADV_NORMAL: Advice { normal }
+
+    /// Indicates that you expect to access the data sequentially,
+    /// from lower offsets to higher ones.
+    ///
+    /// The corresponding C constant is `POSIX_FADV_SEQUENTIAL`.
+    @_alwaysEmitIntoClient
+    public static var sequential: Advice { Advice(rawValue: _POSIX_FADV_SEQUENTIAL) }
+
+    @_alwaysEmitIntoClient
+    @available(*, unavailable, renamed: "sequential")
+    public static var POSIX_FADV_SEQUENTIAL: Advice { sequential }
+
+    /// Indicates that you expect to access the data in a random order.
+    ///
+    /// The corresponding C constant is `POSIX_FADV_RANDOM`.
+    @_alwaysEmitIntoClient
+    public static var random: Advice { Advice(rawValue: _POSIX_FADV_RANDOM) }
+
+    @_alwaysEmitIntoClient
+    @available(*, unavailable, renamed: "random")
+    public static var POSIX_FADV_RANDOM: Advice { random }
+
+    /// Indicates that you expect to access the data in the near future.
+    ///
+    /// The corresponding C constant is `POSIX_FADV_WILLNEED`.
+    @_alwaysEmitIntoClient
+    public static var willNeed: Advice { Advice(rawValue: _POSIX_FADV_WILLNEED) }
+
+    @_alwaysEmitIntoClient
+    @available(*, unavailable, renamed: "willNeed")
+    public static var POSIX_FADV_WILLNEED: Advice { willNeed }
+
+    /// Indicates that you don't expect to access the data in the near future.
+    ///
+    /// The corresponding C constant is `POSIX_FADV_DONTNEED`.
+    @_alwaysEmitIntoClient
+    public static var dontNeed: Advice { Advice(rawValue: _POSIX_FADV_DONTNEED) }
+
+    @_alwaysEmitIntoClient
+    @available(*, unavailable, renamed: "dontNeed")
+    public static var POSIX_FADV_DONTNEED: Advice { dontNeed }
+
+    /// Indicates that you expect to access the data only once.
+    ///
+    /// The corresponding C constant is `POSIX_FADV_NOREUSE`.
+    @_alwaysEmitIntoClient
+    public static var noReuse: Advice { Advice(rawValue: _POSIX_FADV_NOREUSE) }
+
+    @_alwaysEmitIntoClient
+    @available(*, unavailable, renamed: "noReuse")
+    public static var POSIX_FADV_NOREUSE: Advice { noReuse }
+  }
+}
+#endif // os(Linux) || os(Android) || os(FreeBSD) || os(WASI)
+
 @available(System 0.0.1, *)
 extension FileDescriptor.AccessMode
   : CustomStringConvertible, CustomDebugStringConvertible
