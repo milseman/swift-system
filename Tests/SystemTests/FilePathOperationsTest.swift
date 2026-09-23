@@ -139,6 +139,39 @@ final class FilePathOperationsTest: XCTestCase {
           }
         }
       },
+
+      MockTestCase(name: "link", .interruptable, "existing", "a path") {
+        retryOnInterrupt in
+        try path.makeHardLink(to: "existing", retryOnInterrupt: retryOnInterrupt)
+      },
+
+      MockTestCase(name: "link", .interruptable, "existing", "a path") {
+        retryOnInterrupt in
+        try "a path".withCString { new in
+          try "existing".withCString { existing in
+            try FilePath.makeHardLink(new, to: existing, retryOnInterrupt: retryOnInterrupt)
+          }
+        }
+      },
+
+      MockTestCase(
+        name: "linkat", .interruptable, 43, "existing", 42, "a path", AT_SYMLINK_FOLLOW
+      ) { retryOnInterrupt in
+        try path.makeHardLink(
+          relativeTo: dir, to: "existing", relativeTo: FileDescriptor(rawValue: 43),
+          flags: .symlinkFollow, retryOnInterrupt: retryOnInterrupt)
+      },
+
+      MockTestCase(name: "linkat", .interruptable, 43, "existing", 42, "a path", 0) {
+        retryOnInterrupt in
+        try "a path".withCString { new in
+          try "existing".withCString { existing in
+            try FilePath.makeHardLink(
+              new, relativeTo: dir, to: existing, relativeTo: FileDescriptor(rawValue: 43),
+              retryOnInterrupt: retryOnInterrupt)
+          }
+        }
+      },
     ]
 
     for test in syscallTestCases { test.runAllTests() }
@@ -365,6 +398,57 @@ final class FilePathOperationsTest: XCTestCase {
             XCTAssertEqual($0 as? Errno, .noSuchFileOrDirectory)
           }
         }
+      }
+    }
+  }
+
+  @available(System 199, *)
+  func testMakeHardLink() throws {
+    try withTemporaryFilePath(basename: "testMakeHardLink") { path in
+      let a = path.appending("a")
+      let fd = try FileDescriptor.open(
+        a, .writeOnly, options: .create, permissions: .ownerReadWrite)
+      try fd.close()
+
+      try path.appending("b").makeHardLink(to: a)
+      XCTAssertEqual(try path.appending("b").stat().inode, try a.stat().inode)
+      XCTAssertEqual(try a.stat().linkCount, 2)
+
+      try path.appending("c").withCString { new in
+        try a.withCString { existing in
+          try FilePath.makeHardLink(new, to: existing)
+        }
+      }
+      XCTAssertEqual(try path.appending("c").stat().inode, try a.stat().inode)
+      XCTAssertEqual(try a.stat().linkCount, 3)
+
+      XCTAssertThrowsError(try path.appending("b").makeHardLink(to: a)) {
+        XCTAssertEqual($0 as? Errno, .fileExists)
+      }
+      XCTAssertThrowsError(try path.appending("d").makeHardLink(to: path.appending("x"))) {
+        XCTAssertEqual($0 as? Errno, .noSuchFileOrDirectory)
+      }
+
+      let dir = try FileDescriptor.open(path, .readOnly, options: .directory)
+      try dir.closeAfter {
+        try FilePath("e").makeHardLink(relativeTo: dir, to: "a", relativeTo: dir)
+        XCTAssertEqual(try path.appending("e").stat().inode, try a.stat().inode)
+
+        // With .symlinkFollow, a symbolic link is resolved to its target.
+        "a".withCString { target in
+          path.appending("symlink").withCString { link in
+            XCTAssertEqual(symlink(target, link), 0)
+          }
+        }
+        try "f".withCString { new in
+          try "symlink".withCString { existing in
+            try FilePath.makeHardLink(
+              new, relativeTo: dir, to: existing, relativeTo: dir, flags: .symlinkFollow)
+          }
+        }
+        let f = try path.appending("f").stat(followTargetSymlink: false)
+        XCTAssertEqual(f.type, .regular)
+        XCTAssertEqual(f.inode, try a.stat().inode)
       }
     }
   }

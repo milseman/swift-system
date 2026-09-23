@@ -615,4 +615,172 @@ extension FilePath {
   }
 }
 
+// MARK: - link, linkat
+
+@available(System 199, *)
+extension FilePath {
+  /// Creates a hard link at this path to an existing file.
+  ///
+  /// - Parameters:
+  ///   - existingPath: The file to link to.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// The new link and the existing file must be on the same file system,
+  /// and the existing file must not be a directory.
+  /// If `existingPath` names a symbolic link,
+  /// Darwin links to the symbolic link's target
+  /// and Linux links to the symbolic link itself.
+  /// To choose, call
+  /// ``makeHardLink(relativeTo:to:relativeTo:flags:retryOnInterrupt:)``
+  /// with or without ``ResolutionFlags/symlinkFollow``.
+  ///
+  /// The corresponding C function is `link`.
+  @_alwaysEmitIntoClient
+  public func makeHardLink(
+    to existingPath: FilePath,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try withPlatformString { new in
+      existingPath.withPlatformString { existing in
+        FilePath._makeHardLink(new, to: existing, retryOnInterrupt: retryOnInterrupt)
+      }
+    }.get()
+  }
+
+  /// Creates a hard link at the given path to an existing file.
+  ///
+  /// - Parameters:
+  ///   - path: The location of the new link.
+  ///   - existingPath: The file to link to.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// The new link and the existing file must be on the same file system,
+  /// and the existing file must not be a directory.
+  /// If `existingPath` names a symbolic link,
+  /// Darwin links to the symbolic link's target
+  /// and Linux links to the symbolic link itself.
+  /// To choose, call
+  /// ``makeHardLink(_:relativeTo:to:relativeTo:flags:retryOnInterrupt:)``
+  /// with or without ``ResolutionFlags/symlinkFollow``.
+  ///
+  /// The corresponding C function is `link`.
+  @_alwaysEmitIntoClient
+  public static func makeHardLink(
+    _ path: UnsafePointer<CChar>,
+    to existingPath: UnsafePointer<CChar>,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try _makeHardLink(path, to: existingPath, retryOnInterrupt: retryOnInterrupt).get()
+  }
+
+  @usableFromInline
+  internal static func _makeHardLink(
+    _ path: UnsafePointer<CChar>,
+    to existingPath: UnsafePointer<CChar>,
+    retryOnInterrupt: Bool
+  ) -> Result<(), Errno> {
+    nothingOrErrno(retryOnInterrupt: retryOnInterrupt) {
+      system_link(existingPath, path)
+    }
+  }
+
+  /// Creates a hard link at this path to an existing file,
+  /// resolving relative paths against directories.
+  ///
+  /// - Parameters:
+  ///   - fd: The directory against which this path is resolved, if relative.
+  ///   - existingPath: The file to link to.
+  ///   - existingFD: The directory against which `existingPath` is resolved,
+  ///     if relative.
+  ///   - flags: Options that control how `existingPath` is resolved.
+  ///     Pass ``ResolutionFlags/symlinkFollow`` to link to the target
+  ///     of a symbolic link at `existingPath`, rather than to the link itself.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// The new link and the existing file must be on the same file system,
+  /// and the existing file must not be a directory.
+  ///
+  /// An absolute path ignores its directory argument.
+  ///
+  /// The corresponding C function is `linkat`.
+  @_alwaysEmitIntoClient
+  public func makeHardLink(
+    relativeTo fd: FileDescriptor,
+    to existingPath: FilePath,
+    relativeTo existingFD: FileDescriptor,
+    flags: FilePath.ResolutionFlags = [],
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try withPlatformString { new in
+      existingPath.withPlatformString { existing in
+        FilePath._makeHardLink(
+          new, relativeTo: fd, to: existing, relativeTo: existingFD,
+          flags: flags, retryOnInterrupt: retryOnInterrupt)
+      }
+    }.get()
+  }
+
+  /// Creates a hard link at the given path to an existing file,
+  /// resolving relative paths against directories.
+  ///
+  /// - Parameters:
+  ///   - path: The location of the new link.
+  ///   - fd: The directory against which `path` is resolved, if relative.
+  ///   - existingPath: The file to link to.
+  ///   - existingFD: The directory against which `existingPath` is resolved,
+  ///     if relative.
+  ///   - flags: Options that control how `existingPath` is resolved.
+  ///     Pass ``ResolutionFlags/symlinkFollow`` to link to the target
+  ///     of a symbolic link at `existingPath`, rather than to the link itself.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// The new link and the existing file must be on the same file system,
+  /// and the existing file must not be a directory.
+  ///
+  /// An absolute path ignores its directory argument.
+  ///
+  /// The corresponding C function is `linkat`.
+  @_alwaysEmitIntoClient
+  public static func makeHardLink(
+    _ path: UnsafePointer<CChar>,
+    relativeTo fd: FileDescriptor,
+    to existingPath: UnsafePointer<CChar>,
+    relativeTo existingFD: FileDescriptor,
+    flags: FilePath.ResolutionFlags = [],
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try _makeHardLink(
+      path, relativeTo: fd, to: existingPath, relativeTo: existingFD,
+      flags: flags, retryOnInterrupt: retryOnInterrupt
+    ).get()
+  }
+
+  @usableFromInline
+  internal static func _makeHardLink(
+    _ path: UnsafePointer<CChar>,
+    relativeTo fd: FileDescriptor,
+    to existingPath: UnsafePointer<CChar>,
+    relativeTo existingFD: FileDescriptor,
+    flags: FilePath.ResolutionFlags,
+    retryOnInterrupt: Bool
+  ) -> Result<(), Errno> {
+    nothingOrErrno(retryOnInterrupt: retryOnInterrupt) {
+      system_linkat(
+        existingFD.rawValue, existingPath, fd.rawValue, path, flags.rawValue)
+    }
+  }
+}
+
 #endif // !os(Windows)

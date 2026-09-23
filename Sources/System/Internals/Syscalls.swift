@@ -328,6 +328,35 @@ internal func system_renameat(
   return renameat(oldFD, old, newFD, new)
 }
 
+internal func system_link(
+  _ existing: UnsafePointer<CInterop.PlatformChar>,
+  _ new: UnsafePointer<CInterop.PlatformChar>
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled {
+    return _mock(path: existing, String(_errorCorrectingPlatformString: new))
+  }
+#endif
+  return link(existing, new)
+}
+
+internal func system_linkat(
+  _ existingFD: CInt,
+  _ existing: UnsafePointer<CInterop.PlatformChar>,
+  _ newFD: CInt,
+  _ new: UnsafePointer<CInterop.PlatformChar>,
+  _ flag: CInt
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled {
+    return _mock(
+      existingFD, String(_errorCorrectingPlatformString: existing),
+      newFD, String(_errorCorrectingPlatformString: new), flag)
+  }
+#endif
+  return linkat(existingFD, existing, newFD, new, flag)
+}
+
 internal func system_fdopendir(
   _ fd: CInt
 ) -> system_DIRPtr? {
