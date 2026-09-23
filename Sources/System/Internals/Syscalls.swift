@@ -173,6 +173,15 @@ internal func system_ftruncate(_ fd: Int32, _ length: off_t) -> Int32 {
   return ftruncate(fd, length)
 }
 
+#if !os(Windows)
+internal func system_fsync(_ fd: Int32) -> Int32 {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(fd) }
+#endif
+  return fsync(fd)
+}
+#endif // !os(Windows)
+
 internal func system_mkdir(
     _ path: UnsafePointer<CInterop.PlatformChar>,
     _ mode: CInterop.Mode

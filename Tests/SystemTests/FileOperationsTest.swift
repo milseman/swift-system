@@ -34,7 +34,7 @@ final class FileOperationsTest: XCTestCase {
     let writeBuf = UnsafeRawBufferPointer(rawBuf)
     let writeBufAddr = writeBuf.baseAddress
 
-    let syscallTestCases: Array<MockTestCase> = [
+    var syscallTestCases: Array<MockTestCase> = [
       MockTestCase(name: "open", .interruptable, "a path", O_RDWR | O_APPEND) {
         retryOnInterrupt in
         _ = try FileDescriptor.open(
@@ -88,6 +88,14 @@ final class FileOperationsTest: XCTestCase {
                              retryOnInterrupt: retryOnInterrupt)
       },
     ]
+
+    #if !os(Windows)
+    syscallTestCases += [
+      MockTestCase(name: "fsync", .interruptable, rawFD) { retryOnInterrupt in
+        try fd.synchronize(retryOnInterrupt: retryOnInterrupt)
+      },
+    ]
+    #endif // !os(Windows)
 
     for test in syscallTestCases { test.runAllTests() }
   }
@@ -381,5 +389,18 @@ final class FileOperationsTest: XCTestCase {
       }
     }
   }
+
+#if !os(Windows)
+  func testSynchronize() throws {
+    try withTemporaryFilePath(basename: "testSynchronize") { path in
+      let fd = try FileDescriptor.open(path.appending("\(UUID().uuidString).txt"), .readWrite, options: [.create, .truncate], permissions: .ownerReadWrite)
+      try fd.closeAfter {
+        try fd.writeAll("abc".utf8)
+        try fd.synchronize()
+        XCTAssertEqual(try fd.fileSize(), 3)
+      }
+    }
+  }
+#endif // !os(Windows)
 }
 

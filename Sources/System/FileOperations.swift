@@ -768,6 +768,37 @@ extension FileDescriptor {
   }
 }
 
+#if !os(Windows)
+extension FileDescriptor {
+  /// Flushes modified data and metadata of the file referenced by this
+  /// file descriptor to its storage device.
+  ///
+  /// - Parameters:
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// This method blocks until the storage device reports
+  /// that the transfer has completed.
+  /// What that guarantees about durability varies by platform;
+  /// for more information, see the `fsync(2)` man page.
+  ///
+  /// The corresponding C function is `fsync`.
+  @_alwaysEmitIntoClient
+  public func synchronize(retryOnInterrupt: Bool = true) throws(Errno) {
+    try _synchronize(retryOnInterrupt: retryOnInterrupt).get()
+  }
+
+  @usableFromInline
+  internal func _synchronize(retryOnInterrupt: Bool) -> Result<(), Errno> {
+    nothingOrErrno(retryOnInterrupt: retryOnInterrupt) {
+      system_fsync(self.rawValue)
+    }
+  }
+}
+#endif // !os(Windows)
+
 #if !os(WASI) // WASI has no umask
 extension FilePermissions {
   /// The file creation permission mask (aka "umask").
