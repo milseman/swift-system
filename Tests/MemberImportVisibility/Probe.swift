@@ -44,4 +44,19 @@ func _mivProbe(_ s: CInterop.Stat) {
   _ = s.st_mtim
   _ = s.st_ctim
 }
+
+func _mivProbe(_ t: CInterop.Termios) {
+  _ = t.c_iflag
+  _ = t.c_oflag
+  _ = t.c_cflag
+  _ = t.c_lflag
+  _ = t.c_cc
+}
+
+func _mivProbe(_ w: CInterop.WinSize) {
+  _ = w.ws_row
+  _ = w.ws_col
+  _ = w.ws_xpixel
+  _ = w.ws_ypixel
+}
 #endif

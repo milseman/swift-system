@@ -1,20 +1,37 @@
 /*
  This source file is part of the Swift System open source project
 
- Copyright (c) 2026 Apple Inc. and the Swift System project authors
+ Copyright (c) 2024 - 2026 Apple Inc. and the Swift System project authors
  Licensed under Apache License v2.0 with Runtime Library Exception
 
  See https://swift.org/LICENSE.txt for license information
-*/
+ */
 
 #if !os(Windows) && !os(WASI)
-/// A terminal descriptor.
+
+/// A file descriptor referring to a terminal device.
 ///
-/// A `TerminalDescriptor` is a type-safe wrapper around a file descriptor
-/// that refers to a terminal device, such as a pseudoterminal.
+/// `TerminalDescriptor` wraps a `FileDescriptor` and provides terminal-specific
+/// operations defined by POSIX. Use the throwing initializer to verify that a
+/// file descriptor refers to a terminal, ``FileDescriptor/asTerminal`` to get
+/// `nil` instead of an error, or the `unchecked` initializer when you know the
+/// descriptor refers to a terminal.
+///
+/// ```swift
+/// // Checked conversion
+/// if let terminal = FileDescriptor.standardInput.asTerminal {
+///     var attrs = try terminal.attributes()
+///     attrs.localFlags.remove(.echo)
+///     try terminal.setAttributes(attrs, when: .now)
+/// }
+///
+/// // Unchecked (use when you know it's a terminal)
+/// let terminal = TerminalDescriptor(unchecked: .standardInput)
+/// ```
 ///
 /// - Note: Only available on Unix-like platforms.
 @frozen
+@available(System 199, *)
 public struct TerminalDescriptor: RawRepresentable, Hashable, Codable, Sendable {
   /// The raw C file handle.
   @_alwaysEmitIntoClient
@@ -25,6 +42,7 @@ public struct TerminalDescriptor: RawRepresentable, Hashable, Codable, Sendable 
   public init(rawValue: CInt) { self.rawValue = rawValue }
 }
 
+@available(System 199, *)
 extension TerminalDescriptor {
   /// The file descriptor for this terminal.
   ///
@@ -66,4 +84,30 @@ extension TerminalDescriptor {
     return .failure(system_errno == 0 ? .inappropriateIOCTLForDevice : .current)
   }
 }
-#endif
+
+// MARK: - FileDescriptor conveniences
+
+@available(System 199, *)
+extension FileDescriptor {
+  /// Returns whether this file descriptor refers to a terminal device.
+  ///
+  /// The corresponding C function is `isatty`.
+  @_alwaysEmitIntoClient
+  public var isTerminal: Bool {
+    asTerminal != nil
+  }
+
+  /// Returns this file descriptor as a terminal descriptor, or `nil` if
+  /// it does not refer to a terminal device.
+  ///
+  /// To learn why a file descriptor isn't a terminal, use
+  /// ``TerminalDescriptor/init(_:)``, which throws the error instead.
+  ///
+  /// The corresponding C function is `isatty`.
+  @_alwaysEmitIntoClient
+  public var asTerminal: TerminalDescriptor? {
+    try? TerminalDescriptor(self)
+  }
+}
+
+#endif // !os(Windows) && !os(WASI)
