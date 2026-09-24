@@ -2,8 +2,11 @@
 
 `deinit` can't throw, so an error from the implicit close has to be dropped,
 turned into a trap, or avoided by requiring an explicit `close()`. This
-directory compares the policies in use. `OwnedFD` now drops I/O errors and
-traps on `EBADF`.
+directory compares the policies in use.
+
+**Status: the recommendation below was not adopted, and the question is
+open.** `system-next` keeps the status quo: `OwnedFD`'s deinit drops every
+close error, `EBADF` included.
 
 ## Policies
 
@@ -94,7 +97,7 @@ The 10 tests that trap under must-close: `testDeinitClosesOnce`,
   built `-O` and a client built `-Onone`, neither variant's `assert` fired.
   With both built `-Onone`, both fired.
 
-## Decision
+## Recommendation (not adopted)
 
 Drop I/O errors, as before, and trap on `EBADF` in every build.
 
@@ -155,8 +158,9 @@ general owner. Medium on trapping `EBADF` in release builds rather than only
 in debug builds. Changing that is a one-line switch to `assertionFailure`,
 which V11e shows would then check only debug builds of SystemPackage.
 
-Tests: `Tests/SystemTests/OwnedFDDeinitTests.swift` checks the trap with
-swift-testing exit tests: closing the vended descriptor, and adopting one
-descriptor twice. Controls check that destroying an owner normally exits
-cleanly, and that `close()` throws `EBADF` rather than trapping. Against the
-drop policy, the two trap tests fail as expected.
+Tests: in commit a2401b7, swift-testing exit tests in
+`Tests/SystemTests/OwnedFDDeinitTests.swift` checked the trap. Closing the
+vended descriptor, and adopting one descriptor twice, each trapped in a child
+process, and those tests failed against the drop policy, as they should.
+Since the recommendation wasn't adopted, the same tests now check the status
+quo: both cases exit normally.

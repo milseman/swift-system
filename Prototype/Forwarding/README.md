@@ -228,8 +228,10 @@ Don't extend forwarding.
   else. New `FileDescriptor` API needs no `OwnedFD` change.
 
 The remaining hazard is the same with the closure and with forwarding: a
-vended descriptor can outlive its owner (V12c), or be closed. Closing it now
-makes the owner's deinit trap (see `Prototype/CloseErrors`). Keeping it is
+vended descriptor can outlive its owner (V12c), or be closed. Closing it
+leaves the owner to close the same number again. Its deinit drops the
+`EBADF`, or closes an unrelated file if the number was reused; whether that
+should trap is open (see `Prototype/CloseErrors`). Keeping it is
 caught only by review, or in the future by a lifetime-dependent borrowed type
 (see `Prototype/Verify/V14*`). Such a type would itself need
 the whole forwarded surface to be worth having.

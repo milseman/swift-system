@@ -42,12 +42,8 @@ struct Owned<Descriptor: OwnableDescriptor>: ~Copyable, Sendable {
   }
 
   deinit {
-    // The same policy as OwnedFD's deinit.
-    do { try _fileDescriptor.close() } catch {
-      if let errno = error as? Errno, errno == .badFileDescriptor {
-        preconditionFailure("Owned: descriptor already closed")
-      }
-    }
+    // The same policy as OwnedFD's deinit: drop every error.
+    _ = try? _fileDescriptor.close()
   }
 
   var descriptor: Descriptor { Descriptor(unchecked: _fileDescriptor) }

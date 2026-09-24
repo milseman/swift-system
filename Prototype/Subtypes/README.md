@@ -1,7 +1,7 @@
 # Extending ownership to descriptor sub-types and other owners
 
 A sketch, not API. It covers how the owned design (`OwnedFD`: close exactly
-once, trap on `EBADF`, vend rather than forward) extends in two directions:
+once, vend rather than forward) extends in two directions:
 to the descriptor sub-types `SocketDescriptor` and `TerminalDescriptor`, and
 to future noncopyable owners such as kqueue, epoll, and pidfd. `check.sh`
 typechecks both files as clients of SystemPackage and SystemSockets:
@@ -19,9 +19,10 @@ swift build && ./Prototype/Subtypes/check.sh
 Each owned kind is a small noncopyable struct that holds an `OwnedFD` and has
 no deinit of its own.
 
-- **Close policy.** It inherits `OwnedFD`'s close semantics, including the
-  `EBADF` trap. It can consume its field to implement `close()` and
-  `relinquish()`.
+- **Close policy.** It inherits `OwnedFD`'s close semantics, so whatever
+  `OwnedFD`'s deinit does with a close error, every kind does. That's open:
+  today it drops every error (`Prototype/CloseErrors`). It can consume its
+  field to implement `close()` and `relinquish()`.
 - **Vending.** It vends its kind's raw descriptor, and the `FileDescriptor`.
   It forwards nothing (see `Prototype/Forwarding`).
 - **Conversions.** It widens to `OwnedFD` without a check, and narrows from
@@ -121,7 +122,8 @@ shape.
   (`Prototype/CloseErrors`) rather than `OwnedFD`'s.
 - **fork.** A kqueue isn't inherited across `fork(2)`. A child that forked
   without `exec` and then destroyed a `KernelQueue` would close a descriptor
-  that isn't open, and trap on the `EBADF`.
+  that isn't open. Today's deinit drops the `EBADF`; under
+  `Prototype/CloseErrors`' recommendation it would trap.
 
 ### The multi-platform enum
 

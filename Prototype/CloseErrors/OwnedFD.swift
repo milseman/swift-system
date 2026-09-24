@@ -1,7 +1,7 @@
 // The owner under test. Its deinit policy is chosen at compile time:
 //
-//   -D POLICY_DROP        drop every close error (OwnedFD before this change,
-//                         IORing, Rust's OwnedFd in release builds)
+//   -D POLICY_DROP        drop every close error (OwnedFD's deinit, IORing,
+//                         Rust's OwnedFd in release builds)
 //   -D POLICY_TRAP        trap on any close error (Mach.Port)
 //   -D POLICY_MUST_CLOSE  trap whenever deinit runs: the owner must be
 //                         consumed by close() or relinquish() (a debug-mode
@@ -9,8 +9,8 @@
 //   -D POLICY_EBADF       drop I/O errors, trap on EBADF, which means something
 //                         other than the owner closed the descriptor (Rust's
 //                         OwnedFd in debug builds; swift-subprocess's
-//                         _safelyClose in all builds; OwnedFD after this change,
-//                         in all builds)
+//                         _safelyClose in all builds; README.md's
+//                         recommendation, which wasn't adopted)
 //
 // The must-close trap stands for a debug-build check; the others would trap
 // in every build.

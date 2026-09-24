@@ -304,8 +304,8 @@ final class OwnedFDOwnershipTest: XCTestCase {
   func testClosingVendedDescriptorLeavesOwnerStale() throws {
     // Nothing prevents closing the vended descriptor, as
     // Prototype/Verify/V10a_prototype_escape_hatch.swift notes. Then the
-    // owner's own close fails. (Destroying the owner instead would trap; see
-    // OwnedFDDeinitTests.swift.)
+    // owner's own close fails. (Destroying the owner instead drops the
+    // error; see OwnedFDDeinitTests.swift.)
     let pipe = try FileDescriptor.pipe()
     let readEnd = OwnedFD(taking: pipe.readEnd)
     let writeEnd = OwnedFD(taking: pipe.writeEnd)

@@ -1,4 +1,4 @@
-// V10a: what the `fileDescriptor` accessor does not prevent (client of the prototype module). Expected to compile. The same held for withDescriptor(body:), which the accessor replaced. Closing the vended descriptor now makes the owner's deinit trap (see Tests/SystemTests/OwnedFDDeinitTests.swift), unless the number is reused first.
+// V10a: what the `fileDescriptor` accessor does not prevent (client of the prototype module). Expected to compile. The same held for withDescriptor(body:), which the accessor replaced. Closing the vended descriptor leaves the owner to close the same number again: its deinit drops the EBADF, or closes an unrelated file if the number was reused first.
 import SystemPackage
 
 func leakCopy(_ owned: borrowing OwnedFD) -> FileDescriptor {

@@ -5,7 +5,8 @@
 // The pattern for each owned kind:
 //
 // - It holds an OwnedFD and has no deinit of its own, so it inherits
-//   OwnedFD's close policy (drop I/O errors, trap on EBADF).
+//   OwnedFD's close policy, whatever that ends up being. Today the deinit
+//   drops every error (see Prototype/CloseErrors).
 // - It vends its kind's raw descriptor and the FileDescriptor, and forwards
 //   nothing.
 // - It converts to OwnedFD without a check, and from OwnedFD with
