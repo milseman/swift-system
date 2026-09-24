@@ -41,6 +41,7 @@ struct SystemSamples: ParsableCommand {
       SpanCopy.self,
       Links.self,
       Ln.self,
+      Beneath.self,
     ])
 }
 
