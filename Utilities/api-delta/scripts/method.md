@@ -22,7 +22,7 @@ Each decision is listed with the alternative it rejected.
 2. **Recover `System x.y` availability with a marker domain.** In the default build every `System` macro expands to the same OS versions (macOS 10.10, …), so symbol graphs can't tell `System 199` from `System 0.0.1`. The scratch manifest appends `OpenBSD <x.y>` to each macro's expansion.
    - The compiler then records the macro version in the symbol graph. It merges the version through enclosing extensions and types, taking the maximum, as it does for any availability.
    - OpenBSD isn't a compilation target here, so the macOS build and its diagnostics don't change.
-   - Neither tree names OpenBSD in any `@available`.
+   - The domain has to be free, so `scripts/patch_manifest.py` stops the run if an exported source names OpenBSD in an `@available`.
    - Explicit OS floors show up as OS versions that differ from the macro expansion.
 
    *Rejected:*
@@ -34,12 +34,12 @@ Each decision is listed with the alternative it rejected.
    *Rejected:* one graph variant for both purposes.
 5. **Match symbols by USR, then pair the leftovers by (path, kind) and declaration similarity.** A pair counts as *changed*. The comparison covers declaration text (with default arguments and printed attributes such as `@frozen` and `@discardableResult`), effective availability, conformances, generic and extension constraints, and access level. Doc-comment edits and file moves are recorded as notes, not changes.
    *Rejected:* USR-only matching, which reports a signature change such as `throws` → `throws(Errno)` as a removal plus an addition; and name-only matching, which breaks on overloads.
-6. **Use the debug configuration.** It's the default, and it's what CLAUDE.md builds. The difference from release is `ENABLE_MOCKING`, and the source scan confirms that no public declaration sits under `ENABLE_MOCKING` or `DEBUG`.
-   *Rejected:* a release build, which would have given the same public API at the cost of a second configuration.
+6. **Use the debug configuration.** It's the default, and it's what CLAUDE.md builds. It differs from release by defining `ENABLE_MOCKING` and `DEBUG`, and the summary says whether any public declaration on either commit is conditional on them.
+   *Rejected:* a release build as well. It would add two builds to every run, and it could only differ where the summary flags such a declaration.
 7. **Use a lexical source scan for what the graphs omit, evaluating each declaration's `#if` stack per platform.** The platforms are Darwin, Linux (Glibc), Musl, Android, FreeBSD, OpenBSD, WASI and Windows.
    - The scan follows CLAUDE.md: FreeBSD and OpenBSD import the overlay named `Glibc`, `canImport(Darwin, _version:)` is assumed true for a current SDK, and IORing is Linux-only.
    - A module whose files reach `#error` on a platform is treated as not building there.
-   - The scan is checked against the graphs. Every graph symbol maps to a scanned declaration, except enum cases (which have no `public` keyword) and synthesized `Codable` initializers. Every scanned public declaration missing from the graph is explained: unavailable stub, underscored, not compiled on Darwin, or member of a non-public type.
+   - The scan is checked against the graphs, and the summary reports each mismatch. A graph symbol with no scanned declaration is expected only for enum cases, which have no `public` keyword, and for synthesized members, which have no source location. A scanned public declaration missing from the graphs has to be an unavailable stub, underscored, not compiled on Darwin, or a member of a non-public type; the report lists any other as unclassified.
 
    *Rejected:*
    - Cross-building for Linux: no Linux SDK is installed, since `swift sdk list` is empty.

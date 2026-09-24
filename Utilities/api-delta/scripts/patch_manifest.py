@@ -2,7 +2,7 @@
 """Patch a *scratch copy* of swift-system's Package.swift for API extraction.
 
 Never run this on a tracked checkout; regenerate.sh runs it on a `git archive`
-export under $WORK.
+export under $API_DELTA_WORK.
 
 Two edits:
 
@@ -12,19 +12,34 @@ Two edits:
    `OpenBSD <x.y>` to each macro's source availability. OpenBSD is not a
    compilation target here, so the macOS build (and its availability
    diagnostics) is unchanged, but symbol graphs record the extra domain, merged
-   through enclosing extensions and types by the compiler. No declaration in
-   the sources names OpenBSD in an @available, so the domain is free.
+   through enclosing extensions and types by the compiler. The domain has to
+   be free, so this script fails if any source names OpenBSD in an
+   @available attribute.
 
 2. Drop the Samples executable and its swift-argument-parser dependency, which
    would otherwise need a network fetch. Samples is not part of the
    SystemPackage or SystemSockets API.
 """
 
+import os
 import re
 import sys
 
 path = sys.argv[1]
 text = open(path).read()
+
+# The marker domain must be free: an `@available(OpenBSD ...)` in the sources
+# would read as a `System` version.
+root = os.path.dirname(os.path.abspath(path))
+for dirpath, _, files in os.walk(os.path.join(root, "Sources")):
+    for f in sorted(files):
+        if f.endswith(".swift"):
+            src = open(os.path.join(dirpath, f), encoding="utf-8").read()
+            for m in re.finditer(r"@available\s*\((?:[^()]|\([^()]*\))*\)", src):
+                if re.search(r"\bOpenBSD\b", m.group(0)):
+                    line = src.count("\n", 0, m.start()) + 1
+                    sys.exit(f"patch_manifest: {os.path.relpath(os.path.join(dirpath, f), root)}:{line} names "
+                             "OpenBSD in @available, which collides with the availability marker")
 
 # 1. Availability marker.
 old = 'self.sourceAvailability = "macOS 10.10, iOS 8.0, watchOS 2.0, tvOS 9.0, visionOS 1.0"'

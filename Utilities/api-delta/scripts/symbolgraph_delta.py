@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Diff two sets of Swift symbol graphs (base = main, head = system-next).
+"""Diff two sets of Swift symbol graphs, from a base and a head commit.
 
 Symbols are matched by precise identifier (USR). Unmatched symbols are then
 paired by (module, path, kind), because a signature change such as

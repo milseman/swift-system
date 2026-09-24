@@ -3,8 +3,8 @@
 
 Inputs (all paths are arguments; see regenerate.sh):
   --delta         symbolgraph_delta.py output
-  --base-scan     scan_sources.py output for main
-  --head-scan     scan_sources.py output for system-next
+  --base-scan     scan_sources.py output for the base commit
+  --head-scan     scan_sources.py output for the head commit
   --diff          `git diff -U0 BASE HEAD -- Sources/System Sources/SystemSockets`
   --base-reqavail / --head-reqavail
                   logs of builds with -require-explicit-availability=warn
@@ -240,6 +240,12 @@ def main():
                                           if is_public(d) and (d["file"], d["line"]) not in head_graph_locs)
     underscored_existing = [d for d in hs_decls if is_public(d) and d["underscored"]
                             and d["line"] not in added_lines.get(d["file"], ())]
+    # Graph symbols with no scanned declaration, and public declarations whose
+    # existence depends on the build configuration.
+    unscanned = [e for e in added + removed + changed if e["platforms"] is None]
+    debug_only = {ref: [d for d in decls if is_public(d)
+                        and any(re.search(r"\b(ENABLE_MOCKING|DEBUG)\b", c) for c in d["conditions"])]
+                  for ref, decls in ((meta["baseRef"], bs_decls), (meta["headRef"], hs_decls))}
 
     # Explicit-availability warnings.
     ra_base = parse_reqavail(a.base_reqavail, a.base_root)
@@ -294,17 +300,26 @@ def main():
 
     # Summary.
     n_add = collections.Counter(e["module"] for e in added)
+    n_rem = collections.Counter(e["module"] for e in removed)
+    n_chg = collections.Counter(e["module"] for e in changed)
     cnt = delta["counts"]
+    base_mods, head_mods = set(base_scan["moduleUnsupportedPlatforms"]), set(head_scan["moduleUnsupportedPlatforms"])
     w("## Summary")
     w("")
     w(f"- **{len(added)} added, {len(removed)} removed, {len(changed)} changed** declarations in the macOS "
       f"symbol graphs.")
     for m in ("SystemPackage", "SystemSockets"):
+        if m not in base_mods and m not in head_mods:
+            continue
         b, h = cnt["base"].get(m, 0), cnt["head"].get(m, 0)
-        note = " SystemSockets is a new module; it doesn't exist on `main`." if b == 0 and h else ""
-        w(f"  - {m}: +{n_add.get(m, 0)} ({b} → {h} public symbols).{note}")
+        note = (f" {m} is a new module; it doesn't exist on `{base_ref}`." if m not in base_mods else
+                f" {m} doesn't exist on `{head_ref}`." if m not in head_mods else "")
+        tally = f"+{n_add.get(m, 0)}" + (f", −{n_rem[m]}" if n_rem[m] else "") + \
+            (f", {n_chg[m]} changed" if n_chg[m] else "")
+        w(f"  - {m}: {tally} ({b} → {h} public symbols).{note}")
     ac = collections.Counter(avail_class(e) for e in added)
-    w("- Availability of the additions:")
+    if ac:
+        w("- Availability of the additions:")
     for k in sorted(ac, key=lambda k: (-ac[k], k)):
         w(f"  - {k}: {ac[k]}")
     hn = collections.Counter(d["hiddenClass"] for d in hidden_new)
@@ -315,7 +330,22 @@ def main():
     if hn.get("unexplained") or hn.get("nonpublic-scope"):
         w(f"  - {hn.get('unexplained', 0) + hn.get('nonpublic-scope', 0)} declarations the scan couldn't classify; "
           f"see the list below.")
+    if unscanned:
+        kinds = collections.Counter("enum case" if e["kind"] == "swift.enum.case" else
+                                    "no source location" if not e["file"] else "other" for e in unscanned)
+        w(f"  - {len(unscanned)} added, removed or changed graph symbols the scan didn't find ("
+          + ", ".join(f"{k}: {v}" for k, v in sorted(kinds.items()))
+          + "). Enum cases have no `public` keyword, and synthesized members have no location; any others "
+          "are scanner misses. Their platforms show as `?`.")
     w(f"- {len(hidden_removed)} public declarations hidden from the graphs were removed.")
+    if any(debug_only.values()):
+        w("- **Public declarations are conditional on `ENABLE_MOCKING` or `DEBUG`**, so a release build's API "
+          "differs from these debug graphs: "
+          + "; ".join(f"{len(v)} on `{ref}` (" + ", ".join(f"`{d['file']}:{d['line']}`" for d in v) + ")"
+                      for ref, v in debug_only.items() if v) + ".")
+    else:
+        w("- No public declaration is conditional on `ENABLE_MOCKING` or `DEBUG`, so a release build has the same "
+          "public API as the debug graphs.")
     if a.digester and os.path.exists(a.digester):
         dg = load(a.digester)
         w("- Cross-check with `swift-api-digester`, which dumps every declaration, implicit ones included:")
@@ -326,15 +356,23 @@ def main():
                        if i["graphAddedMissingFromDigester"] else "; it has every graph addition")
             brk = ("" if i["diagnoseSdk"] is None else
                    "; `-diagnose-sdk` reports no breaking changes" if not i["diagnoseSdk"] else
-                   f"; `-diagnose-sdk` reports: " + "; ".join(i["diagnoseSdk"]))
+                   f"; `-diagnose-sdk` reports {len(i['diagnoseSdk'])}: " + "; ".join(i["diagnoseSdk"][:10])
+                   + (f"; and {len(i['diagnoseSdk']) - 10} more in `logs/digester-{m}.txt`"
+                      if len(i["diagnoseSdk"]) > 10 else ""))
             w(f"  - {m}: +{i['digesterAdded']} / -{len(i['digesterRemoved'])} declarations, which is the graphs' "
               f"+{i['graphAdded']} plus {i['digesterOnlyImplicit']} implicit ones{extra}{missing}{brk}.")
         for err in dg.get("errors", []):
             w(f"  - error: {err}")
-    w("- Nothing was removed or changed. Every deletion in `git diff` between the two commits is "
-      "implementation code. The *changed* check compares declaration text (including default "
-      "arguments), availability, conformances, generic and extension constraints, and access level, "
-      "and pairs symbols by path when a signature change alters the USR.")
+    changed_check = ("The *changed* check compares declaration text (including default arguments), availability, "
+                     "conformances, generic and extension constraints, and access level, and pairs symbols by path "
+                     "when a signature change alters the USR.")
+    if not removed and not changed and not hidden_removed:
+        w("- Nothing was removed or changed: no public declaration left the graphs or the source scan. "
+          + changed_check)
+    else:
+        w(f"- {len(removed)} removed and {len(changed)} changed in the graphs, and {len(hidden_removed)} removed "
+          "among the declarations the graphs can't see. The full list below gives the first kind, and "
+          "section 5 the second. " + changed_check)
     w("")
 
     # Area table.
@@ -420,7 +458,7 @@ def main():
     w("| Kind | Declaration | Source |")
     w("|---|---|---|")
     for x in ra_head:
-        w(f"| {x['kind']}{'' if x['new'] else ' (also on main)'} | {md_code(x['text'])} | `{x['file']}:{x['line']}` |")
+        w(f"| {x['kind']}{'' if x['new'] else f' (also on `{base_ref}`)'} | {md_code(x['text'])} | `{x['file']}:{x['line']}` |")
     w("")
     hidden_noavail = [d for d in hidden_new if d["hiddenClass"] == "platform"
                       and not d["availability"] and not d["scopeAvailability"]]
@@ -550,6 +588,13 @@ def main():
         for d in other:
             w(f"- {md_code(d['signature'])} — `{d['file']}:{d['line']}`")
         w("")
+    if hidden_removed:
+        w(f"**Removed public declarations the graphs can't see ({len(hidden_removed)}).** Locations are on "
+          f"`{base_ref}`:")
+        w("")
+        for d in hidden_removed:
+            w(f"- {md_code('.'.join(d['scopes'] + [d['name']]))} ({d['hiddenClass']}) — `{d['file']}:{d['line']}`")
+        w("")
 
     # Full list.
     w("## Full list by type and extension")
@@ -558,8 +603,12 @@ def main():
       "Where the entry says so, it adds the platforms (from the `#if` stack; empty means every platform "
       "the module builds on), a missing doc comment, and constraints, then gives the source location.")
     w("")
-    w(f"SystemPackage builds on {', '.join(module_platforms['SystemPackage'])}. SystemSockets builds on "
-      f"{', '.join(module_platforms['SystemSockets'])}, because its files `#error` elsewhere.")
+    builds = []
+    for m in ("SystemPackage", "SystemSockets"):
+        if m in head_mods:
+            builds.append(f"{m} builds on {', '.join(module_platforms[m])}"
+                          + (", because its files `#error` elsewhere." if unsupported.get(m) else "."))
+    w(" ".join(builds))
     w("")
     for status, title in (("removed", "Removed"), ("changed", "Changed")):
         items = [e for e in entries if e["status"] == status]
@@ -569,8 +618,8 @@ def main():
             w("None.")
             w("")
         for e in items:
-            ch = "; ".join(e.get("changes", []))
-            w(f"- {md_code(e['path'])} — {ch} — `{e['file']}:{e['line']}`")
+            what = md_code(e["decl"]) if status == "removed" else "; ".join(e.get("changes", []))
+            w(f"- {md_code(e['path'])} — {what} — `{e['file']}:{e['line']}`")
         if items:
             w("")
     w(f"### Added ({len(added)})")
@@ -637,6 +686,8 @@ def main():
                             "existing": [d["signature"] for d in underscored_existing]},
             "usableFromInlineNew": len(ufi_new),
             "publicWithoutAEIC": [f"{d['file']}:{d['line']}" for d in nonaeic],
+            "notFoundByScan": [e["path"] for e in unscanned],
+            "debugOnly": {ref: [f"{d['file']}:{d['line']}" for d in v] for ref, v in debug_only.items()},
         },
     }, open(a.out_json, "w"), indent=1)
     print(f"report: wrote {a.out_md} and {a.out_json}")
