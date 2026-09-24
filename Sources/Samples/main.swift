@@ -40,6 +40,7 @@ struct SystemSamples: ParsableCommand {
       Touch.self,
       SpanCopy.self,
       Links.self,
+      Ln.self,
     ])
 }
 
