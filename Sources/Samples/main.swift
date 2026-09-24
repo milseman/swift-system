@@ -32,6 +32,7 @@ struct SystemSamples: ParsableCommand {
       TerminalSize.self,
       RawMode.self,
       Stty.self,
+      JobControl.self,
       // File and process samples
       PIDFile.self,
       AtomicWrite.self,
