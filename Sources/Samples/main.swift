@@ -49,6 +49,7 @@ struct SystemSamples: ParsableCommand {
       Access.self,
       Pushd.self,
       Locks.self,
+      GetConf.self,
     ])
 }
 
