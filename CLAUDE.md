@@ -19,6 +19,7 @@ swift test --filter FileOperationsTest/testSetOwner       # one XCTest method
 swift test --filter SocketOperationsTests/bindToAnyPort   # one swift-testing test
 swift run system-samples --help
 Utilities/api-delta/regenerate.sh                         # public API delta, main vs system-next, into .build/api-delta (see its README.md)
+Utilities/nio-coverage/check.sh                           # what swift-nio uses from the OS vs System's API, into .build/nio-coverage (see its README.md)
 
 # CI variants (.github/workflows/pull_request.yml). A separate --scratch-path keeps
 # the default .build from being rebuilt whenever the manifest flags change.
