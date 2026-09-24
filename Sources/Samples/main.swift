@@ -57,6 +57,7 @@ struct SystemSamples: ParsableCommand {
       ChmodH.self,
       WAL.self,
       FDPath.self,
+      SignalIO.self,
     ])
 }
 
