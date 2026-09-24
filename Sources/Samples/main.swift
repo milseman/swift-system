@@ -51,6 +51,7 @@ struct SystemSamples: ParsableCommand {
       Locks.self,
       GetConf.self,
       ProcInfo.self,
+      Sparse.self,
     ])
 }
 
