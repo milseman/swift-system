@@ -59,6 +59,7 @@ struct SystemSamples: ParsableCommand {
       FDPath.self,
       SignalIO.self,
       PipeAtomic.self,
+      Extents.self,
     ])
 }
 
