@@ -56,6 +56,7 @@ struct SystemSamples: ParsableCommand {
       MkdirP.self,
       ChmodH.self,
       WAL.self,
+      FDPath.self,
     ])
 }
 
