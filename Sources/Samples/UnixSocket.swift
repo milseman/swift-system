@@ -11,6 +11,10 @@ import ArgumentParser
 import SystemPackage
 import SystemSockets
 
+#if SYSTEM_PACKAGE_DARWIN
+import Darwin
+#endif
+
 struct UnixSocket: ParsableCommand {
   static let configuration = CommandConfiguration(
     commandName: "unix-socket",
@@ -53,6 +57,17 @@ struct UnixSocket: ParsableCommand {
           var peer = SocketAddress()
           try client.getPeerAddress(into: &peer)
           print("Client connected to \(name(peer)), from \(name(clientAddress))")
+          #if SYSTEM_PACKAGE_DARWIN
+          // The kernel knows who is at the other end, which is the usual
+          // reason to use a Unix domain socket. SystemSockets has no named
+          // options for it, so the generic getOption takes the raw level and
+          // option, and returns the C types. Linux has SO_PEERCRED instead.
+          let local = SocketDescriptor.OptionLevel(rawValue: SOL_LOCAL)
+          let credentials: xucred = try connection.getOption(local, LOCAL_PEERCRED)
+          let peerProcess: pid_t = try connection.getOption(local, LOCAL_PEERPID)
+          print("Server asked who connected: user \(credentials.cr_uid), process \(peerProcess)"
+            + (peerProcess == ProcessID.current.rawValue ? ", which is this one" : ""))
+          #endif
 
           for message in messages {
             try send(message, on: client)
