@@ -50,6 +50,7 @@ struct SystemSamples: ParsableCommand {
       Pushd.self,
       Locks.self,
       GetConf.self,
+      ProcInfo.self,
     ])
 }
 

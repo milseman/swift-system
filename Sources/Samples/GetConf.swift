@@ -122,20 +122,4 @@ private func option(_ value: Int?) -> String {
   (value ?? 0) != 0 ? "yes" : "no"
 }
 
-/// Prints rows of cells in left-aligned columns, indented.
-private func printTable(_ rows: [[String]]) {
-  let columns = rows.map(\.count).max() ?? 0
-  let widths = (0..<columns).map { column in
-    rows.map { column < $0.count ? $0[column].count : 0 }.max()! + 2
-  }
-  for row in rows {
-    var line = "  "
-    for (column, text) in row.enumerated() {
-      let isLast = column == row.count - 1
-      line += isLast ? text : text + String(repeating: " ", count: widths[column] - text.count)
-    }
-    print(line)
-  }
-}
-
 #endif // !os(Windows) && !os(WASI)
