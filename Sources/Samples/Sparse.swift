@@ -34,6 +34,18 @@ struct Sparse: ParsableCommand {
       _ = try message.withUnsafeBytes { try fd.write(toAbsoluteOffset: 512 << 20, $0) }
       print("Wrote \(message.count) bytes at 512 MiB: \(try usage(fd))")
 
+      #if SYSTEM_PACKAGE_DARWIN
+      // A hole can also be made in the middle of data, which frees its storage.
+      // The range must be a multiple of the file system's block size;
+      // otherwise the command throws EINVAL.
+      let data = [UInt8](repeating: 0xAB, count: 1 << 20)
+      _ = try data.withUnsafeBytes { try fd.write(toAbsoluteOffset: 0, $0) }
+      print("Wrote 1 MiB at the start: \(try usage(fd))")
+      var hole = FileDescriptor.ControlTypes.PunchHole(offset: 256 << 10, length: 512 << 10)
+      try fd.control(.punchHole, &hole)
+      print("Punched a hole in 256 KiB ..< 768 KiB with F_PUNCHHOLE: \(try usage(fd))")
+      #endif
+
       #if SYSTEM_PACKAGE_DARWIN || os(FreeBSD)
       // Storage is allocated, and holes are found, in units of this size.
       if let holeSize = try SystemConfig.value(.minimumHoleSize, for: fd) {
@@ -54,11 +66,23 @@ struct Sparse: ParsableCommand {
       #endif
 
       var bytes = [UInt8](repeating: 0xFF, count: 4)
-      _ = try bytes.withUnsafeMutableBytes { try fd.read(fromAbsoluteOffset: 1 << 20, into: $0) }
-      print("A hole reads as zeros: the 4 bytes at 1 MiB are \(bytes)")
+      _ = try bytes.withUnsafeMutableBytes { try fd.read(fromAbsoluteOffset: 256 << 10, into: $0) }
+      print("A hole reads as zeros: the 4 bytes at 256 KiB are \(bytes)")
 
       try fd.resize(to: 256 << 20)
-      print("Resized it to 256 MiB, which cuts off the data: \(try usage(fd))")
+      print("Resized it to 256 MiB, which cuts off the data at 512 MiB: \(try usage(fd))")
+
+      // Preallocating is the opposite of a hole: storage without data,
+      // so that later writes can't fail for lack of space.
+      #if SYSTEM_PACKAGE_DARWIN
+      var store = FileDescriptor.ControlTypes.Store(
+        positionMode: .physicalEndOfFile, length: 8 << 20, flags: .allOrNone)
+      try fd.control(.preallocate, &store)
+      print("Preallocated \(amount(store.bytesAllocated)) with F_PREALLOCATE: \(try usage(fd))")
+      #elseif os(Linux) || os(Android) || os(FreeBSD)
+      try fd.allocateSpace(offset: 0, length: 8 << 20)
+      print("Allocated the first 8 MiB with posix_fallocate: \(try usage(fd))")
+      #endif
     }
   }
 }
