@@ -113,20 +113,3 @@ private func dataRegions(_ fd: FileDescriptor, size: Int64) throws -> [Range<Int
   return regions
 }
 #endif
-
-/// Formats an offset in a file, which is a number of bytes.
-private func position(_ offset: Int64) -> String {
-  offset == 0 ? "0" : amount(offset)
-}
-
-/// Formats a number of bytes as a sum of units, such as "512 MiB + 4 KiB".
-private func amount(_ bytes: Int64) -> String {
-  var parts: [String] = []
-  var rest = bytes
-  for (unit, shift) in [("GiB", 30), ("MiB", 20), ("KiB", 10)] where rest >> shift > 0 {
-    parts.append("\(rest >> shift) \(unit)")
-    rest &= (1 << shift) - 1
-  }
-  if rest > 0 || parts.isEmpty { parts.append(rest == 1 ? "1 byte" : "\(rest) bytes") }
-  return parts.joined(separator: " + ")
-}

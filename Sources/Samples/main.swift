@@ -28,6 +28,7 @@ struct SystemSamples: ParsableCommand {
       OwnedRedirect.self,
       OwnedPoll.self,
       OwnedLines.self,
+      OwnedPipe.self,
       // Terminal samples
       PasswordReader.self,
       TerminalSize.self,
@@ -56,6 +57,10 @@ struct SystemSamples: ParsableCommand {
       MkdirP.self,
       ChmodH.self,
       WAL.self,
+      FDPath.self,
+      SignalIO.self,
+      PipeAtomic.self,
+      Extents.self,
     ])
 }
 
