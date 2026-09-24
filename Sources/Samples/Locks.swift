@@ -43,6 +43,7 @@ struct Locks: ParsableCommand {
       try attempt("B read-locks bytes 50..<150") {
         try b.lock(.read, byteRange: 50..<150)
       }
+      print("B asks what's in the way: \(try blocker(of: .read, 50..<150, for: b))")
       // Locking bytes that the same open file has locked replaces the kind
       // of lock on them, atomically.
       try attempt("A changes its lock on bytes 0..<100 to a read lock") {
@@ -104,6 +105,26 @@ struct Locks: ParsableCommand {
 /// Prints whether a lock was placed, or was blocked by another open file's lock.
 private func attempt(_ action: String, _ body: () throws -> Bool) rethrows {
   print("\(action): \(try body() ? "locked" : "blocked")")
+}
+
+/// Describes the lock that would block one on a range of bytes,
+/// as another open file holds it.
+private func blocker(
+  of kind: FileDescriptor.FileLock.Kind, _ range: Range<Int64>, for fd: FileDescriptor
+) throws -> String {
+  // The query replaces the description with that of a lock in the way.
+  var lock = FileDescriptor.FileLock(
+    kind: kind, start: range.lowerBound, length: Int64(range.count))
+  try fd.control(.getOFDLock, &lock)
+  guard lock.kind != .none else { return "nothing" }
+  // A length of 0 means "to the end of the file".
+  let bytes = lock.length == 0
+    ? "\(lock.start)..." : "\(lock.start)..<\(lock.start + lock.length)"
+  // An open file description lock belongs to no process,
+  // so the query reports its process ID as -1.
+  let owner = lock.processID.rawValue == -1
+    ? "an open file (process ID -1)" : "process \(lock.processID.rawValue)"
+  return "a \(lock.kind) lock on bytes \(bytes), owned by \(owner)"
 }
 
 /// Prints whether a whole-file lock was placed, or why not.
