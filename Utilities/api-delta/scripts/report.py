@@ -11,7 +11,6 @@ Inputs (all paths are arguments; see regenerate.sh):
   --docc          LABEL=PATH diagnostics files from `docc convert`, e.g.
                   head:SystemSockets=.../SystemSockets.diagnostics.json
   --meta          JSON with refs, commits, toolchain, SDK, date
-  --notes         hand-written review notes, included verbatim
   --base-root / --head-root
                   source roots of the two exports, stripped from paths
 """
@@ -152,7 +151,6 @@ def main():
     ap.add_argument("--head-root", required=True)
     ap.add_argument("--docc", action="append")
     ap.add_argument("--meta", required=True)
-    ap.add_argument("--notes")
     ap.add_argument("--digester")
     ap.add_argument("--out-md", required=True)
     ap.add_argument("--out-json", required=True)
@@ -380,9 +378,6 @@ def main():
     # Oddities.
     w("## Oddities")
     w("")
-    w("Sections 1–4 and 6 are computed from the data and regenerated with the report. Section 5 is a "
-      "hand review of names and design.")
-    w("")
     w("### 1. Availability")
     w("")
     w(f"**Public API with no `@available` at all ({len(no_avail)} symbols).** In the "
@@ -519,15 +514,7 @@ def main():
       + ", ".join(f"`{f}` ({c})" for f, c in byfile.most_common()) + ".")
     w("")
 
-    w("### 5. Naming and design inconsistencies (hand review)")
-    w("")
-    if a.notes and os.path.exists(a.notes):
-        text = open(a.notes).read()
-        text = re.sub(r"<!--.*?-->\s*", "", text, flags=re.S)
-        w(text.strip())
-    w("")
-
-    w("### 6. Public declarations the macOS graphs can't see")
+    w("### 5. Public declarations the macOS graphs can't see")
     w("")
     plat = [d for d in hidden_new if d["hiddenClass"] == "platform"]
     w(f"**New public API that isn't compiled on Darwin ({len(plat)}).** Platforms come from evaluating each "

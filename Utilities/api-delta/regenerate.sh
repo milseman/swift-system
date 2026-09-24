@@ -147,7 +147,6 @@ python3 "$S/report.py" \
   ${docc_args[@]+"${docc_args[@]}"} \
   --meta "$WORK/meta.json" \
   --digester "$WORK/digester.json" \
-  --notes "$S/review-notes.md" \
   --out-md "$OUT/API-DELTA.md" --out-json "$OUT/api-delta.json"
 
 log "copying outputs to $OUT"

@@ -11,7 +11,7 @@
 5. **Explicit-availability check.** `swift build -Xswiftc -Xfrontend -Xswiftc -require-explicit-availability=warn` runs on each export (see CLAUDE.md, Commands).
 6. **Docs.** `scripts/docs_graphs.py` rewrites availability for DocC, then `xcrun docc convert` builds one archive per module and `xcrun docc merge` combines them.
 7. **Cross-check.** `scripts/digester_check.py` dumps each module with `swift-api-digester -dump-sdk`, reconciles its added and removed declarations with the delta by USR, and runs `-diagnose-sdk` for breaking changes.
-8. **Report.** `scripts/report.py` writes this file and `api-delta.json`, and includes `scripts/review-notes.md` verbatim.
+8. **Report.** `scripts/report.py` writes this file and `api-delta.json`.
 
 ### Design decisions
 
@@ -53,7 +53,6 @@ Each decision is listed with the alternative it rejected.
 11. **Ship `main`'s SystemPackage archive as is.** `main` has one module, and in this toolchain `docc merge` of a single archive fails ("The file “tutorials” couldn't be opened").
 12. **Cross-check with `swift-api-digester`, not with a second symbol-graph run.** The digester is the compiler's own API-breakage tool and applies different inclusion rules: it keeps implicit and underscored declarations. Agreement between the two is therefore meaningful, and the report lists every declaration the digester has that the graphs don't.
     *Rejected:* diffing `.swiftinterface` files, which needs library evolution (see decision 7).
-13. **Keep hand review separate.** The naming and design notes in section 5 are hand-written in `scripts/review-notes.md` and included verbatim, stamped with the commit they were written against. Everything else is recomputed.
 
 ### Limitations
 
@@ -71,7 +70,7 @@ Each decision is listed with the alternative it rejected.
 | `docs/<base>.doccarchive` | DocC for `main` (SystemPackage only). |
 | `symbolgraphs/<ref>/` | The symbol graphs the diff read. Their availability includes the `OpenBSD` marker domain; read it as `System x.y`. |
 | `logs/` | Build logs for `dump-symbol-graph` and the explicit-availability build, DocC logs and diagnostics, the source diff, run metadata (`meta.json`), and the `swift-api-digester` results (`digester.json`, `digester-SystemPackage.txt`). |
-| `scripts/` | The pipeline, `review-notes.md` and this `method.md`. |
+| `scripts/` | The pipeline and this `method.md`. |
 | `regenerate.sh` | Reruns everything. |
 
 ### Browsing the docs
