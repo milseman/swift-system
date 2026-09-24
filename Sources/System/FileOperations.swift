@@ -792,8 +792,8 @@ extension FileDescriptor {
 #if !os(Windows) && !os(WASI)
 @available(System 199, *)
 extension FileDescriptor {
-  /// Places an advisory lock on the open file that this file descriptor
-  /// refers to.
+  /// Places an advisory lock on the whole open file
+  /// that this file descriptor refers to.
   ///
   /// - Parameters:
   ///   - shared: Whether to place a shared lock, which several open files
@@ -812,14 +812,23 @@ extension FileDescriptor {
   /// it only excludes others that also lock the file.
   /// It belongs to the open file, rather than to this file descriptor,
   /// so descriptors duplicated from this one share it.
-  /// The lock is released by ``unlock(retryOnInterrupt:)``,
+  /// The lock is released by ``unlockWholeFile(retryOnInterrupt:)``,
   /// or when the last descriptor for the open file is closed.
   /// Locking a file that this open file has already locked
   /// converts the lock to the requested kind.
   ///
+  /// These whole-file locks aren't the record locks that
+  /// ``lock(_:byteRange:retryOnInterrupt:)`` places,
+  /// which can cover part of a file.
+  /// On Darwin the two kinds of lock conflict with each other;
+  /// on Linux they're independent.
+  /// This kind of lock is the one that the
+  /// ``OpenOptions/sharedLock`` and ``OpenOptions/exclusiveLock``
+  /// options place, where they're available.
+  ///
   /// The corresponding C function is `flock`.
   @_alwaysEmitIntoClient
-  public func lock(
+  public func lockWholeFile(
     shared: Bool = false,
     nonBlocking: Bool = false,
     retryOnInterrupt: Bool = true
@@ -828,8 +837,8 @@ extension FileDescriptor {
     try _flock(operation, retryOnInterrupt: retryOnInterrupt).get()
   }
 
-  /// Removes the advisory lock from the open file that this file descriptor
-  /// refers to.
+  /// Removes the advisory whole-file lock from the open file
+  /// that this file descriptor refers to.
   ///
   /// - Parameters:
   ///   - retryOnInterrupt: Whether to retry the operation
@@ -837,9 +846,12 @@ extension FileDescriptor {
   ///     The default is `true`.
   ///     Pass `false` to try only once and throw an error upon interruption.
   ///
+  /// This method removes the lock that
+  /// ``lockWholeFile(shared:nonBlocking:retryOnInterrupt:)`` places.
+  ///
   /// The corresponding C function is `flock`, with `LOCK_UN`.
   @_alwaysEmitIntoClient
-  public func unlock(retryOnInterrupt: Bool = true) throws(Errno) {
+  public func unlockWholeFile(retryOnInterrupt: Bool = true) throws(Errno) {
     try _flock(_LOCK_UN, retryOnInterrupt: retryOnInterrupt).get()
   }
 
@@ -1347,6 +1359,277 @@ extension FileDescriptor {
   }
 }
 #endif // SYSTEM_PACKAGE_DARWIN
+
+#if !os(Windows) && !os(WASI)
+@available(System 199, *)
+extension FileDescriptor {
+  /// Returns the process or process group that receives signals
+  /// about the open file that this file descriptor refers to.
+  ///
+  /// - Returns: The process or process group that receives the signals,
+  ///   with `isGroup` set for a process group,
+  ///   or `nil` if no process receives them.
+  ///
+  /// The owner receives `SIGIO` when input or output becomes possible,
+  /// if the open file's ``StatusFlags/async`` flag is set,
+  /// and `SIGURG` when a socket receives out-of-band data.
+  /// The owner belongs to the open file,
+  /// so all the file descriptors that refer to it share one.
+  ///
+  /// On Darwin, not every kind of file has an owner:
+  /// a regular file throws an error such as
+  /// ``Errno/inappropriateIOCTLForDevice``.
+  /// A terminal's owner is its foreground process group.
+  /// A pipe reports its owner with the sign reversed,
+  /// so this method reports a process that was set as the owner
+  /// as a process group, and the reverse.
+  ///
+  /// The corresponding C function is `fcntl`, with the `F_GETOWN` command.
+  @_alwaysEmitIntoClient
+  public func signalOwner() throws(Errno) -> (id: ProcessID, isGroup: Bool)? {
+    try _signalOwner().get()
+  }
+
+  @usableFromInline
+  internal func _signalOwner() -> Result<(id: ProcessID, isGroup: Bool)?, Errno> {
+    // A process group is reported as its negated ID, so for process group 1
+    // only errno tells the result from a failure.
+    system_errno = 0
+    let owner = system_fcntl(self.rawValue, _F_GETOWN)
+    if owner == -1 && system_errno != 0 { return .failure(.current) }
+    if owner == 0 { return .success(nil) }
+    if owner < 0 { return .success((id: ProcessID(rawValue: -owner), isGroup: true)) }
+    return .success((id: ProcessID(rawValue: owner), isGroup: false))
+  }
+
+  /// Sets the process or process group that receives signals
+  /// about the open file that this file descriptor refers to.
+  ///
+  /// - Parameters:
+  ///   - id: The process or process group to receive the signals,
+  ///     or `nil` so that no process receives them.
+  ///   - isGroup: Whether `id` names a process group, rather than a process.
+  ///     The default is `false`.
+  ///
+  /// The owner receives `SIGIO` when input or output becomes possible,
+  /// if the open file's ``StatusFlags/async`` flag is set,
+  /// and `SIGURG` when a socket receives out-of-band data.
+  /// For more information, see ``signalOwner()``.
+  ///
+  /// The corresponding C function is `fcntl`, with the `F_SETOWN` command.
+  @_alwaysEmitIntoClient
+  public func setSignalOwner(_ id: ProcessID?, isGroup: Bool = false) throws(Errno) {
+    try _setSignalOwner(id, isGroup: isGroup).get()
+  }
+
+  @usableFromInline
+  internal func _setSignalOwner(_ id: ProcessID?, isGroup: Bool) -> Result<(), Errno> {
+    // A process group is passed as its negated ID, and no owner as 0.
+    let owner = id.map { isGroup ? -$0.rawValue : $0.rawValue } ?? 0
+    return nothingOrErrno(retryOnInterrupt: false) {
+      system_fcntl(self.rawValue, _F_SETOWN, owner)
+    }
+  }
+}
+#endif // !os(Windows) && !os(WASI)
+
+#if SYSTEM_PACKAGE_DARWIN
+@available(System 199, *)
+extension FileDescriptor {
+  /// Turns data caching off or on
+  /// for the open file that this file descriptor refers to.
+  ///
+  /// - Parameters:
+  ///   - noCache: Whether to turn caching off.
+  ///     Pass `false` to turn it back on.
+  ///
+  /// With caching off, reads and writes bypass the system's cache
+  /// where they can,
+  /// which suits data that won't be read again soon,
+  /// such as a large file being copied.
+  /// The setting belongs to the open file,
+  /// so it applies to all the file descriptors that refer to it.
+  /// A file descriptor that doesn't refer to a regular file
+  /// throws an error such as ``Errno/badFileDescriptor``.
+  ///
+  /// The corresponding C function is `fcntl`, with the `F_NOCACHE` command.
+  /// - Note: Only available on Darwin.
+  @_alwaysEmitIntoClient
+  public func setNoCache(_ noCache: Bool) throws(Errno) {
+    try _setNoCache(noCache).get()
+  }
+
+  @usableFromInline
+  internal func _setNoCache(_ noCache: Bool) -> Result<(), Errno> {
+    nothingOrErrno(retryOnInterrupt: false) {
+      system_fcntl(self.rawValue, _F_NOCACHE, noCache ? 1 : 0)
+    }
+  }
+
+  /// Returns whether writing to the pipe or socket
+  /// that this file descriptor refers to only throws an error
+  /// when nothing can read the data,
+  /// rather than also raising `SIGPIPE`.
+  ///
+  /// - Returns: `true` if such a write only throws ``Errno/brokenPipe``,
+  ///   or `false` if it also sends the process `SIGPIPE`,
+  ///   which terminates the process unless it handles or ignores the signal.
+  ///
+  /// The setting belongs to the open file,
+  /// so all the file descriptors that refer to it share it.
+  /// For a socket, it's the same setting as the `SO_NOSIGPIPE` socket option.
+  ///
+  /// The corresponding C function is `fcntl`, with the `F_GETNOSIGPIPE` command.
+  /// - Note: Only available on Darwin.
+  @_alwaysEmitIntoClient
+  public func noSigPipe() throws(Errno) -> Bool {
+    try _noSigPipe().get()
+  }
+
+  @usableFromInline
+  internal func _noSigPipe() -> Result<Bool, Errno> {
+    valueOrErrno(retryOnInterrupt: false) {
+      system_fcntl(self.rawValue, _F_GETNOSIGPIPE)
+    }.map { $0 != 0 }
+  }
+
+  /// Sets whether writing to the pipe or socket
+  /// that this file descriptor refers to only throws an error
+  /// when nothing can read the data,
+  /// rather than also raising `SIGPIPE`.
+  ///
+  /// - Parameters:
+  ///   - noSigPipe: Whether such a write only throws ``Errno/brokenPipe``,
+  ///     rather than also sending the process `SIGPIPE`,
+  ///     which terminates the process unless it handles or ignores the signal.
+  ///     Pass `false` to restore the default.
+  ///
+  /// The setting belongs to the open file,
+  /// so it applies to all the file descriptors that refer to it.
+  /// For a socket, it's the same setting as the `SO_NOSIGPIPE` socket option.
+  ///
+  /// The corresponding C function is `fcntl`, with the `F_SETNOSIGPIPE` command.
+  /// - Note: Only available on Darwin.
+  @_alwaysEmitIntoClient
+  public func setNoSigPipe(_ noSigPipe: Bool) throws(Errno) {
+    try _setNoSigPipe(noSigPipe).get()
+  }
+
+  @usableFromInline
+  internal func _setNoSigPipe(_ noSigPipe: Bool) -> Result<(), Errno> {
+    nothingOrErrno(retryOnInterrupt: false) {
+      system_fcntl(self.rawValue, _F_SETNOSIGPIPE, noSigPipe ? 1 : 0)
+    }
+  }
+
+  /// Returns the path of the file that this file descriptor refers to.
+  ///
+  /// - Parameters:
+  ///   - resolvingFirmlinks: Whether to return the path that doesn't
+  ///     pass through firmlinks,
+  ///     such as `/System/Volumes/Data/Users/me` rather than `/Users/me`.
+  ///     The default is `false`.
+  /// - Returns: The file's absolute path.
+  ///
+  /// The path is the file's current one, which reflects any renames
+  /// since the file was opened.
+  /// If the file was removed, the path can be the one it had.
+  /// A file descriptor that doesn't refer to a file system object,
+  /// such as a pipe or a socket,
+  /// throws an error such as ``Errno/badFileDescriptor``.
+  ///
+  /// The corresponding C function is `fcntl`, with the `F_GETPATH` command,
+  /// or `F_GETPATH_NOFIRMLINK` if `resolvingFirmlinks` is `true`.
+  /// - Note: Only available on Darwin.
+  @_alwaysEmitIntoClient
+  public func path(resolvingFirmlinks: Bool = false) throws(Errno) -> FilePath {
+    try _path(resolvingFirmlinks: resolvingFirmlinks).get()
+  }
+
+  @usableFromInline
+  internal func _path(resolvingFirmlinks: Bool) -> Result<FilePath, Errno> {
+    let command = resolvingFirmlinks ? _F_GETPATH_NOFIRMLINK : _F_GETPATH
+    var result: Result<(), Errno> = .success(())
+    // The command fills a buffer of MAXPATHLEN bytes with a null-terminated
+    // path, without reporting its length.
+    let chars = SystemString.Storage(
+      unsafeUninitializedCapacity: _MAXPATHLEN
+    ) { buffer, initializedCount in
+      let length: Int? = buffer.withMemoryRebound(
+        to: CInterop.PlatformChar.self
+      ) { buffer in
+        // The path is empty if the call writes nothing, as when mocked.
+        buffer.baseAddress!.initialize(to: 0)
+        result = nothingOrErrno(retryOnInterrupt: false) {
+          system_fcntl(self.rawValue, command, UnsafeMutableRawPointer(buffer.baseAddress!))
+        }
+        guard case .success = result else { return nil }
+        return system_platform_strlen(buffer.baseAddress!)
+      }
+      initializedCount = length.map { $0 + 1 } ?? 0
+    }
+    return result.map { FilePath(SystemString(nullTerminated: chars)) }
+  }
+}
+#endif // SYSTEM_PACKAGE_DARWIN
+
+#if os(Linux) || os(Android)
+@available(System 199, *)
+extension FileDescriptor {
+  /// Returns the capacity of the pipe that this file descriptor refers to.
+  ///
+  /// - Returns: The number of bytes that the pipe can hold.
+  ///
+  /// A write to a full pipe blocks, or throws ``Errno/wouldBlock``
+  /// if the pipe's ``StatusFlags/nonBlocking`` flag is set,
+  /// until a read makes room.
+  ///
+  /// The corresponding C function is `fcntl`, with the `F_GETPIPE_SZ` command.
+  /// - Note: Only available on Linux and Android.
+  @_alwaysEmitIntoClient
+  public func pipeCapacity() throws(Errno) -> Int {
+    try _pipeCapacity().get()
+  }
+
+  @usableFromInline
+  internal func _pipeCapacity() -> Result<Int, Errno> {
+    valueOrErrno(retryOnInterrupt: false) {
+      system_fcntl(self.rawValue, _F_GETPIPE_SZ)
+    }.map { Int($0) }
+  }
+
+  /// Sets the capacity of the pipe that this file descriptor refers to.
+  ///
+  /// - Parameters:
+  ///   - minimum: The smallest capacity to set, in bytes.
+  /// - Returns: The capacity that the system set,
+  ///   which can be larger than `minimum`.
+  ///
+  /// The system rounds the capacity up,
+  /// such as to the page size or to a power of two times the page size.
+  /// Setting a capacity smaller than the data in the pipe
+  /// throws ``Errno/resourceBusy``.
+  /// Without privileges, setting a capacity larger than
+  /// the one in `/proc/sys/fs/pipe-max-size`
+  /// throws ``Errno/notPermitted``.
+  ///
+  /// The corresponding C function is `fcntl`, with the `F_SETPIPE_SZ` command.
+  /// - Note: Only available on Linux and Android.
+  @_alwaysEmitIntoClient
+  @discardableResult
+  public func setPipeCapacity(atLeast minimum: Int) throws(Errno) -> Int {
+    try _setPipeCapacity(atLeast: minimum).get()
+  }
+
+  @usableFromInline
+  internal func _setPipeCapacity(atLeast minimum: Int) -> Result<Int, Errno> {
+    // Too large a capacity fails with an error, rather than trapping.
+    valueOrErrno(retryOnInterrupt: false) {
+      system_fcntl(self.rawValue, _F_SETPIPE_SZ, CInt(clamping: minimum))
+    }.map { Int($0) }
+  }
+}
+#endif // os(Linux) || os(Android)
 
 #if os(Linux) || os(Android) || os(FreeBSD) || os(WASI)
 @available(System 199, *)

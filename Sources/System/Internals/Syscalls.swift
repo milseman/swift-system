@@ -234,13 +234,52 @@ internal func system_fcntl(_ fd: Int32, _ cmd: Int32, _ value: Int32) -> Int32 {
 #endif // !os(Windows)
 
 #if !os(Windows) && !os(WASI)
+internal func system_fcntl(
+  _ fd: Int32, _ cmd: Int32, _ pointer: UnsafeMutableRawPointer
+) -> Int32 {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(fd, cmd, pointer) }
+#endif
+  return fcntl(fd, cmd, pointer)
+}
+
 internal func system_flock(_ fd: Int32, _ operation: Int32) -> Int32 {
 #if ENABLE_MOCKING
   if mockingEnabled { return _mock(fd, operation) }
 #endif
   return flock(fd, operation)
 }
+
+// Records the lock's fields by value, rather than the pointer.
+internal func system_fcntl(
+  _ fd: Int32, _ cmd: Int32, _ lock: UnsafeMutablePointer<flock>
+) -> Int32 {
+#if ENABLE_MOCKING
+  if mockingEnabled {
+    let l = lock.pointee
+    return _mock(fd, cmd, l.l_type, l.l_whence, l.l_start, l.l_len, l.l_pid)
+  }
+#endif
+  return fcntl(fd, cmd, lock)
+}
 #endif // !os(Windows) && !os(WASI)
+
+#if SYSTEM_PACKAGE_DARWIN
+// Records the lock's fields and the timeout by value, rather than the pointer.
+internal func system_fcntl(
+  _ fd: Int32, _ cmd: Int32, _ lock: UnsafeMutablePointer<flocktimeout>
+) -> Int32 {
+#if ENABLE_MOCKING
+  if mockingEnabled {
+    let l = lock.pointee.fl
+    let t = lock.pointee.timeout
+    return _mock(
+      fd, cmd, l.l_type, l.l_whence, l.l_start, l.l_len, l.l_pid, t.tv_sec, t.tv_nsec)
+  }
+#endif
+  return fcntl(fd, cmd, lock)
+}
+#endif // SYSTEM_PACKAGE_DARWIN
 
 // These return an error number rather than setting errno.
 #if os(Linux) || os(Android) || os(FreeBSD) || os(WASI)
@@ -903,6 +942,33 @@ internal func system_getgrnam_r(
 }
 #endif // !os(Windows) && !os(WASI)
 
+// These return -1 without setting errno for a variable with no limit.
+#if !os(Windows) && !os(WASI)
+internal func system_sysconf(_ name: CInt) -> Int {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mockInt(name) }
+#endif
+  return sysconf(name)
+}
+
+internal func system_pathconf(
+  _ path: UnsafePointer<CInterop.PlatformChar>,
+  _ name: CInt
+) -> Int {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mockInt(path: path, name) }
+#endif
+  return pathconf(path, name)
+}
+
+internal func system_fpathconf(_ fd: CInt, _ name: CInt) -> Int {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mockInt(fd, name) }
+#endif
+  return fpathconf(fd, name)
+}
+#endif // !os(Windows) && !os(WASI)
+
 #if !os(Windows) && !os(WASI)
 internal func system_getpid() -> CInterop.ProcessID {
   return getpid()
@@ -918,6 +984,34 @@ internal func system_getenv(
 ) -> UnsafeMutablePointer<CChar>? {
   return getenv(name)
 }
+
+// MARK: - Process information
+
+// libproc is only in the macOS SDK.
+#if os(macOS)
+internal func system_proc_pid_rusage(
+  _ pid: pid_t, _ flavor: CInt, _ buffer: UnsafeMutableRawPointer
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(pid, flavor, buffer) }
+#endif
+  // The C parameter is a `rusage_info_t *`, but the call fills the buffer
+  // it points to with the structure for `flavor`.
+  return proc_pid_rusage(pid, flavor, UnsafeMutablePointer(OpaquePointer(buffer)))
+}
+
+// Returns the number of bytes it fills, or 0 on failure, with errno set.
+internal func system_proc_pidinfo(
+  _ pid: pid_t, _ flavor: CInt, _ argument: UInt64,
+  _ buffer: UnsafeMutableRawPointer, _ size: CInt
+) -> CInt {
+#if ENABLE_MOCKING
+  // Reports success the way the call does, as filling the buffer.
+  if mockingEnabled { return _mock(pid, flavor, argument, buffer, size) == 0 ? size : 0 }
+#endif
+  return proc_pidinfo(pid, flavor, argument, buffer, size)
+}
+#endif // os(macOS)
 
 // MARK: - Terminal Control (termios)
 
@@ -992,6 +1086,31 @@ internal func system_tcsendbreak(
   }
 #endif
   return tcsendbreak(fd, duration)
+}
+
+internal func system_tcgetpgrp(_ fd: CInt) -> pid_t {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(fd) }
+#endif
+  return tcgetpgrp(fd)
+}
+
+internal func system_tcsetpgrp(_ fd: CInt, _ pgrp: pid_t) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(fd, pgrp) }
+#endif
+  return tcsetpgrp(fd, pgrp)
+}
+
+internal func system_tcgetsid(_ fd: CInt) -> pid_t {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(fd) }
+#endif
+#if os(Linux) || os(Android)
+  return csystem_tcgetsid(fd)
+#else
+  return tcgetsid(fd)
+#endif
 }
 
 

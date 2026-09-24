@@ -10,15 +10,22 @@ See https://swift.org/LICENSE.txt for license information
 add_library(SystemPackage
   Errno.swift
   ErrnoWindows.swift
+  FileControl.swift
+  FileControlCommand.swift
+  FileControlTypes.swift
   FileDescriptor.swift
   FileHelpers.swift
+  FileLock.swift
   FileOperations.swift
   FilePermissions.swift
   MachPort.swift
   OwnedFD.swift
   PlatformString.swift
   ProcessID.swift
+  ResourceUsageInfo.swift
+  SystemConfig.swift
   SystemString.swift
+  TaskInfo.swift
   UserDatabase.swift
   Util.swift
   Util+StringArray.swift
@@ -91,6 +98,7 @@ target_sources(SystemPackage PRIVATE
   Terminal/TerminalAttributes+Serial.swift
   Terminal/TerminalDescriptor.swift
   Terminal/TerminalFlags.swift
+  Terminal/TerminalJobControl.swift
   Terminal/TerminalOperations.swift
   Terminal/TerminalWindowSize.swift)
 target_link_libraries(SystemPackage PUBLIC

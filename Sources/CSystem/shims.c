@@ -135,3 +135,11 @@ extern int csystem_ptsname_r(int fd, char *buffer, size_t length) {
   return ptsname_r(fd, buffer, length);
 }
 #endif // __linux__
+
+#ifdef __linux__
+#include <termios.h>
+
+extern int csystem_tcgetsid(int fd) {
+  return tcgetsid(fd);
+}
+#endif // __linux__
