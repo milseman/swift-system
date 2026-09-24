@@ -42,6 +42,7 @@ struct SystemSamples: ParsableCommand {
       Links.self,
       Ln.self,
       Beneath.self,
+      FDFlags.self,
     ])
 }
 
