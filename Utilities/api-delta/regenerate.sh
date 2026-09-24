@@ -33,9 +33,9 @@ if here="$(git rev-parse --show-toplevel 2>/dev/null)" \
 fi
 REPO="$(cd "$REPO" && pwd -P)"
 
-# SwiftPM runs manifest compilation under sandbox-exec, which fails when this
+# SwiftPM runs each manifest under sandbox-exec, which can fail when this
 # script itself runs in a sandbox ("sandbox_apply: Operation not permitted").
-# The manifests are this repository's own.
+# The manifests are this repository's own; see README.md.
 SWIFTPM=(--disable-sandbox)
 
 log() { printf '\n== %s\n' "$*"; }
