@@ -958,9 +958,21 @@ internal var _NCCS: CInt { CInt(NCCS) }
 
 @_alwaysEmitIntoClient
 internal var __POSIX_VDISABLE: cc_t {
-  // _POSIX_VDISABLE is typically 0xFF (255) on POSIX systems
-  // On Darwin and Linux, it's defined as 0xFF
+#if SYSTEM_PACKAGE_DARWIN
+  // <sys/_types/_posix_vdisable.h> defines _POSIX_VDISABLE as
+  // ((unsigned char)'\377'), which Swift doesn't import.
   0xFF
+#elseif os(Linux) && canImport(Glibc)
+  // glibc's <bits/posix_opt.h> defines it as '\0', which Swift doesn't import.
+  0
+#elseif os(Android)
+  // Bionic's <bits/posix_limits.h> defines it as '\0', which Swift doesn't import.
+  0
+#else
+  // musl's <unistd.h> defines it as 0, FreeBSD's <sys/_termios.h> as 0xff,
+  // and OpenBSD's <sys/termios.h> as (0377), which Swift imports.
+  cc_t(_POSIX_VDISABLE)
+#endif
 }
 
 // Input flags (c_iflag)

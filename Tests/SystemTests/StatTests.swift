@@ -63,6 +63,9 @@ private struct StatTests {
       defer {
         try? fileFD.close()
       }
+      // The creation mask can clear some of those permissions, such as
+      // with a umask of 077, so set them outright.
+      try #require(fchmod(fileFD.rawValue, 0o644) == 0, "\(Errno.current)")
       try fileFD.writeAll("Hello, world!".utf8)
 
       let fileStatFromFD = try fileFD.stat()
@@ -195,6 +198,9 @@ private struct StatTests {
     try withTemporaryFilePath(basename: "Stat_permissions") { tempDir in
       let testFile = tempDir.appending("test.txt")
       let fd = try FileDescriptor.open(testFile, .writeOnly, options: .create, permissions: [.ownerReadWrite, .groupRead, .otherRead])
+      // The creation mask can clear some of those permissions, so set them
+      // outright.
+      try #require(fchmod(fd.rawValue, 0o644) == 0, "\(Errno.current)")
       try fd.close()
 
       let stat = try testFile.stat()

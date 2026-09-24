@@ -38,3 +38,11 @@ extern int csystem_renameat2(int olddirfd, const char *oldpath,
                              unsigned int flags);
 #endif
 
+#ifdef __linux__
+// Pseudoterminal functions. glibc declares them only with _XOPEN_SOURCE or
+// _GNU_SOURCE, which can't be defined here; see shims.c.
+extern int csystem_posix_openpt(int flags);
+extern int csystem_grantpt(int fd);
+extern int csystem_unlockpt(int fd);
+extern int csystem_ptsname_r(int fd, char *buffer, size_t length);
+#endif // __linux__

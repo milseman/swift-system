@@ -103,45 +103,60 @@ final class UserDatabaseTest: XCTestCase {
 
   @available(System 199, *)
   func testUserEntry() throws {
-    let entry = try XCTUnwrap(UserEntry(userID: .effective))
-    XCTAssertEqual(entry.userID, .effective)
-    XCTAssertFalse(entry.name.isEmpty)
-    XCTAssertEqual(try UserEntry(name: entry.name), entry)
+    // Compare with the non-reentrant call. The effective user and user ID 0
+    // needn't have entries, as in a container run with an arbitrary user ID,
+    // so neither does UserEntry then.
+    for userID in [UserID.effective, UserID(0)] {
+      let entry = try UserEntry(userID: userID)
+      guard let c = getpwuid(userID.rawValue)?.pointee else {
+        XCTAssertNil(entry, "\(userID)")
+        continue
+      }
+      let found = try XCTUnwrap(entry, "\(userID)")
+      XCTAssertEqual(found.userID, userID)
+      XCTAssertFalse(found.name.isEmpty)
+      XCTAssertEqual(try UserEntry(name: found.name), found)
 
-    // Compare with the non-reentrant call. Bionic marks the strings nullable.
-    let c = try XCTUnwrap(getpwuid(geteuid())).pointee
-    XCTAssertEqual(entry.name, c.pw_name.map { String(cString: $0) })
-    XCTAssertEqual(entry.groupID.rawValue, c.pw_gid)
-    XCTAssertEqual(entry.homeDirectory, c.pw_dir.map { FilePath(platformString: $0) })
-    XCTAssertEqual(entry.shell, c.pw_shell.map { FilePath(platformString: $0) })
-    #if !os(Android) || _pointerBitWidth(_64)
-    XCTAssertEqual(entry.realName, c.pw_gecos.map { String(cString: $0) })
-    #endif
+      // Bionic marks the strings nullable.
+      XCTAssertEqual(found.name, c.pw_name.map { String(cString: $0) })
+      XCTAssertEqual(found.groupID.rawValue, c.pw_gid)
+      XCTAssertEqual(found.homeDirectory, c.pw_dir.map { FilePath(platformString: $0) })
+      XCTAssertEqual(found.shell, c.pw_shell.map { FilePath(platformString: $0) })
+      #if !os(Android) || _pointerBitWidth(_64)
+      XCTAssertEqual(found.realName, c.pw_gecos.map { String(cString: $0) })
+      #endif
+    }
 
-    XCTAssertEqual(try UserEntry(userID: UserID(0))?.name, "root")
     XCTAssertNil(try UserEntry(name: "no such user \(Int.random(in: 0..<1_000_000))"))
   }
 
   @available(System 199, *)
   func testGroupEntry() throws {
-    let entry = try XCTUnwrap(GroupEntry(groupID: .effective))
-    XCTAssertEqual(entry.groupID, .effective)
-    XCTAssertFalse(entry.name.isEmpty)
-    XCTAssertEqual(try GroupEntry(name: entry.name), entry)
-
-    // Compare with the non-reentrant call. Bionic marks the strings nullable.
-    let c = try XCTUnwrap(getgrgid(getegid())).pointee
-    XCTAssertEqual(entry.name, c.gr_name.map { String(cString: $0) })
-    var members: [String] = []
-    if var member = c.gr_mem {
-      while let name = member.pointee {
-        members.append(String(cString: name))
-        member += 1
+    // Compare with the non-reentrant call. As for users, the effective group
+    // and group ID 0 needn't have entries.
+    for groupID in [GroupID.effective, GroupID(0)] {
+      let entry = try GroupEntry(groupID: groupID)
+      guard let c = getgrgid(groupID.rawValue)?.pointee else {
+        XCTAssertNil(entry, "\(groupID)")
+        continue
       }
-    }
-    XCTAssertEqual(entry.members, members)
+      let found = try XCTUnwrap(entry, "\(groupID)")
+      XCTAssertEqual(found.groupID, groupID)
+      XCTAssertFalse(found.name.isEmpty)
+      XCTAssertEqual(try GroupEntry(name: found.name), found)
 
-    XCTAssertEqual(try GroupEntry(groupID: GroupID(0))?.groupID, GroupID(0))
+      // Bionic marks the strings nullable.
+      XCTAssertEqual(found.name, c.gr_name.map { String(cString: $0) })
+      var members: [String] = []
+      if var member = c.gr_mem {
+        while let name = member.pointee {
+          members.append(String(cString: name))
+          member += 1
+        }
+      }
+      XCTAssertEqual(found.members, members)
+    }
+
     XCTAssertNil(try GroupEntry(name: "no such group \(Int.random(in: 0..<1_000_000))"))
   }
 }

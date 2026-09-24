@@ -113,3 +113,25 @@ extern int csystem_renameat2(int olddirfd, const char *oldpath,
   #endif
 }
 #endif // __linux__
+
+#ifdef __linux__
+#include <stdlib.h>
+
+// With _GNU_SOURCE, which this file defines on Linux, <stdlib.h> declares these.
+
+extern int csystem_posix_openpt(int flags) {
+  return posix_openpt(flags);
+}
+
+extern int csystem_grantpt(int fd) {
+  return grantpt(fd);
+}
+
+extern int csystem_unlockpt(int fd) {
+  return unlockpt(fd);
+}
+
+extern int csystem_ptsname_r(int fd, char *buffer, size_t length) {
+  return ptsname_r(fd, buffer, length);
+}
+#endif // __linux__
