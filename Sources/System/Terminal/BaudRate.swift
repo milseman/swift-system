@@ -27,9 +27,11 @@
 @frozen
 @available(System 199, *)
 public struct BaudRate: RawRepresentable, Hashable, Sendable {
+  /// The raw C speed value.
   @_alwaysEmitIntoClient
   public var rawValue: CInterop.SpeedT
 
+  /// Creates a strongly-typed baud rate from a raw C speed value.
   @_alwaysEmitIntoClient
   public init(rawValue: CInterop.SpeedT) {
     self.rawValue = rawValue

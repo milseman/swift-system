@@ -20,6 +20,7 @@ struct SystemSamples: ParsableCommand {
       Connect.self,
       Listen.self,
       SocketPair.self,
+      UDPEcho.self,
       // Owned descriptor samples
       OwnedCat.self,
       OwnedCopy.self,
@@ -30,10 +31,22 @@ struct SystemSamples: ParsableCommand {
       PasswordReader.self,
       TerminalSize.self,
       RawMode.self,
+      Stty.self,
       // File and process samples
       PIDFile.self,
       AtomicWrite.self,
       SetAttributes.self,
+      Rename.self,
+      FIFO.self,
+      ID.self,
+      Touch.self,
+      SpanCopy.self,
+      Links.self,
+      Ln.self,
+      Beneath.self,
+      FDFlags.self,
+      Access.self,
+      Pushd.self,
     ])
 }
 

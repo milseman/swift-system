@@ -61,6 +61,10 @@ internal class MockingDriver {
   // Mock errors inside syscalls
   internal var forceErrno = ForceErrno.none
 
+  // Byte counts for successful mocked calls that return one, such as read
+  // and write, to return in order. Once they run out, those calls return 0.
+  internal var byteCounts: [Int] = []
+
   // Whether we should pretend to be Windows for syntactic operations
   // inside FilePath
   fileprivate var forceWindowsSyntaxForPaths: Bool? = nil
@@ -185,7 +189,11 @@ internal func _mock(
 internal func _mockInt(
   name: String = #function, path: UnsafePointer<CInterop.PlatformChar>? = nil, _ args: AnyHashable...
 ) -> Int {
-  Int(mockImpl(name: name, path: path, args))
+  let result = Int(mockImpl(name: name, path: path, args))
+  guard result == 0, let driver = currentMockingDriver, !driver.byteCounts.isEmpty else {
+    return result
+  }
+  return driver.byteCounts.removeFirst()
 }
 
 internal func _mockOffT(

@@ -706,6 +706,391 @@ internal var _F_FULLFSYNC: CInt { F_FULLFSYNC }
 internal var _F_BARRIERFSYNC: CInt { F_BARRIERFSYNC }
 #endif
 
+// MARK: - Record locks
+
+#if !os(Windows) && !os(WASI)
+// `l_type` is a `short`.
+@_alwaysEmitIntoClient
+internal var _F_RDLCK: CShort { CShort(F_RDLCK) }
+
+@_alwaysEmitIntoClient
+internal var _F_WRLCK: CShort { CShort(F_WRLCK) }
+
+@_alwaysEmitIntoClient
+internal var _F_UNLCK: CShort { CShort(F_UNLCK) }
+#endif
+
+// glibc declares the OFD commands only with _GNU_SOURCE, so on Linux they
+// come from CSystemLinux.h.
+#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
+@_alwaysEmitIntoClient
+internal var _F_OFD_GETLK: CInt {
+#if SYSTEM_PACKAGE_DARWIN
+  F_OFD_GETLK
+#else
+  CSYSTEM_F_OFD_GETLK
+#endif
+}
+
+@_alwaysEmitIntoClient
+internal var _F_OFD_SETLK: CInt {
+#if SYSTEM_PACKAGE_DARWIN
+  F_OFD_SETLK
+#else
+  CSYSTEM_F_OFD_SETLK
+#endif
+}
+
+@_alwaysEmitIntoClient
+internal var _F_OFD_SETLKW: CInt {
+#if SYSTEM_PACKAGE_DARWIN
+  F_OFD_SETLKW
+#else
+  CSYSTEM_F_OFD_SETLKW
+#endif
+}
+#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
+
+#if SYSTEM_PACKAGE_DARWIN
+@_alwaysEmitIntoClient
+internal var _F_OFD_SETLKWTIMEOUT: CInt { F_OFD_SETLKWTIMEOUT }
+#endif
+
+// MARK: - fcntl commands
+
+#if !os(Windows) && !os(WASI)
+@_alwaysEmitIntoClient
+internal var _F_GETOWN: CInt { F_GETOWN }
+
+@_alwaysEmitIntoClient
+internal var _F_SETOWN: CInt { F_SETOWN }
+
+@_alwaysEmitIntoClient
+internal var _F_GETLK: CInt { F_GETLK }
+
+@_alwaysEmitIntoClient
+internal var _F_SETLK: CInt { F_SETLK }
+
+@_alwaysEmitIntoClient
+internal var _F_SETLKW: CInt { F_SETLKW }
+#endif
+
+#if SYSTEM_PACKAGE_DARWIN
+@_alwaysEmitIntoClient
+internal var _F_SETLKWTIMEOUT: CInt { F_SETLKWTIMEOUT }
+
+@_alwaysEmitIntoClient
+internal var _F_FLUSH_DATA: CInt { F_FLUSH_DATA }
+
+@_alwaysEmitIntoClient
+internal var _F_CHKCLEAN: CInt { F_CHKCLEAN }
+
+@_alwaysEmitIntoClient
+internal var _F_PREALLOCATE: CInt { F_PREALLOCATE }
+
+@_alwaysEmitIntoClient
+internal var _F_SETSIZE: CInt { F_SETSIZE }
+
+@_alwaysEmitIntoClient
+internal var _F_RDADVISE: CInt { F_RDADVISE }
+
+@_alwaysEmitIntoClient
+internal var _F_RDAHEAD: CInt { F_RDAHEAD }
+
+@_alwaysEmitIntoClient
+internal var _F_NOCACHE: CInt { F_NOCACHE }
+
+@_alwaysEmitIntoClient
+internal var _F_LOG2PHYS: CInt { F_LOG2PHYS }
+
+@_alwaysEmitIntoClient
+internal var _F_GETPATH: CInt { F_GETPATH }
+
+@_alwaysEmitIntoClient
+internal var _F_PATHPKG_CHECK: CInt { F_PATHPKG_CHECK }
+
+@_alwaysEmitIntoClient
+internal var _F_FREEZE_FS: CInt { F_FREEZE_FS }
+
+@_alwaysEmitIntoClient
+internal var _F_THAW_FS: CInt { F_THAW_FS }
+
+@_alwaysEmitIntoClient
+internal var _F_GLOBAL_NOCACHE: CInt { F_GLOBAL_NOCACHE }
+
+@_alwaysEmitIntoClient
+internal var _F_ADDSIGS: CInt { F_ADDSIGS }
+
+@_alwaysEmitIntoClient
+internal var _F_ADDFILESIGS: CInt { F_ADDFILESIGS }
+
+@_alwaysEmitIntoClient
+internal var _F_NODIRECT: CInt { F_NODIRECT }
+
+@_alwaysEmitIntoClient
+internal var _F_GETPROTECTIONCLASS: CInt { F_GETPROTECTIONCLASS }
+
+@_alwaysEmitIntoClient
+internal var _F_SETPROTECTIONCLASS: CInt { F_SETPROTECTIONCLASS }
+
+@_alwaysEmitIntoClient
+internal var _F_LOG2PHYS_EXT: CInt { F_LOG2PHYS_EXT }
+
+@_alwaysEmitIntoClient
+internal var _F_GETLKPID: CInt { F_GETLKPID }
+
+@_alwaysEmitIntoClient
+internal var _F_SETBACKINGSTORE: CInt { F_SETBACKINGSTORE }
+
+@_alwaysEmitIntoClient
+internal var _F_GETPATH_MTMINFO: CInt { F_GETPATH_MTMINFO }
+
+@_alwaysEmitIntoClient
+internal var _F_GETCODEDIR: CInt { F_GETCODEDIR }
+
+@_alwaysEmitIntoClient
+internal var _F_SETNOSIGPIPE: CInt { F_SETNOSIGPIPE }
+
+@_alwaysEmitIntoClient
+internal var _F_GETNOSIGPIPE: CInt { F_GETNOSIGPIPE }
+
+@_alwaysEmitIntoClient
+internal var _F_TRANSCODEKEY: CInt { F_TRANSCODEKEY }
+
+@_alwaysEmitIntoClient
+internal var _F_SINGLE_WRITER: CInt { F_SINGLE_WRITER }
+
+@_alwaysEmitIntoClient
+internal var _F_GETPROTECTIONLEVEL: CInt { F_GETPROTECTIONLEVEL }
+
+@_alwaysEmitIntoClient
+internal var _F_FINDSIGS: CInt { F_FINDSIGS }
+
+@_alwaysEmitIntoClient
+internal var _F_ADDFILESIGS_FOR_DYLD_SIM: CInt { F_ADDFILESIGS_FOR_DYLD_SIM }
+
+@_alwaysEmitIntoClient
+internal var _F_ADDFILESIGS_RETURN: CInt { F_ADDFILESIGS_RETURN }
+
+@_alwaysEmitIntoClient
+internal var _F_CHECK_LV: CInt { F_CHECK_LV }
+
+@_alwaysEmitIntoClient
+internal var _F_PUNCHHOLE: CInt { F_PUNCHHOLE }
+
+@_alwaysEmitIntoClient
+internal var _F_TRIM_ACTIVE_FILE: CInt { F_TRIM_ACTIVE_FILE }
+
+@_alwaysEmitIntoClient
+internal var _F_SPECULATIVE_READ: CInt { F_SPECULATIVE_READ }
+
+@_alwaysEmitIntoClient
+internal var _F_GETPATH_NOFIRMLINK: CInt { F_GETPATH_NOFIRMLINK }
+
+@_alwaysEmitIntoClient
+internal var _F_ADDFILESIGS_INFO: CInt { F_ADDFILESIGS_INFO }
+
+@_alwaysEmitIntoClient
+internal var _F_ADDFILESUPPL: CInt { F_ADDFILESUPPL }
+
+@_alwaysEmitIntoClient
+internal var _F_GETSIGSINFO: CInt { F_GETSIGSINFO }
+
+// `fst_flags` is an `unsigned int`.
+@_alwaysEmitIntoClient
+internal var _F_ALLOCATECONTIG: UInt32 { UInt32(F_ALLOCATECONTIG) }
+
+@_alwaysEmitIntoClient
+internal var _F_ALLOCATEALL: UInt32 { UInt32(F_ALLOCATEALL) }
+
+@_alwaysEmitIntoClient
+internal var _F_ALLOCATEPERSIST: UInt32 { UInt32(F_ALLOCATEPERSIST) }
+
+@_alwaysEmitIntoClient
+internal var _F_PEOFPOSMODE: CInt { F_PEOFPOSMODE }
+
+@_alwaysEmitIntoClient
+internal var _F_VOLPOSMODE: CInt { F_VOLPOSMODE }
+
+// The size of the buffer that F_GETPATH fills.
+@_alwaysEmitIntoClient
+internal var _MAXPATHLEN: Int { Int(MAXPATHLEN) }
+#endif
+
+// glibc declares these only with _GNU_SOURCE, and Bionic defines them with
+// an expression Swift can't import, so they come from CSystemLinux.h.
+#if os(Linux) || os(Android)
+@_alwaysEmitIntoClient
+internal var _F_GETPIPE_SZ: CInt { CSYSTEM_F_GETPIPE_SZ }
+
+@_alwaysEmitIntoClient
+internal var _F_SETPIPE_SZ: CInt { CSYSTEM_F_SETPIPE_SZ }
+#endif
+
+// MARK: - sysconf and pathconf
+
+#if !os(Windows) && !os(WASI)
+// These are macros on some platforms and enumerations on others.
+@_alwaysEmitIntoClient
+internal var __SC_ARG_MAX: CInt { CInt(_SC_ARG_MAX) }
+
+@_alwaysEmitIntoClient
+internal var __SC_CHILD_MAX: CInt { CInt(_SC_CHILD_MAX) }
+
+@_alwaysEmitIntoClient
+internal var __SC_CLK_TCK: CInt { CInt(_SC_CLK_TCK) }
+
+@_alwaysEmitIntoClient
+internal var __SC_IOV_MAX: CInt { CInt(_SC_IOV_MAX) }
+
+@_alwaysEmitIntoClient
+internal var __SC_NGROUPS_MAX: CInt { CInt(_SC_NGROUPS_MAX) }
+
+@_alwaysEmitIntoClient
+internal var __SC_NPROCESSORS_CONF: CInt { CInt(_SC_NPROCESSORS_CONF) }
+
+@_alwaysEmitIntoClient
+internal var __SC_NPROCESSORS_ONLN: CInt { CInt(_SC_NPROCESSORS_ONLN) }
+
+@_alwaysEmitIntoClient
+internal var __SC_OPEN_MAX: CInt { CInt(_SC_OPEN_MAX) }
+
+@_alwaysEmitIntoClient
+internal var __SC_PAGESIZE: CInt { CInt(_SC_PAGESIZE) }
+
+@_alwaysEmitIntoClient
+internal var __SC_STREAM_MAX: CInt { CInt(_SC_STREAM_MAX) }
+
+@_alwaysEmitIntoClient
+internal var __SC_TZNAME_MAX: CInt { CInt(_SC_TZNAME_MAX) }
+
+@_alwaysEmitIntoClient
+internal var __SC_JOB_CONTROL: CInt { CInt(_SC_JOB_CONTROL) }
+
+@_alwaysEmitIntoClient
+internal var __SC_SAVED_IDS: CInt { CInt(_SC_SAVED_IDS) }
+
+@_alwaysEmitIntoClient
+internal var __SC_VERSION: CInt { CInt(_SC_VERSION) }
+
+@_alwaysEmitIntoClient
+internal var __SC_BC_BASE_MAX: CInt { CInt(_SC_BC_BASE_MAX) }
+
+@_alwaysEmitIntoClient
+internal var __SC_BC_DIM_MAX: CInt { CInt(_SC_BC_DIM_MAX) }
+
+@_alwaysEmitIntoClient
+internal var __SC_BC_SCALE_MAX: CInt { CInt(_SC_BC_SCALE_MAX) }
+
+@_alwaysEmitIntoClient
+internal var __SC_BC_STRING_MAX: CInt { CInt(_SC_BC_STRING_MAX) }
+
+@_alwaysEmitIntoClient
+internal var __SC_COLL_WEIGHTS_MAX: CInt { CInt(_SC_COLL_WEIGHTS_MAX) }
+
+@_alwaysEmitIntoClient
+internal var __SC_EXPR_NEST_MAX: CInt { CInt(_SC_EXPR_NEST_MAX) }
+
+@_alwaysEmitIntoClient
+internal var __SC_LINE_MAX: CInt { CInt(_SC_LINE_MAX) }
+
+@_alwaysEmitIntoClient
+internal var __SC_RE_DUP_MAX: CInt { CInt(_SC_RE_DUP_MAX) }
+
+@_alwaysEmitIntoClient
+internal var __SC_2_VERSION: CInt { CInt(_SC_2_VERSION) }
+
+@_alwaysEmitIntoClient
+internal var __SC_2_C_BIND: CInt { CInt(_SC_2_C_BIND) }
+
+@_alwaysEmitIntoClient
+internal var __SC_2_C_DEV: CInt { CInt(_SC_2_C_DEV) }
+
+@_alwaysEmitIntoClient
+internal var __SC_2_CHAR_TERM: CInt { CInt(_SC_2_CHAR_TERM) }
+
+@_alwaysEmitIntoClient
+internal var __SC_2_FORT_DEV: CInt { CInt(_SC_2_FORT_DEV) }
+
+@_alwaysEmitIntoClient
+internal var __SC_2_FORT_RUN: CInt { CInt(_SC_2_FORT_RUN) }
+
+@_alwaysEmitIntoClient
+internal var __SC_2_LOCALEDEF: CInt { CInt(_SC_2_LOCALEDEF) }
+
+@_alwaysEmitIntoClient
+internal var __SC_2_SW_DEV: CInt { CInt(_SC_2_SW_DEV) }
+
+@_alwaysEmitIntoClient
+internal var __SC_2_UPE: CInt { CInt(_SC_2_UPE) }
+
+@_alwaysEmitIntoClient
+internal var __SC_PHYS_PAGES: CInt { CInt(_SC_PHYS_PAGES) }
+
+@_alwaysEmitIntoClient
+internal var __SC_GETPW_R_SIZE_MAX: CInt { CInt(_SC_GETPW_R_SIZE_MAX) }
+
+@_alwaysEmitIntoClient
+internal var __SC_GETGR_R_SIZE_MAX: CInt { CInt(_SC_GETGR_R_SIZE_MAX) }
+
+@_alwaysEmitIntoClient
+internal var __SC_HOST_NAME_MAX: CInt { CInt(_SC_HOST_NAME_MAX) }
+
+@_alwaysEmitIntoClient
+internal var __PC_LINK_MAX: CInt { CInt(_PC_LINK_MAX) }
+
+@_alwaysEmitIntoClient
+internal var __PC_MAX_CANON: CInt { CInt(_PC_MAX_CANON) }
+
+@_alwaysEmitIntoClient
+internal var __PC_MAX_INPUT: CInt { CInt(_PC_MAX_INPUT) }
+
+@_alwaysEmitIntoClient
+internal var __PC_NAME_MAX: CInt { CInt(_PC_NAME_MAX) }
+
+@_alwaysEmitIntoClient
+internal var __PC_PATH_MAX: CInt { CInt(_PC_PATH_MAX) }
+
+@_alwaysEmitIntoClient
+internal var __PC_PIPE_BUF: CInt { CInt(_PC_PIPE_BUF) }
+
+@_alwaysEmitIntoClient
+internal var __PC_CHOWN_RESTRICTED: CInt { CInt(_PC_CHOWN_RESTRICTED) }
+
+@_alwaysEmitIntoClient
+internal var __PC_NO_TRUNC: CInt { CInt(_PC_NO_TRUNC) }
+
+@_alwaysEmitIntoClient
+internal var __PC_VDISABLE: CInt { CInt(_PC_VDISABLE) }
+
+@_alwaysEmitIntoClient
+internal var __PC_FILESIZEBITS: CInt { CInt(_PC_FILESIZEBITS) }
+
+@_alwaysEmitIntoClient
+internal var __PC_SYMLINK_MAX: CInt { CInt(_PC_SYMLINK_MAX) }
+
+#if SYSTEM_PACKAGE_DARWIN
+@_alwaysEmitIntoClient
+internal var __PC_XATTR_SIZE_BITS: CInt { CInt(_PC_XATTR_SIZE_BITS) }
+#endif
+
+#if SYSTEM_PACKAGE_DARWIN || os(FreeBSD)
+@_alwaysEmitIntoClient
+internal var __PC_MIN_HOLE_SIZE: CInt { CInt(_PC_MIN_HOLE_SIZE) }
+#endif
+#endif // !os(Windows) && !os(WASI)
+
+// MARK: - Process information
+
+// libproc is only in the macOS SDK.
+#if os(macOS)
+@_alwaysEmitIntoClient
+internal var _RUSAGE_INFO_V6: CInt { RUSAGE_INFO_V6 }
+
+@_alwaysEmitIntoClient
+internal var _PROC_PIDTASKINFO: CInt { PROC_PIDTASKINFO }
+#endif
+
 // MARK: - posix_fadvise
 
 #if os(Linux) || os(Android) || os(FreeBSD) || os(WASI)
@@ -958,9 +1343,21 @@ internal var _NCCS: CInt { CInt(NCCS) }
 
 @_alwaysEmitIntoClient
 internal var __POSIX_VDISABLE: cc_t {
-  // _POSIX_VDISABLE is typically 0xFF (255) on POSIX systems
-  // On Darwin and Linux, it's defined as 0xFF
+#if SYSTEM_PACKAGE_DARWIN
+  // <sys/_types/_posix_vdisable.h> defines _POSIX_VDISABLE as
+  // ((unsigned char)'\377'), which Swift doesn't import.
   0xFF
+#elseif os(Linux) && canImport(Glibc)
+  // glibc's <bits/posix_opt.h> defines it as '\0', which Swift doesn't import.
+  0
+#elseif os(Android)
+  // Bionic's <bits/posix_limits.h> defines it as '\0', which Swift doesn't import.
+  0
+#else
+  // musl's <unistd.h> defines it as 0, FreeBSD's <sys/_termios.h> as 0xff,
+  // and OpenBSD's <sys/termios.h> as (0377), which Swift imports.
+  cc_t(_POSIX_VDISABLE)
+#endif
 }
 
 // Input flags (c_iflag)

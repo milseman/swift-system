@@ -36,5 +36,29 @@ int _system_ioctl_TIOCSWINSZ(int fd, const void *ws);
 extern int csystem_renameat2(int olddirfd, const char *oldpath,
                              int newdirfd, const char *newpath,
                              unsigned int flags);
+
+// The open file description lock commands for fcntl. glibc only declares
+// them with _GNU_SOURCE, which can't be defined here; see shims.c. They have
+// these values on every architecture.
+#define CSYSTEM_F_OFD_GETLK 36
+#define CSYSTEM_F_OFD_SETLK 37
+#define CSYSTEM_F_OFD_SETLKW 38
+
+// The pipe capacity commands for fcntl, which glibc also declares only with
+// _GNU_SOURCE, and Bionic defines as F_LINUX_SPECIFIC_BASE + 7 and + 8.
+#define CSYSTEM_F_SETPIPE_SZ 1031
+#define CSYSTEM_F_GETPIPE_SZ 1032
+
+// tcgetsid, which not every C library declares without feature macros
+// such as _GNU_SOURCE, which can't be defined here; see shims.c.
+extern int csystem_tcgetsid(int fd);
 #endif
 
+#ifdef __linux__
+// Pseudoterminal functions. glibc declares them only with _XOPEN_SOURCE or
+// _GNU_SOURCE, which can't be defined here; see shims.c.
+extern int csystem_posix_openpt(int flags);
+extern int csystem_grantpt(int fd);
+extern int csystem_unlockpt(int fd);
+extern int csystem_ptsname_r(int fd, char *buffer, size_t length);
+#endif // __linux__
