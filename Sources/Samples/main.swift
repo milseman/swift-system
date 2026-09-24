@@ -54,6 +54,7 @@ struct SystemSamples: ParsableCommand {
       ProcInfo.self,
       Sparse.self,
       MkdirP.self,
+      ChmodH.self,
     ])
 }
 
