@@ -46,6 +46,7 @@ struct SystemSamples: ParsableCommand {
       Beneath.self,
       FDFlags.self,
       Access.self,
+      Pushd.self,
     ])
 }
 
