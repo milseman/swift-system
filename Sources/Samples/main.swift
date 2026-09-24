@@ -21,6 +21,7 @@ struct SystemSamples: ParsableCommand {
       Listen.self,
       SocketPair.self,
       UDPEcho.self,
+      UnixSocket.self,
       // Owned descriptor samples
       OwnedCat.self,
       OwnedCopy.self,
