@@ -39,7 +39,7 @@ final class OwnedFDTest: XCTestCase {
     MockingDriver.withMockingEnabled { mocking in
       do {
         let fd = OwnedFD(taking: FileDescriptor(rawValue: 42))
-        _ = fd.withDescriptor { $0.rawValue }
+        _ = fd.fileDescriptor.rawValue
       }
       XCTAssertEqual(drain(mocking), ["close(42)"])
     }
@@ -116,7 +116,7 @@ final class OwnedFDTest: XCTestCase {
     // error. `closeAfter` drops it in the same situation.
     func openThenThrow() throws {
       let fd = OwnedFD(taking: FileDescriptor(rawValue: 42))
-      _ = fd.withDescriptor { $0.rawValue }
+      _ = fd.fileDescriptor.rawValue
       throw BodyError()
     }
     try MockingDriver.withMockingEnabled { mocking in
@@ -157,11 +157,11 @@ final class OwnedFDTest: XCTestCase {
     try readEnd.close()
   }
 
-  func testWithDescriptorCanReturnOwnedFD() throws {
+  func testVendedDescriptorCanBeDuplicatedAndAdopted() throws {
     let pipe = try FileDescriptor.pipe()
     let readEnd = OwnedFD(taking: pipe.readEnd)
     let writeEnd = OwnedFD(taking: pipe.writeEnd)
-    let duplicate = try writeEnd.withDescriptor { OwnedFD(taking: try $0.duplicate()) }
+    let duplicate = OwnedFD(taking: try writeEnd.fileDescriptor.duplicate())
     try writeEnd.close()
     _ = try duplicate.writeAll("xy".utf8)
     try duplicate.close()

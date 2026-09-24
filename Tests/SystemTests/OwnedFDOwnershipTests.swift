@@ -18,8 +18,6 @@ import XCTest
 // PROTOTYPE: more tests for Sources/System/OwnedFD.swift: the syscall and
 // retry behavior of each forwarded method, ownership transfer, and errors.
 
-private struct BodyError: Error {}
-
 final class OwnedFDOwnershipTest: XCTestCase {
   #if ENABLE_MOCKING && !os(WASI) // Would need to use _getConst funcs from CSystem
   /// Calls `body` with an `OwnedFD` for descriptor 42, then relinquishes it,
@@ -147,12 +145,11 @@ final class OwnedFDOwnershipTest: XCTestCase {
     for test in syscallTestCases { test.runAllTests() }
   }
 
-  func testWithDescriptorRethrowsWithoutClosing() throws {
-    try MockingDriver.withMockingEnabled { mocking in
+  func testVendingMakesNoSyscall() {
+    MockingDriver.withMockingEnabled { mocking in
       let fd = OwnedFD(taking: FileDescriptor(rawValue: 42))
-      XCTAssertThrowsError(
-        try fd.withDescriptor { _ throws(BodyError) in throw BodyError() }
-      ) { XCTAssert($0 is BodyError) }
+      XCTAssertEqual(fd.fileDescriptor.rawValue, 42)
+      XCTAssertEqual(fd.fileDescriptor, fd.fileDescriptor)
       XCTAssertTrue(mocking.trace.isEmpty)
       _ = fd.relinquish()
     }
@@ -160,9 +157,9 @@ final class OwnedFDOwnershipTest: XCTestCase {
   #endif // ENABLE_MOCKING && !os(WASI)
 
   func testStandardStreamValues() {
-    XCTAssertEqual(OwnedFD.standardInput.withDescriptor { $0 }, .standardInput)
-    XCTAssertEqual(OwnedFD.standardOutput.withDescriptor { $0 }, .standardOutput)
-    XCTAssertEqual(OwnedFD.standardError.withDescriptor { $0 }, .standardError)
+    XCTAssertEqual(OwnedFD.standardInput.fileDescriptor, .standardInput)
+    XCTAssertEqual(OwnedFD.standardOutput.fileDescriptor, .standardOutput)
+    XCTAssertEqual(OwnedFD.standardError.fileDescriptor, .standardError)
   }
 
   func testForwardsReportBadFileDescriptor() {
@@ -304,14 +301,15 @@ final class OwnedFDOwnershipTest: XCTestCase {
     XCTAssertEqual(try readToEnd(readEnd), "abc")
   }
 
-  func testClosingThroughWithDescriptorLeavesOwnerStale() throws {
-    // `withDescriptor` doesn't prevent closing the borrowed descriptor, as
+  func testClosingVendedDescriptorLeavesOwnerStale() throws {
+    // Nothing prevents closing the vended descriptor, as
     // Prototype/Verify/V10a_prototype_escape_hatch.swift notes. Then the
-    // owner's own close fails.
+    // owner's own close fails. (Destroying the owner instead drops the
+    // error; see OwnedFDDeinitTests.swift.)
     let pipe = try FileDescriptor.pipe()
     let readEnd = OwnedFD(taking: pipe.readEnd)
     let writeEnd = OwnedFD(taking: pipe.writeEnd)
-    try writeEnd.withDescriptor { try $0.close() }
+    try writeEnd.fileDescriptor.close()
     XCTAssertEqual(try readToEnd(readEnd), "")
     do {
       try writeEnd.close()

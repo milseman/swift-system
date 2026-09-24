@@ -1,16 +1,16 @@
-// V10a: what `withDescriptor` does not prevent (client of the prototype module). Expected to compile.
+// V10a: what the `fileDescriptor` accessor does not prevent (client of the prototype module). Expected to compile. The same held for withDescriptor(body:), which the accessor replaced. Closing the vended descriptor leaves the owner to close the same number again: its deinit drops the EBADF, or closes an unrelated file if the number was reused first.
 import SystemPackage
 
 func leakCopy(_ owned: borrowing OwnedFD) -> FileDescriptor {
-  owned.withDescriptor { $0 }                 // a copy of the FileDescriptor escapes
+  owned.fileDescriptor                        // a copy of the FileDescriptor escapes
 }
 
 func closeThroughHatch(_ owned: borrowing OwnedFD) throws {
-  try owned.withDescriptor { try $0.close() } // closes; the owner's deinit closes again later
+  try owned.fileDescriptor.close()            // closes; the owner's deinit closes again later
 }
 
 func closeStandardInputThroughHatch() throws {
-  try OwnedFD.standardInput.withDescriptor { try $0.close() }
+  try OwnedFD.standardInput.fileDescriptor.close()
 }
 
 func adoptTwice(_ fd: FileDescriptor) {

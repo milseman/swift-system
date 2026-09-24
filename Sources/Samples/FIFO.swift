@@ -45,11 +45,9 @@ struct FIFO: ParsableCommand {
 
     // Nonblocking is a status flag of the open file, so it can be turned off
     // again, to make reads wait for data. OwnedFD doesn't forward fcntl.
-    try reader.withDescriptor { fd in
-      var flags = try fd.statusFlags()
-      flags.remove(.nonBlocking)
-      try fd.setStatusFlags(flags)
-    }
+    var flags = try reader.fileDescriptor.statusFlags()
+    flags.remove(.nonBlocking)
+    try reader.fileDescriptor.setStatusFlags(flags)
     print("Turned off nonblocking for the read end")
 
     try writer.writeAll(message.utf8)

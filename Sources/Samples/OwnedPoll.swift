@@ -39,25 +39,12 @@ struct OwnedPoll: ParsableCommand {
   }
 }
 
-/// Both ends of a pipe.
-struct OwnedPipe: ~Copyable {
-  var readEnd: OwnedFD
-  var writeEnd: OwnedFD
-
-  init() throws {
-    // A tuple can't hold noncopyable values, so `FileDescriptor.pipe()`
-    // has no owned equivalent; adopt each end.
-    let fds = try FileDescriptor.pipe()
-    readEnd = OwnedFD(taking: fds.readEnd)
-    writeEnd = OwnedFD(taking: fds.writeEnd)
-  }
-}
-
 @available(macOS 26, iOS 26, watchOS 26, tvOS 26, visionOS 26, *)
 func pollPipes() throws {
   // `Array` requires copyable elements, so the table is a fixed-size
-  // InlineArray.
-  let pipes = try InlineArray<3, OwnedPipe> { _ in try OwnedPipe() }
+  // InlineArray. A tuple can't hold noncopyable values either, so each pipe
+  // is an OwnedFD.Pipe, which owns both ends.
+  let pipes = try InlineArray<3, OwnedFD.Pipe> { _ in try OwnedFD.pipe() }
 
   // Swift 6.2 rejects `pipes[i].readEnd.read(...)` with "unexpected
   // exclusivity violation. This is a compiler bug", so each use below passes
@@ -80,24 +67,21 @@ func pollPipes() throws {
   }
 }
 
-func send(_ text: String, through pipe: borrowing OwnedPipe) throws(Errno) {
+func send(_ text: String, through pipe: borrowing OwnedFD.Pipe) throws(Errno) {
   try pipe.writeEnd.writeAll(text.utf8)
 }
 
 /// Describes the read end of `pipe` for poll(2).
 ///
-/// The raw descriptor outlives the closure that produced it,
-/// and stays valid only while `pipe` is alive.
-func pollDescriptor(forReadEndOf pipe: borrowing OwnedPipe) -> pollfd {
+/// The raw descriptor in the result stays valid only while `pipe` is alive.
+func pollDescriptor(forReadEndOf pipe: borrowing OwnedFD.Pipe) -> pollfd {
   // poll(2) takes raw descriptors, and System doesn't wrap it.
-  pipe.readEnd.withDescriptor {
-    pollfd(fd: $0.rawValue, events: Int16(POLLIN), revents: 0)
-  }
+  pollfd(fd: pipe.readEnd.fileDescriptor.rawValue, events: Int16(POLLIN), revents: 0)
 }
 
 /// Reads whatever is available from the read end of `pipe`,
 /// up to 1 KiB, as UTF-8 text.
-func readAvailable(from pipe: borrowing OwnedPipe) throws(Errno) -> String {
+func readAvailable(from pipe: borrowing OwnedFD.Pipe) throws(Errno) -> String {
   let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 1024, alignment: 1)
   defer { buffer.deallocate() }
   let count = try pipe.readEnd.read(into: buffer)

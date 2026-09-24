@@ -27,8 +27,8 @@ struct OwnedCopy: ParsableCommand {
   func run() throws {
     let input = try OwnedFD.open(FilePath(source), .readOnly)
 
-    // OwnedFD doesn't forward `stat()`.
-    let permissions = try input.withDescriptor { try $0.stat() }.permissions
+    // OwnedFD doesn't forward `stat()`; its file descriptor has it.
+    let permissions = try input.fileDescriptor.stat().permissions
 
     let output = try OwnedFD.open(
       FilePath(destination), .writeOnly,
