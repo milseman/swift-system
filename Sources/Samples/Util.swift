@@ -29,6 +29,22 @@ internal func disableBuffering() {
   setbuf(stderr, nil)
 }
 
+/// Prints rows of cells in left-aligned columns, indented.
+internal func printTable(_ rows: [[String]]) {
+  let columns = rows.map(\.count).max() ?? 0
+  let widths = (0..<columns).map { column in
+    rows.map { column < $0.count ? $0[column].count : 0 }.max()! + 2
+  }
+  for row in rows {
+    var line = "  "
+    for (column, text) in row.enumerated() {
+      let isLast = column == row.count - 1
+      line += isLast ? text : text + String(repeating: " ", count: widths[column] - text.count)
+    }
+    print(line)
+  }
+}
+
 internal func complain(_ message: String) {
   var message = message + "\n"
   message.withUTF8 { buffer in
