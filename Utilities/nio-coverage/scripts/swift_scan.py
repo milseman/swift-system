@@ -686,6 +686,9 @@ def scan_file(path, rel):
             continue
         if prev is not None and prev.text in ("break", "continue") and prev.line == t.line:
             continue
+        # An accessor: `_modify {`, `set(newValue) {`.
+        if name in ACCESSOR_KW and qualifier is None and nxt is not None and nxt.text in ("{", "("):
+            continue
         if prev is not None and prev.kind == "id" and prev.text in DECL_KW and qualifier is None \
                 and not (prev.text == "case" and scope_at[i].kind != "type"):
             continue
