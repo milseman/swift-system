@@ -32,18 +32,19 @@ import Android
 @Suite("Terminal Descriptor")
 private struct TerminalDescriptorTests {
 
-  // glibc declares posix_openpt(3) and friends only under _XOPEN_SOURCE,
-  // which Swift's Glibc module doesn't define.
-  #if !(os(Linux) && canImport(Glibc))
   @available(System 199, *)
   @Test func checkedConversionFromTerminal() throws {
-    try withPseudoterminal { terminal in
+    try withPseudoterminal { controller, terminal in
       let converted = try TerminalDescriptor(terminal)
       #expect(converted.fileDescriptor == terminal)
       #expect(converted == TerminalDescriptor(unchecked: terminal))
+      #expect(terminal.isTerminal)
+      #expect(terminal.asTerminal == converted)
+
+      // The controller is a terminal too.
+      #expect(try TerminalDescriptor(controller).fileDescriptor == controller)
     }
   }
-  #endif
 
   @available(System 199, *)
   @Test func checkedConversionFromNonTerminal() throws {
@@ -97,24 +98,5 @@ private struct TerminalDescriptorTests {
     #expect((fcntl(STDIN_FILENO, F_GETFD) != -1) == isOpen)
   }
 }
-
-#if !(os(Linux) && canImport(Glibc))
-/// Opens a pseudoterminal and calls `body` with its terminal end.
-private func withPseudoterminal(_ body: (FileDescriptor) throws -> Void) throws {
-  let controller = FileDescriptor(rawValue: posix_openpt(O_RDWR | O_NOCTTY))
-  guard controller.rawValue != -1 else { throw Errno(rawValue: errno) }
-  defer { try? controller.close() }
-
-  guard grantpt(controller.rawValue) == 0,
-        unlockpt(controller.rawValue) == 0,
-        let path = ptsname(controller.rawValue)
-  else { throw Errno(rawValue: errno) }
-
-  let terminal = try FileDescriptor.open(
-    path, .readWrite, options: FileDescriptor.OpenOptions(rawValue: O_NOCTTY))
-  defer { try? terminal.close() }
-  try body(terminal)
-}
-#endif
 
 #endif

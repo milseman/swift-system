@@ -29,6 +29,15 @@
 /// let terminal = TerminalDescriptor(unchecked: .standardInput)
 /// ```
 ///
+/// A process in the background can't change its controlling terminal
+/// without the system sending its process group `SIGTTOU`,
+/// which stops the process by default.
+/// Once the process continues, the call can throw ``Errno/interrupted``,
+/// so the methods that change a terminal retry by default,
+/// as `retryOnInterrupt` describes.
+/// A process that ignores or blocks `SIGTTOU` makes the change
+/// without the signal.
+///
 /// - Note: Only available on Unix-like platforms.
 @frozen
 @available(System 199, *)
