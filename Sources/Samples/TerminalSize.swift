@@ -85,35 +85,40 @@ struct TerminalSize: ParsableCommand {
       print("  - Formatting output to fit the terminal")
       print("  - Creating full-screen terminal UIs")
       print("  - Responsive command-line applications")
-    } else {
+    } else if !border {
       print("\(size.columns)x\(size.rows)")
     }
 
     if border {
-      print()
-      drawBorder(width: Int(size.columns), height: Int(size.rows))
+      // Leave the last row for the shell prompt, so the whole border stays
+      // on screen.
+      let width = Int(size.columns)
+      let height = Int(size.rows) - 1
+      // A terminal whose size was never set, such as a new pseudo-terminal,
+      // reports 0x0.
+      guard width >= 2, height >= 2 else {
+        complain("Error: a \(size.columns)x\(size.rows) terminal is too small for a border")
+        throw ExitCode.failure
+      }
+      drawBorder(width: width, height: height, label: "\(size.columns)x\(size.rows)")
     }
   }
 
-  private func drawBorder(width: Int, height: Int) {
-    // Top border
-    print("┌" + String(repeating: "─", count: width - 2) + "┐")
-
-    // Middle rows
-    for row in 2..<height {
-      if row == height / 2 {
-        // Center text
-        let text = "\(width)x\(height)"
-        let leftPad = (width - 2 - text.count) / 2
-        let rightPad = width - 2 - text.count - leftPad
-        print("│" + String(repeating: " ", count: leftPad) + text + String(repeating: " ", count: rightPad) + "│")
+  /// Draws a box `width` columns by `height` rows,
+  /// with `label` in the middle if it fits.
+  private func drawBorder(width: Int, height: Int, label: String) {
+    let inner = width - 2
+    print("┌" + String(repeating: "─", count: inner) + "┐")
+    for row in 1..<height - 1 {
+      if row == (height - 1) / 2 && label.count <= inner {
+        let leftPad = (inner - label.count) / 2
+        let rightPad = inner - label.count - leftPad
+        print("│" + String(repeating: " ", count: leftPad) + label + String(repeating: " ", count: rightPad) + "│")
       } else {
-        print("│" + String(repeating: " ", count: width - 2) + "│")
+        print("│" + String(repeating: " ", count: inner) + "│")
       }
     }
-
-    // Bottom border
-    print("└" + String(repeating: "─", count: width - 2) + "┘")
+    print("└" + String(repeating: "─", count: inner) + "┘")
   }
 }
 
