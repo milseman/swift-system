@@ -18,8 +18,9 @@ and three `duplicate` overloads.
 | tree | instance members | to forward |
 |---|---|---|
 | `main` (1b452c2) | 14 | 10 |
-| `system-next` (this branch) | 43 | 38 |
-| `syscalls-3` (pending `lock(_:byteRange:)`, `unlock(byteRange:)`) | 47 | 42 |
+| `system-next` at c5781b2, when this was measured | 43 | 38 |
+| `syscalls-3` then (pending `lock(_:byteRange:)`, `unlock(byteRange:)`) | 47 | 42 |
+| `ownership` after merging `syscalls-3` and `demos` (0229e0f) | 63 | 58 |
 
 Other kinds of API forwarding can't reach:
 
@@ -40,7 +41,7 @@ Other kinds of API forwarding can't reach:
   streams, `writeAll` (3), and `duplicate` (3). None of the three uses `seek`,
   `pipe()`, `stat`, `setPermissions`, or `open(_:relativeTo:)`.
 
-The full inventory, as `forwarding.py inventory` prints it on this branch:
+The full inventory, as `forwarding.py inventory` printed it at c5781b2:
 
 | kind | member | availability | platforms (#if) | declared at | ownership |
 |---|---|---|---|---|---|
@@ -142,7 +143,9 @@ four fixes to compile:
    `_foo(...).get()` call, as the hand-written forwards do. That couples it
    to the internal layering.
 
-With those fixes, the copy builds and its 26 OwnedFD tests pass. The
+With those fixes, the copy builds and its 26 OwnedFD tests pass. After the
+merge of `syscalls-3` and `demos`, the generator needed no further fixes for
+the 20 new members: 661 lines for 58 members, and the copy still builds. The
 generated forwards carry no documentation, only "Forwards to
 `FileDescriptor.x`". They add 23,708 bytes (1.6%) to the debug
 `SystemPackage.swiftmodule`. They add no code: the same operations compile
@@ -204,7 +207,7 @@ Don't extend forwarding.
   descriptor too. Some form of vending has to exist, and once it does,
   forwarding more is convenience rather than coverage.
 - **Forwarding's cost grows with the API, in every lane.** The count went from
-  10 to 38 on this branch, and a lane has 4 more waiting. Each lane that adds
+  10 to 38 by c5781b2, and to 58 once the `syscalls-3` lane merged. Each lane that adds
   a `FileDescriptor` method would have to add a matching `OwnedFD` forward
   with the same `#if` and `@available`. Only the ABI-stable build catches a
   mismatch, and that build doesn't pass today. Owned socket, terminal, and
