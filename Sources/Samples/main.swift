@@ -38,6 +38,7 @@ struct SystemSamples: ParsableCommand {
       FIFO.self,
       ID.self,
       Touch.self,
+      SpanCopy.self,
     ])
 }
 
