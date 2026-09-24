@@ -139,6 +139,10 @@ def md_code(s):
     return f"`{s}`"
 
 
+def md_text(s):
+    return re.sub(r"([\\`*_\[\]<>|])", r"\\\1", s)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--delta", required=True)
@@ -274,9 +278,12 @@ def main():
     base_ref, head_ref = meta["baseRef"], meta["headRef"]
     w(f"# Public API delta: `{base_ref}` → `{head_ref}`")
     w("")
-    w(f"This covers the **SystemPackage** and **SystemSockets** modules. It compares "
-      f"`{base_ref}` @ `{meta['baseCommit'][:7]}` with `{head_ref}` @ `{meta['headCommit'][:7]}`, "
-      f"and was generated {meta['date']} on {meta['host']} with {meta['swift']}, macOS SDK {meta['sdk']}.")
+    for side, ref in (("Base", base_ref), ("Head", head_ref)):
+        subject = meta.get(side.lower() + "Subject")
+        w(f"- {side}: `{ref}` @ `{meta[side.lower() + 'Commit']}`" + (f" — {md_text(subject)}" if subject else ""))
+    w("")
+    w(f"This covers the **SystemPackage** and **SystemSockets** modules. It was generated {meta['date']} "
+      f"on {meta['host']} with {meta['swift']}, macOS SDK {meta['sdk']}.")
     w("")
     w("The primary source is the public symbol graphs of a macOS debug build of each commit. Synthesized "
       "members are left out, and so are inherited doc comments. A source scan adds the public declarations "
