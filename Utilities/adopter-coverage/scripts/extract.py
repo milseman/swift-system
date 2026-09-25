@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""List every OS and C-library interface that NIO's library targets use.
+"""List every OS and C-library interface that a package's library targets use.
 
-Inputs: the index-store dump (indexstore.py) from a macOS debug build of an
-export of NIO, and the export's sources, which swift_scan.py and c_scan.py
-scan lexically. Output: nio-interfaces.json.
+Inputs: the package's settings (packages/NAME.ini), the index-store dump
+(indexstore.py) from a macOS debug build of an export of the package, and
+the export's sources, which swift_scan.py and c_scan.py scan lexically.
+Output: interfaces.json.
 
 How a reference is found:
   - Lines the Darwin build compiled: the index store. The compiler resolved
@@ -12,16 +13,17 @@ How a reference is found:
   - Lines the Darwin build didn't compile (Linux-, Windows-, WASI-only
     code): the lexical scans. A candidate identifier counts when it is
     qualified by an OS or shim module (`Glibc.x`, `CNIOLinux.y`), named by
-    a scoped import (`import func WinSDK.z`), declared by a NIO shim, or
-    named like a Darwin SDK declaration; or, failing all of those, when
-    it's declared nowhere in NIO, the Swift libraries or NIO's dependencies
-    ("unresolved": presumed to come from the platform's C library).
+    a scoped import (`import func WinSDK.z`), declared by one of the
+    package's shims, or named like a Darwin SDK declaration; or, failing all
+    of those, when it's declared nowhere in the package, the Swift libraries
+    or the package's dependencies ("unresolved": presumed to come from the
+    platform's C library).
   - The same lexical classification also runs on the lines the Darwin build
     compiled and is compared with the index. That's the estimate of the
     lexical scan's accuracy on the lines nothing else checks.
 
-Usage: extract.py --root EXPORT --index index.json --dump dump.json
-                  --describe describe.json --out nio-interfaces.json
+Usage: extract.py --package packages/NAME.ini --root EXPORT --index index.json
+                  --dump dump.json --describe describe.json --out interfaces.json
 """
 
 import sys
@@ -38,17 +40,18 @@ import subprocess
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import c_scan  # noqa: E402
+import package  # noqa: E402
 import platforms  # noqa: E402
 import swift_scan  # noqa: E402
 
 PLATFORMS = platforms.PLATFORMS
 
-# NIO's C shim targets: C code that exists to reach the OS. Their
-# declarations are interfaces of their own, and the report says which OS
-# interfaces each one wraps. NIO's other C targets (CNIOAtomics, CNIOLLHTTP,
-# CNIOSHA1) are implementations: their own functions are NIO-internal, but
-# what they call in the C library counts.
-SHIM_TARGETS = {"CNIOLinux", "CNIODarwin", "CNIOWindows", "CNIOOpenBSD", "CNIOFreeBSD", "CNIOWASI", "CNIOPosix"}
+# The package's C shim targets (`shim-targets`): C code that exists to reach
+# the OS. Their declarations are interfaces of their own, and the report
+# says which OS interfaces each one wraps. The package's other C targets are
+# implementations: their own functions are internal, but what they call in
+# the C library counts. Set from the package file in main().
+SHIM_TARGETS = set()
 # Modules whose members are OS or C-library symbols when named with a
 # qualifier, as in `Glibc.SOCK_CLOEXEC`.
 OS_MODULES = {"Darwin", "Glibc", "Musl", "Android", "Bionic", "WinSDK", "ucrt", "WASILibc", "wasi_pthread",
@@ -86,9 +89,10 @@ def base_name(name):
     return name.split("(")[0]
 
 
-def load_targets(dump, describe):
+def load_targets(dump, describe, skip):
     """Library targets and the ones skipped, from `swift package dump-package`
-    and `describe`."""
+    and `describe`. `skip` is the package file's `skip-targets`: regular
+    targets that aren't library code, such as test support."""
     types = {t["name"]: t["type"] for t in dump["targets"]}
     defines = {}
     for t in dump["targets"]:
@@ -100,10 +104,10 @@ def load_targets(dump, describe):
         info = {"name": t["name"], "c99name": t.get("c99name", t["name"]), "path": t["path"],
                 "language": "c" if t.get("module_type") == "ClangTarget" else "swift",
                 "sources": t.get("sources", []), "defines": defines.get(t["name"], [])}
-        if kind == "regular":
+        if kind == "regular" and t["name"] not in skip:
             lib.append(info)
         else:
-            skipped[kind].append(t["name"])
+            skipped[skip.get(t["name"], "skipped") if kind == "regular" else kind].append(t["name"])
     return sorted(lib, key=lambda t: t["name"]), {k: sorted(v) for k, v in skipped.items()}
 
 
@@ -155,6 +159,12 @@ def header_of(path):
     m = re.search(r"/([^/]+)\.framework/(?:Versions/[^/]+/)?Headers/(.+)$", path or "")
     if m:
         return m.group(1) + "/" + m.group(2)
+    # Clang's own headers, which the toolchain reaches both as
+    # usr/lib/clang/<version>/include and through usr/lib/swift/clang; which
+    # path the index records depends on the build.
+    m = re.search(r"/lib/(?:swift/clang|clang/[^/]+)/include/(.+)$", path or "")
+    if m:
+        return m.group(1)
     m = re.search(r"/lib/(?:clang/[^/]+/include|swift)/([^/]+?)(\.swiftmodule|\.swiftinterface)?(/|$)", path or "")
     if m:
         return m.group(1) + (" (Swift overlay)" if m.group(2) else "")
@@ -164,12 +174,12 @@ def header_of(path):
 class Classifier:
     """Classifies a declaration by the module and file that declare it."""
 
-    def __init__(self, src_root, targets, dep_modules, all_nio_modules):
+    def __init__(self, src_root, targets, dep_modules, own_modules):
         self.src_root = src_root.rstrip("/") + "/"
         self.path_to_target = sorted(((t["path"].rstrip("/") + "/", t["c99name"]) for t in targets),
                                      key=lambda x: -len(x[0]))
         self.dep_modules = dep_modules
-        self.nio_modules = all_nio_modules
+        self.own_modules = own_modules
 
     def target_of(self, rel):
         for prefix, name in self.path_to_target:
@@ -180,7 +190,7 @@ class Classifier:
     def module_class(self, module, path):
         if path and path.startswith(self.src_root):
             t = self.target_of(os.path.normpath(path[len(self.src_root):]))
-            return ("shim" if t in SHIM_TARGETS else "nio"), t
+            return ("shim" if t in SHIM_TARGETS else "own"), t
         top = (module or "").split(".")[0]
         if top in SWIFT_LIBS:
             return "swift", top
@@ -188,8 +198,8 @@ class Classifier:
             return "foundation", top
         if top in SYSTEM_MODULES:
             return "system", top
-        if top in self.nio_modules:
-            return "nio", top
+        if top in self.own_modules:
+            return "own", top
         if top in self.dep_modules or (path and "/checkouts/" in path):
             return "dependency", top
         if not top:
@@ -199,15 +209,15 @@ class Classifier:
 
 class Lexicon:
     """What a lexical candidate is, from vocabularies of every name the index
-    store saw declared plus NIO's own declarations from the scans."""
+    store saw declared plus the package's own declarations from the scans."""
 
-    def __init__(self, index, swift_scans, c_scans, all_nio, dep_modules):
+    def __init__(self, index, swift_scans, c_scans, own, dep_modules):
         vocab = index["vocab"]
         # Library names count only when they're top-level: a member such as
         # FileDescriptor.read, or System's unavailable `Errno.EBADF` stub,
         # doesn't shadow a C function. OS names are every C declaration plus
         # top-level Swift overlay declarations.
-        self.os_vocab, self.lib_vocab, self.lib_vocab_all, self.nio_vocab = {}, set(), set(), set()
+        self.os_vocab, self.lib_vocab, self.lib_vocab_all, self.own_vocab = {}, set(), set(), set()
         self.os_c_vocab = set()   # C declarations only: what C code can name
         for module, names in vocab.items():
             top = module.split(".")[0]
@@ -216,8 +226,8 @@ class Lexicon:
                     self.lib_vocab_all.add(n)
                     if kinds & TOP_LEVEL_KINDS:
                         self.lib_vocab.add(n)
-            elif top in all_nio or top == "":
-                self.nio_vocab.update(names)
+            elif top in own or top == "":
+                self.own_vocab.update(names)
             else:
                 for n, (kinds, langs) in names.items():
                     # C declarations other than fields (a field can't be
@@ -229,16 +239,17 @@ class Lexicon:
                         self.os_vocab[n] = ((prev[0] if prev else 0) | kinds, prev[1] if prev else module)
                     if langs & 1 and kinds & ~FIELD_KINDS:
                         self.os_c_vocab.add(n)
-        # NIO's own top-level names, with the platforms that compile them: a
-        # Windows-only `typealias socklen_t` doesn't shadow Glibc's.
-        self.nio_top = {}
+        # The package's own top-level names, with the platforms that compile
+        # them: a Windows-only `typealias socklen_t` doesn't shadow Glibc's.
+        self.own_top = {}
         for sc in swift_scans.values():
             for name, line in sc["topLevel"]:
-                ent = self.nio_top.setdefault(name, {"platforms": set(), "built": False})
+                ent = self.own_top.setdefault(name, {"platforms": set(), "built": False})
                 ent["platforms"].update((sc["states"][line - 1] or {}).keys())
                 ent["built"] = ent["built"] or sc["build"][line - 1]
-        # Names NIO declares at top level anywhere, whatever the platform.
-        self.nio_top_any = set(self.nio_top)
+        # Names the package declares at top level anywhere, whatever the
+        # platform.
+        self.own_top_any = set(self.own_top)
         self.shim_decls = {}
         self.shim_kinds = {}
         self.target_decls = collections.defaultdict(set)
@@ -250,7 +261,7 @@ class Lexicon:
                     self.shim_kinds.setdefault(n, k)
             self.target_decls[sc["target"]].update(sc["declared"])
             self.target_decls[sc["target"]].update(sc["localDeclared"])
-        self.module_names = set(vocab) | {m.split(".")[0] for m in vocab} | all_nio | OS_MODULES | SWIFT_LIBS \
+        self.module_names = set(vocab) | {m.split(".")[0] for m in vocab} | own | OS_MODULES | SWIFT_LIBS \
             | FOUNDATION | SYSTEM_MODULES | dep_modules
 
     def swift(self, c, scan, built, use_os_vocab=True):
@@ -269,7 +280,7 @@ class Lexicon:
         if name in self.shim_decls:
             return name, "lexical-shim", None, ()
         shadowed = ()
-        ent = self.nio_top.get(name)
+        ent = self.own_top.get(name)
         if ent is not None:
             if built:
                 if ent["built"]:
@@ -278,10 +289,11 @@ class Lexicon:
                 site = set((scan["states"][c["line"] - 1] or {}).keys())
                 if site <= ent["platforms"]:
                     return None
-                # NIO declares the name on some of the site's platforms. A
-                # name the Darwin SDK also declares (`socklen_t`) is the OS's
-                # on the others; any other name is NIO's own, used under
-                # looser conditions than it's declared under.
+                # The package declares the name on some of the site's
+                # platforms. A name the Darwin SDK also declares
+                # (`socklen_t`) is the OS's on the others; any other name is
+                # the package's own, used under looser conditions than it's
+                # declared under.
                 if name not in self.os_vocab:
                     return None
                 shadowed = tuple(sorted(site & ent["platforms"]))
@@ -289,11 +301,11 @@ class Lexicon:
             return None
         if use_os_vocab and name in self.os_vocab:
             return name, "lexical-darwin-name", None, shadowed
-        # A member (of a NIO type, or one NIO inherits from a library) can be
-        # named unqualified only inside a type.
-        if c["types"] and (name in self.nio_vocab or name in self.lib_vocab_all):
+        # A member (of the package's type, or one it inherits from a library)
+        # can be named unqualified only inside a type.
+        if c["types"] and (name in self.own_vocab or name in self.lib_vocab_all):
             return None
-        if name in self.nio_top_any:
+        if name in self.own_top_any:
             return None
         return name, "lexical-unresolved", None, shadowed
 
@@ -378,8 +390,68 @@ class Collector:
         return True
 
 
+def nested_packages(root):
+    """Directories under the export's root that hold packages of their own
+    (a Package.swift below the top level), by top-level directory, with how
+    many there are: `Benchmarks/`, `Fixtures/`, ..."""
+    out = collections.Counter()
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if not d.startswith(".")]
+        if dirpath != root and "Package.swift" in filenames:
+            out[os.path.relpath(dirpath, root).split(os.sep)[0] + "/"] += 1
+    return dict(sorted(out.items()))
+
+
+def system_dependency(dump, root):
+    """How the manifest asks for swift-system, and what the build resolved
+    (from the Package.resolved the build wrote), or None."""
+    for dep in dump.get("dependencies", []):
+        for kind, specs in dep.items():
+            for spec in specs or []:
+                if spec.get("identity") != "swift-system":
+                    continue
+                out = {"kind": kind, "url": None, "path": None, "requirement": None, "resolved": None}
+                loc = spec.get("location") or {}
+                if loc.get("remote"):
+                    out["url"] = loc["remote"][0].get("urlString")
+                if loc.get("local"):
+                    out["path"] = loc["local"][0]
+                if spec.get("path"):
+                    out["path"] = spec["path"]
+                req = spec.get("requirement") or {}
+                if req.get("range"):
+                    lo, hi = req["range"][0]["lowerBound"], req["range"][0]["upperBound"]
+                    nxt = f"{int(lo.split('.')[0]) + 1}.0.0"
+                    out["requirement"] = f"from: {lo}" if hi == nxt else f"{lo}..<{hi}"
+                for k in ("exact", "revision", "branch"):
+                    if req.get(k):
+                        out["requirement"] = f"{k}: {req[k][0]}"
+                try:
+                    pins = json.load(open(os.path.join(root, "Package.resolved"))).get("pins", [])
+                except (OSError, ValueError):
+                    pins = []
+                for pin in pins:
+                    if pin.get("identity") == "swift-system":
+                        st = pin.get("state", {})
+                        out["resolved"] = st.get("version") or st.get("branch") or st.get("revision")
+                return out
+    return None
+
+
+def dependency_packages(units):
+    """Module -> dependency package, from the index units whose main file is
+    in a checkout of the build (`.../checkouts/swift-atomics/...`)."""
+    out = {}
+    for u in units:
+        m = re.search(r"/checkouts/([^/]+)/", u.get("mainFile") or "")
+        if m and u["module"]:
+            out.setdefault(u["module"].split(".")[0], m.group(1))
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument("--package", required=True)
     ap.add_argument("--root", required=True)
     ap.add_argument("--index", required=True)
     ap.add_argument("--dump", required=True)
@@ -387,14 +459,18 @@ def main():
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
 
+    pkg = package.load(args.package)
+    SHIM_TARGETS.update(pkg["shim-targets"])
     root = os.path.realpath(args.root)
     index = json.load(open(args.index))
     describe = json.load(open(args.describe))
-    targets, skipped = load_targets(json.load(open(args.dump)), describe)
-    all_nio = {t["c99name"] for t in describe["targets"]}
+    targets, skipped = load_targets(json.load(open(args.dump)), describe,
+                                    {t: pkg["skipReasons"].get(t, "skipped") for t in pkg["skip-targets"]})
+    own = {t["c99name"] for t in describe["targets"]}
     lib_names = {t["c99name"] for t in targets}
-    dep_modules = {u["module"].split(".")[0] for u in index["units"] if u["module"]} - all_nio - SYSTEM_MODULES
-    cls = Classifier(root, targets, dep_modules, all_nio)
+    dep_modules = {u["module"].split(".")[0] for u in index["units"] if u["module"]} - own - SYSTEM_MODULES
+    dep_packages = dependency_packages(index["units"])
+    cls = Classifier(root, targets, dep_modules, own)
 
     # ------------------------------------------------------------ scans
     swift_scans, c_scans = {}, {}
@@ -414,9 +490,12 @@ def main():
                 c_scans[rel]["target"] = t["c99name"]
     swift_scan.resolve_member_filter(list(swift_scans.values()))
 
-    # A target that reaches `#error` on a platform doesn't build there.
+    # A target that reaches `#error` on a platform doesn't build there, and
+    # none builds on a platform the package doesn't support (`platforms`).
     unsupported = collections.defaultdict(set)
     error_sites = collections.defaultdict(list)
+    for t in lib_names:
+        unsupported[t].update(p for p in PLATFORMS if p not in pkg["platforms"])
     for rel, sc in swift_scans.items():
         for idx, st in sc["errors"]:
             for p, (v, _m) in st.items():
@@ -424,7 +503,7 @@ def main():
                     unsupported[sc["target"]].add(p)
                     error_sites[sc["target"]].append(f"{rel}:{idx + 1} ({p})")
 
-    lex = Lexicon(index, swift_scans, c_scans, all_nio, dep_modules)
+    lex = Lexicon(index, swift_scans, c_scans, own, dep_modules)
     col = Collector(unsupported)
 
     # ------------------------------------------------- index references
@@ -451,7 +530,7 @@ def main():
     for sc in c_scans.values():
         target_macros[sc["target"]].update(n for n, k in sc.get("declaredKinds", {}).items() if k == "macro")
 
-    def nio_macro_on_line(rel, line):
+    def own_macro_on_line(rel, line):
         sc = c_scans.get(rel)
         if sc is None:
             return False
@@ -508,11 +587,11 @@ def main():
         mc, mod = cls.module_class(d[0], d[1])
         # A name that isn't written on the line is an implicit reference:
         # through a typealias in Swift, or from a macro's expansion in C.
-        # Keep what NIO's own macros expand to (CNIOAtomics' MAKE(type)
+        # Keep what the package's own macros expand to (CNIOAtomics' MAKE(type)
         # calls atomic_load_explicit and friends); drop what an SDK macro
         # expands to (IOCTL_VM_SOCKETS_GET_LOCAL_CID's IOC_OUT).
         if not literal(f, line, c_usr_parts(usr)[1] or base_name(name)) and not literal(f, line, base_name(name)):
-            if f in swift_scans or not nio_macro_on_line(f, line):
+            if f in swift_scans or not own_macro_on_line(f, line):
                 excluded["implicit" if f in swift_scans else "SDK macro expansion"] += 1
                 continue
         if mc == "shim" and mod == target:
@@ -552,10 +631,10 @@ def main():
             excluded["SDK macro expansion"] += 1
             continue
         func = enclosing_func(swift_scans[f], line) if f in swift_scans else None
-        # Where NIO declares the same top-level name (NIOFS's Windows
-        # stand-ins for fchmod and friends), the site means NIO's.
+        # Where the package declares the same top-level name (NIOFS's
+        # Windows stand-ins for fchmod and friends), the site means its own.
         shadow = ()
-        ent = lex.nio_top.get(key) if f in swift_scans and not member else None
+        ent = lex.own_top.get(key) if f in swift_scans and not member else None
         if ent is not None:
             shadow = tuple(sorted(ent["platforms"]))
         ok = col.add(key, kname, scan, f, line, "index", called, member=member,
@@ -701,7 +780,7 @@ def main():
     # Captures: NIO reaches most syscalls through file-scope function
     # values (`private let sysRead = read`), which its wrappers then call
     # (`sysRead(fd, ...)`). Record which interfaces each wrapper reaches
-    # that way, for the gap estimate.
+    # that way, for the gap estimate. Any package can do this.
     function_like = {k for k, it in col.interfaces.items()
                      if "function" in it["kinds"] or ("macro" in it["kinds"] and any(x["called"] for x in it["sites"]))}
     sites_by_line = collections.defaultdict(dict)   # (file, line) -> {interface: platforms}
@@ -741,13 +820,22 @@ def main():
                                                     "end": d.get("end", d["start"])} for d in sc.get("defs", [])],
                       "captureCalls": capture_calls.get(rel, [])}
 
+    # A target the package doesn't support on a platform isn't news; the
+    # report lists only the ones that reach `#error`.
+    not_supported = set(PLATFORMS) - set(pkg["platforms"])
     out = {
-        "nioRoot": root,
+        "package": pkg,
+        "root": root,
         "platforms": PLATFORMS,
+        "packagePlatforms": pkg["platforms"],
+        "nestedPackages": nested_packages(root),
+        "systemDependency": system_dependency(json.load(open(args.dump)), root),
+        "dependencyPackages": {m: p for m, p in sorted(dep_packages.items()) if m in dep_modules},
         "libraryTargets": [t["name"] for t in targets],
         "shimTargets": sorted(SHIM_TARGETS & lib_names),
         "skippedTargets": skipped,
-        "unsupportedPlatforms": {t: sorted(v) for t, v in sorted(unsupported.items())},
+        "unsupportedPlatforms": {t: sorted(v - not_supported) for t, v in sorted(unsupported.items())
+                                 if v - not_supported},
         "unsupportedBecause": {t: v for t, v in sorted(error_sites.items())},
         "interfaces": out_interfaces,
         "alreadySystem": [{"module": m, "symbol": k, "sites": v} for (m, k), v in sorted(already_system.items())],
