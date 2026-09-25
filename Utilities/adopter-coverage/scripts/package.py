@@ -24,6 +24,8 @@ PLATFORMS = ["Darwin", "Linux", "Musl", "Android", "FreeBSD", "OpenBSD", "WASI",
 
 LIST_KEYS = {"shim-targets", "skip-targets", "build-targets", "build-flags", "unset-env", "platforms",
              "false-flags", "wrapper-files", "twin-targets", "through"}
+# Lists of paths, which can hold spaces: one per line.
+LINE_KEYS = {"wrapper-files"}
 KEYS = LIST_KEYS | {"title", "name", "variable", "checkout", "in-all", "build-hint", "swift-exec-note"}
 
 
@@ -48,7 +50,10 @@ def load(path):
             continue
         if k not in KEYS:
             raise SystemExit(f"{path}: unknown key {k!r}")
-        pkg[k] = v.split() if k in LIST_KEYS else " ".join(v.split())
+        if k in LINE_KEYS:
+            pkg[k] = [line.strip() for line in v.split("\n") if line.strip()]
+        else:
+            pkg[k] = v.split() if k in LIST_KEYS else " ".join(v.split())
     for k in LIST_KEYS:
         pkg.setdefault(k, [])
     pkg.setdefault("title", key)

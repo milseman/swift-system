@@ -2,7 +2,7 @@
 
 One file per adopter the tool audits, named for the package: `check.sh nio` reads `nio.ini`. Everything the tool needs to know about a package that it can't learn from the package's manifest or its build is here. What System covers is in `../mapping.ini`, which all packages share.
 
-Each file has one section, `[package]`. Lists are separated by whitespace.
+Each file has one section, `[package]`. Lists are separated by whitespace, except `wrapper-files`, which takes one glob per line.
 
 | Key | | |
 |---|---|---|
@@ -18,5 +18,5 @@ Each file has one section, `[package]`. Lists are separated by whitespace.
 | `build-flags` | | Extra arguments for `swift build` and `swift package`. |
 | `unset-env` | | Environment variables to unset for the build, such as switches the manifest reads. |
 | `build-hint` | | What to print when the build fails, such as which compiler the package needs. |
-| `wrapper-files` | | The package's syscall layer: globs of files whose functions exist only to reach the OS. The gap estimate counts the thin wrapper functions in them. |
+| `wrapper-files` | | The package's syscall layer: files whose functions exist only to reach the OS, one glob per line. The gap estimate counts the thin wrapper functions in them. |
 | `twin-targets` | | Targets that are copies of each other, whose code the gap estimate counts twice; the report says so. |
