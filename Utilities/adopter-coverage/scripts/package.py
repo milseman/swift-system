@@ -9,6 +9,10 @@ through `package.py shell`, and the other scripts import `load`.
 
 Usage: package.py shell PACKAGES_DIR NAME   shell assignments, for eval
        package.py list PACKAGES_DIR         the packages `all` runs
+       package.py roots PACKAGES_DIR NAME DUMP.json
+                                            the library targets no other
+                                            library target depends on, for
+                                            `build-targets = :libraries`
 """
 
 import sys
@@ -68,8 +72,27 @@ def load(path):
     return pkg
 
 
+def library_roots(pkg, dump):
+    """The package's library targets (regular ones it doesn't skip) that no
+    other library target depends on: building them builds every library
+    target, and no executable."""
+    libs = {t["name"]: t for t in dump["targets"] if t["type"] == "regular" and t["name"] not in pkg["skip-targets"]}
+    used = set()
+    for t in libs.values():
+        for d in t.get("dependencies", []):
+            for kind in ("byName", "target"):
+                if kind in d and d[kind] and d[kind][0] in libs:
+                    used.add(d[kind][0])
+    return sorted(set(libs) - used)
+
+
 def main():
     cmd, packages = sys.argv[1], sys.argv[2]
+    if cmd == "roots":
+        import json
+        pkg = load(os.path.join(packages, sys.argv[3] + ".ini"))
+        print("\n".join(library_roots(pkg, json.load(open(sys.argv[4])))))
+        return
     if cmd == "list":
         for f in sorted(os.listdir(packages)):
             if f.endswith(".ini") and load(os.path.join(packages, f))["in-all"] == "yes":

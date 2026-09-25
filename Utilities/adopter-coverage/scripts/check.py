@@ -41,6 +41,9 @@ CATEGORIES = [
     "dynamic loading", "system info", "errno & errors", "dispatch", "strings/ctype/libm/stdio",
     "atomics", "C language", "compiler intrinsics",
 ]
+# Platforms an `@available(<name>, unavailable)` takes away.
+UNAVAILABLE_PLATFORMS = {"macOS": ["Darwin"], "Windows": ["Windows"], "Linux": ["Linux", "Musl"],
+                         "Android": ["Android"], "WASI": ["WASI"], "FreeBSD": ["FreeBSD"], "OpenBSD": ["OpenBSD"]}
 # A function too long to be a thin wrapper counts only its call-site lines.
 THIN_WRAPPER_LINES = 40
 
@@ -105,13 +108,19 @@ class SystemAPI:
             scope = ".".join(d["scopes"])
             kw = d["kw"].rstrip("?!")
             base = d["name"].split("(")[0].rstrip("?!")
+            # `@available(*, unavailable)` (a renamed stub) can't be cited;
+            # `@available(Windows, unavailable)` only takes Windows away.
+            unavail = d.get("unavailable") or []
+            gone = {p for a in unavail for name, plats in UNAVAILABLE_PLATFORMS.items()
+                    if re.search(rf"\(\s*{name}\s*,\s*unavailable", a) for p in plats}
             entry = {
                 "scope": scope, "name": d["name"], "module": d["module"], "file": d["file"], "line": d["line"],
                 "declaration": normalize_decl(d["signature"], kw if kw in ("var", "let", "case") else None),
-                "platforms": [p.lstrip("?") for p in d["platforms"]],
+                "platforms": [p.lstrip("?") for p in d["platforms"] if p.lstrip("?") not in gone],
                 "uncertainPlatforms": [p[1:] for p in d["platforms"] if p.startswith("?")],
                 "availability": availability(d["availability"] + d.get("scopeAvailability", [])),
-                "unavailable": bool(d.get("unavailable")),
+                "unavailable": any(re.search(r"\(\s*\*\s*,\s*unavailable", a) for a in unavail),
+                "unavailableOn": sorted(gone),
             }
             self.by_key[(scope, entry["declaration"])].append(entry)
             self.by_name[(scope, base)].append(entry)
@@ -454,9 +463,11 @@ def main():
         "summary": summary,
         "gaps": gaps,
         "alreadySystem": already,
+        "directLines": len({(x["file"], x["line"]) for i in ext["interfaces"] for x in i["sites"]}),
         "extraction": {k: ext[k] for k in ("libraryTargets", "shimTargets", "skippedTargets", "unsupportedPlatforms",
                                            "unsupportedBecause", "excludedReferences", "crosscheck", "warnings",
-                                           "nestedPackages", "dependencyPackages", "systemDependency")},
+                                           "nestedPackages", "dependencyPackages", "systemDependency",
+                                           "dependencies", "model")},
     }
     json.dump(out, open(args.out, "w"), indent=1)
     failed = any(problems[k] for k in ("malformed", "unmapped", "duplicate", "apiMissing", "alreadySystemMissing"))

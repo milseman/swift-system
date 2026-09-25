@@ -14,7 +14,7 @@ Each file has one section, `[package]`. Lists are separated by whitespace, excep
 | `shim-targets` | | C targets that exist to reach the OS. Their declarations are interfaces of their own, and the gap estimate counts their definitions. The package's other C targets are implementations: what they call in the C library counts, but their own functions don't. |
 | `skip-targets` | | Regular targets that aren't library code, such as test support. `skip.<Target> = reason` skips one and says why. Test, executable, plugin, macro and snippet targets are always skipped; the report lists every skipped target. |
 | `platforms` | | The platforms the package supports, of Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI and Windows. Defaults to all of them. Code on the others doesn't count. |
-| `build-targets` | | Build only these targets, one `swift build --target` each, instead of everything `swift build` builds. |
+| `build-targets` | | Build only these targets, one `swift build --target` each, instead of everything `swift build` builds. `:libraries` means the library targets no other library target depends on: every library target, and no executable. |
 | `build-flags` | | Extra arguments for `swift build` and `swift package`. |
 | `unset-env` | | Environment variables to unset for the build, such as switches the manifest reads. |
 | `build-hint` | | What to print when the build fails, such as which compiler the package needs. |

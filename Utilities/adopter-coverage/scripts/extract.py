@@ -40,6 +40,7 @@ import subprocess
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import c_scan  # noqa: E402
+import deps  # noqa: E402
 import package  # noqa: E402
 import platforms  # noqa: E402
 import swift_scan  # noqa: E402
@@ -207,7 +208,10 @@ def c_usr_parts(usr):
 
 
 def demangle(usrs):
-    """Simplified demangled names for Swift USRs, via swift-demangle."""
+    """Simplified demangled names for Swift USRs, via swift-demangle. A
+    global operator's gets the type of its first operand as its scope, which
+    the simplified form drops: Dispatch's `+ infix(_:_:)` on DispatchTime
+    becomes `Dispatch.DispatchTime.+ infix(_:_:)`, a member of DispatchTime."""
     usrs = sorted(usrs)
     if not usrs:
         return {}
@@ -216,7 +220,16 @@ def demangle(usrs):
                              input="\n".join("$s" + u[2:] for u in usrs)).stdout.split("\n")
     except OSError:
         return {}
-    return dict(zip(usrs, out))
+    names = dict(zip(usrs, out))
+    ops = [u for u, d in names.items() if re.match(r"^[^\w(\s]", d or "")]
+    if ops:
+        full = subprocess.run(["xcrun", "swift-demangle"], capture_output=True, text=True,
+                              input="\n".join("$s" + u[2:] for u in ops)).stdout.split("\n")
+        for u, d in zip(ops, full):
+            m = re.search(r"\(([A-Za-z_][\w.]*)(?:, |\))", d)
+            if m:
+                names[u] = m.group(1) + "." + names[u]
+    return names
 
 
 def swift_symbol_key(demangled, fallback):
@@ -285,6 +298,10 @@ class Classifier:
         if top in self.dep_modules or (path and "/checkouts/" in path):
             return "dependency", top
         if not top:
+            # A header the index saw only through a textual include has no
+            # module; in an SDK it's still the OS's.
+            if path and ".sdk/" in path:
+                return "os", header_of(path)
             return "unknown", top
         return "os", top
 
@@ -295,6 +312,28 @@ class Lexicon:
 
     def __init__(self, index, swift_scans, c_scans, own, dep_modules):
         vocab = index["vocab"]
+        # Names in module-less records (headers read textually, which an
+        # index read before indexstore.py named them by place has as ""):
+        # where the package's code references one, its declaration's path
+        # says whether it's the SDK's, a dependency's or the package's.
+        by_place = {}
+        for usr, d in index["decls"].items():
+            if not d[0] and usr.startswith("c:") and d[1]:
+                n = c_usr_parts(usr)[1]
+                if n and ".sdk/" in d[1]:
+                    by_place.setdefault(n, "<sdk>")
+                elif n and "/checkouts/" in d[1]:
+                    by_place.setdefault(n, "<dependency>/" + d[1].split("/checkouts/")[1].split("/")[0])
+        if "" in vocab:
+            vocab = dict(vocab)
+            rest = {}
+            for n, v in vocab[""].items():
+                place = by_place.get(n)
+                if place:
+                    vocab.setdefault(place, {})[n] = v
+                else:
+                    rest[n] = v
+            vocab[""] = rest
         # Library names count only when they're top-level: a member such as
         # FileDescriptor.read, or System's unavailable `Errno.EBADF` stub,
         # doesn't shadow a C function. OS names are every C declaration plus
@@ -303,11 +342,20 @@ class Lexicon:
         self.os_c_vocab = set()   # C declarations only: what C code can name
         for module, names in vocab.items():
             top = module.split(".")[0]
+            if top.startswith("<dependency>/"):
+                top = next(iter(dep_modules), top)    # a dependency's header, read textually
+            elif top == "<sdk>":
+                top = "Darwin"                        # an SDK header, read textually
             if top in SWIFT_LIBS or top in FOUNDATION or top in dep_modules or top in SYSTEM_MODULES:
                 for n, (kinds, _langs) in names.items():
-                    self.lib_vocab_all.add(n)
-                    if kinds & TOP_LEVEL_KINDS:
-                        self.lib_vocab.add(n)
+                    # Foundation's Objective-C classes are named in Swift
+                    # without their prefix: NSURLSessionTask is
+                    # URLSessionTask.
+                    aliases = [n, n[2:]] if top in FOUNDATION and re.match(r"^NS[A-Z]", n) else [n]
+                    for a in aliases:
+                        self.lib_vocab_all.add(a)
+                        if kinds & TOP_LEVEL_KINDS:
+                            self.lib_vocab.add(a)
             elif top in own or top == "":
                 self.own_vocab.update(names)
             else:
@@ -345,6 +393,26 @@ class Lexicon:
             self.target_decls[sc["target"]].update(sc["localDeclared"])
         # OS types, which an extension can extend.
         self.os_types = {n for n, (kinds, _m) in self.os_vocab.items() if kinds & TYPE_KINDS}
+        # OS names that are Swift declarations or types, which can take
+        # labels: `timespec(tv_sec:tv_nsec:)`, `dispatchPrecondition(condition:)`.
+        self.os_swift_or_types = set()
+        for module, names in vocab.items():
+            top = module.split(".")[0]
+            if top in own or top in SWIFT_LIBS or top in FOUNDATION or top in dep_modules or top in SYSTEM_MODULES:
+                continue
+            self.os_swift_or_types.update(n for n, (kinds, langs) in names.items() if langs & 2 or kinds & TYPE_KINDS)
+        # Types the package's dependencies declare, and what else each of
+        # their modules declares: inside `extension TerminalController`, TSC's
+        # `write` is the class's, not Darwin's.
+        self.dep_type_modules = collections.defaultdict(set)
+        self.module_vocab = {}
+        for module, names in vocab.items():
+            top = module.split(".")[0]
+            if top in dep_modules:
+                self.module_vocab[module] = names
+                for n, (kinds, _langs) in names.items():
+                    if kinds & TYPE_KINDS:
+                        self.dep_type_modules[n].add(module)
         self.module_names = set(vocab) | {m.split(".")[0] for m in vocab} | own | OS_MODULES | SWIFT_LIBS \
             | FOUNDATION | SYSTEM_MODULES | dep_modules
 
@@ -352,6 +420,8 @@ class Lexicon:
         """(key, evidence, via, platforms to leave out, member) or None."""
         name, q = c["name"], c["qualifier"]
         if q is not None:
+            if c.get("qualifierBound"):
+                return None
             if q in OS_MODULES:
                 return name, "lexical-qualified", q, (), None
             if q in SHIM_TARGETS:
@@ -383,6 +453,14 @@ class Lexicon:
                 shadowed = tuple(sorted(site & ent["platforms"]))
         if name in self.lib_vocab:
             return None
+        if c["types"] and any(name in self.module_vocab.get(m, ()) for m in self.dep_type_modules.get(c["types"][0], ())):
+            return None
+        # A C function takes no argument labels and no trailing closure, so
+        # `index(i, offsetBy: 1)` or `filter { ... }` is some Swift member,
+        # not index(3) or ncurses' filter().
+        if (c.get("labeled") or c.get("trailingClosure")) and name in self.os_c_vocab \
+                and name not in self.os_swift_or_types:
+            return None
         if use_os_vocab and name in self.os_vocab:
             return name, "lexical-darwin-name", None, shadowed, None
         # A member (of the package's type, or one it inherits from a library)
@@ -397,6 +475,11 @@ class Lexicon:
         if use_os_vocab and c["types"] and c["types"][0] in self.os_types \
                 and c["types"][0] not in self.own_top_any:
             return c["types"][0], "lexical-member", None, shadowed, name
+        # The standard library's underscored internals (`_fastPath`,
+        # `_typeName`) aren't all in its vocabulary; C's underscored names
+        # are `_lower_case` or `_Upper` (`_get_osfhandle`, `_O_BINARY`).
+        if re.match(r"^_[a-z]+[A-Z]\w*$", name):
+            return None
         return name, "lexical-unresolved", None, shadowed, None
 
     def c(self, c, target, use_os_vocab=True):
@@ -646,6 +729,7 @@ def main():
         return any(w in macros for w in re.findall(r"[A-Za-z_]\w*", text))
 
     index_hits = collections.defaultdict(set)          # (file, line) -> keys, for the cross-check
+    index_written = collections.defaultdict(dict)      # (file, line) -> {name written: key}
     index_hits_members = collections.defaultdict(set)  # fields and members, which the scans don't look for
     already_system = collections.defaultdict(list)
     excluded = collections.Counter()
@@ -659,8 +743,8 @@ def main():
         if scan is None:
             warnings.append(f"index reference in a file the scans don't cover: {f}:{line}")
             continue
-        if usr.startswith("c:@M@"):
-            continue   # a module name, in an import
+        if re.match(r"^c:@M@[^@]+$", usr):
+            continue   # a module name, in an import (c:@M@Mod@E@X is a declaration in one)
         called = bool(roles & ROLE_CALL)
         d = decls.get(usr)
         if d is None:
@@ -688,6 +772,8 @@ def main():
             if col.add(key, "type" if usr.startswith("s:So") else "constant", scan, f, line, "index", called,
                        member=member):
                 (index_hits_members if member else index_hits)[(f, line)].add(key)
+                if not member and base_name(name) != key:
+                    index_written[(f, line)][base_name(name)] = key
             continue
         mc, mod = cls.module_class(d[0], d[1])
         # A name that isn't written on the line is an implicit reference:
@@ -747,14 +833,24 @@ def main():
                      func=func, exclude_platforms=shadow)
         if ok:
             (index_hits_members if member else index_hits)[(f, line)].add(key)
+            # The name the source wrote, when Swift renames the C one:
+            # `CFDictionary` for CFDictionaryRef.
+            if not member and base_name(name) != key:
+                index_written[(f, line)][base_name(name)] = key
 
     # ------------------------------------------------ lexical candidates
     cross = {"swift": collections.Counter(), "c": collections.Counter()}
     misses, false_pos, un_false_pos = (collections.defaultdict(list) for _ in range(3))
 
     def compare(kind, rel, line, lex_keys, lex_unresolved):
+        # A lexical finding of the name the source wrote stands for the key
+        # the index gave it.
+        written = index_written.get((rel, line), {})
+        lex_keys = {written.get(k, k) for k in lex_keys}
+        lex_unresolved = {written.get(k, k) for k in lex_unresolved}
         all_idx = index_hits.get((rel, line), set())
-        idx = {k for k in all_idx if literal(rel, line, k)}
+        idx = {k for k in all_idx if literal(rel, line, k) or any(v == k and literal(rel, line, w)
+                                                                    for w, v in written.items())}
         cross[kind]["implicit"] += len(all_idx - idx)
         members = index_hits_members.get((rel, line), set())
         cross[kind]["index"] += len(idx)
@@ -785,6 +881,10 @@ def main():
             if sc["build"][line - 1]:
                 found = [r for r in (lex.swift(c, sc, True) for c in cs) if r]
                 keys = {r[0] for r in found if r[1] != "lexical-member"}
+                # Scoped imports, `import class Dispatch.DispatchQueue`: the
+                # same rule as on lines the Darwin build skips.
+                keys |= {nm for ln, kw, module, nm in sc["imports"] if ln == line and kw != "module" and nm
+                         and (module in OS_MODULES or module in SHIM_TARGETS)}
                 unresolved = {r[0] for r in (lex.swift(c, sc, True, use_os_vocab=False) for c in cs)
                               if r and r[1] == "lexical-unresolved"}
                 compare("swift", rel, line, keys, unresolved)
@@ -932,6 +1032,9 @@ def main():
                                                     "end": d.get("end", d["start"])} for d in sc.get("defs", [])],
                       "captureCalls": capture_calls.get(rel, [])}
 
+    dependencies = deps.analyze(index, cls, lib_names, lambda m: cls.module_class(m, None)[0] == "os", FOUNDATION,
+                                pkg["through"])
+
     # A target the package doesn't support on a platform isn't news; the
     # report lists only the ones that reach `#error`.
     not_supported = set(PLATFORMS) - set(pkg["platforms"])
@@ -942,6 +1045,7 @@ def main():
         "packagePlatforms": pkg["platforms"],
         "nestedPackages": nested_packages(root),
         "systemDependency": system_dependency(dump, root),
+        "dependencies": dependencies,
         "model": dict(manifest_model, compiler=".".join(map(str, compiler)) if compiler else None,
                       falseFlags={f: {"files": sorted(r for r, sc in swift_scans.items() if f in sc["hiddenBy"])}
                                   for f in pkg["false-flags"]},

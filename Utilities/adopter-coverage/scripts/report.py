@@ -343,6 +343,64 @@ def main():
     w("</details>")
     w("")
 
+    # --------------------------------------------------- dependencies
+    dep = ext.get("dependencies")
+    if dep and dep.get("packages"):
+        w("## OS use through dependencies")
+        w("")
+        w(f"{name}'s library targets name OS interfaces directly on {cov.get('directLines', 0)} lines: the "
+          "extraction above. They also call into their package dependencies, whose sources the index store covers "
+          "too, so the tool follows those calls through the dependencies' call graph (`scripts/deps.py`). A "
+          "dependency symbol *reaches the OS* when its implementation calls an OS function, directly or through "
+          "other dependency code: a protocol requirement through any implementation the build compiled, a property "
+          "through its accessors. That's what it may reach, however rarely the path is taken, and only calls count, "
+          "not uses of OS types or constants. The dependencies aren't mapped; their OS calls are only counted.")
+        w("")
+        w(f"| Dependency | Its own OS calls: functions (sites) | {name} lines that use it | …using a symbol that "
+          "reaches the OS | Symbols used | …that reach the OS |")
+        w("|---|---|---|---|---|---|")
+        rows = sorted(dep["packages"].items(), key=lambda kv: (-kv[1]["reachingSites"], -kv[1]["boundarySites"], kv[0]))
+        for p, d in rows:
+            if not d["boundarySites"] and not d["osSites"]:
+                continue
+            hl = f"**{p}**" if p in dep.get("through", []) else p
+            w(f"| {hl} | {d['osFunctions']} ({d['osSites']}) | {d['boundarySites']} | {d['reachingSites']} | "
+              f"{d['boundarySymbols']} | {d['reachingSymbols']} |")
+        w("")
+        th = [p for p in dep.get("through", []) if p in dep["packages"]]
+        if th:
+            tot = sum(dep["packages"][p]["reachingSites"] for p in th)
+            w(f"Through {and_list(th)}: {tot} lines of {name} use a symbol of one of them that reaches the OS, "
+              f"against {cov.get('directLines', 0)} lines that name an OS interface themselves (a line can do both, "
+              "and one that uses two of them counts for each).")
+            w("")
+            for p in th:
+                d = dep["packages"][p]
+                if not d["top"]:
+                    continue
+                w(f"<details><summary>{p}: the symbols {name} uses most that reach the OS</summary>")
+                w("")
+                w("| Symbol | Lines | OS functions reached | Some of them |")
+                w("|---|---|---|---|")
+                for t in d["top"]:
+                    w(f"| {code(t['symbol'])} | {t['sites']} | {t['reachCount']} | "
+                      f"{esc(', '.join(t['reaches']))} |")
+                w("")
+                w(f"Its own most frequent OS calls: " + ", ".join(f"{code(n)} ×{c}" for n, c in d["topOs"]) + ".")
+                w("")
+                w("</details>")
+                w("")
+        fd = dep.get("foundation") or {}
+        if fd.get("sites"):
+            w(f"{name} also uses Foundation on {fd['sites']} references. The SDK's Foundation is a binary framework, "
+              "so the index can't follow those calls; the types referenced most are "
+              + ", ".join(f"{t} ({n})" for t, n in fd["types"][:12]) + ".")
+            w("")
+        g = dep.get("graph", {})
+        w(f"The call graph has {g.get('symbols', 0)} symbols and {g.get('edges', 0)} edges; "
+          f"{g.get('osFunctions', 0)} of its symbols are OS functions.")
+        w("")
+
     # ------------------------------------------------------ extraction
     w("## Extraction")
     w("")
