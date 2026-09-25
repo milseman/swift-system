@@ -78,8 +78,8 @@ else
 fi
 
 log "extracting $name's OS interfaces"
-python3 "$S/extract.py" --package "$PACKAGES/$name.ini" --root "$N/src" --index "$N/index.json" \
-  --dump "$N/dump.json" --describe "$N/describe.json" --out "$O/interfaces.json"
+python3 "$S/extract.py" --package "$PACKAGES/$name.ini" --swift-version "$compiler" --root "$N/src" \
+  --index "$N/index.json" --dump "$N/dump.json" --describe "$N/describe.json" --out "$O/interfaces.json"
 
 python3 - "$O/meta.json" "$name" "$PKG_TITLE" "$P_PATH" "$P_REF" "$P_COMMIT" "$REPO" "$SYSTEM_REF" "$SYSTEM_COMMIT" \
   "$compiler" "$P_SWIFT_EXEC" <<'EOF'

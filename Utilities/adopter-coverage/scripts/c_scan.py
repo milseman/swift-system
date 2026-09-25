@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Lexical scan of NIO's C sources (the CNIO* targets).
+"""Lexical scan of a package's C sources (NIO's CNIO* targets, Foundation's
+_FoundationCShims, ...).
 
 Like swift_scan.py: per-line platform states (platforms.c_line_states, with
 the target's own defines), then candidate references to OS symbols. It also
@@ -454,12 +455,32 @@ class Structure:
                 "tok_start": start, "tok_end": end, "locals": set()}
 
 
-def scan_c_file(path, rel, defines=()):
+INT_DEFINE = re.compile(r"^\s*#\s*define\s+([A-Za-z_]\w*)\s+\(?\s*(0[xX][0-9a-fA-F]+|\d+)[uUlL]*\s*\)?\s*$")
+
+
+def integer_macros(path, defines=()):
+    """`#define NAME <integer>` lines in a file, with the platforms each is
+    active on: {name: [(value, states, build)]}. Foundation's and
+    Subprocess's target_conditionals.h define TARGET_OS_LINUX and friends to
+    1 or 0 this way, from the compiler's own macros; extract.py turns these
+    into per-platform values for c_line_states."""
+    code, _ = blank_c(open(path, encoding="utf-8", errors="replace").read())
+    lines = code.split("\n")
+    states, build = platforms.c_line_states(lines, defines)
+    out = {}
+    for i, line in enumerate(lines):
+        m = INT_DEFINE.match(line)
+        if m:
+            out.setdefault(m.group(1), []).append((int(m.group(2), 0), states[i], build[i]))
+    return out
+
+
+def scan_c_file(path, rel, defines=(), values=None):
     raw = open(path, encoding="utf-8", errors="replace").read()
     code, ends_in_comment = blank_c(raw)
     code_lines = code.split("\n")
     raw_lines = raw.split("\n")
-    states, build = platforms.c_line_states(code_lines, defines)
+    states, build = platforms.c_line_states(code_lines, defines, values)
     dead = {k + 1 for k, st in enumerate(states) if not st and not build[k]}
 
     # Directive lines (with their continuations: a trailing backslash, or a
@@ -556,11 +577,16 @@ def scan_c_file(path, rel, defines=()):
                       "struct": prev is not None and prev.text in ("struct", "union", "enum"),
                       "def": d["name"] if d else None})
 
+    cond_macros = set()
+    for line in code_lines:
+        if re.match(r"\s*#\s*(if|elif|ifdef|ifndef)\b", line):
+            cond_macros.update(re.findall(r"[A-Za-z_]\w*", re.sub(r"^\s*#\s*\w+", "", line)))
     return {
         "file": rel,
         "states": states,
         "build": build,
         "includes": includes,
+        "conditionMacros": sorted(cond_macros - {"defined"}),
         "declared": sorted(declared),
         "declaredKinds": kinds,
         "localDeclared": sorted(st.local_decls),

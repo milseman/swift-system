@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Lexical scan of NIO's Swift sources.
+"""Lexical scan of a package's Swift sources.
 
 For every file it records, per line, the platforms that compile the line
-(platforms.swift_line_states) and whether the Darwin index build compiled
-it. It then lists *candidate* references to C or OS symbols: identifiers
+(platforms.swift_line_states, with the target's platforms.Model) and
+whether the Darwin index build compiled it. It then lists *candidate* references to C or OS symbols: identifiers
 that aren't keywords, member accesses, argument labels, or names bound in
 an enclosing scope. extract.py decides which candidates are OS symbols,
 using vocabularies from the index store.
@@ -19,6 +19,11 @@ This is a scanner, not a parser. It doesn't respect declaration order
 within a scope, and it can't see members inherited from protocols or
 superclasses; extract.py measures its accuracy against the index on the
 lines the Darwin build compiled.
+
+Flags the package file calls false (`false-flags`, such as Foundation's
+FOUNDATION_FRAMEWORK) are F everywhere in the model; a file that tests one
+is evaluated a second time without them, and the lines only that hides are
+counted, so the report can say how much code no modeled build compiles.
 """
 
 import sys
@@ -428,11 +433,29 @@ def inherited_types(header):
     return out
 
 
-def scan_file(path, rel):
+def hidden_lines(code_lines, states, build, relaxed, false_flags):
+    """How many code lines the false flags hide: active on some platform, or
+    in the Darwin build, when the flags are unknown (`relaxed`), and nowhere
+    when they're false; and which flags the file's directives test."""
+    tested = sorted({f for l in code_lines if re.match(r"\s*#(if|elseif)\b", l)
+                     for f in re.findall(r"[A-Za-z_]\w*", l) if f in false_flags})
+    if not tested:
+        return 0, []
+    rstates, rbuild, _ = platforms.swift_line_states(code_lines, relaxed)
+    n = 0
+    for i, l in enumerate(code_lines):
+        if l.strip() and not l.strip().startswith("#") and not states[i] and not build[i] \
+                and (rstates[i] or rbuild[i]):
+            n += 1
+    return n, tested
+
+
+def scan_file(path, rel, mdl=None, relaxed=None, false_flags=()):
     raw = open(path, encoding="utf-8").read()
     code, _ = strip_comments_and_strings(raw)
     code_lines = code.split("\n")
-    states, build, errors = platforms.swift_line_states(code_lines)
+    states, build, errors = platforms.swift_line_states(code_lines, mdl)
+    hidden, hidden_by = hidden_lines(code_lines, states, build, relaxed, set(false_flags)) if relaxed else (0, [])
     skip_lines = directive_lines(code_lines)
     toks = [t for t in tokenize(code) if t.line not in skip_lines]
 
@@ -733,6 +756,7 @@ def scan_file(path, rel):
         "topLevel": sorted(top_level),
         "funcs": funcs,
         "codeLines": [i + 1 for i, l in enumerate(code_lines) if l.strip() and not l.strip().startswith("#")],
+        "hiddenLines": hidden, "hiddenBy": hidden_by,
     }
 
 

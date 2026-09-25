@@ -89,21 +89,102 @@ def base_name(name):
     return name.split("(")[0]
 
 
+def swift_version(text):
+    """(6, 2) from `Apple Swift version 6.2 (...)`, or None."""
+    m = re.search(r"Swift version (\d+)\.(\d+)", text or "")
+    return (int(m.group(1)), int(m.group(2))) if m else None
+
+
+def target_models(dump, pkg, imports, compiler):
+    """Each target's platforms.Model: the Swift flags its manifest settings
+    define, on which platforms and in which configuration; the package's
+    traits; SWIFT_PACKAGE; the package file's false flags. A flag the
+    manifest defines only for other targets is F here. Also the relaxed
+    model, with the false flags unknown instead, and each target's C
+    defines as {name: platforms}."""
+    T, F, M = platforms.T, platforms.F, platforms.M
+    traits = dump.get("traits") or []
+    default = set(next((t.get("enabledTraits") or [] for t in traits if t["name"] == "default"), []))
+    trait_names = {t["name"] for t in traits if t["name"] != "default"}
+    defined, cdefs, manifest = {}, {}, set()
+    for t in dump["targets"]:
+        fl, bl, cd = {}, {}, {}
+        for st in t.get("settings", []):
+            if "define" not in st.get("kind", {}):
+                continue
+            name = st["kind"]["define"]["_0"].split("=")[0]
+            cond = st.get("condition") or {}
+            plats = platforms.condition_platforms(cond)
+            if st.get("tool") == "c":
+                cd.setdefault(name, set()).update(plats)
+                continue
+            if st.get("tool") != "swift":
+                continue
+            manifest.add(name)
+            config = cond.get("config")
+            for p in PLATFORMS:
+                v = (T if config is None else M) if p in plats else F
+                fl.setdefault(name, {})[p] = platforms._tri_or(fl.get(name, {}).get(p, F), v)
+            b = T if "Darwin" in plats and config in (None, "debug") else F
+            bl[name] = platforms._tri_or(bl.get(name, F), b)
+        defined[t["name"]] = (fl, bl)
+        cdefs[t["name"]] = cd
+    false_flags = set(pkg["false-flags"])
+    models = {}
+    for t in dump["targets"]:
+        fl, bl = defined[t["name"]]
+        flags, build = {}, {}
+        for name in manifest - set(fl):
+            flags[name], build[name] = {p: F for p in PLATFORMS}, F
+        for name in trait_names:
+            v = T if name in default else M
+            flags[name], build[name] = {p: v for p in PLATFORMS}, T if name in default else F
+        flags["SWIFT_PACKAGE"], build["SWIFT_PACKAGE"] = {p: T for p in PLATFORMS}, T
+        flags.update(fl)
+        build.update(bl)
+        relaxed = platforms.model(dict(flags), dict(build), imports, compiler)
+        for name in false_flags:
+            flags[name], build[name] = {p: F for p in PLATFORMS}, F
+        models[t["name"]] = (platforms.model(flags, build, imports, compiler), relaxed)
+    return models, cdefs, {"traits": sorted(trait_names), "defaultTraits": sorted(default),
+                           "swiftDefines": sorted(manifest)}
+
+
+def c_macro_values(files):
+    """Per-platform values of the integer macros the package's C headers
+    define (c_scan.integer_macros): {name: {platform or "build": value}},
+    None where the definitions active there disagree or depend on the
+    configuration."""
+    raw = collections.defaultdict(list)
+    for path, defines in files:
+        for name, defs in c_scan.integer_macros(path, defines).items():
+            raw[name].extend(defs)
+    values = {}
+    for name, defs in raw.items():
+        v = {}
+        for p in PLATFORMS:
+            active = [(val, (st or {})[p][0]) for val, st, _b in defs if p in (st or {})]
+            if active:
+                vals = {val for val, _ in active}
+                v[p] = vals.pop() if len(vals) == 1 and all(m == platforms.T for _, m in active) else None
+        bvals = {val for val, _st, b in defs if b}
+        if bvals:
+            v["build"] = bvals.pop() if len(bvals) == 1 else None
+        values[name] = v
+    return values
+
+
 def load_targets(dump, describe, skip):
     """Library targets and the ones skipped, from `swift package dump-package`
     and `describe`. `skip` is the package file's `skip-targets`: regular
     targets that aren't library code, such as test support."""
     types = {t["name"]: t["type"] for t in dump["targets"]}
-    defines = {}
-    for t in dump["targets"]:
-        defines[t["name"]] = [s["kind"]["define"]["_0"] for s in t.get("settings", [])
-                              if s.get("tool") == "c" and "define" in s.get("kind", {})]
     lib, skipped = [], collections.defaultdict(list)
     for t in describe["targets"]:
         kind = types.get(t["name"], t.get("type"))
         info = {"name": t["name"], "c99name": t.get("c99name", t["name"]), "path": t["path"],
                 "language": "c" if t.get("module_type") == "ClangTarget" else "swift",
-                "sources": t.get("sources", []), "defines": defines.get(t["name"], [])}
+                "sources": t.get("sources", [])}
         if kind == "regular" and t["name"] not in skip:
             lib.append(info)
         else:
@@ -452,6 +533,7 @@ def dependency_packages(units):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--package", required=True)
+    ap.add_argument("--swift-version", default="", help="the first line of the compiler's --version")
     ap.add_argument("--root", required=True)
     ap.add_argument("--index", required=True)
     ap.add_argument("--dump", required=True)
@@ -464,30 +546,42 @@ def main():
     root = os.path.realpath(args.root)
     index = json.load(open(args.index))
     describe = json.load(open(args.describe))
-    targets, skipped = load_targets(json.load(open(args.dump)), describe,
+    dump = json.load(open(args.dump))
+    targets, skipped = load_targets(dump, describe,
                                     {t: pkg["skipReasons"].get(t, "skipped") for t in pkg["skip-targets"]})
     own = {t["c99name"] for t in describe["targets"]}
     lib_names = {t["c99name"] for t in targets}
     dep_modules = {u["module"].split(".")[0] for u in index["units"] if u["module"]} - own - SYSTEM_MODULES
     dep_packages = dependency_packages(index["units"])
     cls = Classifier(root, targets, dep_modules, own)
+    # canImport finds the package's own modules and every module its build
+    # built, on every platform.
+    built = {u["module"].split(".")[0] for u in index["units"] if u["module"]}
+    compiler = swift_version(args.swift_version)
+    models, cdefines, manifest_model = target_models(dump, pkg, own | built, compiler)
 
     # ------------------------------------------------------------ scans
     swift_scans, c_scans = {}, {}
+    c_files = []
     for t in targets:
-        base = os.path.join(root, t["path"])
-        if t["language"] == "swift":
-            for src in t["sources"]:
-                rel = os.path.normpath(os.path.join(t["path"], src))
-                swift_scans[rel] = swift_scan.scan_file(os.path.join(root, rel), rel)
-                swift_scans[rel]["target"] = t["c99name"]
-        else:
+        if t["language"] != "swift":
+            base = os.path.join(root, t["path"])
             rels = {os.path.normpath(os.path.join(t["path"], s)) for s in t["sources"]}
             for h in glob.glob(os.path.join(base, "**", "*.h"), recursive=True):
                 rels.add(os.path.relpath(h, root))
-            for rel in sorted(rels):
-                c_scans[rel] = c_scan.scan_c_file(os.path.join(root, rel), rel, t["defines"])
-                c_scans[rel]["target"] = t["c99name"]
+            c_files.extend((t, rel) for rel in sorted(rels))
+    c_values = c_macro_values([(os.path.join(root, rel), cdefines.get(t["name"], {})) for t, rel in c_files])
+    for t in targets:
+        if t["language"] == "swift":
+            mdl, relaxed = models.get(t["name"], (None, None))
+            for src in t["sources"]:
+                rel = os.path.normpath(os.path.join(t["path"], src))
+                swift_scans[rel] = swift_scan.scan_file(os.path.join(root, rel), rel, mdl,
+                                                        relaxed if pkg["false-flags"] else None, pkg["false-flags"])
+                swift_scans[rel]["target"] = t["c99name"]
+    for t, rel in c_files:
+        c_scans[rel] = c_scan.scan_c_file(os.path.join(root, rel), rel, cdefines.get(t["name"], {}), c_values)
+        c_scans[rel]["target"] = t["c99name"]
     swift_scan.resolve_member_filter(list(swift_scans.values()))
 
     # A target that reaches `#error` on a platform doesn't build there, and
@@ -829,7 +923,13 @@ def main():
         "platforms": PLATFORMS,
         "packagePlatforms": pkg["platforms"],
         "nestedPackages": nested_packages(root),
-        "systemDependency": system_dependency(json.load(open(args.dump)), root),
+        "systemDependency": system_dependency(dump, root),
+        "model": dict(manifest_model, compiler=".".join(map(str, compiler)) if compiler else None,
+                      falseFlags={f: {"files": sorted(r for r, sc in swift_scans.items() if f in sc["hiddenBy"])}
+                                  for f in pkg["false-flags"]},
+                      hiddenLines=sum(sc["hiddenLines"] for sc in swift_scans.values()),
+                      cMacroValues={n: v for n, v in sorted(c_values.items())
+                                    if any(n in sc["conditionMacros"] for sc in c_scans.values())}),
         "dependencyPackages": {m: p for m, p in sorted(dep_packages.items()) if m in dep_modules},
         "libraryTargets": [t["name"] for t in targets],
         "shimTargets": sorted(SHIM_TARGETS & lib_names),
