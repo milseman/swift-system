@@ -707,10 +707,27 @@ internal func system_pthread_key_create(
   _ key: UnsafeMutablePointer<pthread_key_t>
 ) -> CInt {
 #if ENABLE_MOCKING
-  if mockingEnabled { return _mockReturningErrno(key) }
+  if mockingEnabled {
+    let result = _mockReturningErrno(key)
+    if result == 0 {
+      // Report a real key that never has a value, since the owner's
+      // pthread_getspecific calls aren't mocked. On Darwin, reading a key
+      // that doesn't exist can read the system's own thread-specific data.
+      key.pointee = _mockPThreadKey
+    }
+    return result
+  }
 #endif
   return pthread_key_create(key, { value in _pthreadKeyDestructor(value) })
 }
+
+#if ENABLE_MOCKING
+private let _mockPThreadKey: pthread_key_t = {
+  var key = pthread_key_t()
+  guard pthread_key_create(&key, nil) == 0 else { fatalError("Unable to create key") }
+  return key
+}()
+#endif
 
 internal func system_pthread_key_delete(_ key: pthread_key_t) -> CInt {
 #if ENABLE_MOCKING

@@ -82,6 +82,7 @@ extension PThread {
     /// from 0, the default, down to `QOS_MIN_RELATIVE_PRIORITY`.
     ///
     /// This option applies only if ``qosClass`` isn't `nil`.
+    /// Darwin doesn't reject a value outside the range.
     ///
     /// The corresponding C function is `pthread_attr_set_qos_class_np`.
     /// - Note: Only available on Darwin.

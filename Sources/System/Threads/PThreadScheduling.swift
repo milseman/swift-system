@@ -85,6 +85,9 @@ extension PThread {
 extension PThread.SchedulingPolicy {
   /// The priorities that threads can have under this policy.
   ///
+  /// On Darwin, every policy has the same range, 15...47 on macOS 26,
+  /// and a policy that doesn't exist doesn't throw.
+  ///
   /// The corresponding C functions are `sched_get_priority_min`
   /// and `sched_get_priority_max`.
   @_alwaysEmitIntoClient
