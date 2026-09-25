@@ -56,6 +56,10 @@ target_compile_options(SystemPackage PRIVATE
   ${SWIFT_SYSTEM_AVAILABILITY_MACRO}
   "SHELL:-package-name swift-system")
 target_sources(SystemPackage PRIVATE
+  Events/KernelEvent.swift
+  Events/KernelQueue.swift
+  Events/Timeouts.swift)
+target_sources(SystemPackage PRIVATE
   FilePath/FilePath.swift
   FilePath/FilePathComponents.swift
   FilePath/FilePathComponentView.swift
@@ -85,10 +89,12 @@ endif()
 target_sources(SystemPackage PRIVATE
   Internals/Backcompat.swift
   Internals/CInterop.swift
+  Internals/Constants+Events.swift
   Internals/Constants.swift
   Internals/Exports.swift
   Internals/Mocking.swift
   Internals/RawBuffer.swift
+  Internals/Syscalls+Events.swift
   Internals/Syscalls.swift
   Internals/WindowsSyscallAdapters.swift)
 target_sources(SystemPackage PRIVATE
