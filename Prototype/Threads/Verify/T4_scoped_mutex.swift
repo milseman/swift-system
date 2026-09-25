@@ -1,5 +1,5 @@
-// V16d: a closure-scoped mutex lives on the stack of withMutex, so its address is stable, but it can't leave the closure. Expected to compile and run as written. With -D ESCAPE, a thread body (an escaping closure) can't capture it: Swift 6.2 crashes in the move checker ("Assertion failed: (srcAddr->getType() == destAddr->getType())", MoveOnlyChecker) instead of printing the diagnostic, and a named function's borrowing parameter gets "'m' cannot be captured by an escaping closure since it is a borrowed parameter" (-D ESCAPE_PARAM). With -D STORE, it can't be stored ("implicit conversion to 'ScopedMutex?' is consuming").
-// Check: swiftc -emit-sil -o /dev/null -swift-version 6 [-D ESCAPE | -D ESCAPE_PARAM | -D STORE] V16d_scoped_mutex.swift
+// T4: a closure-scoped mutex lives on the stack of withMutex, so its address is stable, but it can't leave the closure. Expected to compile and run as written. With -D ESCAPE, a thread body (an escaping closure) can't capture it: Swift 6.2 crashes in the move checker ("Assertion failed: (srcAddr->getType() == destAddr->getType())", MoveOnlyChecker) instead of printing the diagnostic, and a named function's borrowing parameter gets "'m' cannot be captured by an escaping closure since it is a borrowed parameter" (-D ESCAPE_PARAM). With -D STORE, it can't be stored ("implicit conversion to 'ScopedMutex?' is consuming").
+// Check: swiftc -emit-sil -o /dev/null -swift-version 6 [-D ESCAPE | -D ESCAPE_PARAM | -D STORE] T4_scoped_mutex.swift
 import Darwin
 
 struct ScopedMutex: ~Copyable, @unchecked Sendable {

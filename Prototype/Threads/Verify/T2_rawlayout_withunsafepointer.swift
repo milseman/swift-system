@@ -1,5 +1,5 @@
-// V16b: @_rawLayout storage, as the standard library's Mutex uses, outside the standard library. Expected to fail without -enable-experimental-feature RawLayout ("the '@_rawLayout' attribute is experimental"). With it, it compiles in the release 6.2 compiler, and the address is stable across borrows, but the storage still moves: into the class field, and (at -Onone) before the deinit runs. Mutating through withUnsafePointer(to:) is also formally undefined; the standard library uses Builtin.addressOfRawLayout instead (V16c).
-// Run: swiftc -swift-version 6 -enable-experimental-feature RawLayout V16b_rawlayout_withunsafepointer.swift -o /tmp/V16b && /tmp/V16b
+// T2: @_rawLayout storage, as the standard library's Mutex uses, outside the standard library. Expected to fail without -enable-experimental-feature RawLayout ("the '@_rawLayout' attribute is experimental"). With it, it compiles in the release 6.2 compiler, and the address is stable across borrows, but the storage still moves: into the class field, and (at -Onone) before the deinit runs. Mutating through withUnsafePointer(to:) is also formally undefined; the standard library uses Builtin.addressOfRawLayout instead (T3).
+// Run: swiftc -swift-version 6 -enable-experimental-feature RawLayout T2_rawlayout_withunsafepointer.swift -o /tmp/T2 && /tmp/T2
 import Darwin
 
 @_rawLayout(like: pthread_mutex_t)

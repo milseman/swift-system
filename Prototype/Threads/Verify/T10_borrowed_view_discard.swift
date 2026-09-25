@@ -1,5 +1,5 @@
-// V16j: a scoped API can lend a non-owning noncopyable view of memory that other code owns, and end the view with `discard self` on both the normal and the throwing path, so its deinit never runs. Expected to compile and print "42" and "caught E()", with no "deinit" line: a non-throwing body needs no `try`, the result can be noncopyable, and `rethrows` allows the catch-and-rethrow. With -D ESCAPE, the body can't keep the view ("implicit conversion to 'Owner?' is consuming"). PThread.Mutex.withUnsafeMutex(at:_:) and its Condition and ReadWriteLock counterparts use this for C-owned objects.
-// Run: swiftc -swift-version 6 V16j_borrowed_view_discard.swift -o /tmp/V16j && /tmp/V16j
+// T10: a scoped API can lend a non-owning noncopyable view of memory that other code owns, and end the view with `discard self` on both the normal and the throwing path, so its deinit never runs. Expected to compile and print "42" and "caught E()", with no "deinit" line: a non-throwing body needs no `try`, the result can be noncopyable, and `rethrows` allows the catch-and-rethrow. With -D ESCAPE, the body can't keep the view ("implicit conversion to 'Owner?' is consuming"). PThread.Mutex.withUnsafeMutex(at:_:) and its Condition and ReadWriteLock counterparts use this for C-owned objects.
+// Run: swiftc -swift-version 6 T10_borrowed_view_discard.swift -o /tmp/T10 && /tmp/T10
 struct Owner: ~Copyable {
   let address: UnsafeMutableRawPointer
   let owns: Bool

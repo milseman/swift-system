@@ -1,5 +1,5 @@
-// V16e: a scoped thread, one that the scope joins before returning, can borrow a closure-scoped mutex, because its body doesn't escape. Expected to compile and print 100000. This is the only way V16d's scoped mutex reaches another thread, so a scoped-mutex design would also need a scoped-thread API. Note that nothing here checks Sendable: withoutActuallyEscaping hands pthread_create a closure that isn't @Sendable.
-// Run: swiftc -swift-version 6 V16e_scoped_thread_borrow.swift -o /tmp/V16e && /tmp/V16e
+// T5: a scoped thread, one that the scope joins before returning, can borrow a closure-scoped mutex, because its body doesn't escape. Expected to compile and print 100000. This is the only way T4's scoped mutex reaches another thread, so a scoped-mutex design would also need a scoped-thread API. Note that nothing here checks Sendable: withoutActuallyEscaping hands pthread_create a closure that isn't @Sendable.
+// Run: swiftc -swift-version 6 T5_scoped_thread_borrow.swift -o /tmp/T5 && /tmp/T5
 import Darwin
 
 struct ScopedMutex: ~Copyable, @unchecked Sendable {

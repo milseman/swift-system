@@ -1,5 +1,5 @@
-// V16h: a noncopyable local's deinit runs at the end of its scope, in reverse order of declaration, not after its last use, including when an error ends the scope. Expected to print the same order at -Onone and -O: "deinit b" and "deinit a" after "end of scope", and "deinit c" after "about to throw". So a PThread whose deinit joins is joined at the end of the scope that created it.
-// Run: swiftc -swift-version 6 -O V16h_noncopyable_deinit_timing.swift -o /tmp/V16h && /tmp/V16h
+// T8: a noncopyable local's deinit runs at the end of its scope, in reverse order of declaration, not after its last use, including when an error ends the scope. Expected to print the same order at -Onone and -O: "deinit b" and "deinit a" after "end of scope", and "deinit c" after "about to throw". So a PThread whose deinit joins is joined at the end of the scope that created it.
+// Run: swiftc -swift-version 6 -O T8_noncopyable_deinit_timing.swift -o /tmp/T8 && /tmp/T8
 final class Log: @unchecked Sendable { var lines: [String] = [] }
 let log = Log()
 

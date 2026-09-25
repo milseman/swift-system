@@ -1,5 +1,5 @@
-// V16c: @_rawLayout with Builtin.addressOfRawLayout, as the standard library's _MutexHandle gets its address. Expected to compile only with -enable-experimental-feature RawLayout and -enable-experimental-feature BuiltinModule, which the release 6.2 compiler accepts. The value still moves when the class takes it, and at -Onone the deinit sees yet another address. Mutex tolerates moves because os_unfair_lock and a futex word are plain integers when unlocked; pthread_mutex_t isn't specified to be.
-// Run: swiftc -swift-version 6 -enable-experimental-feature RawLayout -enable-experimental-feature BuiltinModule V16c_rawlayout_builtin.swift -o /tmp/V16c && /tmp/V16c
+// T3: @_rawLayout with Builtin.addressOfRawLayout, as the standard library's _MutexHandle gets its address. Expected to compile only with -enable-experimental-feature RawLayout and -enable-experimental-feature BuiltinModule, which the release 6.2 compiler accepts. The value still moves when the class takes it, and at -Onone the deinit sees yet another address. Mutex tolerates moves because os_unfair_lock and a futex word are plain integers when unlocked; pthread_mutex_t isn't specified to be.
+// Run: swiftc -swift-version 6 -enable-experimental-feature RawLayout -enable-experimental-feature BuiltinModule T3_rawlayout_builtin.swift -o /tmp/T3 && /tmp/T3
 import Darwin
 import Builtin
 

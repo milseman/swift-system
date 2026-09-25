@@ -1,5 +1,5 @@
-// V16f: a noncopyable owner of heap storage keeps the pthread_mutex_t at one address through every move: from the init, into a local, into a class field, and into the deinit. Two threads lock it through a shared class. Expected to compile and print one address five times and "count 200000", at -Onone and -O. This is the design PThread.Mutex, Condition, and ReadWriteLock use.
-// Run: swiftc -swift-version 6 V16f_heap_mutex_stable.swift -o /tmp/V16f && /tmp/V16f
+// T6: a noncopyable owner of heap storage keeps the pthread_mutex_t at one address through every move: from the init, into a local, into a class field, and into the deinit. Two threads lock it through a shared class. Expected to compile and print one address five times and "count 200000", at -Onone and -O. This is the design PThread.Mutex, Condition, and ReadWriteLock use.
+// Run: swiftc -swift-version 6 T6_heap_mutex_stable.swift -o /tmp/T6 && /tmp/T6
 import Darwin
 
 struct HeapMutex: ~Copyable, @unchecked Sendable {

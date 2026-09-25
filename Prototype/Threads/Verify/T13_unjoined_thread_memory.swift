@@ -1,5 +1,5 @@
-// V16m: on Darwin, a joinable thread that finishes keeps some of its resources until it's joined. Expected on macOS 26.3: 500 finished threads that were never joined hold about 15 MiB more virtual memory than before them (about 30 KiB each), and 500 joined ones hold none. This is the cost of the leak policy in Prototype/ThreadDeinit.
-// Run: swiftc V16m_unjoined_thread_memory.swift -o /tmp/V16m && /tmp/V16m && /tmp/V16m join
+// T13: on Darwin, a joinable thread that finishes keeps some of its resources until it's joined. Expected on macOS 26.3: 500 finished threads that were never joined hold about 15 MiB more virtual memory than before them (about 30 KiB each), and 500 joined ones hold none. This is the cost of the leak policy in Prototype/ThreadDeinit.
+// Run: swiftc T13_unjoined_thread_memory.swift -o /tmp/T13 && /tmp/T13 && /tmp/T13 join
 import Darwin
 
 func virtualSize() -> UInt64 {

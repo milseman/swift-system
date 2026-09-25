@@ -15,7 +15,9 @@ the package implements one of them as a default, not as a decision.
 
 Everything here was built and run with Swift 6.2 (swiftlang-6.2.0.19.9) on
 macOS 26.3. The Linux paths have only been typechecked; see
-[Unverified off Darwin](#unverified-off-darwin).
+[Unverified off Darwin](#unverified-off-darwin). The compiler and runtime
+checks cited as T1 to T13 are in `Verify/`; each opens with the claim it
+checks and the command that runs it. V11a is in `Prototype/Verify/`.
 
 ## The API
 
@@ -58,11 +60,11 @@ protecting a value within one process, use `Synchronization.Mutex`;
 The evidence that the two don't overlap:
 
 - `Mutex` isn't a pthread mutex. `Mutex<Void>` is 4 bytes, an
-  `os_unfair_lock` on Darwin, against 64 for `pthread_mutex_t` (V16g), and
+  `os_unfair_lock` on Darwin, against 64 for `pthread_mutex_t` (T7), and
   its interface (`Synchronization.swiftinterface`) wraps a `_MutexHandle`
   that vends only `withLock`, `withLockIfAvailable`, and unsafe
   lock/unlock. So `pthread_cond_wait` can't take one, and it has no
-  attributes. It must also be a `let` (`@_staticExclusiveOnly`, V16g).
+  attributes. It must also be a `let` (`@_staticExclusiveOnly`, T7).
 - `Mutex` needs macOS 15 and iOS 18. As a package, `PThread.Mutex` has no
   OS floor, which matters to adopters like NIO that deploy to older OSes.
   In the SDK, `System 199` is new API, so this advantage is the package's
@@ -85,7 +87,7 @@ What System adds, each exercised by a test in `Tests/SystemTests`:
 - interoperation with C in both directions: `unsafeAddress` hands a
   System-owned object to C (`unsafeAddressIsTheMutexThatCUses`), and
   `withUnsafeMutex(at:_:)` and its counterparts lend a non-owning view of
-  a C-owned one (`borrowingAMutexThatCOwns`, V16j).
+  a C-owned one (`borrowingAMutexThatCOwns`, T10).
 
 Where System defers: it has no `PThread.Mutex<Value>` (that's `Mutex`), no
 atomics (that's `Atomic`), and no `pthread_once` (Swift's globals and
@@ -101,10 +103,10 @@ noncopyable struct can move whenever it's consumed.
 
 | storage | compiles with 6.2 | address stable | can be stored | cost |
 |---|---|---|---|---|
-| inline in a noncopyable struct | yes | **no**: five addresses between init, a local, a borrow, a class field, and the deinit, which can only destroy a copy because a deinit's `self` is immutable (V16a) | yes | none |
-| `@_rawLayout`, as `Mutex` does | only with `-enable-experimental-feature RawLayout`, and `BuiltinModule` for `Builtin.addressOfRawLayout` (V16b, V16c) | during a borrow only: it moves into a class field, and before its deinit (V16b, V16c) | yes | none |
-| closure-scoped (`withMutex { m in … }`) | yes | yes (V16d) | **no**: it can't reach a thread body, which escapes (V16d); only a scoped thread that's joined before the scope ends can borrow it (V16e) | none |
-| heap storage owned by a noncopyable struct (**chosen**) | yes | yes, through every move, at -Onone and -O (V16f) | yes | one allocation per object |
+| inline in a noncopyable struct | yes | **no**: five addresses between init, a local, a borrow, a class field, and the deinit, which can only destroy a copy because a deinit's `self` is immutable (T1) | yes | none |
+| `@_rawLayout`, as `Mutex` does | only with `-enable-experimental-feature RawLayout`, and `BuiltinModule` for `Builtin.addressOfRawLayout` (T2, T3) | during a borrow only: it moves into a class field, and before its deinit (T2, T3) | yes | none |
+| closure-scoped (`withMutex { m in … }`) | yes | yes (T4) | **no**: it can't reach a thread body, which escapes (T4); only a scoped thread that's joined before the scope ends can borrow it (T5) | none |
+| heap storage owned by a noncopyable struct (**chosen**) | yes | yes, through every move, at -Onone and -O (T6) | yes | one allocation per object |
 | a class with the object tail-allocated (NIO's `LockStorage`) | yes | yes | yes, by reference | one allocation; a copyable reference |
 
 `Mutex` gets away with moving because `os_unfair_lock` and a futex word are
@@ -120,8 +122,8 @@ features, and can be stored where threads share it. Around it:
   deallocate the memory.
 - `unsafeAddress` hands the address to C; it's valid while the owner lives.
 - `withUnsafeMutex(at:_:)` lends a `borrowing PThread.Mutex` over a C-owned
-  mutex, ended with `discard self` so its deinit never runs (V16j). A
-  borrowed view can't be stored or escape (V16j).
+  mutex, ended with `discard self` so its deinit never runs (T10). A
+  borrowed view can't be stored or escape (T10).
 
 Confidence: high against inline, `@_rawLayout`, and closure-scoped storage.
 Medium against the class: a class is the other option that works, and
@@ -152,7 +154,7 @@ behavior.
 **`PThread`** is the responsibility: a noncopyable owner that must be
 joined or detached.
 
-- The body is `sending @escaping () -> Void`, not `@Sendable` (V16i). It
+- The body is `sending @escaping () -> Void`, not `@Sendable` (T9). It
   can capture non-Sendable values that the caller doesn't use again, which
   `@Sendable` rejects. The cost is one pattern `@Sendable` accepts: two
   bodies can't capture the same local noncopyable value, even a Sendable
@@ -181,7 +183,7 @@ that default with detaching, trapping, and doing nothing, in a harness of
 14 scenarios and across the package's own tests and samples. In short:
 
 - **join** keeps threads structured: a thread started in a scope finishes
-  before the scope ends, also when an error ends it, which V16h confirms is
+  before the scope ends, also when an error ends it, which T8 confirms is
   the end of the scope. Its costs are hidden blocking: it deadlocks when
   the thread waits for its owner's scope, blocks whoever releases a class
   that holds the owner, serializes a loop that drops its threads, and
@@ -379,15 +381,15 @@ types and stub declarations of the Linux functions; there, the mock tests
   from `relinquish()` with `PThread(taking:)` to join, a class per thread,
   or `InlineArray` (macOS 26).
 - In top-level code, a noncopyable `let` is a global and can't be consumed,
-  so `try thread.join()` fails there (V16l); the same holds for `OwnedFD`.
+  so `try thread.join()` fails there (T12); the same holds for `OwnedFD`.
 - Swift 6.2 crashes in the move checker instead of diagnosing a closure's
-  borrowed noncopyable parameter captured by an escaping closure (V16d).
+  borrowed noncopyable parameter captured by an escaping closure (T4).
 - In a closure, a `do`/`catch` catches `any Error` unless it's written
   `do throws(Errno)`, and a closure whose only `try` is inside
   `#expect(...)` isn't inferred as throwing.
 - Darwin 26.3 behaviors that its headers don't describe:
   `pthread_cond_timedwait_relative_np` waits forever for a negative
-  `tv_sec` (V16k), so `wait(on:timeout:)` clamps a negative `Duration` to
+  `tv_sec` (T11), so `wait(on:timeout:)` clamps a negative `Duration` to
   zero; `sched_get_priority_min` and `max` ignore the policy (15...47 for
   any value); and `pthread_attr_set_qos_class_np` accepts any relative
   priority.
@@ -401,4 +403,4 @@ types and stub declarations of the Linux functions; there, the mock tests
   `Tests/MemberImportVisibility/ThreadsProbe.swift`.
 - `Sources/Samples/Threads*.swift`: `threads-pool`, `threads-local`,
   `threads-info`.
-- `Prototype/Verify/V16a`–`V16m` and `Prototype/ThreadDeinit/`.
+- `Prototype/Threads/Verify/`, T1–T13, and `Prototype/ThreadDeinit/`.

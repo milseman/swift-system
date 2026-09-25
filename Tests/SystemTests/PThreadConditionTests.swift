@@ -136,7 +136,7 @@ private struct PThreadConditionTests {
   @available(System 199, *)
   @available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *)
   @Test func timeoutThatIsNotPositive() throws {
-    // Darwin waits forever for a negative relative timeout (V16k), so the
+    // Darwin waits forever for a negative relative timeout (T11), so the
     // wrapper times out at once instead.
     let queue = Queue()
     try queue.mutex.lock()

@@ -113,7 +113,8 @@ No policy is free.
   join does, because the class's deinit has to join.
 - **Leak** is the C behavior. A finished thread that's never joined keeps
   some of its resources until the process exits: on Darwin, 500 of them
-  held 15 MiB more virtual memory than 500 joined ones (V16m).
+  held 15 MiB more virtual memory than 500 joined ones
+  (`Prototype/Threads/Verify/T13`).
 
 Both join and detach act on a thread by an ID that something else may
 already have joined (`joined-through-hatch`). Darwin reports `ESRCH`; on
