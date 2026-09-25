@@ -22,6 +22,7 @@ struct SystemSamples: ParsableCommand {
       SocketPair.self,
       UDPEcho.self,
       UnixSocket.self,
+      PassFD.self,
       // Owned descriptor samples
       OwnedCat.self,
       OwnedCopy.self,
