@@ -362,27 +362,38 @@ def main():
           "extraction above. They also call into their package dependencies, whose sources the index store covers "
           "too, so the tool follows those calls through the dependencies' call graph (`scripts/deps.py`). A "
           "dependency symbol *reaches the OS* when its implementation calls an OS function, directly or through "
-          "other dependency code: a protocol requirement through any implementation the build compiled, a property "
-          "through its accessors. That's what it may reach, however rarely the path is taken, and only calls count, "
-          "not uses of OS types or constants. The dependencies aren't mapped; their OS calls are only counted.")
+          "other dependency code. A requirement the package calls through a protocol reaches what any implementation "
+          "the build compiled reaches, and a property what its accessors do; inside the dependencies, dispatch isn't "
+          "expanded again, which misses OS work behind a dependency's own protocols. *Upper bound* expands dispatch "
+          "everywhere instead, which over-counts. Either way it's what a symbol may reach, however rarely the path is "
+          "taken, and process exit (an error path) doesn't count. An OS function here is "
+          "one the Darwin SDK's libc and kernel interfaces declare (Darwin and its overlays, MachO), other than the C "
+          "library's computation (strings, memory, math, locale, and stdio's and stdlib's formatting, conversions "
+          "and allocation) and errno; file streams (fopen, fwrite) count. Dispatch, the Apple "
+          "frameworks, C++'s library and OS types' initializers don't count, nor do locks and thread-local storage, "
+          "which a library takes for its own synchronization. The dependencies aren't mapped; their OS calls are "
+          "only counted.")
         w("")
         w(f"| Dependency | Its own OS calls: functions (sites) | {name} lines that use it | …using a symbol that "
-          "reaches the OS | Symbols used | …that reach the OS |")
-        w("|---|---|---|---|---|---|")
+          "reaches the OS | Upper bound | Symbols used | …that reach the OS |")
+        w("|---|---|---|---|---|---|---|")
         rows = sorted(dep["packages"].items(), key=lambda kv: (-kv[1]["reachingSites"], -kv[1]["boundarySites"], kv[0]))
         for p, d in rows:
             if not d["boundarySites"] and not d["osSites"]:
                 continue
             hl = f"**{p}**" if p in dep.get("through", []) else p
             w(f"| {hl} | {d['osFunctions']} ({d['osSites']}) | {d['boundarySites']} | {d['reachingSites']} | "
-              f"{d['boundarySymbols']} | {d['reachingSymbols']} |")
+              f"{d.get('upperSites', '')} | {d['boundarySymbols']} | {d['reachingSymbols']} |")
         w("")
         th = [p for p in dep.get("through", []) if p in dep["packages"]]
         if th:
             tot = sum(dep["packages"][p]["reachingSites"] for p in th)
-            w(f"Through {and_list(th)}: {tot} lines of {name} use a symbol of one of them that reaches the OS, "
-              f"against {cov.get('directLines', 0)} lines that name an OS interface themselves (a line can do both, "
-              "and one that uses two of them counts for each).")
+            up = sum(dep["packages"][p].get("upperSites", 0) for p in th)
+            w(f"Through {and_list(th)}: {tot} lines of {name} use a symbol of one of them that reaches the OS ({up} "
+              f"with dispatch expanded everywhere). {name}'s own code names an OS interface in System's scope on "
+              f"{cov.get('directScopeLines', 0)} lines ({cov.get('directLines', 0)} counting Dispatch, the Apple "
+              "frameworks, C libraries, C types and string, math and atomics functions). A line can do both, and one "
+              "that uses two dependencies counts for each.")
             w("")
             for p in th:
                 d = dep["packages"][p]

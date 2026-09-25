@@ -45,6 +45,11 @@ CATEGORIES = [
 # Platforms an `@available(<name>, unavailable)` takes away.
 UNAVAILABLE_PLATFORMS = {"macOS": ["Darwin"], "Windows": ["Windows"], "Linux": ["Linux", "Musl"],
                          "Android": ["Android"], "WASI": ["WASI"], "FreeBSD": ["FreeBSD"], "OpenBSD": ["OpenBSD"]}
+# Categories outside System's scope: the OS's, but not System's to wrap, or
+# not OS interfaces at all. Used for the lines that compare with the reach
+# of the dependencies.
+OUT_OF_SCOPE = {"dispatch", "Apple frameworks", "C libraries", "strings/ctype/libm/stdio", "atomics", "C language",
+                "compiler intrinsics"}
 # A function too long to be a thin wrapper counts only its call-site lines.
 THIN_WRAPPER_LINES = 40
 
@@ -470,6 +475,10 @@ def main():
         "gaps": gaps,
         "alreadySystem": already,
         "directLines": len({(x["file"], x["line"]) for i in ext["interfaces"] for x in i["sites"]}),
+        "directScopeLines": len({(x["file"], x["line"]) for i in ext["interfaces"] for x in i["sites"]
+                                 if i["name"] in owner and owner[i["name"]]["wrap"] != "no"
+                                 and owner[i["name"]]["status"] != "ignore"
+                                 and owner[i["name"]]["category"] not in OUT_OF_SCOPE}),
         "extraction": {k: ext[k] for k in ("libraryTargets", "shimTargets", "skippedTargets", "unsupportedPlatforms",
                                            "unsupportedBecause", "excludedReferences", "crosscheck", "warnings",
                                            "nestedPackages", "dependencyPackages", "systemDependency",

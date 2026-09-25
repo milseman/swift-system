@@ -24,8 +24,10 @@ call graph of the package's dependencies, for deps.py. Its symbols are
 numbered:
   packages    the dependency packages (the directories of DEPS_ROOT)
   nodes       per symbol: [package index] for one declared in a dependency,
-              [-1, module, name, kind, language] for one declared elsewhere
-              (the OS, the Swift libraries, Foundation), [-2] if unknown
+              [-1, module, name, kind, language, header] for one declared
+              elsewhere (the OS, the Swift libraries, Foundation), with the
+              header as it's included (`sys/stat.h`, `Security/SecItem.h`),
+              [-2] if unknown
   edges       [container, referenced] pairs, one per pair, from each
               reference's containedBy or calledBy relation
   overrides   [base, override] pairs (a protocol requirement and a type's
@@ -112,6 +114,22 @@ def base_name(name):
     """'write(_:_:_:)' -> 'write'; 'getter:errno' -> 'errno'."""
     name = re.sub(r"^(getter|setter|_modify|_read|willSet|didSet|init):", "", name)
     return name.split("(")[0]
+
+
+def include_name(path):
+    """A declaring file as it's included: `sys/stat.h` for
+    .../usr/include/sys/stat.h, `Security/SecItem.h` for a framework's
+    header, `c++/v1/vector` for libc++'s."""
+    m = re.search(r"/usr/include/(.+)$", path or "")
+    if m:
+        return m.group(1)
+    m = re.search(r"/([^/]+)\.framework/(?:Versions/[^/]+/)?Headers/(.+)$", path or "")
+    if m:
+        return m.group(1) + "/" + m.group(2)
+    m = re.search(r"/lib/(?:swift/clang|clang/[^/]+)/include/(.+)$", path or "")
+    if m:
+        return m.group(1)
+    return (path or "").rsplit("/", 1)[-1]
 
 
 def main():
@@ -267,7 +285,7 @@ def main():
                 nodes.append([pkg_index[d[1][len(deps_root):].split("/")[0]]])
             else:
                 name, kind, lang = dep_info[k] or ("", 0, 0)
-                nodes.append([-1, d[0], name, kind, lang])
+                nodes.append([-1, d[0], name, kind, lang, include_name(d[1])])
         # Site counts only for symbols declared outside the checkouts: what
         # each dependency uses of the OS, the Swift libraries and Foundation.
         graph = {"packages": packages, "nodes": nodes, "edges": sorted(dep_edges),
