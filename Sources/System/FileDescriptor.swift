@@ -807,7 +807,12 @@ extension FileDescriptor.OpenOptions
   public var debugDescription: String { self.description }
 }
 
-// The decision on whether to make FileDescriptor Sendable or not
-// is currently being discussed in https://github.com/apple/swift-system/pull/112
-//@available(*, unavailable, message: "File descriptors are not completely thread-safe.")
-//extension FileDescriptor: Sendable {}
+// FileDescriptor has always been Sendable implicitly, as a frozen struct
+// whose one stored property is a CInt, and the SDK's System module interface
+// lists the conformance. Sending a descriptor to another task shares its
+// number, and the hazards of that, such as a close in one task while another
+// still uses the number, are inherent to file descriptors rather than
+// something this type prevents. See the discussion in
+// https://github.com/apple/swift-system/pull/112.
+@available(System 0.0.1, *)
+extension FileDescriptor: Sendable {}
