@@ -57,7 +57,8 @@ extension CInterop {
 /// so remove a descriptor that has duplicates,
 /// such as from `dup` or in a child process, before closing it.
 ///
-/// Adding, modifying, removing, and waiting don't change the instance,
+/// The kernel serializes adding, modifying, removing, and waiting,
+/// and none of them mutates the `EventPoll` value,
 /// so several threads can use an instance at once.
 @frozen
 @available(System 199, *)

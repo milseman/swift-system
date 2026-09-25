@@ -49,7 +49,8 @@ import Glibc
 /// On Darwin, its file descriptor is also closed when the process
 /// executes a new program.
 ///
-/// Registering and polling don't change the queue,
+/// The kernel serializes registering and polling,
+/// and neither method mutates the `KernelQueue` value,
 /// so several threads can use a queue at once:
 /// for example, one thread can wait for events
 /// while another triggers a user event to wake it.
@@ -225,7 +226,6 @@ extension KernelQueue {
 @available(System 199, *)
 @available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *)
 extension KernelQueue {
-
   /// Changes the events that the queue watches for,
   /// and then waits for events to report.
   ///
