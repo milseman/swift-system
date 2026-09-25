@@ -169,7 +169,7 @@ private struct SocketMessagesTests {
       var ancillary = SocketDescriptor.AncillaryMessageBuffer()
       withUnsafeBytes(of: fileToSend.rawValue) { bytes in
         ancillary.appendMessage(
-          level: SocketDescriptor.ProtocolID(rawValue: SOL_SOCKET),
+          level: .socket,
           type: .init(rawValue: CInt(SCM_RIGHTS)),
           bytes: bytes
         )
@@ -281,7 +281,7 @@ private struct SocketMessagesTests {
       var fds = [fd1.rawValue, fd2.rawValue, fd3.rawValue]
       fds.withUnsafeBytes { bytes in
         ancillary.appendMessage(
-          level: SocketDescriptor.ProtocolID(rawValue: SOL_SOCKET),
+          level: .socket,
           type: .init(rawValue: CInt(SCM_RIGHTS)),
           bytes: bytes
         )
