@@ -57,9 +57,10 @@ internal enum DirectoryFixture {
   /// which is removed afterward, with everything in it.
   ///
   /// This removes the directory's contents with a postorder walk first,
-  /// because `withTemporaryFilePath`'s own removal recurses with the wrong
-  /// descriptor: it leaves behind any directory nested two deep, and
-  /// crashes on a chain of directories that have the same name.
+  /// which is iterative. `withTemporaryFilePath`'s own removal recurses, and
+  /// in a debug build it overflows the stack of the thread that runs a
+  /// swift-testing test somewhere between 40 and 60 levels deep. The
+  /// descriptor-limit test makes a tree 100 deep.
   static func withTemporaryDirectory<R>(
     _ basename: FilePath.Component, _ body: (FilePath) throws -> R
   ) throws -> R {

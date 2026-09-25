@@ -367,22 +367,26 @@ and a buffer, with no `DIR` and no deinit.
 
 ## Found along the way
 
-These are in files this lane doesn't own, so they're reported, not fixed.
+These are in files this lane doesn't own, so they're reported here, not
+fixed.
 
-- **`withTemporaryFilePath` removes the wrong files, leaks trees, and can
-  crash.** `recursiveRemove` in `FilePathTempPosix.swift` recurses, and
-  unlinks, relative to the top directory's descriptor (`in: dirfd`) rather
-  than the subdirectory's. So clearing `sub` looks each of its names up in
-  the top directory. For a file `sub/x`, it unlinks the top directory's `x` if
-  there is one, and otherwise gets `ENOENT`, which the helper's `try?` drops.
-  Either way, any subdirectory that isn't empty is left behind: `$TMPDIR`
-  held 81 `testRename.*` directories (`one/g` remains in each) and 79
-  `testOpenRelativeNested.*` (`sub/file.txt`). A chain of directories with the
-  same name, as short as `d/d`, reopens `top/d` forever and crashes the
-  process: SIGSEGV on the main thread, SIGBUS on a 512 KB thread. The
-  directory tests therefore empty their scratch directories with a
-  postorder `DirectoryWalk` first (`DirectoryFixture.withTemporaryDirectory`).
-  A walk-based `_recursiveRemove` would fix all three.
+- **`withTemporaryFilePath` removed the wrong files, leaked trees, and could
+  crash.** This lane found it, and `40d0ea4` on `system-next` (refine-3) fixed
+  it independently, the same day. `recursiveRemove` in
+  `FilePathTempPosix.swift` recursed, and unlinked, relative to the top
+  directory's descriptor, not the subdirectory's. For a file `sub/x`, it
+  unlinked the top directory's `x`, or got `ENOENT`, which the helper's `try?`
+  dropped, so every subdirectory that wasn't empty leaked. A chain of
+  same-named directories, as short as `d/d`, recursed until it crashed:
+  SIGSEGV on the main thread, SIGBUS on a 512 KB thread. After the fix, one
+  limit remains. The removal still recurses, with large frames, so in a debug
+  build it overflows the stack of the thread that runs a swift-testing test.
+  A 40-deep chain is removed; a 60-deep one crashes the test process with
+  SIGBUS. On XCTest's main thread, 500 deep is fine. The directory tests
+  therefore empty their scratch directories with a postorder `DirectoryWalk`
+  first (`DirectoryFixture.withTemporaryDirectory`), because the
+  descriptor-limit test makes a tree 100 deep. A walk-based
+  `_recursiveRemove` would lift the limit.
 - **`forEachFile` copies the whole `dirent`** (`try body(dirent.pointee)`),
   which can read past the end of `readdir`'s buffer (see Entries).
 - **`FilePath.Component.withPlatformString` always copies.** That's the FIXME
