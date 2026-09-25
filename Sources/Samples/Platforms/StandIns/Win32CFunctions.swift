@@ -62,4 +62,42 @@ func GetFileInformationByHandle(
   return true
 }
 
+/// The C constant `MOVEFILE_REPLACE_EXISTING`.
+let MOVEFILE_REPLACE_EXISTING: DWORD = 0x1
+
+/// The C constant `MOVEFILE_WRITE_THROUGH`.
+let MOVEFILE_WRITE_THROUGH: DWORD = 0x8
+
+/// The C function `MoveFileExW`: renames a file, replacing any file at the
+/// new name with `MOVEFILE_REPLACE_EXISTING`, and with
+/// `MOVEFILE_WRITE_THROUGH`, not returning until the move is on disk.
+///
+/// Simulated with rename(2), and for write-through, fsync on the new name's
+/// directory, which is what Unix needs for the same guarantee.
+func MoveFileExW(
+  _ lpExistingFileName: UnsafePointer<CInterop.PlatformChar>,
+  _ lpNewFileName: UnsafePointer<CInterop.PlatformChar>,
+  _ dwFlags: DWORD
+) -> Bool {
+  let existing = FilePath(platformString: lpExistingFileName)
+  let new = FilePath(platformString: lpNewFileName)
+  do {
+    if dwFlags & MOVEFILE_REPLACE_EXISTING == 0, (try? new.stat()) != nil {
+      lastError = Win32.Error.alreadyExists.rawValue
+      return false
+    }
+    try existing.rename(to: new)
+    if dwFlags & MOVEFILE_WRITE_THROUGH != 0 {
+      let parent = new.removingLastComponent()
+      let directory = try OwnedFD.open(parent.isEmpty ? "." : parent, .readOnly, options: .directory)
+      try directory.fileDescriptor.synchronize()
+      try directory.close()
+    }
+    return true
+  } catch {
+    lastError = Win32Simulation.error(from: error).rawValue
+    return false
+  }
+}
+
 #endif // SIMULATE_PLATFORMS
