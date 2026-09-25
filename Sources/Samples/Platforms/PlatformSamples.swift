@@ -29,5 +29,6 @@ struct PlatformSamples: ParsableCommand {
       PlatformDarwinOnly.self,
       PlatformWindowsOnly.self,
       PlatformLibrary.self,
+      PlatformOwned.self,
     ])
 }
