@@ -161,7 +161,7 @@ final class TerminalMockTests: XCTestCase {
   func testWithAttributesRestoresTheOriginalAttributes() throws {
     let terminal = TerminalDescriptor(rawValue: 42)
     try MockingDriver.withMockingEnabled { mocking in
-      // The changed attributes apply after a flush, as `appliedWhen`
+      // The changed attributes apply after a flush, as `when`
       // defaults to, and the original ones immediately afterward.
       let result = try terminal.withAttributes({ $0.localFlags.remove(.echo) }) {
         expectCall(mocking, "tcgetattr", 42, Wildcard())
@@ -172,7 +172,7 @@ final class TerminalMockTests: XCTestCase {
       expectCall(mocking, "tcsetattr", 42, TCSANOW, Wildcard())
       XCTAssertTrue(mocking.trace.isEmpty)
 
-      try terminal.withAttributes(appliedWhen: .afterDrain, { _ in }) {}
+      try terminal.withAttributes(when: .afterDrain, { _ in }) {}
       expectCall(mocking, "tcgetattr", 42, Wildcard())
       expectCall(mocking, "tcsetattr", 42, TCSADRAIN, Wildcard())
       expectCall(mocking, "tcsetattr", 42, TCSANOW, Wildcard())

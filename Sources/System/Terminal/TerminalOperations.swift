@@ -204,7 +204,7 @@ extension TerminalDescriptor {
   ///
   /// The corresponding C functions are `tcgetattr` and `tcsetattr`.
   public func withAttributes<T>(
-    appliedWhen action: TerminalAttributes.SetAction = .afterFlush,
+    when action: TerminalAttributes.SetAction = .afterFlush,
     retryOnInterrupt: Bool = true,
     _ modify: (inout TerminalAttributes) throws -> Void,
     do body: () throws -> T
@@ -233,7 +233,7 @@ extension TerminalDescriptor {
   /// This method changes the attributes as
   /// ``TerminalAttributes/makeRaw()`` does, after pending output is
   /// transmitted, discarding unread input, and restores them as
-  /// ``withAttributes(appliedWhen:retryOnInterrupt:_:do:)`` does.
+  /// ``withAttributes(when:retryOnInterrupt:_:do:)`` does.
   ///
   /// The corresponding C functions are `tcgetattr`, `cfmakeraw`,
   /// and `tcsetattr`.
