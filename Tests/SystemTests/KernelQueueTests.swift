@@ -392,20 +392,6 @@ internal func registerAndPoll(
   }
 }
 
-/// Asserts that `body` throws `expected`.
-internal func assertThrows(
-  _ expected: Errno, _ message: String = "",
-  file: StaticString = #filePath, line: UInt = #line,
-  _ body: () throws -> Void
-) {
-  do {
-    try body()
-    XCTFail("expected \(expected) \(message)", file: file, line: line)
-  } catch {
-    XCTAssertEqual(error as? Errno, expected, message, file: file, line: line)
-  }
-}
-
 #if SYSTEM_PACKAGE_DARWIN
 /// Spawns `arguments`, with `standardInput` as the child's standard input,
 /// and returns its process ID. The child inherits no other descriptors.

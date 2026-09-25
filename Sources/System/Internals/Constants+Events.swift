@@ -7,8 +7,8 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-// The event notification constants: for kqueue, and for poll. Each is
-// typed as the C field or argument that it goes in.
+// The event notification constants: for kqueue, epoll, eventfd, timerfd,
+// and poll. Each is typed as the C field or argument that it goes in.
 
 import CSystem
 #if SYSTEM_PACKAGE_DARWIN
@@ -234,6 +234,96 @@ internal var _NOTE_FFCTRLMASK: UInt32 { UInt32(truncatingIfNeeded: NOTE_FFCTRLMA
 @_alwaysEmitIntoClient
 internal var _NOTE_FFLAGSMASK: UInt32 { UInt32(truncatingIfNeeded: NOTE_FFLAGSMASK) }
 #endif // SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
+
+#if os(Linux) || os(Android)
+// MARK: epoll, eventfd, and timerfd
+//
+// These have the same values on every architecture: they're part of the
+// kernel's interface, and the flags that aren't are defined as O_CLOEXEC and
+// O_NONBLOCK. The C libraries declare them in different ways: glibc declares
+// the epoll events as an enumeration (so `EPOLLIN.rawValue`), musl and
+// Bionic as macros, and Bionic's EPOLLET doesn't import. So they're spelled
+// out here, once, for every C library.
+
+@_alwaysEmitIntoClient
+internal var _EPOLL_CLOEXEC: CInt { _O_CLOEXEC }
+
+@_alwaysEmitIntoClient
+internal var _EPOLL_CTL_ADD: CInt { 1 }
+
+@_alwaysEmitIntoClient
+internal var _EPOLL_CTL_DEL: CInt { 2 }
+
+@_alwaysEmitIntoClient
+internal var _EPOLL_CTL_MOD: CInt { 3 }
+
+@_alwaysEmitIntoClient
+internal var _EPOLLIN: UInt32 { 0x0000_0001 }
+
+@_alwaysEmitIntoClient
+internal var _EPOLLPRI: UInt32 { 0x0000_0002 }
+
+@_alwaysEmitIntoClient
+internal var _EPOLLOUT: UInt32 { 0x0000_0004 }
+
+@_alwaysEmitIntoClient
+internal var _EPOLLERR: UInt32 { 0x0000_0008 }
+
+@_alwaysEmitIntoClient
+internal var _EPOLLHUP: UInt32 { 0x0000_0010 }
+
+@_alwaysEmitIntoClient
+internal var _EPOLLRDHUP: UInt32 { 0x0000_2000 }
+
+@_alwaysEmitIntoClient
+internal var _EPOLLEXCLUSIVE: UInt32 { 1 << 28 }
+
+@_alwaysEmitIntoClient
+internal var _EPOLLWAKEUP: UInt32 { 1 << 29 }
+
+@_alwaysEmitIntoClient
+internal var _EPOLLONESHOT: UInt32 { 1 << 30 }
+
+@_alwaysEmitIntoClient
+internal var _EPOLLET: UInt32 { 1 << 31 }
+
+@_alwaysEmitIntoClient
+internal var _EFD_SEMAPHORE: CInt { 1 }
+
+@_alwaysEmitIntoClient
+internal var _EFD_CLOEXEC: CInt { _O_CLOEXEC }
+
+@_alwaysEmitIntoClient
+internal var _EFD_NONBLOCK: CInt { _O_NONBLOCK }
+
+@_alwaysEmitIntoClient
+internal var _TFD_CLOEXEC: CInt { _O_CLOEXEC }
+
+@_alwaysEmitIntoClient
+internal var _TFD_NONBLOCK: CInt { _O_NONBLOCK }
+
+@_alwaysEmitIntoClient
+internal var _TFD_TIMER_ABSTIME: CInt { 1 << 0 }
+
+@_alwaysEmitIntoClient
+internal var _TFD_TIMER_CANCEL_ON_SET: CInt { 1 << 1 }
+
+// The clocks that timerfd accepts.
+@_alwaysEmitIntoClient
+internal var _CLOCK_REALTIME: CInt { 0 }
+
+@_alwaysEmitIntoClient
+internal var _CLOCK_MONOTONIC: CInt { 1 }
+
+@_alwaysEmitIntoClient
+internal var _CLOCK_BOOTTIME: CInt { 7 }
+
+@_alwaysEmitIntoClient
+internal var _CLOCK_REALTIME_ALARM: CInt { 8 }
+
+@_alwaysEmitIntoClient
+internal var _CLOCK_BOOTTIME_ALARM: CInt { 9 }
+#endif // os(Linux) || os(Android)
 
 #if !os(Windows) && !os(WASI)
 // MARK: poll

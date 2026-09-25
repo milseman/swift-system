@@ -7,8 +7,9 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-// The event notification calls: kqueue on Darwin, FreeBSD, and OpenBSD,
-// and poll on every Unix platform.
+// The event notification calls: kqueue on Darwin, FreeBSD, and OpenBSD;
+// epoll, eventfd, and timerfd on Linux and Android; and poll on every Unix
+// platform.
 
 import CSystem
 #if SYSTEM_PACKAGE_DARWIN
@@ -55,6 +56,103 @@ internal func system_kevent(
   return kevent(kq, changelist, nchanges, eventlist, nevents, timeout)
 }
 #endif // SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
+
+#if os(Linux) || os(Android)
+// epoll_create1
+internal func system_epoll_create1(_ flags: CInt) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(flags) }
+#endif
+  return epoll_create1(flags)
+}
+
+// epoll_ctl
+internal func system_epoll_ctl(
+  _ epfd: CInt, _ op: CInt, _ fd: CInt,
+  _ event: UnsafeMutablePointer<epoll_event>?
+) -> CInt {
+#if ENABLE_MOCKING
+  // Records the event's value, or 0 and 0 for no event.
+  if mockingEnabled {
+    return _mock(
+      epfd, op, fd,
+      event.map { $0.pointee.events } ?? 0,
+      event.map { $0.pointee.data.u64 } ?? 0)
+  }
+#endif
+  return epoll_ctl(epfd, op, fd, event)
+}
+
+// epoll_wait. Bionic declares the event list _Nonnull.
+internal func system_epoll_wait(
+  _ epfd: CInt, _ events: UnsafeMutablePointer<epoll_event>,
+  _ maxevents: CInt, _ timeout: CInt
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(epfd, maxevents, timeout) }
+#endif
+  return epoll_wait(epfd, events, maxevents, timeout)
+}
+
+// epoll_pwait. Bionic declares the event list _Nonnull.
+internal func system_epoll_pwait(
+  _ epfd: CInt, _ events: UnsafeMutablePointer<epoll_event>,
+  _ maxevents: CInt, _ timeout: CInt,
+  _ sigmask: UnsafePointer<sigset_t>?
+) -> CInt {
+#if ENABLE_MOCKING
+  // Records the signal mask as a pointer, which tests don't check.
+  if mockingEnabled { return _mock(epfd, maxevents, timeout, sigmask) }
+#endif
+  return epoll_pwait(epfd, events, maxevents, timeout, sigmask)
+}
+
+// eventfd
+internal func system_eventfd(_ initval: CUnsignedInt, _ flags: CInt) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(initval, flags) }
+#endif
+  // Older C libraries declare the initial value as an int,
+  // so let the parameter's type decide the conversion.
+  return eventfd(.init(initval), flags)
+}
+
+// timerfd_create
+internal func system_timerfd_create(_ clockid: CInt, _ flags: CInt) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(clockid, flags) }
+#endif
+  return timerfd_create(.init(clockid), flags)
+}
+
+// timerfd_settime
+internal func system_timerfd_settime(
+  _ fd: CInt, _ flags: CInt,
+  _ new: UnsafePointer<itimerspec>,
+  _ old: UnsafeMutablePointer<itimerspec>?
+) -> CInt {
+#if ENABLE_MOCKING
+  // Records the new schedule's value.
+  if mockingEnabled {
+    return _mock(
+      fd, flags,
+      Int(new.pointee.it_value.tv_sec), Int(new.pointee.it_value.tv_nsec),
+      Int(new.pointee.it_interval.tv_sec), Int(new.pointee.it_interval.tv_nsec))
+  }
+#endif
+  return timerfd_settime(fd, flags, new, old)
+}
+
+// timerfd_gettime
+internal func system_timerfd_gettime(
+  _ fd: CInt, _ current: UnsafeMutablePointer<itimerspec>
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(fd) }
+#endif
+  return timerfd_gettime(fd, current)
+}
+#endif // os(Linux) || os(Android)
 
 #if !os(Windows) && !os(WASI)
 // poll

@@ -58,6 +58,24 @@ internal func _nanosecondComponents(
   return (seconds == .max ? .max : seconds + 1, 0)
 }
 
+/// Converts a duration to a `timespec`, without a maximum:
+/// a negative duration becomes zero,
+/// and a positive one rounds up to a whole nanosecond.
+@available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *)
+@_alwaysEmitIntoClient
+internal func _timespec(_ duration: Duration) -> timespec {
+  guard duration > .zero else { return timespec(tv_sec: 0, tv_nsec: 0) }
+  let (seconds, nanoseconds) = _nanosecondComponents(duration)
+  return timespec(tv_sec: .init(clamping: seconds), tv_nsec: .init(nanoseconds))
+}
+
+/// Converts a `timespec` to a duration.
+@available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *)
+@_alwaysEmitIntoClient
+internal func _duration(_ time: timespec) -> Duration {
+  .seconds(Int64(time.tv_sec)) + .nanoseconds(Int64(time.tv_nsec))
+}
+
 /// Converts an optional timeout to the milliseconds that `poll` and
 /// `epoll_wait` take: `-1` for `nil`, which waits until an event arrives,
 /// and otherwise a value clamped to between zero and `CInt.max`,
