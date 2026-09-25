@@ -61,6 +61,9 @@ struct SystemSamples: ParsableCommand {
       SignalIO.self,
       PipeAtomic.self,
       Extents.self,
+      ThreadsPool.self,
+      ThreadsLocal.self,
+      ThreadsInfo.self,
     ])
 }
 
