@@ -102,6 +102,11 @@ def system_dependency_text(name, dep):
             f"about what {name} uses; the System API it already calls is looked up on the tip below.")
 
 
+def note_text(entry):
+    """The package's note for an entry, then the shared one."""
+    return " ".join(x for x in (entry.get("packageNote"), entry.get("note")) if x)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--coverage", required=True)
@@ -112,7 +117,8 @@ def main():
     meta = cov.get("meta", {})
     platforms = cov["platforms"]
     categories = cov["categories"]
-    entries = cov["entries"]
+    # The mapping is shared; this report is about the entries the package uses.
+    entries = [e for e in cov["entries"] if e.get("sites")]
     interfaces = cov["interfaces"]
     problems = cov["problems"]
     ext = cov["extraction"]
@@ -152,9 +158,9 @@ def main():
     for k, label in checks:
         n = len(problems.get(k, []))
         w(f"- {'**' + str(n) + '**' if n else 'No'} {label}.")
-    stale = problems.get("stale", [])
-    w(f"- {len(stale) or 'No'} entries name symbols {name} no longer uses"
-      + (" (not an error; prune them)." if stale else "."))
+    stale = problems.get("staleNotes", [])
+    w(f"- {len(stale) or 'No'} entries have a `note.{pkg['key']}` although {name} uses none of their symbols"
+      + (" (not an error; drop the note)." if stale else ".") + " Symbols no package uses are in the combined report.")
     w("")
     if problems.get("unmapped"):
         w(f"### New {name} interfaces")
@@ -187,7 +193,7 @@ def main():
             w(f"- {esc(m)}")
     if stale:
         w("")
-        w("Stale: " + "; ".join(f"[{s['entry']}] {', '.join(s['symbols'])}" for s in stale) + ".")
+        w("Stale notes: " + "; ".join(f"[{s['entry']}]" for s in stale) + ".")
     w("")
 
     # ---------------------------------------------------------- summary
@@ -214,9 +220,9 @@ def main():
     out.extend(summary_table(cov["summary"]["all"], platforms, categories, swift_alts_a))
     w("")
     unrel = [e for e in entries if e.get("unreleased") and e["status"] in ("covered", "partial")]
-    rel_syms = sum(len(e["symbols"]) for e in unrel)
+    rel_syms = sum(len([s for s in e["symbols"] if s in interfaces]) for e in unrel)
     w(f"{len(unrel)} of the covered and partial entries ({rel_syms} symbols) cite unreleased `System 199` API, so "
-      f"{name} can adopt them only once a release ships it. Entries by status: " +
+      f"{name} can adopt them only once a release ships it. Entries {name} uses, by status: " +
       ", ".join(f"{sum(1 for e in entries if e['status'] == s)} {s}" for s in STATUSES_ALL) + ".")
     w("")
 
@@ -242,7 +248,7 @@ def main():
     w("|---|---|---|---|---|---|---|")
     for i, g in enumerate(cov["gaps"][:GAP_COUNT], 1):
         e = by_id[g["id"]]
-        note = e["note"]
+        note = note_text(e)
         if len(note) > 260:
             note = note[:257].rsplit(" ", 1)[0] + " ..."
         w(f"| {i} | {esc(g['id'])} | {g['category']} | {' '.join(ABBREV[p] for p in g['gapPlatforms'])} | "
@@ -271,7 +277,7 @@ def main():
             reason = "; ".join(sorted({f"{ABBREV[p]}: {v['reason']}" for p, v in e["platformStatus"].items()
                                         if v.get("reason")}))
             status = plat_status(e, platforms) + (f" ({esc(reason)})" if reason else "")
-            note = e["note"] + (f" *Swift:* {e['swift']}." if e.get("swift") else "")
+            note = note_text(e) + (f" *Swift:* {e['swift']}." if e.get("swift") else "")
             w(f"| {esc(e['id'])} | {sym_cell} | {status} | {api_cell(e) or '—'} | {e['sites']} ({esc(tg)}) | "
               f"{esc(note)} |")
         w("")
@@ -280,7 +286,7 @@ def main():
         w("### Ignored (not OS interfaces)")
         w("")
         for e in ignored:
-            w(f"- [{esc(e['id'])}] {', '.join(code(s) for s in e['symbols'])}: {esc(e['note'])}")
+            w(f"- [{esc(e['id'])}] {', '.join(code(s) for s in e['symbols'])}: {esc(note_text(e))}")
         w("")
 
     # --------------------------------------------------- per interface

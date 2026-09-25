@@ -145,7 +145,9 @@ def availability(attrs):
     return {"system": system, "os": sorted(set(floors))}
 
 
-def load_mapping(path):
+def load_mapping(path, packages=()):
+    """(config, entries, problems). `packages` are the names note.<package>
+    may use."""
     problems = []
     cp = configparser.ConfigParser(interpolation=None, delimiters=("=",), comment_prefixes=("#",),
                                    inline_comment_prefixes=None, strict=True, empty_lines_in_values=False,
@@ -171,12 +173,18 @@ def load_mapping(path):
         e = {"id": sec, "symbols": (items.get("symbols") or sec).split(),
              "category": items.get("category", "").strip(), "status": items.get("status", "").strip(),
              "note": " ".join(items.get("note", "").split()), "swift": " ".join(items.get("swift", "").split()),
-             "apis": [], "overrides": {}}
+             "notes": {}, "apis": [], "overrides": {}}
         for line in (items.get("system") or "").split("\n"):
             if line.strip():
                 scope, decl = parse_api_line(line)
                 e["apis"].append({"text": line.strip(), "scope": scope, "decl": decl})
         for k, v in items.items():
+            m = re.match(r"^note\.([\w-]+)$", k)
+            if m:
+                if packages and m.group(1) not in packages:
+                    problems.append(f"[{sec}]: {k} names no package in packages/")
+                e["notes"][m.group(1)] = " ".join(v.split())
+                continue
             m = re.match(r"^status\.(\w+)$", k)
             if m:
                 plat = next((p for p in PLATFORMS if p.lower() == m.group(1).lower()), None)
@@ -193,7 +201,7 @@ def load_mapping(path):
             problems.append(f"[{sec}]: unknown category {e['category']!r}")
         if e["status"] in ("covered", "partial") and not e["apis"]:
             problems.append(f"[{sec}]: a {e['status']} entry needs a `system` declaration")
-        if e["status"] in ("partial", "ignore") and not e["note"]:
+        if e["status"] in ("partial", "ignore") and not e["note"] and not e["notes"]:
             problems.append(f"[{sec}]: a {e['status']} entry needs a note")
         entries.append(e)
     return config, entries, problems
@@ -221,10 +229,13 @@ def main():
     ext = json.load(open(args.interfaces))
     api = SystemAPI(json.load(open(args.system)))
     meta = json.load(open(args.meta)) if args.meta else {}
-    config, entries, malformed = load_mapping(args.mapping)
+    known = {f[:-4] for f in os.listdir(os.path.dirname(os.path.abspath(args.package))) if f.endswith(".ini")}
+    config, entries, malformed = load_mapping(args.mapping, known)
     interfaces = {i["name"]: i for i in ext["interfaces"]}
+    for e in entries:
+        e["packageNote"] = e["notes"].get(pkg["key"], "")
 
-    problems = {"malformed": malformed, "unmapped": [], "duplicate": [], "apiMissing": [], "stale": [],
+    problems = {"malformed": malformed, "unmapped": [], "duplicate": [], "apiMissing": [], "staleNotes": [],
                 "alreadySystemMissing": []}
 
     # ------------------------------------------------- symbols to entries
@@ -241,10 +252,11 @@ def main():
                                          "platforms": it["platforms"], "targets": it["targets"],
                                          "headers": it["headers"] or it["reachedThrough"],
                                          "examples": [f"{s['file']}:{s['line']}" for s in it["sites"][:3]]})
+    # A note for this package on an entry it no longer uses. (Symbols no
+    # package uses are the combined report's to find.)
     for e in entries:
-        stale = [s for s in e["symbols"] if s not in interfaces]
-        if stale:
-            problems["stale"].append({"entry": e["id"], "symbols": stale})
+        if e["packageNote"] and not any(s in interfaces for s in e["symbols"]):
+            problems["staleNotes"].append({"entry": e["id"], "symbols": e["symbols"]})
 
     # ------------------------------------------------------ System APIs
     for e in entries:
@@ -494,7 +506,7 @@ def print_summary(cov):
                      ("apiMissing", "cited System declarations missing on the tip"),
                      ("alreadySystemMissing", f"System API {name} already uses, missing on the tip"),
                      ("duplicate", "symbols mapped twice"), ("malformed", "mapping errors"),
-                     ("stale", f"mapping entries naming symbols {name} no longer uses")):
+                     ("staleNotes", f"entries with a note for {name} that {name} no longer uses")):
         if p[k]:
             print(f"{label}: {len(p[k])}")
             for x in p[k][:10]:
