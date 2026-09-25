@@ -20,6 +20,7 @@ swift test --filter SocketOperationsTests/bindToAnyPort   # one swift-testing te
 swift run system-samples --help
 Utilities/api-delta/regenerate.sh                         # public API delta, main vs system-next, into .build/api-delta (see its README.md)
 Utilities/nio-coverage/check.sh                           # what swift-nio uses from the OS vs System's API, into .build/nio-coverage (see its README.md)
+Prototype/PlatformEnum/check.sh                           # the platform-enum samples, real and simulated builds, run as every platform (see its README.md)
 
 # CI variants (.github/workflows/pull_request.yml). A separate --scratch-path keeps
 # the default .build from being rebuilt whenever the manifest flags change.
@@ -84,6 +85,8 @@ The first three directions in `Next/Vision.md` have prototypes merged into `syst
    - Samples are in `Sources/Samples/Owned*.swift`, and tests are in `Tests/SystemTests/OwnedFD*Tests.swift`.
 2. **Descriptor sub-types.** `Terminal/TerminalDescriptor.swift` and `SocketDescriptor` share one conversion pattern: a `fileDescriptor` property, `init(unchecked:)`, and a checked `init(_:) throws(Errno)` that verifies with `isatty` or `getsockopt(SO_TYPE)`. Terminals also get `FileDescriptor.isTerminal` and `asTerminal`, which returns `nil` rather than throwing; sockets have no equivalent.
 3. **Process IDs.** `ProcessID.swift` wraps `pid_t` on the model of `UserID` and `GroupID`, with `.current` and `.parent`.
+
+Direction 4, multi-platform enums, is prototyped in `Sources/Samples/Platforms/` (`system-samples platform <sample>`), which the `platform-enum` lane owns. Its `Platform.File`, `.Directory`, `.Socket`, and `.Process` enums wrap each platform's owners. Built with `-Xswiftc -DSIMULATE_PLATFORMS` (and a separate `--scratch-path`), every platform's cases exist, over stand-ins for the Win32 drafts (SYS-0010 to SYS-0016) simulated on POSIX, and `--as windows` runs their arms. The findings and a recommendation are in `Prototype/PlatformEnum/README.md`.
 
 The subdirectories of `Prototype/` record how the `OwnedFD` design was decided. Each README ends with a decision or a recommendation. Scripts that build a modified copy of the package make it under `$TMPDIR`, not in this checkout.
 - `Forwarding/`: why `OwnedFD` forwards only byte I/O and vends the rest. `forwarding.py inventory` lists `FileDescriptor`'s public members.

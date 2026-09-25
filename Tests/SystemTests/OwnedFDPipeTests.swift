@@ -21,6 +21,7 @@ import XCTest
 // is frozen (see Prototype/Verify/V13b_crossmodule_frozen_pair).
 
 #if !os(WASI) // WASI has no pipe
+@available(System 199, *)
 final class OwnedFDPipeTest: XCTestCase {
   #if ENABLE_MOCKING
   func testPipeSyscalls() {

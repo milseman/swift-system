@@ -103,35 +103,23 @@ final class TerminalJobControlTest: XCTestCase {
     XCTAssertEqual(try terminal.foregroundProcessGroup(), original)
   }
 
-  // glibc declares posix_openpt(3) and friends only under _XOPEN_SOURCE,
-  // which Swift's Glibc module doesn't define.
-  #if !(os(Linux) && canImport(Glibc))
   func testNotTheControllingTerminal() throws {
-    // A pseudoterminal opened with O_NOCTTY is a terminal,
+    // The pseudoterminal is opened with O_NOCTTY, so it's a terminal,
     // but not this process's controlling terminal.
-    let controller = FileDescriptor(rawValue: posix_openpt(O_RDWR | O_NOCTTY))
-    guard controller.rawValue != -1 else { throw Errno.current }
-    defer { try? controller.close() }
-    guard grantpt(controller.rawValue) == 0,
-          unlockpt(controller.rawValue) == 0,
-          let path = ptsname(controller.rawValue)
-    else { throw Errno.current }
-    let fd = try FileDescriptor.open(
-      path, .readWrite, options: FileDescriptor.OpenOptions(rawValue: O_NOCTTY))
-    defer { try? fd.close() }
-    let terminal = try TerminalDescriptor(fd)
+    try withPseudoterminal { _, fd in
+      let terminal = try TerminalDescriptor(fd)
 
-    XCTAssertThrowsError(try terminal.foregroundProcessGroup()) {
-      XCTAssertEqual($0 as? Errno, .inappropriateIOCTLForDevice)
-    }
-    XCTAssertThrowsError(try terminal.sessionID()) {
-      XCTAssertEqual($0 as? Errno, .inappropriateIOCTLForDevice)
-    }
-    XCTAssertThrowsError(try terminal.setForegroundProcessGroup(ProcessID(getpgrp()))) {
-      XCTAssertEqual($0 as? Errno, .inappropriateIOCTLForDevice)
+      XCTAssertThrowsError(try terminal.foregroundProcessGroup()) {
+        XCTAssertEqual($0 as? Errno, .inappropriateIOCTLForDevice)
+      }
+      XCTAssertThrowsError(try terminal.sessionID()) {
+        XCTAssertEqual($0 as? Errno, .inappropriateIOCTLForDevice)
+      }
+      XCTAssertThrowsError(try terminal.setForegroundProcessGroup(ProcessID(getpgrp()))) {
+        XCTAssertEqual($0 as? Errno, .inappropriateIOCTLForDevice)
+      }
     }
   }
-  #endif
 
   func testNotATerminal() throws {
     let pipe = try FileDescriptor.pipe()

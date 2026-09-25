@@ -36,6 +36,7 @@ import Android
 @Suite("ProcessID")
 private struct ProcessIDTests {
 
+  @available(System 199, *)
   @Test func rawValue() {
     let pid = ProcessID(rawValue: 42)
     #expect(pid.rawValue == 42)
@@ -45,12 +46,14 @@ private struct ProcessIDTests {
   }
 
   #if !os(WASI)
+  @available(System 199, *)
   @Test func current() {
     #expect(ProcessID.current.rawValue == getpid())
     #expect(ProcessID.current.rawValue > 0)
     #expect(ProcessID.current == ProcessID.current)
   }
 
+  @available(System 199, *)
   @Test func parent() {
     #expect(ProcessID.parent.rawValue == getppid())
     #expect(ProcessID.parent != ProcessID.current)

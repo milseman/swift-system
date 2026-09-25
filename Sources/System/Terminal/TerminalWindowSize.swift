@@ -85,8 +85,20 @@ extension TerminalDescriptor {
 
   /// Returns the terminal's window size.
   ///
-  /// - Returns: The window size, which is zero if nothing has set it,
-  ///   as for a new pseudoterminal.
+  /// - Returns: The window size. Its rows and columns are zero
+  ///   if nothing has set them.
+  ///
+  /// A size of zero isn't an error, so this method returns it
+  /// rather than throwing.
+  /// A terminal emulator sets the size of the terminal it provides,
+  /// and updates it when its window changes,
+  /// but a new pseudoterminal has zero rows and columns
+  /// until something sets them,
+  /// for example with ``setWindowSize(_:retryOnInterrupt:)``.
+  /// Check for zero before using the size to lay out output:
+  /// subtracting from zero `columns`, for example, traps.
+  /// Without a size, programs commonly use the `COLUMNS`
+  /// and `LINES` environment variables, or 80 columns by 24 rows.
   ///
   /// The corresponding C function is `ioctl`, with the `TIOCGWINSZ` request.
   @_alwaysEmitIntoClient

@@ -611,6 +611,16 @@ extension FileDescriptor {
     /// Indicates that the process receives a signal
     /// when input or output becomes possible on the file.
     ///
+    /// The signal is `SIGIO`, and it goes to the open file's owner,
+    /// which ``FileDescriptor/setSignalOwner(_:isGroup:)`` sets.
+    /// Install a handler for `SIGIO` before setting this flag:
+    /// on Linux, the signal's default action terminates the process.
+    /// On Darwin, its default action discards it,
+    /// and the system discards a signal with that action
+    /// even while the signal is blocked,
+    /// so without a handler, this flag seems to do nothing:
+    /// `sigwait` and `sigpending` never see the signal.
+    ///
     /// The corresponding C constant is `O_ASYNC`.
     @_alwaysEmitIntoClient
     public static var async: StatusFlags { StatusFlags(rawValue: _O_ASYNC) }
@@ -807,7 +817,12 @@ extension FileDescriptor.OpenOptions
   public var debugDescription: String { self.description }
 }
 
-// The decision on whether to make FileDescriptor Sendable or not
-// is currently being discussed in https://github.com/apple/swift-system/pull/112
-//@available(*, unavailable, message: "File descriptors are not completely thread-safe.")
-//extension FileDescriptor: Sendable {}
+// FileDescriptor has always been Sendable implicitly, as a frozen struct
+// whose one stored property is a CInt, and the SDK's System module interface
+// lists the conformance. Sending a descriptor to another task shares its
+// number, and the hazards of that, such as a close in one task while another
+// still uses the number, are inherent to file descriptors rather than
+// something this type prevents. See the discussion in
+// https://github.com/apple/swift-system/pull/112.
+@available(System 0.0.1, *)
+extension FileDescriptor: Sendable {}
