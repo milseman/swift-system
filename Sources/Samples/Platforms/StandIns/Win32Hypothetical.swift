@@ -49,6 +49,29 @@ extension Win32.FileHandle {
   static let standardError: Win32.FileHandle? = Win32.FileHandle(_simulated: 2)
 }
 
+// MARK: - Anonymous pipes
+
+extension Win32.FileHandle {
+  /// Both ends of an anonymous pipe. A tuple can't hold noncopyable values.
+  struct Pipe: ~Copyable, Sendable {
+    var readEnd: Win32.FileHandle
+    var writeEnd: Win32.FileHandle
+  }
+
+  /// Creates an anonymous pipe. SYS-0011 leaves `CreatePipe` to a future
+  /// proposal on named pipes.
+  ///
+  /// The corresponding C function is `CreatePipe`.
+  static func createPipe(inheritable: Bool = false) throws(Win32.Error) -> Pipe {
+    let ends = try Win32Simulation.posix { try FileDescriptor.pipe() }
+    let all: Win32.ShareMode = [.read, .write]
+    let readEnd = try Win32Simulation.register(ends.readEnd.rawValue, access: .genericRead, share: all)
+    let writeEnd = try Win32Simulation.register(ends.writeEnd.rawValue, access: .genericWrite, share: all)
+    return Pipe(
+      readEnd: Win32.FileHandle(_simulated: readEnd), writeEnd: Win32.FileHandle(_simulated: writeEnd))
+  }
+}
+
 // MARK: - Processes
 
 extension Win32 {
