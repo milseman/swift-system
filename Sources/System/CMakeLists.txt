@@ -101,6 +101,20 @@ target_sources(SystemPackage PRIVATE
   Terminal/TerminalJobControl.swift
   Terminal/TerminalOperations.swift
   Terminal/TerminalWindowSize.swift)
+target_sources(SystemPackage PRIVATE
+  Internals/Constants+Threads.swift
+  Internals/Syscalls+Threads.swift
+  Threads/CInterop+Threads.swift
+  Threads/PThread.swift
+  Threads/PThreadAttributes.swift
+  Threads/PThreadCondition.swift
+  Threads/PThreadCPUSet.swift
+  Threads/PThreadID.swift
+  Threads/PThreadKey.swift
+  Threads/PThreadMutex.swift
+  Threads/PThreadNames.swift
+  Threads/PThreadReadWriteLock.swift
+  Threads/PThreadScheduling.swift)
 target_link_libraries(SystemPackage PUBLIC
   CSystem)
 
