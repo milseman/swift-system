@@ -94,10 +94,10 @@ atomics (that's `Atomic`), and no `pthread_once` (Swift's globals and
 ## 2. Address stability
 
 A `pthread_mutex_t`, `pthread_cond_t`, or `pthread_rwlock_t` must not move
-after initialization: POSIX makes using a copy undefined, Darwin's kernel
-keys waiters by the object's address, and Darwin records the object's
-alignment when it initializes it. A noncopyable struct can move whenever
-it's consumed.
+after initialization: POSIX makes using a copy undefined, and in Darwin's
+libpthread (from its source, not tested here) the kernel keys waiters by
+the object's address, and initialization records the object's alignment. A
+noncopyable struct can move whenever it's consumed.
 
 | storage | compiles with 6.2 | address stable | can be stored | cost |
 |---|---|---|---|---|
