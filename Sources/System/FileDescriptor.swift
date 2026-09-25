@@ -611,6 +611,16 @@ extension FileDescriptor {
     /// Indicates that the process receives a signal
     /// when input or output becomes possible on the file.
     ///
+    /// The signal is `SIGIO`, and it goes to the open file's owner,
+    /// which ``FileDescriptor/setSignalOwner(_:isGroup:)`` sets.
+    /// Install a handler for `SIGIO` before setting this flag:
+    /// on Linux, the signal's default action terminates the process.
+    /// On Darwin, its default action discards it,
+    /// and the system discards a signal with that action
+    /// even while the signal is blocked,
+    /// so without a handler, this flag seems to do nothing:
+    /// `sigwait` and `sigpending` never see the signal.
+    ///
     /// The corresponding C constant is `O_ASYNC`.
     @_alwaysEmitIntoClient
     public static var async: StatusFlags { StatusFlags(rawValue: _O_ASYNC) }
