@@ -131,6 +131,7 @@ for name in ${done_packages[@]+"${done_packages[@]}"}; do
   mv "$STAGE/$name" "$OUT/$name"
 done
 cp "$STAGE/system-api.json" "$OUT/system-api.json"
+python3 "$S/combine.py" --out "$OUT" --mapping "$MAPPING" --packages "$PACKAGES"
 
 for name in ${done_packages[@]+"${done_packages[@]}"}; do
   echo
@@ -141,5 +142,5 @@ for name in ${failed_packages[@]+"${failed_packages[@]}"}; do
   echo
   echo "$name: failed; see the messages above"
 done
-log "done: $OUT"
+log "done: $OUT/COVERAGE.md, and a report per package beside it"
 exit "$status"

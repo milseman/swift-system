@@ -18,5 +18,7 @@ Each file has one section, `[package]`. Lists are separated by whitespace, excep
 | `build-flags` | | Extra arguments for `swift build` and `swift package`. |
 | `unset-env` | | Environment variables to unset for the build, such as switches the manifest reads. |
 | `build-hint` | | What to print when the build fails, such as which compiler the package needs. |
+| `false-flags` | | Compilation flags only builds the tool doesn't model define, such as Foundation's FOUNDATION_FRAMEWORK: false everywhere, and the report counts the lines they hide. |
 | `wrapper-files` | | The package's syscall layer: files whose functions exist only to reach the OS, one glob per line. The gap estimate counts the thin wrapper functions in them. |
 | `twin-targets` | | Targets that are copies of each other, whose code the gap estimate counts twice; the report says so. |
+| `through` | | Dependency packages (checkout names, `swift-tools-support-core`) whose OS use on the package's behalf the report dwells on. Every dependency is measured; these get their most used symbols listed. |
