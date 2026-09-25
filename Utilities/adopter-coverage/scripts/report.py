@@ -242,7 +242,9 @@ def main():
       "get no wrapper lines ("
       + ", ".join(code(x) for x in cov["config"].get("secondary", [])) + ") are under `[config]` in "
       "`mapping.ini`. Entries the Swift standard library covers aren't ranked: "
-      + ", ".join(cov["config"].get("unrankedStdlib", [])) + ".")
+      + ", ".join(cov["config"].get("unrankedStdlib", [])) + "."
+      + (" Nor are those that aren't System's to wrap (`wrap = no`): "
+         + ", ".join(cov["config"]["notWrapped"]) + "." if cov["config"].get("notWrapped") else ""))
     w("")
     w("| # | Entry | Category | Gap on | Lines (Swift + C) | Call sites | What's missing |")
     w("|---|---|---|---|---|---|---|")

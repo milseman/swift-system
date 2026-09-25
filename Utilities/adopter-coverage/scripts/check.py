@@ -37,7 +37,7 @@ PLATFORMS = package.PLATFORMS
 STATUSES = ("covered", "partial", "missing", "ignore")
 CATEGORIES = [
     "file I/O", "file system", "directories", "sockets", "name resolution", "network interfaces",
-    "event notification", "io_uring", "processes", "signals", "threads & locks", "time", "memory",
+    "event notification", "io_uring", "system calls", "processes", "signals", "threads & locks", "time", "memory",
     "dynamic loading", "system info", "errno & errors", "dispatch", "Apple frameworks", "C libraries",
     "strings/ctype/libm/stdio", "atomics", "C language", "compiler intrinsics",
 ]
@@ -182,7 +182,7 @@ def load_mapping(path, packages=()):
         e = {"id": sec, "symbols": (items.get("symbols") or sec).split(),
              "category": items.get("category", "").strip(), "status": items.get("status", "").strip(),
              "note": " ".join(items.get("note", "").split()), "swift": " ".join(items.get("swift", "").split()),
-             "notes": {}, "apis": [], "overrides": {}}
+             "notes": {}, "apis": [], "overrides": {}, "wrap": items.get("wrap", "yes").strip()}
         for line in (items.get("system") or "").split("\n"):
             if line.strip():
                 scope, decl = parse_api_line(line)
@@ -202,8 +202,10 @@ def load_mapping(path, packages=()):
                     problems.append(f"[{sec}]: bad override {k} = {v}")
                 else:
                     e["overrides"][plat] = {"status": st.strip(), "reason": " ".join(reason.split())}
-            elif k not in ("symbols", "category", "status", "system", "note", "swift"):
+            elif k not in ("symbols", "category", "status", "system", "note", "swift", "wrap"):
                 problems.append(f"[{sec}]: unknown key {k!r}")
+        if e["wrap"] not in ("yes", "no"):
+            problems.append(f"[{sec}]: wrap must be yes or no, not {e['wrap']!r}")
         if e["status"] not in STATUSES:
             problems.append(f"[{sec}]: status must be one of {', '.join(STATUSES)}, not {e['status']!r}")
         if e["status"] != "ignore" and e["category"] not in CATEGORIES:
@@ -345,9 +347,10 @@ def main():
         return sum(1 for ln in files.get(path, {}).get("codeLines", []) if start <= ln <= end)
 
     # Gaps: entries missing or partial somewhere, other than those the Swift
-    # standard library covers (a `swift` alternative), which aren't
-    # System's to fill.
+    # standard library covers (a `swift` alternative) and those that aren't
+    # System's to wrap (`wrap = no`: Dispatch, Apple's frameworks).
     gap_entries = [e for e in entries if e["status"] != "ignore" and not (e["status"] == "missing" and e["swift"])
+                   and e["wrap"] != "no"
                    and any(v["status"] in ("missing", "partial") for v in e["platformStatus"].values())]
     secondary = set((config.get("secondary") or "").split())
     gap_ids = {e["id"] for e in gap_entries}
@@ -453,7 +456,9 @@ def main():
         "package": pkg,
         "config": {"wrapperFiles": wrapper_globs, "thinWrapperLines": THIN_WRAPPER_LINES,
                    "secondary": sorted(secondary),
-                   "unrankedStdlib": sorted(e["id"] for e in entries if e["status"] == "missing" and e["swift"])},
+                   "unrankedStdlib": sorted(e["id"] for e in entries if e["status"] == "missing" and e["swift"]
+                                            and e.get("sites")),
+                   "notWrapped": sorted(e["id"] for e in entries if e["wrap"] == "no" and e.get("sites"))},
         "platforms": platforms,
         "categories": CATEGORIES,
         "problems": problems,
