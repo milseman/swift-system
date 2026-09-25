@@ -56,6 +56,17 @@ target_compile_options(SystemPackage PRIVATE
   ${SWIFT_SYSTEM_AVAILABILITY_MACRO}
   "SHELL:-package-name swift-system")
 target_sources(SystemPackage PRIVATE
+  Directories/DirectoryStream.swift
+  Directories/DirectoryWalk.swift)
+target_sources(SystemPackage PRIVATE
+  Events/EventCounter.swift
+  Events/EventPoll.swift
+  Events/IntervalTimer.swift
+  Events/KernelEvent.swift
+  Events/KernelQueue.swift
+  Events/Poll.swift
+  Events/Timeouts.swift)
+target_sources(SystemPackage PRIVATE
   FilePath/FilePath.swift
   FilePath/FilePathComponents.swift
   FilePath/FilePathComponentView.swift
@@ -85,10 +96,13 @@ endif()
 target_sources(SystemPackage PRIVATE
   Internals/Backcompat.swift
   Internals/CInterop.swift
+  Internals/Constants+Events.swift
   Internals/Constants.swift
   Internals/Exports.swift
   Internals/Mocking.swift
   Internals/RawBuffer.swift
+  Internals/Syscalls+Directories.swift
+  Internals/Syscalls+Events.swift
   Internals/Syscalls.swift
   Internals/WindowsSyscallAdapters.swift)
 target_sources(SystemPackage PRIVATE
@@ -101,6 +115,20 @@ target_sources(SystemPackage PRIVATE
   Terminal/TerminalJobControl.swift
   Terminal/TerminalOperations.swift
   Terminal/TerminalWindowSize.swift)
+target_sources(SystemPackage PRIVATE
+  Internals/Constants+Threads.swift
+  Internals/Syscalls+Threads.swift
+  Threads/CInterop+Threads.swift
+  Threads/PThread.swift
+  Threads/PThreadAttributes.swift
+  Threads/PThreadCondition.swift
+  Threads/PThreadCPUSet.swift
+  Threads/PThreadID.swift
+  Threads/PThreadKey.swift
+  Threads/PThreadMutex.swift
+  Threads/PThreadNames.swift
+  Threads/PThreadReadWriteLock.swift
+  Threads/PThreadScheduling.swift)
 target_link_libraries(SystemPackage PUBLIC
   CSystem)
 

@@ -655,6 +655,11 @@ final class TerminalTests: XCTestCase {
   func testWindowSizeOperation() throws {
     try withPseudoterminal { controller, fd in
       let terminal = try TerminalDescriptor(fd)
+      // Nothing has set a new pseudoterminal's size, which reads as zero.
+      let unset = try terminal.windowSize()
+      XCTAssertEqual(unset.rows, 0)
+      XCTAssertEqual(unset.columns, 0)
+
       let size = TerminalDescriptor.WindowSize(rows: 24, columns: 80)
       try terminal.setWindowSize(size)
       XCTAssertEqual(try terminal.windowSize(), size)

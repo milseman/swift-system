@@ -447,6 +447,12 @@ extension SocketDescriptor {
   ///
   /// This type represents raw socket option constants that can be used
   /// with ancillary messages or generic get/set socket option operations.
+  ///
+  /// An ancillary message's type is an `Option`,
+  /// whose meaning depends on the message's level.
+  /// At the ``OptionLevel/socket`` level the types are control message
+  /// constants such as ``rights``;
+  /// at a protocol's level they're mostly that protocol's option constants.
   @frozen
   public struct Option: RawRepresentable, Hashable, Sendable, CustomStringConvertible {
     @_alwaysEmitIntoClient
@@ -457,6 +463,17 @@ extension SocketDescriptor {
 
     @_alwaysEmitIntoClient
     private init(_ rawValue: CInt) { self.init(rawValue: rawValue) }
+
+    /// Pass file descriptors, at the ``OptionLevel/socket`` level.
+    ///
+    /// A message of this type carries an array of `CInt` descriptors
+    /// over a local socket.
+    /// ``AncillaryMessageBuffer/appendFileDescriptors(_:)`` makes one,
+    /// and a received message's `fileDescriptors` property reads one.
+    ///
+    /// The corresponding C constant is `SCM_RIGHTS`.
+    @_alwaysEmitIntoClient
+    public static var rights: Option { Option(CInt(SCM_RIGHTS)) }
 
     public var description: String { "Option(\(rawValue))" }
   }

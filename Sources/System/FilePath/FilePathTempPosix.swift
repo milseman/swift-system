@@ -47,13 +47,7 @@ internal func _recursiveRemove(
     try? dirfd.close()
   }
 
-  let dot: (CInterop.PlatformChar, CInterop.PlatformChar) = (46, 0)
-  try withUnsafeBytes(of: dot) {
-    try recursiveRemove(
-      in: dirfd.rawValue,
-      name: $0.assumingMemoryBound(to: CInterop.PlatformChar.self).baseAddress!
-    )
-  }
+  try removeContents(of: dirfd.rawValue)
 
   try path.withPlatformString {
     if system_rmdir($0) != 0 {
@@ -121,29 +115,36 @@ fileprivate func forEachFile(
 /// Delete the entire contents of a directory, including its subdirectories.
 ///
 /// - Parameters:
-///   - dirfd: The parent of the directory to be removed.
-///   - name: The name of the directory to be removed.
+///   - dirfd: An open file descriptor for the directory to be emptied.
 ///
-/// Removes a directory completely, including all of its contents.
-fileprivate func recursiveRemove(
-  in dirfd: CInt,
-  name: UnsafePointer<CInterop.PlatformChar>
-) throws {
-  // First, deal with subdirectories
-  try forEachFile(in: dirfd, subdir: name) { dirent in
+/// Removes everything in the directory, but not the directory itself.
+/// Each subdirectory is emptied through a file descriptor of its own,
+/// so every name is resolved against the directory that contains it.
+fileprivate func removeContents(of dirfd: CInt) throws {
+  // First, empty the subdirectories
+  try forEachFile(in: dirfd, subdir: ".") { dirent in
     if dirent.d_type == SYSTEM_DT_DIR {
       try withUnsafeBytes(of: dirent.d_name) {
-        try recursiveRemove(
-          in: dirfd,
-          name: $0.assumingMemoryBound(to: CInterop.PlatformChar.self)
-            .baseAddress!
-        )
+        // Don't follow a symbolic link that has replaced the subdirectory.
+        let subdirfd = system_openat(
+          dirfd,
+          $0.assumingMemoryBound(to: CInterop.PlatformChar.self).baseAddress!,
+          FileDescriptor.AccessMode.readOnly.rawValue
+            | FileDescriptor.OpenOptions.directory.rawValue
+            | FileDescriptor.OpenOptions.noFollow.rawValue)
+        if subdirfd < 0 {
+          throw Errno.current
+        }
+        defer {
+          _ = system_close(subdirfd)
+        }
+        try removeContents(of: subdirfd)
       }
     }
   }
 
   // Now delete the contents of this directory
-  try forEachFile(in: dirfd, subdir: name) { dirent in
+  try forEachFile(in: dirfd, subdir: ".") { dirent in
     let flag: CInt
 
     if dirent.d_type == SYSTEM_DT_DIR {

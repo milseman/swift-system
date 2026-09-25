@@ -32,6 +32,7 @@ import Testing
 
 @Suite("OwnedFD deinit")
 private struct OwnedFDDeinitTests {
+  @available(System 199, *)
   @Test func destroyingAnOwnerExitsNormally() async {
     // The control for the EBADF cases. testDeinitClosesRealDescriptor in
     // OwnedFDTests.swift checks that destroying an owner closes it.
@@ -42,6 +43,7 @@ private struct OwnedFDDeinitTests {
     }
   }
 
+  @available(System 199, *)
   @Test func deinitDropsEBADFWhenVendedDescriptorIsClosed() async {
     await #expect(processExitsWith: .success) {
       let pipe = try FileDescriptor.pipe()
@@ -52,6 +54,7 @@ private struct OwnedFDDeinitTests {
     }
   }
 
+  @available(System 199, *)
   @Test func deinitDropsEBADFWhenAdoptedTwice() async {
     await #expect(processExitsWith: .success) {
       let pipe = try FileDescriptor.pipe()
@@ -63,6 +66,7 @@ private struct OwnedFDDeinitTests {
     }
   }
 
+  @available(System 199, *)
   @Test func explicitCloseThrowsEBADF() {
     // The deinit drops EBADF, but `close()` reports it like any other error.
     #expect(throws: Errno.badFileDescriptor) {

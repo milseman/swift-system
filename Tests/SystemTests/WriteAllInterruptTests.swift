@@ -64,6 +64,7 @@ final class WriteAllInterruptTest: XCTestCase {
   // This covers the positioned variant too, which can't block. It checks
   // only `retryOnInterrupt: false`: when a mocked write is retried, it
   // returns 0 bytes, and writeAll retries that forever.
+  @available(System 199, *)
   func testSpanWriteAllThrowsOnInterruptWhenNotRetrying() throws {
     guard #available(macOS 15, iOS 18, watchOS 11, tvOS 18, visionOS 2, *) else {
       throw XCTSkip("Span-based I/O requires macOS 15 or later")

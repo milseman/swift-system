@@ -62,3 +62,19 @@ extern int csystem_grantpt(int fd);
 extern int csystem_unlockpt(int fd);
 extern int csystem_ptsname_r(int fd, char *buffer, size_t length);
 #endif // __linux__
+
+#ifdef __linux__
+// Thread names and CPU affinity. glibc declares these only with _GNU_SOURCE,
+// and Musl and Bionic declare the affinity functions only with it; see
+// shims.c. Each mask is a cpu_set_t of `size` bytes, untyped because Musl
+// declares cpu_set_t itself only with _GNU_SOURCE.
+extern int csystem_pthread_setname_np(pthread_t thread, const char *name);
+extern int csystem_pthread_getname_np(pthread_t thread, char *name, size_t length);
+extern int csystem_sched_setaffinity(pid_t pid, size_t size, const void *mask);
+extern int csystem_sched_getaffinity(pid_t pid, size_t size, void *mask);
+#ifndef __ANDROID__
+// Bionic has no pthread affinity functions.
+extern int csystem_pthread_setaffinity_np(pthread_t thread, size_t size, const void *mask);
+extern int csystem_pthread_getaffinity_np(pthread_t thread, size_t size, void *mask);
+#endif // !__ANDROID__
+#endif // __linux__
