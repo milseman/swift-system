@@ -705,6 +705,22 @@ def main():
     for usr, name, lang, kind, f, line, colm, roles in refs:
         if usr.startswith("c:"):
             loc_has_c[(f, line, colm)].add(usr)
+    # C names a dependency's modules declare (ICU's), for the synthesized
+    # USRs whose declaration the package doesn't reference directly.
+    dep_c_names = set()
+    for module, names in index["vocab"].items():
+        top = module.split(".")[0]
+        if top in dep_modules or top.startswith("<dependency>/"):
+            dep_c_names.update(n for n, (_k, langs) in names.items() if langs & 1)
+    # C declarations by name, to classify Swift's synthesized USRs for
+    # imported C declarations (s:So10UErrorCodea), which have none of their
+    # own: _FoundationICU's UErrorCode is a dependency's, not the OS's.
+    c_decl_by_name = {}
+    for u, d in decls.items():
+        if u.startswith("c:"):
+            n = c_usr_parts(u)[1]
+            if n:
+                c_decl_by_name.setdefault(n, d)
 
     source_lines = {}
 
@@ -759,6 +775,15 @@ def main():
                 continue
             n = int(m.group(1))
             key = usr[m.end():m.end() + n]
+            cd = c_decl_by_name.get(key)
+            if cd is not None:
+                cmc, cmod = cls.module_class(cd[0], cd[1])
+                if cmc not in ("os", "shim") or (cmc == "shim" and cmod == target):
+                    excluded[cmc if cmc != "shim" else "shim's own declaration"] += 1
+                    continue
+            elif key in dep_c_names:
+                excluded["dependency"] += 1
+                continue
             member = None
             mm = re.match(r"V(\d+)", usr[m.end() + n:])
             if usr.startswith("s:So") and mm:
