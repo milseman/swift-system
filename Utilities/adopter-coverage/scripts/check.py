@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check mapping.ini against the NIO extraction and System's API, and
+"""Check mapping.ini against a package's extraction and System's API, and
 compute the coverage the report shows.
 
   - Every interface the extractor found must be named by exactly one
@@ -12,8 +12,8 @@ compute the coverage the report shows.
     of its declarations compiles, per api-delta's source scan; elsewhere
     it counts as missing.
 
-Usage: check.py --interfaces I.json --system S.json --mapping M.ini
-                --meta meta.json --out coverage.json
+Usage: check.py --package packages/NAME.ini --interfaces I.json --system S.json
+                --mapping M.ini --meta meta.json --out coverage.json
        check.py --summary coverage.json
 Exit status: 0 if the mapping accounts for everything, 2 if not.
 """
@@ -27,16 +27,29 @@ import collections
 import configparser
 import fnmatch
 import json
+import os
 import re
 
-PLATFORMS = ["Darwin", "Linux", "Musl", "Android", "FreeBSD", "OpenBSD", "WASI", "Windows"]
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import package  # noqa: E402
+
+PLATFORMS = package.PLATFORMS
 STATUSES = ("covered", "partial", "missing", "ignore")
 CATEGORIES = [
     "file I/O", "file system", "directories", "sockets", "name resolution", "network interfaces",
-    "event notification", "io_uring", "processes", "signals", "threads & locks", "time", "memory",
-    "dynamic loading", "system info", "errno & errors", "dispatch", "strings/ctype/libm/stdio",
-    "atomics", "C language", "compiler intrinsics",
+    "event notification", "io_uring", "system calls", "processes", "terminals", "signals", "threads & locks", "time",
+    "memory",
+    "dynamic loading", "system info", "errno & errors", "dispatch", "Apple frameworks", "C libraries",
+    "strings/ctype/libm/stdio", "atomics", "C language", "compiler intrinsics",
 ]
+# Platforms an `@available(<name>, unavailable)` takes away.
+UNAVAILABLE_PLATFORMS = {"macOS": ["Darwin"], "Windows": ["Windows"], "Linux": ["Linux", "Musl"],
+                         "Android": ["Android"], "WASI": ["WASI"], "FreeBSD": ["FreeBSD"], "OpenBSD": ["OpenBSD"]}
+# Categories outside System's scope: the OS's, but not System's to wrap, or
+# not OS interfaces at all. Used for the lines that compare with the reach
+# of the dependencies.
+OUT_OF_SCOPE = {"dispatch", "Apple frameworks", "C libraries", "strings/ctype/libm/stdio", "atomics", "C language",
+                "compiler intrinsics"}
 # A function too long to be a thin wrapper counts only its call-site lines.
 THIN_WRAPPER_LINES = 40
 
@@ -101,13 +114,19 @@ class SystemAPI:
             scope = ".".join(d["scopes"])
             kw = d["kw"].rstrip("?!")
             base = d["name"].split("(")[0].rstrip("?!")
+            # `@available(*, unavailable)` (a renamed stub) can't be cited;
+            # `@available(Windows, unavailable)` only takes Windows away.
+            unavail = d.get("unavailable") or []
+            gone = {p for a in unavail for name, plats in UNAVAILABLE_PLATFORMS.items()
+                    if re.search(rf"\(\s*{name}\s*,\s*unavailable", a) for p in plats}
             entry = {
                 "scope": scope, "name": d["name"], "module": d["module"], "file": d["file"], "line": d["line"],
                 "declaration": normalize_decl(d["signature"], kw if kw in ("var", "let", "case") else None),
-                "platforms": [p.lstrip("?") for p in d["platforms"]],
+                "platforms": [p.lstrip("?") for p in d["platforms"] if p.lstrip("?") not in gone],
                 "uncertainPlatforms": [p[1:] for p in d["platforms"] if p.startswith("?")],
                 "availability": availability(d["availability"] + d.get("scopeAvailability", [])),
-                "unavailable": bool(d.get("unavailable")),
+                "unavailable": any(re.search(r"\(\s*\*\s*,\s*unavailable", a) for a in unavail),
+                "unavailableOn": sorted(gone),
             }
             self.by_key[(scope, entry["declaration"])].append(entry)
             self.by_name[(scope, base)].append(entry)
@@ -141,7 +160,9 @@ def availability(attrs):
     return {"system": system, "os": sorted(set(floors))}
 
 
-def load_mapping(path):
+def load_mapping(path, packages=()):
+    """(config, entries, problems). `packages` are the names note.<package>
+    may use."""
     problems = []
     cp = configparser.ConfigParser(interpolation=None, delimiters=("=",), comment_prefixes=("#",),
                                    inline_comment_prefixes=None, strict=True, empty_lines_in_values=False,
@@ -158,16 +179,27 @@ def load_mapping(path):
         items = dict(cp.items(sec))
         if sec == "config":
             config = items
+            for k in config:
+                if k == "wrapper-files":
+                    problems.append("[config]: wrapper-files belongs in the package's file under packages/")
+                elif k != "secondary":
+                    problems.append(f"[config]: unknown key {k!r}")
             continue
         e = {"id": sec, "symbols": (items.get("symbols") or sec).split(),
              "category": items.get("category", "").strip(), "status": items.get("status", "").strip(),
              "note": " ".join(items.get("note", "").split()), "swift": " ".join(items.get("swift", "").split()),
-             "apis": [], "overrides": {}}
+             "notes": {}, "apis": [], "overrides": {}, "wrap": items.get("wrap", "yes").strip()}
         for line in (items.get("system") or "").split("\n"):
             if line.strip():
                 scope, decl = parse_api_line(line)
                 e["apis"].append({"text": line.strip(), "scope": scope, "decl": decl})
         for k, v in items.items():
+            m = re.match(r"^note\.([\w-]+)$", k)
+            if m:
+                if packages and m.group(1) not in packages:
+                    problems.append(f"[{sec}]: {k} names no package in packages/")
+                e["notes"][m.group(1)] = " ".join(v.split())
+                continue
             m = re.match(r"^status\.(\w+)$", k)
             if m:
                 plat = next((p for p in PLATFORMS if p.lower() == m.group(1).lower()), None)
@@ -176,15 +208,17 @@ def load_mapping(path):
                     problems.append(f"[{sec}]: bad override {k} = {v}")
                 else:
                     e["overrides"][plat] = {"status": st.strip(), "reason": " ".join(reason.split())}
-            elif k not in ("symbols", "category", "status", "system", "note", "swift"):
+            elif k not in ("symbols", "category", "status", "system", "note", "swift", "wrap"):
                 problems.append(f"[{sec}]: unknown key {k!r}")
+        if e["wrap"] not in ("yes", "no"):
+            problems.append(f"[{sec}]: wrap must be yes or no, not {e['wrap']!r}")
         if e["status"] not in STATUSES:
             problems.append(f"[{sec}]: status must be one of {', '.join(STATUSES)}, not {e['status']!r}")
         if e["status"] != "ignore" and e["category"] not in CATEGORIES:
             problems.append(f"[{sec}]: unknown category {e['category']!r}")
         if e["status"] in ("covered", "partial") and not e["apis"]:
             problems.append(f"[{sec}]: a {e['status']} entry needs a `system` declaration")
-        if e["status"] in ("partial", "ignore") and not e["note"]:
+        if e["status"] in ("partial", "ignore") and not e["note"] and not e["notes"]:
             problems.append(f"[{sec}]: a {e['status']} entry needs a note")
         entries.append(e)
     return config, entries, problems
@@ -196,6 +230,7 @@ def is_function_like(it):
 
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument("--package")
     ap.add_argument("--interfaces")
     ap.add_argument("--system")
     ap.add_argument("--mapping")
@@ -206,13 +241,18 @@ def main():
     if args.summary:
         return print_summary(json.load(open(args.summary)))
 
+    pkg = package.load(args.package)
+    platforms = [p for p in PLATFORMS if p in pkg["platforms"]]
     ext = json.load(open(args.interfaces))
     api = SystemAPI(json.load(open(args.system)))
     meta = json.load(open(args.meta)) if args.meta else {}
-    config, entries, malformed = load_mapping(args.mapping)
+    known = {f[:-4] for f in os.listdir(os.path.dirname(os.path.abspath(args.package))) if f.endswith(".ini")}
+    config, entries, malformed = load_mapping(args.mapping, known)
     interfaces = {i["name"]: i for i in ext["interfaces"]}
+    for e in entries:
+        e["packageNote"] = e["notes"].get(pkg["key"], "")
 
-    problems = {"malformed": malformed, "unmapped": [], "duplicate": [], "apiMissing": [], "stale": [],
+    problems = {"malformed": malformed, "unmapped": [], "duplicate": [], "apiMissing": [], "staleNotes": [],
                 "alreadySystemMissing": []}
 
     # ------------------------------------------------- symbols to entries
@@ -229,10 +269,11 @@ def main():
                                          "platforms": it["platforms"], "targets": it["targets"],
                                          "headers": it["headers"] or it["reachedThrough"],
                                          "examples": [f"{s['file']}:{s['line']}" for s in it["sites"][:3]]})
+    # A note for this package on an entry it no longer uses. (Symbols no
+    # package uses are the combined report's to find.)
     for e in entries:
-        stale = [s for s in e["symbols"] if s not in interfaces]
-        if stale:
-            problems["stale"].append({"entry": e["id"], "symbols": stale})
+        if e["packageNote"] and not any(s in interfaces for s in e["symbols"]):
+            problems["staleNotes"].append({"entry": e["id"], "symbols": e["symbols"]})
 
     # ------------------------------------------------------ System APIs
     for e in entries:
@@ -252,7 +293,7 @@ def main():
         for s in e["symbols"]:
             for p, n in interfaces.get(s, {}).get("platforms", {}).items():
                 used[p] += n
-        e["used"] = {p: used[p] for p in PLATFORMS if used[p]}
+        e["used"] = {p: used[p] for p in platforms if used[p]}
         api_plats = set()
         for a in e["apis"]:
             for h in a["matched"]:
@@ -282,7 +323,7 @@ def main():
 
     # ------------------------------------------------------ summaries
     def tally(function_only):
-        table = {c: {p: collections.Counter() for p in PLATFORMS + ["all"]} for c in CATEGORIES}
+        table = {c: {p: collections.Counter() for p in platforms + ["all"]} for c in CATEGORIES}
         for e in entries:
             if e["status"] == "ignore":
                 continue
@@ -302,7 +343,7 @@ def main():
     summary = {"functions": tally(True), "all": tally(False)}
 
     # ------------------------------------------------ deletable lines
-    wrapper_globs = (config.get("wrapper-files") or "").split()
+    wrapper_globs = pkg["wrapper-files"]
     files = ext["files"]
 
     def in_wrapper(path):
@@ -312,9 +353,10 @@ def main():
         return sum(1 for ln in files.get(path, {}).get("codeLines", []) if start <= ln <= end)
 
     # Gaps: entries missing or partial somewhere, other than those the Swift
-    # standard library covers (a `swift` alternative), which aren't
-    # System's to fill.
+    # standard library covers (a `swift` alternative) and those that aren't
+    # System's to wrap (`wrap = no`: Dispatch, Apple's frameworks).
     gap_entries = [e for e in entries if e["status"] != "ignore" and not (e["status"] == "missing" and e["swift"])
+                   and e["wrap"] != "no"
                    and any(v["status"] in ("missing", "partial") for v in e["platformStatus"].values())]
     secondary = set((config.get("secondary") or "").split())
     gap_ids = {e["id"] for e in gap_entries}
@@ -357,7 +399,7 @@ def main():
             if e["id"] in gap_ids and it.get("shim"):
                 for d in it["shim"]["defs"]:
                     shim_owners[(d["file"], d["start"], d["end"], d["codeLines"])].add(e["id"])
-    # Calls through NIO's file-scope captures (`sysRead(...)` for read).
+    # Calls through file-scope captures (NIO's `sysRead(...)` for read).
     for path, info in files.items():
         if not in_wrapper(path):
             continue
@@ -401,7 +443,7 @@ def main():
                      "shims": sorted(set(est["shims"])), "callSitesElsewhere": len(touched.get(e["id"], ()))})
     gaps.sort(key=lambda g: (-g["total"], -g["callSitesElsewhere"], g["id"]))
 
-    # ------------------------------------------ System API NIO already uses
+    # ------------------------------ System API the package already uses
     already = []
     for a in ext.get("alreadySystem", []):
         sym = a["symbol"]
@@ -411,15 +453,19 @@ def main():
             if not found:
                 problems["alreadySystemMissing"].append({"symbol": sym, "sites": a["sites"][:3]})
         already.append({"module": a["module"], "symbol": sym, "sites": len(a["sites"]),
+                        "targets": sorted({s["target"] for s in a["sites"]}),
                         "examples": [f"{s['file']}:{s['line']}" for s in a["sites"][:2]],
                         "onTip": bool(found) if a["module"] == "SystemPackage" else None})
 
     out = {
         "meta": meta,
+        "package": pkg,
         "config": {"wrapperFiles": wrapper_globs, "thinWrapperLines": THIN_WRAPPER_LINES,
                    "secondary": sorted(secondary),
-                   "unrankedStdlib": sorted(e["id"] for e in entries if e["status"] == "missing" and e["swift"])},
-        "platforms": PLATFORMS,
+                   "unrankedStdlib": sorted(e["id"] for e in entries if e["status"] == "missing" and e["swift"]
+                                            and e.get("sites")),
+                   "notWrapped": sorted(e["id"] for e in entries if e["wrap"] == "no" and e.get("sites"))},
+        "platforms": platforms,
         "categories": CATEGORIES,
         "problems": problems,
         "entries": [{k: v for k, v in e.items()} for e in entries],
@@ -428,8 +474,15 @@ def main():
         "summary": summary,
         "gaps": gaps,
         "alreadySystem": already,
+        "directLines": len({(x["file"], x["line"]) for i in ext["interfaces"] for x in i["sites"]}),
+        "directScopeLines": len({(x["file"], x["line"]) for i in ext["interfaces"] for x in i["sites"]
+                                 if i["name"] in owner and owner[i["name"]]["wrap"] != "no"
+                                 and owner[i["name"]]["status"] != "ignore"
+                                 and owner[i["name"]]["category"] not in OUT_OF_SCOPE}),
         "extraction": {k: ext[k] for k in ("libraryTargets", "shimTargets", "skippedTargets", "unsupportedPlatforms",
-                                           "unsupportedBecause", "excludedReferences", "crosscheck", "warnings")},
+                                           "unsupportedBecause", "excludedReferences", "crosscheck", "warnings",
+                                           "nestedPackages", "dependencyPackages", "systemDependency",
+                                           "dependencies", "model")},
     }
     json.dump(out, open(args.out, "w"), indent=1)
     failed = any(problems[k] for k in ("malformed", "unmapped", "duplicate", "apiMissing", "alreadySystemMissing"))
@@ -437,9 +490,10 @@ def main():
 
 
 def find_used_symbol(api, demangled):
-    """Whether a System symbol NIO references (a simplified demangled name,
-    e.g. 'FileDescriptor.read(fromAbsoluteOffset:into:retryOnInterrupt:)')
-    still exists."""
+    """Whether a System symbol the package references (a simplified
+    demangled name, e.g.
+    'FileDescriptor.read(fromAbsoluteOffset:into:retryOnInterrupt:)') still
+    exists."""
     d = re.sub(r"^(static |class )", "", demangled)
     d = re.sub(r"^\(extension in [^)]*\):", "", d)
     head = d.split(" : ")[0]
@@ -473,12 +527,13 @@ def print_summary(cov):
             per.append(f"{'every platform' if plat == 'all' else plat} "
                        f"{tot['covered']}/{tot['partial']}/{tot['missing']}")
         print(f"{label} (covered/partial/missing): " + ", ".join(per))
-    for k, label in (("unmapped", "NIO interfaces with no mapping entry"),
+    name = cov.get("package", {}).get("name", "the package")
+    for k, label in (("unmapped", f"{name} interfaces with no mapping entry"),
                      ("apiMissing", "cited System declarations missing on the tip"),
-                     ("alreadySystemMissing", "System API NIO already uses, missing on the tip"),
+                     ("alreadySystemMissing", f"System API {name} already uses, missing on the tip"),
                      ("duplicate", "symbols mapped twice"), ("malformed", "mapping errors"),
-                     ("stale", "mapping entries naming symbols NIO no longer uses")):
-        if p[k]:
+                     ("staleNotes", f"entries with a note for {name} that {name} no longer uses")):
+        if p.get(k):
             print(f"{label}: {len(p[k])}")
             for x in p[k][:10]:
                 print("   ", x if isinstance(x, str) else json.dumps(x)[:160])

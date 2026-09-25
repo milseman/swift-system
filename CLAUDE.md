@@ -19,7 +19,8 @@ swift test --filter FileOperationsTest/testSetOwner       # one XCTest method
 swift test --filter SocketOperationsTests/bindToAnyPort   # one swift-testing test
 swift run system-samples --help
 Utilities/api-delta/regenerate.sh                         # public API delta, main vs system-next, into .build/api-delta (see its README.md)
-Utilities/nio-coverage/check.sh                           # what swift-nio uses from the OS vs System's API, into .build/nio-coverage (see its README.md)
+Utilities/adopter-coverage/check.sh                       # what NIO, Foundation, SwiftPM and Subprocess use from the OS vs System's API, into .build/adopter-coverage (see its README.md)
+Utilities/adopter-coverage/check.sh nio                   # one of them; Utilities/nio-coverage/check.sh still runs this
 Prototype/PlatformEnum/check.sh                           # the platform-enum samples, real and simulated builds, run as every platform (see its README.md)
 
 # CI variants (.github/workflows/pull_request.yml). A separate --scratch-path keeps
@@ -173,6 +174,7 @@ Conventions:
   - To build one against this checkout, point its swift-system dependency at `../swift-system`. The `SWIFTCI_USE_LOCAL_DEPS` switches in NIO and SwiftPM do that, but they also expect sibling checkouts of other packages, which aren't here.
   - NIO's adoption is on branch `adopt-nio`, in `../adopt-nio`, a worktree of `../swift-nio`. Its manifest points swift-system at `../pinned/swift-system`, a detached worktree of this repository at `3ea0746`, an older `system-next`. So NIO sees no newer `system-next` commit until that worktree moves.
   - swift-foundation doesn't depend on swift-system yet.
+  - `Utilities/adopter-coverage` checks what all four use from the OS against System's API at a commit of this repository (`HEAD` by default), each from its own checkout; its mapping of interfaces to System API is shared by all of them. swift-foundation's main branch needs a newer compiler than Swift 6.2 (`FOUNDATION_SWIFT_EXEC`, or `FOUNDATION_REUSE_INDEX=1` to reuse the last index dump).
 - **Commit messages** are detailed.
   - The subject names the API and what it wraps, e.g. "Add FileDescriptor.setOwner(user:group:retryOnInterrupt:) wrapping fchown".
   - The body covers the API's shape and precedent, naming, availability, platforms, and tests.

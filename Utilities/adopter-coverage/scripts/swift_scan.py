@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Lexical scan of NIO's Swift sources.
+"""Lexical scan of a package's Swift sources.
 
 For every file it records, per line, the platforms that compile the line
-(platforms.swift_line_states) and whether the Darwin index build compiled
-it. It then lists *candidate* references to C or OS symbols: identifiers
+(platforms.swift_line_states, with the target's platforms.Model) and
+whether the Darwin index build compiled it. It then lists *candidate* references to C or OS symbols: identifiers
 that aren't keywords, member accesses, argument labels, or names bound in
 an enclosing scope. extract.py decides which candidates are OS symbols,
 using vocabularies from the index store.
@@ -19,12 +19,18 @@ This is a scanner, not a parser. It doesn't respect declaration order
 within a scope, and it can't see members inherited from protocols or
 superclasses; extract.py measures its accuracy against the index on the
 lines the Darwin build compiled.
+
+Flags the package file calls false (`false-flags`, such as Foundation's
+FOUNDATION_FRAMEWORK) are F everywhere in the model; a file that tests one
+is evaluated a second time without them, and the lines only that hides are
+counted, so the report can say how much code no modeled build compiles.
 """
 
 import sys
 
 sys.dont_write_bytecode = True  # no __pycache__, here or in api-delta's scripts
 
+import collections
 import os
 import re
 
@@ -237,9 +243,31 @@ def generic_names(toks):
     return out
 
 
+def body_brace(toks, k):
+    """Index of the `{` that opens the block a statement's bindings belong
+    to: the first one after token k outside parentheses and brackets, so
+    that `for (a, b) in xs.sorted(by: { ... }) {` binds a and b in the loop's
+    body rather than in the closure. None if the statement ends first."""
+    depth = 0
+    for j in range(k + 1, min(len(toks), k + 400)):
+        t = toks[j]
+        if t.text in ("(", "["):
+            depth += 1
+        elif t.text in (")", "]"):
+            depth -= 1
+            if depth < 0:
+                return None
+        elif t.text == "{" and depth == 0:
+            return j
+        elif t.text in ("}", ";") and depth == 0:
+            return None
+    return None
+
+
 def pattern_sites(toks, i):
     """Token indices of the names bound by the `let`/`var` pattern at i:
-    `let x`, `let (a, b)`, `case .some(let x)`."""
+    `let x`, `let (a, b)`, `case .some(let x)`, and each name of
+    `var a: [UInt8] = [], b: [UInt8] = []`."""
     out = set()
     depth = 0
     j = i + 1
@@ -251,6 +279,26 @@ def pattern_sites(toks, i):
             if depth == 0:
                 break
             depth -= 1
+        elif depth == 0 and t.text in (":", "=") and toks[i].text in ("let", "var") \
+                and not (i > 0 and toks[i - 1].line == toks[i].line
+                         and toks[i - 1].text in ("if", "guard", "while", ",", "case", "(")):
+            # A type annotation or an initializer; another binding may
+            # follow it after a comma on the same line.
+            k, d = j + 1, 0
+            while k < len(toks) and toks[k].line == t.line:
+                if toks[k].text in ("(", "[", "<", "{"):
+                    d += 1
+                elif toks[k].text in (")", "]", ">", "}"):
+                    d -= 1
+                    if d < 0:
+                        break
+                elif d == 0 and toks[k].text == ",":
+                    break
+                k += 1
+            if k < len(toks) and toks[k].text == "," and toks[k].line == t.line and d == 0:
+                j = k + 1
+                continue
+            break
         elif depth == 0 and t.text in ("=", ":", "{", "}", ";", "in", ","):
             break
         elif t.kind == "id" and t.text not in KEYWORDS and toks[j - 1].text != ".":
@@ -395,6 +443,39 @@ def classify_open(header):
     return "closure", None
 
 
+def where_names(header):
+    """The names a type header's `where` clause constrains, which are the
+    extended type's generic parameters or associated types:
+    `extension Optional where Wrapped == String` -> {Wrapped}. As (name,
+    token offset in header) pairs."""
+    out = []
+    depth = 0
+    k = None
+    for j, u in enumerate(header):
+        if u.text == "<":
+            depth += 1
+        elif u.text == ">":
+            depth -= 1
+        elif depth == 0 and u.kind == "id" and u.text == "where":
+            k = j
+            break
+    if k is None:
+        return out
+    expect = True
+    for j in range(k + 1, len(header)):
+        u = header[j]
+        if u.text == "<":
+            depth += 1
+        elif u.text == ">":
+            depth -= 1
+        elif depth == 0 and u.text == ",":
+            expect = True
+        elif depth == 0 and expect and u.kind == "id":
+            out.append((u.text, j))
+            expect = False
+    return out
+
+
 def inherited_types(header):
     """Types named in a type declaration's inheritance clause."""
     k = decl_start(header)
@@ -428,11 +509,29 @@ def inherited_types(header):
     return out
 
 
-def scan_file(path, rel):
+def hidden_lines(code_lines, states, build, relaxed, false_flags):
+    """How many code lines the false flags hide: active on some platform, or
+    in the Darwin build, when the flags are unknown (`relaxed`), and nowhere
+    when they're false; and which flags the file's directives test."""
+    tested = sorted({f for l in code_lines if re.match(r"\s*#(if|elseif)\b", l)
+                     for f in re.findall(r"[A-Za-z_]\w*", l) if f in false_flags})
+    if not tested:
+        return 0, []
+    rstates, rbuild, _ = platforms.swift_line_states(code_lines, relaxed)
+    n = 0
+    for i, l in enumerate(code_lines):
+        if l.strip() and not l.strip().startswith("#") and not states[i] and not build[i] \
+                and (rstates[i] or rbuild[i]):
+            n += 1
+    return n, tested
+
+
+def scan_file(path, rel, mdl=None, relaxed=None, false_flags=()):
     raw = open(path, encoding="utf-8").read()
     code, _ = strip_comments_and_strings(raw)
     code_lines = code.split("\n")
-    states, build, errors = platforms.swift_line_states(code_lines)
+    states, build, errors = platforms.swift_line_states(code_lines, mdl)
+    hidden, hidden_by = hidden_lines(code_lines, states, build, relaxed, set(false_flags)) if relaxed else (0, [])
     skip_lines = directive_lines(code_lines)
     toks = [t for t in tokenize(code) if t.line not in skip_lines]
 
@@ -461,7 +560,7 @@ def scan_file(path, rel):
                 if path_ids:
                     imports.append((t.line, "module", path_ids[0], None))
 
-    pending_bindings = set()   # bindings for the next scope (params, closure params, if-let)
+    pending = collections.defaultdict(set)   # `{` index -> bindings for the block it opens (for, if-let)
     type_info = {}             # type name -> inherited types and generic parameters
     binding_sites = set()      # token indices that bind a name
     for i, t in enumerate(toks):
@@ -477,10 +576,16 @@ def scan_file(path, rel):
                 sc.bindings |= {"newValue", "oldValue"}
             elif kind == "type":
                 sc.bindings |= generic_names(header)
+                for wn, off in where_names(header):
+                    sc.bindings.add(wn)
+                    binding_sites.add(i - len(header) + off)
                 if name:
-                    type_info.setdefault(name.split(".")[-1], {"inherits": set(), "generics": set()})
-                    type_info[name.split(".")[-1]]["inherits"].update(inherited_types(header))
-                    type_info[name.split(".")[-1]]["generics"].update(generic_names(header))
+                    ti = type_info.setdefault(name.split(".")[-1], {"inherits": set(), "generics": set(),
+                                                                     "extension": True})
+                    ti["inherits"].update(inherited_types(header))
+                    ti["generics"].update(generic_names(header))
+                    if header[decl_start(header)].text != "extension":
+                        ti["extension"] = False
             elif kind == "closure":
                 sc.bindings |= closure_params(toks, i)
                 sc.bindings |= {"$0", "$1", "$2", "$3", "$4", "$5"}
@@ -493,8 +598,7 @@ def scan_file(path, rel):
                         binding_sites.add(i - len(header) + 2)
                 if name == "catch":
                     sc.bindings.add("error")
-            sc.bindings |= pending_bindings
-            pending_bindings = set()
+            sc.bindings |= pending.pop(i, set())
             if kind in ("func", "type"):
                 # The signature's tokens (generic parameters, labels,
                 # parameter types) belong to the scope they declare.
@@ -519,8 +623,10 @@ def scan_file(path, rel):
             binding_sites.update(sites)
             if cur.kind != "file":
                 cur.bindings |= names
-            # `if let x {` / `guard let x else {`: visible in the next block too.
-            pending_bindings |= names
+            # `if let x {` / `guard let x else {`: visible in the block too.
+            b = body_brace(toks, i)
+            if b is not None:
+                pending[b] |= names
             if cur.kind in ("type", "file"):
                 for n in names:
                     decls.append((cur, t.text, n, t.line))
@@ -528,12 +634,16 @@ def scan_file(path, rel):
         if t.text == "for" and (i == 0 or toks[i - 1].line < t.line or toks[i - 1].text in ("{", "}", ";", ":")) \
                 and not (i + 1 < len(toks) and toks[i + 1].text == ":"):
             j = i + 1
+            names = set()
             while j < len(toks) and toks[j].text not in ("in", "{"):
                 u = toks[j]
                 if u.kind == "id" and u.text not in KEYWORDS and toks[j - 1].text != ".":
-                    pending_bindings.add(u.text)
+                    names.add(u.text)
                     binding_sites.add(j)
                 j += 1
+            b = body_brace(toks, j) if j < len(toks) and toks[j].text == "in" else (j if j < len(toks) else None)
+            if b is not None:
+                pending[b] |= names
             continue
         if t.text in ("func", "typealias", "struct", "class", "enum", "protocol", "actor", "associatedtype", "macro"):
             if i + 1 < len(toks) and toks[i + 1].kind == "id" and toks[i + 1].text not in ("func", "var", "let"):
@@ -572,6 +682,10 @@ def scan_file(path, rel):
     for sc, kw, name, line in decls:
         if sc.kind == "type" and sc.name:
             members.setdefault(sc.name.split(".")[-1], set()).add(name)
+            # A property wrapper's storage and projection: `@OptionGroup var
+            # globalOptions` declares `_globalOptions` and `$globalOptions`.
+            if kw in ("var", "let"):
+                members[sc.name.split(".")[-1]].update(("_" + name, "$" + name))
         elif sc.kind == "file":
             top_level.append((name, line))
 
@@ -694,6 +808,10 @@ def scan_file(path, rel):
             continue
         if name.startswith("$"):
             continue
+        # InlineArray's sugar, `[2 of CInt]`.
+        if name == "of" and prev is not None and (prev.kind == "num" or prev.text == "_") \
+                and nxt is not None and nxt.kind == "id":
+            continue
         sc = scope_at[i]
         bound = False
         types = []
@@ -704,19 +822,52 @@ def scan_file(path, rel):
             if s.kind == "type" and s.name:
                 types.append(s.name.split(".")[-1])
             s = s.parent
-        # A qualified reference `A.b` is never bound.
+        # A qualified reference `A.b` is never bound, but its qualifier may
+        # be (`os.hasPrefix(...)` with a parameter named `os`), in which case
+        # it isn't a module.
+        qualifier_bound = False
         if qualifier is not None:
             bound = False
+            s = sc
+            while s is not None:
+                if qualifier in s.bindings:
+                    qualifier_bound = True
+                    break
+                s = s.parent
         func = None
         s = sc
         while s is not None and s.kind != "func":
             s = s.parent
         if s is not None:
             func = (s.name, s.decl_line, s.end)
+        called = nxt is not None and nxt.text == "(" and nxt.line == t.line
+        labeled = False
+        if called:
+            # `f(a, label: b)`: an argument label, which no C function takes.
+            depth = 0
+            for j in range(i + 1, min(len(toks), i + 200)):
+                u = toks[j]
+                if u.text in ("(", "[", "{"):
+                    depth += 1
+                elif u.text in (")", "]", "}"):
+                    depth -= 1
+                    if depth == 0:
+                        break
+                elif depth == 1 and u.kind == "id" and toks[j - 1].text in ("(", ",") \
+                        and j + 1 < len(toks) and toks[j + 1].text == ":":
+                    labeled = True
+                    break
         cands.append({
             "line": t.line, "col": t.col, "name": name, "qualifier": qualifier,
-            "called": nxt is not None and nxt.text == "(" and nxt.line == t.line,
-            "bound": bound, "types": types, "func": func,
+            "labeled": labeled,
+            # `filter { ... }` where an expression starts: after `return`,
+            # `=`, `(` and the like, not as the operand in `if x == NAME {`.
+            "trailingClosure": nxt is not None and nxt.text == "{" and nxt.line == t.line
+                               and (prev is None or prev.line < t.line
+                                    or prev.text in ("{", "}", ";", "=", "(", ",", "[", "return", "in", "try",
+                                                     "await")),
+            "called": called,
+            "bound": bound, "types": types, "func": func, "qualifierBound": qualifier_bound,
         })
 
     funcs = [{"name": s.name, "start": s.decl_line, "end": s.end} for s in all_scopes if s.kind == "func"]
@@ -728,11 +879,12 @@ def scan_file(path, rel):
         "candidates": cands,
         "imports": imports,
         "members": {k: sorted(v) for k, v in members.items()},
-        "typeInfo": {k: {"inherits": sorted(v["inherits"]), "generics": sorted(v["generics"])}
-                     for k, v in type_info.items()},
+        "typeInfo": {k: {"inherits": sorted(v["inherits"]), "generics": sorted(v["generics"]),
+                         "extension": v["extension"]} for k, v in type_info.items()},
         "topLevel": sorted(top_level),
         "funcs": funcs,
         "codeLines": [i + 1 for i, l in enumerate(code_lines) if l.strip() and not l.strip().startswith("#")],
+        "hiddenLines": hidden, "hiddenBy": hidden_by,
     }
 
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Lexical scan of NIO's C sources (the CNIO* targets).
+"""Lexical scan of a package's C sources (NIO's CNIO* targets, Foundation's
+_FoundationCShims, ...).
 
 Like swift_scan.py: per-line platform states (platforms.c_line_states, with
 the target's own defines), then candidate references to OS symbols. It also
@@ -30,7 +31,11 @@ register restrict return short signed sizeof static struct switch typedef union 
 _Bool _Complex _Imaginary _Static_assert _Thread_local _Alignas _Alignof _Atomic _Generic _Noreturn
 __attribute__ __always_inline__ __declspec __cdecl __stdcall asm __asm__ typeof __typeof__ __extension__
 __inline __inline__ __restrict __restrict__ __volatile__ defined
+_Nullable _Nonnull _Null_unspecified _Nullable_result __nullable __nonnull __null_unspecified
 """.split())
+# Clang's nullability qualifiers, which follow a `*`.
+NULLABILITY = {"_Nullable", "_Nonnull", "_Null_unspecified", "_Nullable_result", "__nullable", "__nonnull",
+               "__null_unspecified"}
 
 TYPE_WORDS = {"int", "char", "unsigned", "signed", "short", "long", "float", "double", "void", "_Bool", "const",
               "volatile", "static", "register", "struct", "union", "enum", "extern", "inline", "_Thread_local",
@@ -229,11 +234,28 @@ class Structure:
 
     def param_name(self, chunk):
         toks = self.toks
-        # `int (*compar)(const FTSENT **, ...)`: the name inside the first parens.
+        # `int (*compar)(const FTSENT **, ...)`, `void (* _Nonnull handler)(int)`:
+        # the name inside the first parens.
         for a, j in enumerate(chunk):
-            if toks[j].text == "(" and a + 2 < len(chunk) and toks[chunk[a + 1]].text == "*" \
-                    and toks[chunk[a + 2]].kind == "id":
-                return chunk[a + 2]
+            if toks[j].text == "(" and a + 2 < len(chunk) and toks[chunk[a + 1]].text == "*":
+                b = a + 2
+                while b < len(chunk) and toks[chunk[b]].text in NULLABILITY | {"const"}:
+                    b += 1
+                if b < len(chunk) and toks[chunk[b]].kind == "id":
+                    return chunk[b]
+        # An array parameter, `int fildes[2]` or `char *const args[_Nonnull]`:
+        # the name is before the brackets.
+        while chunk and toks[chunk[-1]].text == "]":
+            depth, k = 0, len(chunk) - 1
+            while k >= 0:
+                if toks[chunk[k]].text == "]":
+                    depth += 1
+                elif toks[chunk[k]].text == "[":
+                    depth -= 1
+                    if depth == 0:
+                        break
+                k -= 1
+            chunk = chunk[:max(k, 0)]
         ids = [j for j in chunk if toks[j].kind == "id" and toks[j].text not in C_KEYWORDS]
         if len(ids) >= 2 or (ids and len(chunk) > 1 and chunk[-1] == ids[-1] and toks[chunk[0]].text in TYPE_WORDS):
             return ids[-1]
@@ -332,6 +354,13 @@ class Structure:
         toks = self.toks
         if len(stmt) < 2:
             return None
+        # A function pointer: `void (*err_ptr)(int) = signal(...)`.
+        for a in range(len(stmt) - 3):
+            before = toks[stmt[a - 1]] if a > 0 else None
+            if toks[stmt[a]].text == "(" and toks[stmt[a + 1]].text == "*" and toks[stmt[a + 2]].kind == "id" \
+                    and toks[stmt[a + 3]].text == ")" and before is not None and before.kind == "id" \
+                    and (before.text in TYPE_WORDS or before.text not in C_KEYWORDS):
+                return stmt[a + 2]
         k = 0
         while k < len(stmt) and toks[stmt[k]].text in TYPE_WORDS:
             if toks[stmt[k]].text in ("struct", "union", "enum") and k + 1 < len(stmt):
@@ -454,12 +483,32 @@ class Structure:
                 "tok_start": start, "tok_end": end, "locals": set()}
 
 
-def scan_c_file(path, rel, defines=()):
+INT_DEFINE = re.compile(r"^\s*#\s*define\s+([A-Za-z_]\w*)\s+\(?\s*(0[xX][0-9a-fA-F]+|\d+)[uUlL]*\s*\)?\s*$")
+
+
+def integer_macros(path, defines=()):
+    """`#define NAME <integer>` lines in a file, with the platforms each is
+    active on: {name: [(value, states, build)]}. Foundation's and
+    Subprocess's target_conditionals.h define TARGET_OS_LINUX and friends to
+    1 or 0 this way, from the compiler's own macros; extract.py turns these
+    into per-platform values for c_line_states."""
+    code, _ = blank_c(open(path, encoding="utf-8", errors="replace").read())
+    lines = code.split("\n")
+    states, build = platforms.c_line_states(lines, defines)
+    out = {}
+    for i, line in enumerate(lines):
+        m = INT_DEFINE.match(line)
+        if m:
+            out.setdefault(m.group(1), []).append((int(m.group(2), 0), states[i], build[i]))
+    return out
+
+
+def scan_c_file(path, rel, defines=(), values=None):
     raw = open(path, encoding="utf-8", errors="replace").read()
     code, ends_in_comment = blank_c(raw)
     code_lines = code.split("\n")
     raw_lines = raw.split("\n")
-    states, build = platforms.c_line_states(code_lines, defines)
+    states, build = platforms.c_line_states(code_lines, defines, values)
     dead = {k + 1 for k, st in enumerate(states) if not st and not build[k]}
 
     # Directive lines (with their continuations: a trailing backslash, or a
@@ -525,10 +574,12 @@ def scan_c_file(path, rel, defines=()):
     for m in macros:
         kinds.setdefault(m, "macro")
 
-    # Arguments of __attribute__((...)) and __declspec(...).
+    # Arguments of __attribute__((...)) and __declspec(...), and the platform
+    # names of __builtin_available(macOS 27, iOS 27, *).
     in_attr = set()
     for j, t in enumerate(toks):
-        if t.text in ("__attribute__", "__declspec") and j + 1 < len(toks) and toks[j + 1].text == "(":
+        if t.text in ("__attribute__", "__declspec", "__builtin_available") and j + 1 < len(toks) \
+                and toks[j + 1].text == "(":
             end = matching(toks, j + 1, "(", ")")
             in_attr.update(range(j + 1, end + 1))
 
@@ -556,11 +607,16 @@ def scan_c_file(path, rel, defines=()):
                       "struct": prev is not None and prev.text in ("struct", "union", "enum"),
                       "def": d["name"] if d else None})
 
+    cond_macros = set()
+    for line in code_lines:
+        if re.match(r"\s*#\s*(if|elif|ifdef|ifndef)\b", line):
+            cond_macros.update(re.findall(r"[A-Za-z_]\w*", re.sub(r"^\s*#\s*\w+", "", line)))
     return {
         "file": rel,
         "states": states,
         "build": build,
         "includes": includes,
+        "conditionMacros": sorted(cond_macros - {"defined"}),
         "declared": sorted(declared),
         "declaredKinds": kinds,
         "localDeclared": sorted(st.local_decls),
