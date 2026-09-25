@@ -296,6 +296,73 @@ C_MAYBE = {
 
 C_MAYBE_ALL = set().union(*C_MAYBE.values())
 
+# `__has_include(<header>)`. On Darwin, the SDK the package was built with
+# decides (SDK_PATH, set by extract.py). Elsewhere, only headers whose
+# presence doesn't depend on what's installed are known: the C standard
+# library's everywhere; POSIX's off Windows (WASI has only some of them);
+# and the platform-specific ones the packages test. The Linux kernel's
+# headers are M on the Linux family, since which ones exist depends on the
+# kernel headers installed: NIO backports mptcp_info for want of a
+# <linux/mptcp.h>. Anything else is M.
+SDK_PATH = None
+UNIX = {"Darwin", "Linux", "Musl", "Android", "FreeBSD", "OpenBSD"}
+C_STANDARD_HEADERS = {"assert.h", "complex.h", "ctype.h", "errno.h", "fenv.h", "float.h", "inttypes.h", "iso646.h",
+                      "limits.h", "locale.h", "math.h", "setjmp.h", "signal.h", "stdalign.h", "stdarg.h", "stdbool.h",
+                      "stddef.h", "stdint.h", "stdio.h", "stdlib.h", "stdnoreturn.h", "string.h", "tgmath.h",
+                      "time.h", "uchar.h", "wchar.h", "wctype.h"}
+POSIX_HEADERS = {"unistd.h", "fcntl.h", "pthread.h", "sys/types.h", "sys/stat.h", "sys/param.h", "sys/mman.h",
+                 "sys/time.h", "sys/resource.h", "sys/wait.h", "sys/ioctl.h", "sys/socket.h", "sys/uio.h",
+                 "sys/un.h", "sys/select.h", "sys/utsname.h", "dirent.h", "paths.h", "grp.h", "pwd.h", "poll.h",
+                 "termios.h", "dlfcn.h", "spawn.h", "sched.h", "strings.h", "netdb.h", "netinet/in.h",
+                 "arpa/inet.h"}
+# WASI's libc has these of them.
+WASI_POSIX = {"unistd.h", "fcntl.h", "sys/types.h", "sys/stat.h", "sys/time.h", "dirent.h", "poll.h", "sched.h",
+              "strings.h"}
+HEADER_PLATFORMS = [
+    # (prefix or name, platforms that have it, and where it may be missing:
+    # M there)
+    ("linux/", set(), {"Linux", "Musl", "Android"}),
+    ("mach/", {"Darwin"}, set()), ("mach-o/", {"Darwin"}, set()), ("os/", {"Darwin"}, set()),
+    ("malloc/", {"Darwin"}, set()), ("crt_externs.h", {"Darwin"}, set()), ("TargetConditionals.h", {"Darwin"}, set()),
+    ("removefile.h", {"Darwin"}, set()), ("copyfile.h", {"Darwin"}, set()), ("libproc.h", {"Darwin"}, set()),
+    ("sys/attr.h", {"Darwin"}, set()), ("sys/clonefile.h", {"Darwin"}, set()), ("libc_private.h", set(), set()),
+    ("xlocale.h", {"Darwin", "FreeBSD"}, set()), ("tzfile.h", {"Darwin", "FreeBSD", "OpenBSD"}, set()),
+    ("sys/xattr.h", {"Darwin", "Linux", "Musl", "Android"}, set()),
+    ("fts.h", {"Darwin", "Linux", "Android", "FreeBSD", "OpenBSD"}, set()),
+    ("wasi/", {"WASI"}, set()),
+    ("windows.h", {"Windows"}, set()), ("io.h", {"Windows"}, set()), ("direct.h", {"Windows"}, set()),
+    ("winsock2.h", {"Windows"}, set()),
+]
+_sdk_cache = {}
+
+
+def has_include(header, platform, build):
+    """T, F or M for `__has_include(<header>)`."""
+    if platform == "Darwin" and SDK_PATH:
+        if header not in _sdk_cache:
+            import os
+            found = os.path.exists(os.path.join(SDK_PATH, "usr", "include", header))
+            if not found and "/" in header:
+                fw, rest = header.split("/", 1)
+                found = os.path.exists(os.path.join(SDK_PATH, "System", "Library", "Frameworks", fw + ".framework",
+                                                    "Headers", rest))
+            _sdk_cache[header] = found or header in C_STANDARD_HEADERS
+        return T if _sdk_cache[header] else F
+    if build:
+        return F
+    if header in C_STANDARD_HEADERS:
+        return T
+    for prefix, plats, maybe in HEADER_PLATFORMS:
+        if header == prefix or (prefix.endswith("/") and header.startswith(prefix)):
+            return T if platform in plats else M if platform in maybe else F
+    if header in POSIX_HEADERS:
+        if platform == "Windows":
+            return F
+        if platform == "WASI":
+            return T if header in WASI_POSIX else M
+        return T
+    return M
+
 
 def c_env(platform, target_defines=(), build=False, values=None):
     """`target_defines`: the target's defines, as names defined everywhere
@@ -307,7 +374,7 @@ def c_env(platform, target_defines=(), build=False, values=None):
     maybe = set() if build else set(C_MAYBE[platform])
     key = "build" if build else platform
     vals = {n: v[key] for n, v in (values or {}).items() if key in v}
-    return {"defined": defined, "maybe": maybe - defined, "build": build, "values": vals}
+    return {"defined": defined, "maybe": maybe - defined, "build": build, "values": vals, "platform": platform}
 
 
 def c_macro(name, env):
@@ -415,8 +482,11 @@ class CCond:
                 self.maybes.append(f"defined({name})")
             return v
         if tok.startswith("__has_include"):
-            self.maybes.append(tok)
-            return M
+            m = re.search(r"[<\"]([^>\"]+)[>\"]", tok)
+            v = has_include(m.group(1), env.get("platform"), env["build"]) if m else M
+            if v == M:
+                self.maybes.append(tok)
+            return v
         if re.match(r"\d|0[xX]", tok):
             return F if int(re.sub(r"[uUlL]+$", "", tok), 0) == 0 else T
         # A bare macro: undefined macros are 0; a defined one's value is

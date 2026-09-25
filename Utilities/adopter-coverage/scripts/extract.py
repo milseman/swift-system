@@ -71,6 +71,7 @@ ROLE_CALL = 1 << 5
 # union, typealias, function, variable), as a mask over indexstore kinds.
 TOP_LEVEL_KINDS = sum(1 << k for k in (1, 4, 5, 6, 7, 8, 10, 11, 12, 13))
 FIELD_KINDS = 1 << 14
+TYPE_KINDS = sum(1 << k for k in (5, 6, 7, 8, 10, 11))
 DISPATCH_TYPES = {"OS_dispatch_queue": "DispatchQueue", "OS_dispatch_group": "DispatchGroup",
                   "OS_dispatch_semaphore": "DispatchSemaphore", "OS_dispatch_source": "DispatchSource",
                   "OS_dispatch_object": "DispatchObject", "OS_dispatch_io": "DispatchIO",
@@ -342,24 +343,26 @@ class Lexicon:
                     self.shim_kinds.setdefault(n, k)
             self.target_decls[sc["target"]].update(sc["declared"])
             self.target_decls[sc["target"]].update(sc["localDeclared"])
+        # OS types, which an extension can extend.
+        self.os_types = {n for n, (kinds, _m) in self.os_vocab.items() if kinds & TYPE_KINDS}
         self.module_names = set(vocab) | {m.split(".")[0] for m in vocab} | own | OS_MODULES | SWIFT_LIBS \
             | FOUNDATION | SYSTEM_MODULES | dep_modules
 
     def swift(self, c, scan, built, use_os_vocab=True):
-        """(key, evidence, via, platforms to leave out) or None."""
+        """(key, evidence, via, platforms to leave out, member) or None."""
         name, q = c["name"], c["qualifier"]
         if q is not None:
             if q in OS_MODULES:
-                return name, "lexical-qualified", q, ()
+                return name, "lexical-qualified", q, (), None
             if q in SHIM_TARGETS:
                 if name in self.shim_decls:
-                    return name, "lexical-shim", None, ()
-                return name, "lexical-qualified", q, ()
+                    return name, "lexical-shim", None, (), None
+                return name, "lexical-qualified", q, (), None
             return None
         if c["bound"] or name in swift_scan.KEYWORDS or name in self.module_names:
             return None
         if name in self.shim_decls:
-            return name, "lexical-shim", None, ()
+            return name, "lexical-shim", None, (), None
         shadowed = ()
         ent = self.own_top.get(name)
         if ent is not None:
@@ -381,14 +384,20 @@ class Lexicon:
         if name in self.lib_vocab:
             return None
         if use_os_vocab and name in self.os_vocab:
-            return name, "lexical-darwin-name", None, shadowed
+            return name, "lexical-darwin-name", None, shadowed, None
         # A member (of the package's type, or one it inherits from a library)
         # can be named unqualified only inside a type.
         if c["types"] and (name in self.own_vocab or name in self.lib_vocab_all):
             return None
         if name in self.own_top_any:
             return None
-        return name, "lexical-unresolved", None, shadowed
+        # Inside an extension of an OS type (`extension siginfo_t`), a name
+        # declared nowhere else is one of that type's members, such as
+        # Glibc's `_sifields` field; it folds into the type.
+        if use_os_vocab and c["types"] and c["types"][0] in self.os_types \
+                and c["types"][0] not in self.own_top_any:
+            return c["types"][0], "lexical-member", None, shadowed, name
+        return name, "lexical-unresolved", None, shadowed, None
 
     def c(self, c, target, use_os_vocab=True):
         # C code sees only C declarations: the SDK's, its own target's, and
@@ -534,6 +543,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--package", required=True)
     ap.add_argument("--swift-version", default="", help="the first line of the compiler's --version")
+    ap.add_argument("--sdk", help="the macOS SDK the package was built with, for __has_include")
     ap.add_argument("--root", required=True)
     ap.add_argument("--index", required=True)
     ap.add_argument("--dump", required=True)
@@ -543,6 +553,7 @@ def main():
 
     pkg = package.load(args.package)
     SHIM_TARGETS.update(pkg["shim-targets"])
+    platforms.SDK_PATH = args.sdk
     root = os.path.realpath(args.root)
     index = json.load(open(args.index))
     describe = json.load(open(args.describe))
@@ -772,10 +783,17 @@ def main():
                 by_line.setdefault(ln, [])
         for line, cs in sorted(by_line.items()):
             if sc["build"][line - 1]:
-                keys = {r[0] for r in (lex.swift(c, sc, True) for c in cs) if r}
+                found = [r for r in (lex.swift(c, sc, True) for c in cs) if r]
+                keys = {r[0] for r in found if r[1] != "lexical-member"}
                 unresolved = {r[0] for r in (lex.swift(c, sc, True, use_os_vocab=False) for c in cs)
                               if r and r[1] == "lexical-unresolved"}
                 compare("swift", rel, line, keys, unresolved)
+                # The member rule, measured on its own: does the index see a
+                # member of the same type on the line?
+                for r in found:
+                    if r[1] == "lexical-member":
+                        cross["swift"]["memberRule"] += 1
+                        cross["swift"]["memberRuleAgree"] += r[0] in index_hits_members.get((rel, line), set())
                 continue
             if index_hits.get((rel, line)):
                 warnings.append(f"the index saw references on a line the #if evaluation says the Darwin "
@@ -783,9 +801,9 @@ def main():
             for c in cs:
                 r = lex.swift(c, sc, False)
                 if r:
-                    key, evidence, via, shadowed = r
-                    col.add(key, lex.guess_kind(key, c["called"]), sc, rel, line, evidence, c["called"], via=via,
-                            func=c["func"], exclude_platforms=shadowed)
+                    key, evidence, via, shadowed, member = r
+                    col.add(key, "type" if member else lex.guess_kind(key, c["called"]), sc, rel, line, evidence,
+                            c["called"], member=member, via=via, func=c["func"], exclude_platforms=shadowed)
         # Scoped imports: `import func WinSDK.inet_ntop`.
         for line, kw, module, name in sc["imports"]:
             if kw != "module" and name and (module in OS_MODULES or module in SHIM_TARGETS) \

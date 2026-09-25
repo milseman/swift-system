@@ -23,7 +23,7 @@ open .build/adopter-coverage/nio/COVERAGE.md
 | `SYSTEM_REF` | `HEAD` | The System commit to check against. |
 | `ADOPTER_COVERAGE_MAPPING` | `mapping.ini` here | The mapping file. |
 | `ADOPTER_COVERAGE_OUT` | `.build/adopter-coverage` | The output: a directory per package. Each run replaces the directories of the packages it ran. |
-| `ADOPTER_COVERAGE_WORK` | `.build/adopter-coverage-work` | Scratch: each package's export and build, kept for the next run. |
+| `ADOPTER_COVERAGE_WORK` | `.build/adopter-coverage-work` | Scratch: each package's export and a dump of its index store, kept for the next run. A build is deleted as soon as its index has been read (SwiftPM's is 6 GB), so the most a run needs at once is the largest package's build. |
 
 - Refs resolve in the worktree you run the script from, as with api-delta.
 - Only commits count, on both sides. Uncommitted changes aren't checked, and the script says so when there are some.
@@ -54,7 +54,7 @@ When a check fails, the report's Check section lists what to fix:
 - **System API a package already calls, missing on the tip**: a System change that would break that package's build as it stands.
 - **Stale symbols**: the package stopped using them. Remove them from their entry. This isn't an error.
 
-When System gains an API that covers a missing entry, cite its declaration under `system` and change the status. The per-platform status follows from where the declaration compiles.
+When System gains an API that covers a missing entry, cite its declaration under `system` and change the status. The per-platform status follows from where the declaration compiles. `scripts/system_api.py REGEX` prints the matching declarations of the last run's tip in the form `system` takes, with their platforms and availability.
 
 ## Adding a package
 
@@ -92,3 +92,4 @@ As in api-delta: SwiftPM runs each manifest under `sandbox-exec`, and inside ano
 | `scripts/check.py` | Checks the mapping against the extraction and System's API. `check.py --summary coverage.json` prints the totals. |
 | `scripts/report.py` | Writes `COVERAGE.md`. |
 | `scripts/compare.py` | Compares two runs of a package. |
+| `scripts/system_api.py` | Finds System declarations to cite in the mapping, printed the way `system` cites them. |

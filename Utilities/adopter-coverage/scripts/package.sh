@@ -74,11 +74,15 @@ else
   [ -f "$libindexstore" ] || fail "no libIndexStore.dylib next to $(xcrun --find swift)"
   log "reading the index store"
   python3 "$S/indexstore.py" "$libindexstore" "$store" "$(cd "$N/src" && pwd -P)" "$N/index.json"
+  # Everything later steps need is in the index dump, and a new commit is
+  # built from a fresh export, so the build (6 GB for SwiftPM) goes now.
+  rm -rf "${N:?}/build"
   echo "$key" > "$N/key"
 fi
 
 log "extracting $name's OS interfaces"
-python3 "$S/extract.py" --package "$PACKAGES/$name.ini" --swift-version "$compiler" --root "$N/src" \
+python3 "$S/extract.py" --package "$PACKAGES/$name.ini" --swift-version "$compiler" \
+  --sdk "$(xcrun --sdk macosx --show-sdk-path)" --root "$N/src" \
   --index "$N/index.json" --dump "$N/dump.json" --describe "$N/describe.json" --out "$O/interfaces.json"
 
 python3 - "$O/meta.json" "$name" "$PKG_TITLE" "$P_PATH" "$P_REF" "$P_COMMIT" "$REPO" "$SYSTEM_REF" "$SYSTEM_COMMIT" \

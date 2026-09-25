@@ -400,6 +400,39 @@ def classify_open(header):
     return "closure", None
 
 
+def where_names(header):
+    """The names a type header's `where` clause constrains, which are the
+    extended type's generic parameters or associated types:
+    `extension Optional where Wrapped == String` -> {Wrapped}. As (name,
+    token offset in header) pairs."""
+    out = []
+    depth = 0
+    k = None
+    for j, u in enumerate(header):
+        if u.text == "<":
+            depth += 1
+        elif u.text == ">":
+            depth -= 1
+        elif depth == 0 and u.kind == "id" and u.text == "where":
+            k = j
+            break
+    if k is None:
+        return out
+    expect = True
+    for j in range(k + 1, len(header)):
+        u = header[j]
+        if u.text == "<":
+            depth += 1
+        elif u.text == ">":
+            depth -= 1
+        elif depth == 0 and u.text == ",":
+            expect = True
+        elif depth == 0 and expect and u.kind == "id":
+            out.append((u.text, j))
+            expect = False
+    return out
+
+
 def inherited_types(header):
     """Types named in a type declaration's inheritance clause."""
     k = decl_start(header)
@@ -500,6 +533,9 @@ def scan_file(path, rel, mdl=None, relaxed=None, false_flags=()):
                 sc.bindings |= {"newValue", "oldValue"}
             elif kind == "type":
                 sc.bindings |= generic_names(header)
+                for wn, off in where_names(header):
+                    sc.bindings.add(wn)
+                    binding_sites.add(i - len(header) + off)
                 if name:
                     type_info.setdefault(name.split(".")[-1], {"inherits": set(), "generics": set()})
                     type_info[name.split(".")[-1]]["inherits"].update(inherited_types(header))
@@ -716,6 +752,10 @@ def scan_file(path, rel, mdl=None, relaxed=None, false_flags=()):
                 and not (prev.text == "case" and scope_at[i].kind != "type"):
             continue
         if name.startswith("$"):
+            continue
+        # InlineArray's sugar, `[2 of CInt]`.
+        if name == "of" and prev is not None and (prev.kind == "num" or prev.text == "_") \
+                and nxt is not None and nxt.kind == "id":
             continue
         sc = scope_at[i]
         bound = False

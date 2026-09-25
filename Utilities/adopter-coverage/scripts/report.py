@@ -297,6 +297,7 @@ def main():
       "rule on code the Darwin build doesn't compile (`qualified`: `Glibc.x`; `import`: `import func "
       f"WinSDK.x`; `shim`: declared by one of {name}'s C shims; `darwin-name`: named like a Darwin SDK declaration; "
       f"`unresolved`: declared nowhere {name} can see, so presumed to come from the platform's C library; "
+      "`member`: a name declared nowhere, used inside an extension of an OS type, so counted as that type's member; "
       "`unindexed`: a C call the index missed). *Conditions* are the opt-in or configuration flags some sites "
       "depend on.")
     w("")
@@ -381,6 +382,12 @@ def main():
     w("The *unresolved* column reruns the Swift rules without the Darwin SDK's vocabulary, so every C name falls "
       "through to the last rule; that's how names that exist only on Linux or Windows are found.")
     w("")
+    sw = cc.get("swift", {})
+    if sw.get("memberRule"):
+        w(f"The *member* rule (a name declared nowhere, inside an extension of an OS type) fired {sw['memberRule']} "
+          f"times on these lines, and the index saw a member of the same type there {sw.get('memberRuleAgree', 0)} "
+          "times. Its findings aren't in the table above.")
+        w("")
     for label, key in (("Missed", "misses"), ("False positives", "falsePositives")):
         items = cc.get(key, [])[:12]
         if items:
