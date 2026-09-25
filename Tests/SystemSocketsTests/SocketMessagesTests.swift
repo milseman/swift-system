@@ -24,334 +24,372 @@ import Android
 #endif
 
 @testable import SystemSockets
-@testable import SystemPackage
+import SystemPackage
 
+private typealias AncillaryMessageBuffer = SocketDescriptor.AncillaryMessageBuffer
+
+// Real-call tests of sendmsg and recvmsg. Descriptor passing uses socket
+// pairs, which need neither a file system path nor permission to bind.
+// Swift Testing runs these in parallel, so none of them reuses a
+// descriptor number after closing it.
 @Suite("Socket Message Operations")
 private struct SocketMessagesTests {
 
+  @available(System 199, *)
   @available(macOS 15, iOS 18, watchOS 11, tvOS 18, visionOS 2, *)
-  @Test func sendReceiveMessageBasic() throws {
+  @Test(.requiresSocketBinding) func sendReceiveMessageBasic() throws {
     // Test basic sendMessage/receiveMessage with TCP sockets
     let server = try SocketDescriptor.open(.ipv4, .stream, protocol: .tcp)
     defer { try? server.close() }
 
-    let serverAddr = SocketAddress(ipv4: IPv4Address.loopback(port: 0))
-    try server.bind(to: serverAddr)
+    try server.bind(to: SocketAddress(ipv4: .loopback(port: 0)))
     try server.listen(backlog: 1)
-
     var boundAddr = SocketAddress()
     try server.getLocalAddress(into: &boundAddr)
-    let port = boundAddr.ipv4!.port
 
     let client = try SocketDescriptor.open(.ipv4, .stream, protocol: .tcp)
     defer { try? client.close() }
-
-    let connectAddr = SocketAddress(ipv4: IPv4Address.loopback(port: port))
-    try client.connect(to: connectAddr)
+    try client.connect(to: boundAddr)
 
     let accepted = try server.accept()
     defer { try? accepted.close() }
 
     // Send message without ancillary data
     let message = "Hello via sendMessage!"
-    let messageBytes = Array(message.utf8)
-    let sent = try messageBytes.withUnsafeBytes { bytes in
-      let span = RawSpan(_unsafeBytes: bytes)
-      return try client.sendMessage(span)
+    let sent = try Array(message.utf8).withUnsafeBytes {
+      try client.sendMessage(RawSpan(_unsafeBytes: $0))
     }
-    #expect(sent == messageBytes.count)
+    #expect(sent == message.utf8.count)
 
-    // Receive message
-    var buffer = [UInt8](repeating: 0, count: 1024)
-    var recvAncillary = SocketDescriptor.AncillaryMessageBuffer(minimumCapacity: 256)
-    var sender: SocketAddress? = nil
-
-    let received = try buffer.withUnsafeMutableBytes { buf in
-      var recvOutput = OutputRawSpan(buffer: buf, initializedCount: 0)
-      return try accepted.receiveMessage(
-        into: &recvOutput,
-        ancillaryMessages: &recvAncillary,
-        sender: &sender
-      )
-    }
-    #expect(received == messageBytes.count)
-
-    let receivedMessage = String(decoding: buffer.prefix(received), as: UTF8.self)
-    #expect(receivedMessage == message)
+    // A connected stream's messages have no sender address,
+    // and no ancillary messages here.
+    var ancillary = AncillaryMessageBuffer(minimumCapacity: 256)
+    var sender = SocketAddress(ipv4: .loopback(port: 1))
+    let (text, received) = try receiveText(from: accepted, ancillary: &ancillary, sender: &sender)
+    #expect(text == message)
+    #expect(received.flags.isEmpty)
+    #expect(sender.isEmpty)
+    #expect(ancillary.isEmpty)
   }
 
+  @available(System 199, *)
   @available(macOS 15, iOS 18, watchOS 11, tvOS 18, visionOS 2, *)
-  @Test func sendReceiveMessageUDP() throws {
+  @Test(.requiresSocketBinding) func sendReceiveMessageUDP() throws {
     // Test sendMessage/receiveMessage with UDP datagram sockets
     let receiver = try SocketDescriptor.open(.ipv4, .datagram, protocol: .udp)
     defer { try? receiver.close() }
-
-    let receiverAddr = SocketAddress(ipv4: IPv4Address.loopback(port: 0))
-    try receiver.bind(to: receiverAddr)
-
-    var boundAddr = SocketAddress()
-    try receiver.getLocalAddress(into: &boundAddr)
-    let port = boundAddr.ipv4!.port
+    try receiver.bind(to: SocketAddress(ipv4: .loopback(port: 0)))
+    var receiverAddress = SocketAddress()
+    try receiver.getLocalAddress(into: &receiverAddress)
 
     let sender = try SocketDescriptor.open(.ipv4, .datagram, protocol: .udp)
     defer { try? sender.close() }
+    try sender.bind(to: SocketAddress(ipv4: .loopback(port: 0)))
+    var senderAddress = SocketAddress()
+    try sender.getLocalAddress(into: &senderAddress)
 
     // Send datagram via sendMessage
     let message = "UDP via sendMessage"
-    let messageBytes = Array(message.utf8)
-    let targetAddr = SocketAddress(ipv4: IPv4Address.loopback(port: port))
-    let sent = try messageBytes.withUnsafeBytes { bytes in
-      let span = RawSpan(_unsafeBytes: bytes)
-      return try sender.sendMessage(span, to: targetAddr)
+    let sent = try Array(message.utf8).withUnsafeBytes {
+      try sender.sendMessage(RawSpan(_unsafeBytes: $0), to: receiverAddress)
     }
-    #expect(sent == messageBytes.count)
+    #expect(sent == message.utf8.count)
 
-    // Receive datagram
-    var buffer = [UInt8](repeating: 0, count: 1024)
-    var recvAncillary = SocketDescriptor.AncillaryMessageBuffer(minimumCapacity: 256)
-    var fromAddr: SocketAddress? = SocketAddress()
-
-    let received = try buffer.withUnsafeMutableBytes { buf in
-      var recvOutput = OutputRawSpan(buffer: buf, initializedCount: 0)
-      return try receiver.receiveMessage(
-        into: &recvOutput,
-        ancillaryMessages: &recvAncillary,
-        sender: &fromAddr
-      )
-    }
-    #expect(received == messageBytes.count)
-    #expect(fromAddr?.family == .ipv4)
-
-    let receivedMessage = String(decoding: buffer.prefix(received), as: UTF8.self)
-    #expect(receivedMessage == message)
+    // The sender's address is the whole sockaddr_in, port included.
+    var ancillary = AncillaryMessageBuffer()
+    var from = SocketAddress()
+    let (text, received) = try receiveText(from: receiver, ancillary: &ancillary, sender: &from)
+    #expect(text == message)
+    #expect(received.flags.isEmpty)
+    #expect(from == senderAddress)
+    #expect(from.length == MemoryLayout<sockaddr_in>.size)
   }
 
+  @available(System 199, *)
   @available(macOS 15, iOS 18, watchOS 11, tvOS 18, visionOS 2, *)
-  @Test func sendReceiveMessageWithFileDescriptor() throws {
-    try withTemporaryFilePath(basename: "socket-fd-test") { tempDir in
-      // Test file descriptor passing via SCM_RIGHTS over Unix domain sockets
-      let server = try SocketDescriptor.open(.local, .stream)
-      defer { try? server.close() }
+  @Test func passesAFileDescriptor() throws {
+    let (first, second) = try SocketDescriptor.pair(.local, .stream)
+    defer {
+      try? first.close()
+      try? second.close()
+    }
+    let pipe = try FileDescriptor.pipe()
+    defer {
+      try? pipe.readEnd.close()
+      try? pipe.writeEnd.close()
+    }
 
-      let client = try SocketDescriptor.open(.local, .stream)
-      defer { try? client.close() }
+    var ancillary = AncillaryMessageBuffer()
+    ancillary.appendFileDescriptors([pipe.readEnd])
+    let sent = try Array("FD attached".utf8).withUnsafeBytes {
+      try first.sendMessage(RawSpan(_unsafeBytes: $0), ancillaryMessages: ancillary)
+    }
+    #expect(sent == 11)
 
-      let socketPath = tempDir.appending("test.sock")
-      let unixAddr = UnixAddress(socketPath.string)!
-      let address = SocketAddress(unix: unixAddr)
-      try server.bind(to: address)
-      try server.listen(backlog: 1)
+    var received = AncillaryMessageBuffer(minimumCapacity: 256)
+    let (text, result) = try receiveText(from: second, ancillary: &received)
+    #expect(text == "FD attached")
+    #expect(result.flags.isEmpty)
+    let messages = Array(received)
+    #expect(messages.count == 1)
+    let descriptors = try #require(messages.first?.fileDescriptors)
+    #expect(descriptors.count == 1)
+    let passed = try #require(descriptors.first)
+    defer { try? passed.close() }
 
-      try client.connect(to: address)
-      let accepted = try server.accept()
-      defer { try? accepted.close() }
+    // The new descriptor is another name for the pipe's read end.
+    #expect(passed != pipe.readEnd)
+    try pipe.writeEnd.writeAll("through the pipe".utf8)
+    #expect(try readText(from: passed) == "through the pipe")
+  }
 
-      // Create a temporary file to send
-      let tempFile = tempDir.appending("test-data.txt")
-      let fd = try FileDescriptor.open(
-        tempFile,
-        .writeOnly,
-        options: [.create, .truncate],
-        permissions: [.ownerReadWrite]
-      )
-
-      // Write test data to the file
-      let testData = "File descriptor test data"
-      _ = try testData.utf8.withContiguousStorageIfAvailable { buffer in
-        try fd.write(UnsafeRawBufferPointer(buffer))
+  @available(System 199, *)
+  @available(macOS 15, iOS 18, watchOS 11, tvOS 18, visionOS 2, *)
+  @Test func passesSeveralFileDescriptorsInOneMessage() throws {
+    let (first, second) = try SocketDescriptor.pair(.local, .stream)
+    defer {
+      try? first.close()
+      try? second.close()
+    }
+    let pipes = try (0 ..< 3).map { _ in try FileDescriptor.pipe() }
+    defer {
+      for pipe in pipes {
+        try? pipe.readEnd.close()
+        try? pipe.writeEnd.close()
       }
-      try fd.close()
+    }
 
-      // Reopen for reading to send
-      let fileToSend = try FileDescriptor.open(tempFile, .readOnly)
+    var ancillary = AncillaryMessageBuffer()
+    ancillary.appendFileDescriptors(pipes.map(\.readEnd))
+    _ = try Array("Three FDs attached".utf8).withUnsafeBytes {
+      try first.sendMessage(RawSpan(_unsafeBytes: $0), ancillaryMessages: ancillary)
+    }
 
-      // Build ancillary message with SCM_RIGHTS
-      var ancillary = SocketDescriptor.AncillaryMessageBuffer()
-      withUnsafeBytes(of: fileToSend.rawValue) { bytes in
-        ancillary.appendMessage(
-          level: .socket,
-          type: .init(rawValue: CInt(SCM_RIGHTS)),
-          bytes: bytes
-        )
-      }
+    var received = AncillaryMessageBuffer(
+      minimumCapacity: AncillaryMessageBuffer.space(forPayloadSize: 3 * MemoryLayout<CInt>.size))
+    let (text, result) = try receiveText(from: second, ancillary: &received)
+    #expect(text == "Three FDs attached")
+    #expect(result.flags.isEmpty)
+    let descriptors = try #require(received.first?.fileDescriptors)
+    defer { for descriptor in descriptors { try? descriptor.close() } }
+    #expect(descriptors.count == 3)
 
-      // Send message with file descriptor
-      let message = "FD attached"
-      let messageBytes = Array(message.utf8)
-      let sent = try messageBytes.withUnsafeBytes { bytes in
-        let span = RawSpan(_unsafeBytes: bytes)
-        return try client.sendMessage(span, ancillaryMessages: ancillary)
-      }
-      #expect(sent == messageBytes.count)
-
-      // Receive message and file descriptor
-      var buffer = [UInt8](repeating: 0, count: 1024)
-      var recvAncillary = SocketDescriptor.AncillaryMessageBuffer(minimumCapacity: 256)
-      var sender: SocketAddress? = nil
-
-      let received = try buffer.withUnsafeMutableBytes { buf in
-        var recvOutput = OutputRawSpan(buffer: buf, initializedCount: 0)
-        return try accepted.receiveMessage(
-          into: &recvOutput,
-          ancillaryMessages: &recvAncillary,
-          sender: &sender
-        )
-      }
-      #expect(received == messageBytes.count)
-
-      // Extract the received file descriptor using CMSG_FIRSTHDR/CMSG_NXTHDR pattern
-      var receivedFD: CInt? = nil
-      recvAncillary._withUnsafeBytes { controlData in
-        guard controlData.count >= MemoryLayout<CInterop.CMsgHdr>.size else { return }
-
-        let header = controlData.baseAddress!.assumingMemoryBound(to: CInterop.CMsgHdr.self)
-        if header.pointee.cmsg_level == SOL_SOCKET &&
-           header.pointee.cmsg_type == CInt(SCM_RIGHTS) {
-          let dataOffset = MemoryLayout<CInterop.CMsgHdr>.size
-          let fdPtr = (controlData.baseAddress! + dataOffset).assumingMemoryBound(to: CInt.self)
-          receivedFD = fdPtr.pointee
-        }
-      }
-
-      #expect(receivedFD != nil, "Should have received a file descriptor")
-
-      if let fd = receivedFD {
-        let receivedFile = FileDescriptor(rawValue: fd)
-        defer { try? receivedFile.close() }
-
-        // Verify we can read from the received file descriptor
-        var readBuffer = [UInt8](repeating: 0, count: 1024)
-        let bytesRead = try readBuffer.withUnsafeMutableBytes { buf in
-          try receivedFile.read(into: buf)
-        }
-
-        let fileContent = String(decoding: readBuffer.prefix(bytesRead), as: UTF8.self)
-        #expect(fileContent == testData, "File content should match")
-      }
-
-      try fileToSend.close()
+    // They arrive in the order they were sent.
+    for (index, (pipe, passed)) in zip(pipes, descriptors).enumerated() {
+      try pipe.writeEnd.writeAll("pipe \(index)".utf8)
+      #expect(try readText(from: passed) == "pipe \(index)")
     }
   }
 
+  @available(System 199, *)
   @available(macOS 15, iOS 18, watchOS 11, tvOS 18, visionOS 2, *)
-  @Test func sendReceiveMessageWithMultipleFileDescriptors() throws {
-    try withTemporaryFilePath(basename: "socket-multi-fd") { tempDir in
-      // Test passing multiple file descriptors at once
-      let server = try SocketDescriptor.open(.local, .stream)
-      defer { try? server.close() }
-
-      let client = try SocketDescriptor.open(.local, .stream)
-      defer { try? client.close() }
-
-      let socketPath = tempDir.appending("test.sock")
-      let unixAddr = UnixAddress(socketPath.string)!
-      let address = SocketAddress(unix: unixAddr)
-      try server.bind(to: address)
-      try server.listen(backlog: 1)
-
-      try client.connect(to: address)
-      let accepted = try server.accept()
-      defer { try? accepted.close() }
-
-      // Create three temporary files
-      let file1 = tempDir.appending("file1.txt")
-      let file2 = tempDir.appending("file2.txt")
-      let file3 = tempDir.appending("file3.txt")
-
-      // Write different content to each file
-      let testData1 = "First file"
-      let testData2 = "Second file"
-      let testData3 = "Third file"
-
-      for (path, data) in [(file1, testData1), (file2, testData2), (file3, testData3)] {
-        let fd = try FileDescriptor.open(path, .writeOnly, options: [.create, .truncate], permissions: [.ownerReadWrite])
-        _ = try data.utf8.withContiguousStorageIfAvailable { buffer in
-          try fd.write(UnsafeRawBufferPointer(buffer))
-        }
-        try fd.close()
+  @Test func reportsAncillaryMessagesThatDidNotFit() throws {
+    let (first, second) = try SocketDescriptor.pair(.local, .datagram)
+    defer {
+      try? first.close()
+      try? second.close()
+    }
+    var ancillary = AncillaryMessageBuffer()
+    ancillary.appendFileDescriptors([FileDescriptor.standardInput, .standardOutput])
+    for _ in 0 ..< 2 {
+      _ = try Array("x".utf8).withUnsafeBytes {
+        try first.sendMessage(RawSpan(_unsafeBytes: $0), ancillaryMessages: ancillary)
       }
+    }
 
-      // Open all three for reading to send
-      let fd1 = try FileDescriptor.open(file1, .readOnly)
-      let fd2 = try FileDescriptor.open(file2, .readOnly)
-      let fd3 = try FileDescriptor.open(file3, .readOnly)
+    // A control buffer without room for a header gets no messages, and the
+    // flag says so. The system closes the descriptors that didn't arrive.
+    // An AncillaryMessageBuffer's capacity is whatever its allocation
+    // rounds up to, so this uses a header and a buffer of its own. (With no
+    // control buffer at all, Darwin doesn't set the flag.)
+    let byte = UnsafeMutableRawBufferPointer.allocate(byteCount: 1, alignment: 1)
+    let noRoom = UnsafeMutableRawBufferPointer.allocate(byteCount: 4, alignment: 8)
+    defer {
+      byte.deallocate()
+      noRoom.deallocate()
+    }
+    var vector = CInterop.IOVec(iov_base: byte.baseAddress, iov_len: byte.count)
+    var header = CInterop.MsgHdr()
+    let count = try withUnsafeMutablePointer(to: &vector) { vector in
+      header.msg_iov = vector
+      header.msg_iovlen = 1
+      header.msg_control = noRoom.baseAddress
+      header.msg_controllen = .init(noRoom.count)
+      return try second.receiveMessage(&header)
+    }
+    #expect(count == 1)
+    #expect(header.msg_flags & CInt(MSG_CTRUNC) != 0)
+    #expect(SocketDescriptor.UnsafeAncillaryMessages(header).isEmpty)
 
-      // Build ancillary message with three FDs
-      var ancillary = SocketDescriptor.AncillaryMessageBuffer()
-      var fds = [fd1.rawValue, fd2.rawValue, fd3.rawValue]
-      fds.withUnsafeBytes { bytes in
-        ancillary.appendMessage(
-          level: .socket,
-          type: .init(rawValue: CInt(SCM_RIGHTS)),
-          bytes: bytes
-        )
-      }
+    // Receiving replaces a buffer's messages, rather than appending to them.
+    var reused = AncillaryMessageBuffer(minimumCapacity: 256)
+    reused.appendFileDescriptors([FileDescriptor.standardError])
+    let (_, replaced) = try receiveText(from: second, ancillary: &reused)
+    #expect(replaced.flags.isEmpty)
+    let descriptors = try #require(reused.first?.fileDescriptors)
+    defer { for descriptor in descriptors { try? descriptor.close() } }
+    #expect(reused.count == 1)
+    #expect(descriptors.count == 2)
+    #expect(!descriptors.contains(.standardError))
+  }
 
-      // Send message with three file descriptors
-      let message = "Three FDs attached"
-      let messageBytes = Array(message.utf8)
-      let sent = try messageBytes.withUnsafeBytes { bytes in
-        let span = RawSpan(_unsafeBytes: bytes)
-        return try client.sendMessage(span, ancillaryMessages: ancillary)
-      }
-      #expect(sent == messageBytes.count)
+  @available(System 199, *)
+  @available(macOS 15, iOS 18, watchOS 11, tvOS 18, visionOS 2, *)
+  @Test func reportsATruncatedDatagram() throws {
+    let (first, second) = try SocketDescriptor.pair(.local, .datagram)
+    defer {
+      try? first.close()
+      try? second.close()
+    }
+    _ = try Array("0123456789".utf8).withUnsafeBytes {
+      try first.sendMessage(RawSpan(_unsafeBytes: $0))
+    }
+    let storage = UnsafeMutableRawBufferPointer.allocate(byteCount: 4, alignment: 1)
+    defer { storage.deallocate() }
+    var buffer = OutputRawSpan(buffer: storage, initializedCount: 0)
+    var ancillary = AncillaryMessageBuffer()
+    let result = try second.receiveMessage(into: &buffer, ancillaryMessages: &ancillary)
+    #expect(result.byteCount == 4)
+    #expect(result.flags == .dataTruncated)
+    #expect(buffer.byteCount == 4)
+    #expect(Array(storage) == Array("0123".utf8))
+  }
 
-      // Receive message and file descriptors
-      var buffer = [UInt8](repeating: 0, count: 1024)
-      var recvAncillary = SocketDescriptor.AncillaryMessageBuffer(minimumCapacity: 256)
-      var sender: SocketAddress? = nil
+  @available(System 199, *)
+  @available(macOS 15, iOS 18, watchOS 11, tvOS 18, visionOS 2, *)
+  @Test func receivesAfterTheBytesAlreadyInTheBuffer() throws {
+    let (first, second) = try SocketDescriptor.pair(.local, .stream)
+    defer {
+      try? first.close()
+      try? second.close()
+    }
+    _ = try Array("cde".utf8).withUnsafeBytes { try first.send($0) }
 
-      let received = try buffer.withUnsafeMutableBytes { buf in
-        var recvOutput = OutputRawSpan(buffer: buf, initializedCount: 0)
-        return try accepted.receiveMessage(
-          into: &recvOutput,
-          ancillaryMessages: &recvAncillary,
-          sender: &sender
-        )
-      }
-      #expect(received == messageBytes.count)
+    let storage = UnsafeMutableRawBufferPointer.allocate(byteCount: 16, alignment: 1)
+    defer { storage.deallocate() }
+    storage.copyBytes(from: "ab".utf8)
+    var buffer = OutputRawSpan(buffer: storage, initializedCount: 2)
+    var ancillary = AncillaryMessageBuffer()
+    let result = try second.receiveMessage(into: &buffer, ancillaryMessages: &ancillary)
+    #expect(result.byteCount == 3)
+    #expect(buffer.byteCount == 5)
+    #expect(Array(storage.prefix(5)) == Array("abcde".utf8))
+  }
 
-      // Extract the three received file descriptors
-      var receivedFDs: [CInt] = []
-      recvAncillary._withUnsafeBytes { controlData in
-        guard controlData.count >= MemoryLayout<CInterop.CMsgHdr>.size else { return }
+  /// The header forms: scatter and gather, and control buffers in memory
+  /// that the caller manages, as NIO pools them.
+  @available(System 199, *)
+  @Test func headerFormsGatherAndScatter() throws {
+    let (first, second) = try SocketDescriptor.pair(.local, .datagram)
+    defer {
+      try? first.close()
+      try? second.close()
+    }
+    let pipe = try FileDescriptor.pipe()
+    defer {
+      try? pipe.readEnd.close()
+      try? pipe.writeEnd.close()
+    }
 
-        let header = controlData.baseAddress!.assumingMemoryBound(to: CInterop.CMsgHdr.self)
-        if header.pointee.cmsg_level == SOL_SOCKET &&
-           header.pointee.cmsg_type == CInt(SCM_RIGHTS) {
-          let dataOffset = MemoryLayout<CInterop.CMsgHdr>.size
-          let dataSize = Int(header.pointee.cmsg_len) - dataOffset
-          let fdCount = dataSize / MemoryLayout<CInt>.size
-
-          let fdsPtr = (controlData.baseAddress! + dataOffset).assumingMemoryBound(to: CInt.self)
-          for i in 0..<fdCount {
-            receivedFDs.append(fdsPtr[i])
+    // Gather the datagram from two buffers.
+    var ancillary = AncillaryMessageBuffer()
+    ancillary.appendFileDescriptors([pipe.writeEnd])
+    let parts = [Array("hello, ".utf8), Array("world".utf8)]
+    let sent = try parts[0].withUnsafeBytes { part0 in
+      try parts[1].withUnsafeBytes { part1 in
+        var vectors = [
+          CInterop.IOVec(iov_base: UnsafeMutableRawPointer(mutating: part0.baseAddress), iov_len: part0.count),
+          CInterop.IOVec(iov_base: UnsafeMutableRawPointer(mutating: part1.baseAddress), iov_len: part1.count),
+        ]
+        return try vectors.withUnsafeMutableBufferPointer { vectors in
+          try ancillary.withUnsafeBytes { control in
+            var header = CInterop.MsgHdr()
+            header.msg_iov = vectors.baseAddress
+            header.msg_iovlen = .init(vectors.count)
+            header.msg_control = UnsafeMutableRawPointer(mutating: control.baseAddress)
+            header.msg_controllen = .init(control.count)
+            return try first.sendMessage(header)
           }
         }
       }
-
-      #expect(receivedFDs.count == 3, "Should have received 3 file descriptors")
-
-      // Verify we can read correct content from each FD
-      for (index, fdValue) in receivedFDs.enumerated() {
-        let receivedFile = FileDescriptor(rawValue: fdValue)
-        defer { try? receivedFile.close() }
-
-        var readBuffer = [UInt8](repeating: 0, count: 1024)
-        let bytesRead = try readBuffer.withUnsafeMutableBytes { buf in
-          try receivedFile.read(into: buf)
-        }
-
-        let fileContent = String(decoding: readBuffer.prefix(bytesRead), as: UTF8.self)
-        let expectedContent = [testData1, testData2, testData3][index]
-        #expect(fileContent == expectedContent, "FD \(index) content should match")
-      }
-
-      try fd1.close()
-      try fd2.close()
-      try fd3.close()
     }
+    #expect(sent == 12)
+
+    // Scatter it into two buffers, with a control buffer of our own.
+    let head = UnsafeMutableRawBufferPointer.allocate(byteCount: 4, alignment: 1)
+    let tail = UnsafeMutableRawBufferPointer.allocate(byteCount: 20, alignment: 1)
+    let control = UnsafeMutableRawBufferPointer.allocate(byteCount: 64, alignment: 8)
+    defer {
+      head.deallocate()
+      tail.deallocate()
+      control.deallocate()
+    }
+    var vectors = [
+      CInterop.IOVec(iov_base: head.baseAddress, iov_len: head.count),
+      CInterop.IOVec(iov_base: tail.baseAddress, iov_len: tail.count),
+    ]
+    let (count, header) = try vectors.withUnsafeMutableBufferPointer { vectors in
+      var header = CInterop.MsgHdr()
+      header.msg_iov = vectors.baseAddress
+      header.msg_iovlen = .init(vectors.count)
+      header.msg_control = control.baseAddress
+      header.msg_controllen = .init(control.count)
+      let count = try second.receiveMessage(&header)
+      return (count, header)
+    }
+    #expect(count == 12)
+    #expect(String(decoding: Array(head) + tail.prefix(count - head.count), as: UTF8.self) == "hello, world")
+
+    // recvmsg updated the header: the control buffer's length is now the
+    // length of the messages it received.
+    #expect(header.msg_flags == 0)
+    #expect(Int(header.msg_controllen) < control.count)
+    let messages = SocketDescriptor.UnsafeAncillaryMessages(header)
+    #expect(messages.count == 1)
+    let passed = try #require(messages.first?.fileDescriptors?.first)
+    defer { try? passed.close() }
+    try passed.writeAll("into the pipe".utf8)
+    #expect(try readText(from: pipe.readEnd) == "into the pipe")
   }
+}
+
+/// Receives a message of up to 1 KiB as UTF-8 text.
+@available(System 199, *)
+@available(macOS 15, iOS 18, watchOS 11, tvOS 18, visionOS 2, *)
+private func receiveText(
+  from socket: SocketDescriptor,
+  ancillary: inout SocketDescriptor.AncillaryMessageBuffer
+) throws -> (String, (byteCount: Int, flags: SocketDescriptor.MessageFlags)) {
+  let storage = UnsafeMutableRawBufferPointer.allocate(byteCount: 1024, alignment: 1)
+  defer { storage.deallocate() }
+  var buffer = OutputRawSpan(buffer: storage, initializedCount: 0)
+  let result = try socket.receiveMessage(into: &buffer, ancillaryMessages: &ancillary)
+  #expect(buffer.byteCount == result.byteCount)
+  return (String(decoding: storage.prefix(result.byteCount), as: UTF8.self), result)
+}
+
+/// Receives a message of up to 1 KiB as UTF-8 text, and its sender.
+@available(System 199, *)
+@available(macOS 15, iOS 18, watchOS 11, tvOS 18, visionOS 2, *)
+private func receiveText(
+  from socket: SocketDescriptor,
+  ancillary: inout SocketDescriptor.AncillaryMessageBuffer,
+  sender: inout SocketAddress
+) throws -> (String, (byteCount: Int, flags: SocketDescriptor.MessageFlags)) {
+  let storage = UnsafeMutableRawBufferPointer.allocate(byteCount: 1024, alignment: 1)
+  defer { storage.deallocate() }
+  var buffer = OutputRawSpan(buffer: storage, initializedCount: 0)
+  let result = try socket.receiveMessage(
+    into: &buffer, ancillaryMessages: &ancillary, sender: &sender)
+  #expect(buffer.byteCount == result.byteCount)
+  return (String(decoding: storage.prefix(result.byteCount), as: UTF8.self), result)
+}
+
+/// Reads up to 64 bytes from a descriptor as UTF-8 text.
+private func readText(from descriptor: FileDescriptor) throws -> String {
+  var bytes = [UInt8](repeating: 0, count: 64)
+  let count = try bytes.withUnsafeMutableBytes { try descriptor.read(into: $0) }
+  return String(decoding: bytes.prefix(count), as: UTF8.self)
 }
 
 #endif

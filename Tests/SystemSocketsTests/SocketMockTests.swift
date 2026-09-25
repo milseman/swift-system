@@ -136,6 +136,70 @@ private struct SocketMockTests {
   }
 }
 
+// sendmsg and recvmsg, through the header forms and the Span forms.
+@Suite("Socket message syscall mocks")
+private struct SocketMessageMockTests {
+  @available(System 199, *)
+  @Test func headerFormsPassTheSocketAndFlags() throws {
+    let socket = SocketDescriptor(rawValue: 42)
+    try MockingDriver.withMockingEnabled { mocking throws in
+      mocking.byteCounts = [5, 7]
+      #expect(try socket.sendMessage(CInterop.MsgHdr(), flags: .doNotRoute) == 5)
+      var header = CInterop.MsgHdr()
+      #expect(try socket.receiveMessage(&header, flags: .peek) == 7)
+      let calls = drain(mocking)
+      #expect(calls.map(\.name) == ["sendmsg", "recvmsg"])
+      #expect(calls.map { $0.arguments.first } == [42, 42])
+      #expect(calls.map { $0.arguments.last } == [MSG_DONTROUTE, MSG_PEEK])
+    }
+  }
+
+  @available(System 199, *)
+  @Test func headerFormsRetryOnInterruptOnlyWhenAsked() {
+    let socket = SocketDescriptor(rawValue: 42)
+    MockingDriver.withMockingEnabled { mocking in
+      mocking.forceErrno = .counted(errno: EINTR, count: 2)
+      var header = CInterop.MsgHdr()
+      #expect(throws: Never.self) { try socket.receiveMessage(&header) }
+      #expect(drain(mocking).map(\.name) == ["recvmsg", "recvmsg", "recvmsg"])
+
+      mocking.forceErrno = .counted(errno: EINTR, count: 1)
+      #expect(throws: Errno.interrupted) {
+        try socket.sendMessage(CInterop.MsgHdr(), retryOnInterrupt: false)
+      }
+      #expect(drain(mocking).map(\.name) == ["sendmsg"])
+    }
+  }
+
+  @available(System 199, *)
+  @available(macOS 15, iOS 18, watchOS 11, tvOS 18, visionOS 2, *)
+  @Test func receiveMessageAddsTheByteCountToTheBuffer() throws {
+    let socket = SocketDescriptor(rawValue: 42)
+    let storage = UnsafeMutableRawBufferPointer.allocate(byteCount: 16, alignment: 1)
+    defer { storage.deallocate() }
+    try MockingDriver.withMockingEnabled { mocking throws in
+      var buffer = OutputRawSpan(buffer: storage, initializedCount: 3)
+      var ancillary = SocketDescriptor.AncillaryMessageBuffer()
+      ancillary.appendFileDescriptors([FileDescriptor(rawValue: 1)])
+
+      mocking.byteCounts = [4]
+      let received = try socket.receiveMessage(into: &buffer, ancillaryMessages: &ancillary)
+      #expect(received.byteCount == 4)
+      #expect(received.flags.isEmpty)
+      #expect(buffer.byteCount == 7)
+
+      // A failed receive adds nothing, and leaves no ancillary messages.
+      mocking.forceErrno = .always(errno: EAGAIN)
+      #expect(throws: Errno.wouldBlock) {
+        try socket.receiveMessage(into: &buffer, ancillaryMessages: &ancillary)
+      }
+      #expect(buffer.byteCount == 7)
+      #expect(ancillary.isEmpty)
+      #expect(drain(mocking).map(\.name) == ["recvmsg", "recvmsg"])
+    }
+  }
+}
+
 /// Removes and returns the calls that the mocking driver recorded.
 private func drain(_ mocking: MockingDriver) -> [Trace.Entry] {
   var calls: [Trace.Entry] = []
