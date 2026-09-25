@@ -139,6 +139,7 @@ extension CInterop {
 
 @available(System 199, *)
 extension CInterop {
+  /// The C `pid_t` type for process and process group IDs.
   public typealias ProcessID = pid_t
 }
 #endif
