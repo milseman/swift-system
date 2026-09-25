@@ -25,5 +25,6 @@ struct PlatformSamples: ParsableCommand {
       """,
     subcommands: [
       PlatformCopy.self,
+      PlatformLock.self,
     ])
 }
