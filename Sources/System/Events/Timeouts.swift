@@ -57,4 +57,19 @@ internal func _nanosecondComponents(
   guard nanoseconds == 1_000_000_000 else { return (seconds, nanoseconds) }
   return (seconds == .max ? .max : seconds + 1, 0)
 }
+
+/// Converts an optional timeout to the milliseconds that `poll` and
+/// `epoll_wait` take: `-1` for `nil`, which waits until an event arrives,
+/// and otherwise a value clamped to between zero and `CInt.max`,
+/// which is about 24 days.
+@available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *)
+@_alwaysEmitIntoClient
+internal func _milliseconds(timeout: Duration?) -> CInt {
+  guard let timeout else { return -1 }
+  guard timeout > .zero else { return 0 }
+  let (seconds, attoseconds) = timeout.components
+  guard seconds < Int64(CInt.max) / 1000 else { return .max }
+  let milliseconds = (attoseconds + 999_999_999_999_999) / 1_000_000_000_000_000
+  return CInt((seconds * 1000) + milliseconds)
+}
 #endif // !os(Windows) && !os(WASI)

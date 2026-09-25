@@ -7,8 +7,8 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-// The event notification constants, for kqueue. Each is typed as the C
-// field or argument that it goes in.
+// The event notification constants: for kqueue, and for poll. Each is
+// typed as the C field or argument that it goes in.
 
 import CSystem
 #if SYSTEM_PACKAGE_DARWIN
@@ -234,3 +234,44 @@ internal var _NOTE_FFCTRLMASK: UInt32 { UInt32(truncatingIfNeeded: NOTE_FFCTRLMA
 @_alwaysEmitIntoClient
 internal var _NOTE_FFLAGSMASK: UInt32 { UInt32(truncatingIfNeeded: NOTE_FFLAGSMASK) }
 #endif // SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
+
+#if !os(Windows) && !os(WASI)
+// MARK: poll
+
+@_alwaysEmitIntoClient
+internal var _POLLIN: CShort { CShort(POLLIN) }
+
+@_alwaysEmitIntoClient
+internal var _POLLPRI: CShort { CShort(POLLPRI) }
+
+@_alwaysEmitIntoClient
+internal var _POLLOUT: CShort { CShort(POLLOUT) }
+
+@_alwaysEmitIntoClient
+internal var _POLLRDNORM: CShort { CShort(POLLRDNORM) }
+
+@_alwaysEmitIntoClient
+internal var _POLLRDBAND: CShort { CShort(POLLRDBAND) }
+
+@_alwaysEmitIntoClient
+internal var _POLLWRNORM: CShort { CShort(POLLWRNORM) }
+
+@_alwaysEmitIntoClient
+internal var _POLLWRBAND: CShort { CShort(POLLWRBAND) }
+
+@_alwaysEmitIntoClient
+internal var _POLLERR: CShort { CShort(POLLERR) }
+
+@_alwaysEmitIntoClient
+internal var _POLLHUP: CShort { CShort(POLLHUP) }
+
+@_alwaysEmitIntoClient
+internal var _POLLNVAL: CShort { CShort(POLLNVAL) }
+
+#if os(Linux) || os(Android)
+// glibc declares POLLRDHUP only with _GNU_SOURCE. It has this value on
+// every architecture that Swift supports.
+@_alwaysEmitIntoClient
+internal var _POLLRDHUP: CShort { 0x2000 }
+#endif
+#endif // !os(Windows) && !os(WASI)

@@ -258,6 +258,14 @@ final class KernelQueueTests: XCTestCase {
     try adopted.close()
   }
 
+  func testQueueIsReadableWhenItHasEvents() throws {
+    let queue = try KernelQueue()
+    try queue.register(KernelEvent(identifier: 5, filter: .user, flags: .add))
+    XCTAssertEqual(try queue.fileDescriptor.poll(for: .readable, timeout: .zero), [])
+    try queue.register(KernelEvent(identifier: 5, filter: .user, filterFlags: .userTrigger))
+    XCTAssertEqual(try queue.fileDescriptor.poll(for: .readable, timeout: .zero), .readable)
+  }
+
   func testVnodeWrite() throws {
     try withTemporaryFilePath(basename: "testVnodeWrite") { directory in
       let path = directory.appending("file")

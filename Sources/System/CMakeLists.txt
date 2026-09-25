@@ -58,6 +58,7 @@ target_compile_options(SystemPackage PRIVATE
 target_sources(SystemPackage PRIVATE
   Events/KernelEvent.swift
   Events/KernelQueue.swift
+  Events/Poll.swift
   Events/Timeouts.swift)
 target_sources(SystemPackage PRIVATE
   FilePath/FilePath.swift
