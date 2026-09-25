@@ -250,7 +250,7 @@ extension FileDescriptor {
   /// The <doc://com.apple.documentation/documentation/swift/unsafemutablerawbufferpointer/count-95usp> property of `buffer`
   /// determines the maximum number of bytes that are read into that buffer.
   ///
-  /// Unlike <doc:FileDescriptor/read(into:retryOnInterrupt:)>,
+  /// Unlike ``read(into:retryOnInterrupt:)-(UnsafeMutableRawBufferPointer,_)``,
   /// this method leaves the file's existing offset unchanged.
   ///
   /// The corresponding C function is `pread`.
@@ -336,7 +336,7 @@ extension FileDescriptor {
   ///     Pass `false` to try only once and throw an error upon interruption.
   /// - Returns: The number of bytes that were written.
   ///
-  /// Unlike ``write(_:retryOnInterrupt:)``,
+  /// Unlike ``write(_:retryOnInterrupt:)-(UnsafeRawBufferPointer,_)``,
   /// this method leaves the file's existing offset unchanged.
   ///
   /// The corresponding C function is `pwrite`.
@@ -412,7 +412,7 @@ extension FileDescriptor {
   ///     Pass `false` to try only once and throw an error upon interruption.
   /// - Returns: The number of bytes that were written.
   ///
-  /// Unlike ``write(_:retryOnInterrupt:)``,
+  /// Unlike ``write(_:retryOnInterrupt:)-(RawSpan,_)``,
   /// this method leaves the file's existing offset unchanged.
   ///
   /// The corresponding C function is `pwrite`.
@@ -485,7 +485,7 @@ extension FileDescriptor {
   ///     Pass `false` to try only once and throw an error upon interruption.
   /// - Returns: The number of bytes that were read.
   ///
-  /// Unlike ``read(into:retryOnInterrupt:)``,
+  /// Unlike ``read(into:retryOnInterrupt:)-(OutputRawSpan,_)``,
   /// this method leaves the file's existing offset unchanged.
   ///
   /// The corresponding C function is `pread`.

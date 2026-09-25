@@ -322,10 +322,15 @@ public struct OutputFlags: OptionSet, Hashable, Sendable {
   public static var formFeedDelay1: Self { Self(rawValue: _FF1) }
 
   #if canImport(Darwin)
-  /// Expand tabs to spaces (Darwin-specific name for TAB3).
+  /// Expand tabs to spaces.
+  ///
+  /// On Darwin, `OXTABS` and `TAB3` have the same value,
+  /// so this is the same flag as ``expandTabs``,
+  /// which Linux has too.
   ///
   /// The corresponding C constant is `OXTABS`.
   @_alwaysEmitIntoClient
+  @available(*, deprecated, renamed: "expandTabs", message: "OXTABS is the same flag as TAB3 on Darwin")
   public static var oxtabs: Self { Self(rawValue: _OXTABS) }
 
   /// Discard EOT (^D) characters on output.
