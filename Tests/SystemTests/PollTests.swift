@@ -96,6 +96,15 @@ final class PollTests: XCTestCase {
     XCTAssertEqual(Set([entry, other, entry]).count, 2)
   }
 
+  func testDescriptions() {
+    XCTAssertEqual(
+      FileDescriptor.PollEvents([.readable, .hangUp]).description, "[.readable, .hangUp]")
+    XCTAssertEqual(FileDescriptor.PollEvents([]).description, "[]")
+    XCTAssertEqual(
+      FileDescriptor.PollEntry(.standardError, events: .writable).description,
+      "PollEntry(fileDescriptor: 2, events: [.writable], returnedEvents: [])")
+  }
+
   #if ENABLE_MOCKING
   // The mock records each entry's descriptor and events, and the timeout
   // in milliseconds.

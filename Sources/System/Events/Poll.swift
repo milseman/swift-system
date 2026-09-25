@@ -203,6 +203,61 @@ extension FileDescriptor.PollEntry: Hashable {
   }
 }
 
+@available(System 199, *)
+extension FileDescriptor.PollEvents: CustomStringConvertible, CustomDebugStringConvertible {
+  /// A textual representation of the events.
+  @inline(never)
+  public var description: String {
+    // Some platforms define a normal-data bit as its general one, such as
+    // Darwin's POLLWRNORM as POLLOUT, so each general bit comes first.
+    #if os(Linux) || os(Android)
+    let descriptions: [(Element, StaticString)] = [
+      (.readable, ".readable"),
+      (.priority, ".priority"),
+      (.writable, ".writable"),
+      (.readableNormalData, ".readableNormalData"),
+      (.readablePriorityData, ".readablePriorityData"),
+      (.writableNormalData, ".writableNormalData"),
+      (.writablePriorityData, ".writablePriorityData"),
+      (.readHangUp, ".readHangUp"),
+      (.error, ".error"),
+      (.hangUp, ".hangUp"),
+      (.invalidDescriptor, ".invalidDescriptor"),
+    ]
+    #else
+    let descriptions: [(Element, StaticString)] = [
+      (.readable, ".readable"),
+      (.priority, ".priority"),
+      (.writable, ".writable"),
+      (.readableNormalData, ".readableNormalData"),
+      (.readablePriorityData, ".readablePriorityData"),
+      (.writableNormalData, ".writableNormalData"),
+      (.writablePriorityData, ".writablePriorityData"),
+      (.error, ".error"),
+      (.hangUp, ".hangUp"),
+      (.invalidDescriptor, ".invalidDescriptor"),
+    ]
+    #endif
+    return _buildDescription(descriptions)
+  }
+
+  /// A textual representation of the events, suitable for debugging.
+  public var debugDescription: String { self.description }
+}
+
+@available(System 199, *)
+extension FileDescriptor.PollEntry: CustomStringConvertible, CustomDebugStringConvertible {
+  /// A textual representation of the entry.
+  @inline(never)
+  public var description: String {
+    "PollEntry(fileDescriptor: \(fileDescriptor.rawValue), events: \(events), "
+      + "returnedEvents: \(returnedEvents))"
+  }
+
+  /// A textual representation of the entry, suitable for debugging.
+  public var debugDescription: String { self.description }
+}
+
 // Duration and MutableSpan need newer OSes than System 199 means in the
 // default build, so each member carries both.
 extension FileDescriptor {
