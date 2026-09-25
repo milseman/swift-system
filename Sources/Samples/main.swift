@@ -62,6 +62,7 @@ struct SystemSamples: ParsableCommand {
       SignalIO.self,
       PipeAtomic.self,
       Extents.self,
+      PlatformSamples.self,
     ])
 }
 
