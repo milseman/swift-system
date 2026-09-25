@@ -185,10 +185,12 @@ extension KernelQueue {
   }
 }
 
-// MARK: - Registering and polling with spans
+// MARK: - Registering with a span
 
-// Span and Duration need newer OSes than System 199 means in the default
-// build, so each member carries both.
+// Span needs a newer OS than System 199 means in the default build,
+// so this extension carries both.
+@available(System 199, *)
+@available(macOS 10.14.4, iOS 12.2, watchOS 5.2, tvOS 12.2, visionOS 1.0, *)
 extension KernelQueue {
   /// Changes the events that the queue watches for, without waiting.
   ///
@@ -210,12 +212,19 @@ extension KernelQueue {
   /// since the queue applies changes before it would wait.
   ///
   /// The corresponding C function is `kevent`, with an empty event list.
-  @available(System 199, *)
-  @available(macOS 10.14.4, iOS 12.2, watchOS 5.2, tvOS 12.2, visionOS 1.0, *)
   @_alwaysEmitIntoClient
   public func register(_ changes: Span<KernelEvent>) throws(Errno) {
     try changes.withUnsafeBufferPointer { _register($0) }.get()
   }
+}
+
+// MARK: - Polling
+
+// Span and Duration need newer OSes than System 199 means in the default
+// build, so this extension carries both.
+@available(System 199, *)
+@available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *)
+extension KernelQueue {
 
   /// Changes the events that the queue watches for,
   /// and then waits for events to report.
@@ -250,8 +259,6 @@ extension KernelQueue {
   ///   which is zero if the timeout expired.
   ///
   /// The corresponding C function is `kevent`.
-  @available(System 199, *)
-  @available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *)
   @_alwaysEmitIntoClient
   @_lifetime(events: copy events)
   @discardableResult
@@ -273,8 +280,6 @@ extension KernelQueue {
   }
 
   @available(*, unavailable, renamed: "registerAndPoll(_:into:timeout:retryOnInterrupt:)")
-  @available(System 199, *)
-  @available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *)
   @_alwaysEmitIntoClient
   @_lifetime(events: copy events)
   public func kevent(
@@ -308,8 +313,6 @@ extension KernelQueue {
   ///   which is zero if the timeout expired.
   ///
   /// The corresponding C function is `kevent`, with an empty change list.
-  @available(System 199, *)
-  @available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *)
   @_alwaysEmitIntoClient
   @discardableResult
   public func poll(
@@ -327,8 +330,6 @@ extension KernelQueue {
     }.get()
   }
 
-  @available(System 199, *)
-  @available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *)
   @_alwaysEmitIntoClient
   internal func _poll(
     _ changes: UnsafeBufferPointer<KernelEvent>,
