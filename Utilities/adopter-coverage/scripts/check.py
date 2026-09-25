@@ -533,7 +533,7 @@ def print_summary(cov):
                      ("alreadySystemMissing", f"System API {name} already uses, missing on the tip"),
                      ("duplicate", "symbols mapped twice"), ("malformed", "mapping errors"),
                      ("staleNotes", f"entries with a note for {name} that {name} no longer uses")):
-        if p[k]:
+        if p.get(k):
             print(f"{label}: {len(p[k])}")
             for x in p[k][:10]:
                 print("   ", x if isinstance(x, str) else json.dumps(x)[:160])
