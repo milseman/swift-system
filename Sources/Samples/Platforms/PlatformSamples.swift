@@ -28,5 +28,6 @@ struct PlatformSamples: ParsableCommand {
       PlatformLock.self,
       PlatformDarwinOnly.self,
       PlatformWindowsOnly.self,
+      PlatformLibrary.self,
     ])
 }
