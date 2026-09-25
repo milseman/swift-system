@@ -1,6 +1,6 @@
 ### Pipeline
 
-`Utilities/nio-coverage/check.sh` runs every step. It works in a scratch directory (`NIO_COVERAGE_WORK`, default `.build/nio-coverage-work`) and replaces the output directory (`NIO_COVERAGE_OUT`, default `.build/nio-coverage`) only when every step has run. It never touches tracked files, here or in the NIO checkout.
+`Utilities/adopter-coverage/check.sh` runs every step. It works in a scratch directory (`NIO_COVERAGE_WORK`, default `.build/nio-coverage-work`) and replaces the output directory (`NIO_COVERAGE_OUT`, default `.build/nio-coverage`) only when every step has run. It never touches tracked files, here or in the NIO checkout.
 
 1. **Export and build NIO.** `git archive` exports `NIO_REF` from `NIO_PATH`, and `swift build` builds the export in debug, which on macOS writes an index store. The build resolves NIO's dependencies as its manifest says, released swift-system included. The build and its index are kept, keyed by NIO commit, so a rerun against a new System tip skips this step.
 2. **Read the index.** `scripts/indexstore.py` reads the store through the toolchain's `libIndexStore.dylib` with ctypes. It dumps every reference from NIO's sources, Swift and C alike, with the declaring module and file of each referenced symbol, and the names each module declares.

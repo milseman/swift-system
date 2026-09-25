@@ -112,7 +112,7 @@ def main():
       f"{esc(meta.get('nioSubject', ''))} |")
     w("")
     w(f"Generated {meta.get('date', '')} on {meta.get('host', '')} with {meta.get('swift', '')}, by "
-      f"`Utilities/nio-coverage/check.sh` from `Utilities/nio-coverage/mapping.ini`. The last section says how.")
+      f"`Utilities/adopter-coverage/check.sh` from `Utilities/adopter-coverage/mapping.ini`. The last section says how.")
     w("")
     w("Platforms: " + ", ".join(f"{ABBREV[p]} = {p}" for p in platforms) + ". Darwin means macOS.")
     w("")
