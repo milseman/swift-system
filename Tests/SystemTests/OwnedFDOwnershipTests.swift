@@ -18,6 +18,7 @@ import XCTest
 // PROTOTYPE: more tests for Sources/System/OwnedFD.swift: the syscall and
 // retry behavior of each forwarded method, ownership transfer, and errors.
 
+@available(System 199, *)
 final class OwnedFDOwnershipTest: XCTestCase {
   #if ENABLE_MOCKING && !os(WASI) // Would need to use _getConst funcs from CSystem
   /// Calls `body` with an `OwnedFD` for descriptor 42, then relinquishes it,

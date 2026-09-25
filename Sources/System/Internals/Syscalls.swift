@@ -970,11 +970,11 @@ internal func system_fpathconf(_ fd: CInt, _ name: CInt) -> Int {
 #endif // !os(Windows) && !os(WASI)
 
 #if !os(Windows) && !os(WASI)
-internal func system_getpid() -> CInterop.ProcessID {
+internal func system_getpid() -> pid_t {
   return getpid()
 }
 
-internal func system_getppid() -> CInterop.ProcessID {
+internal func system_getppid() -> pid_t {
   return getppid()
 }
 #endif // !os(Windows) && !os(WASI)

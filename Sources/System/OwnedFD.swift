@@ -22,6 +22,7 @@
 /// Destroying an `OwnedFD` closes its file descriptor and ignores any error.
 /// To handle an error from closing, call `close()`.
 @frozen
+@available(System 199, *)
 public struct OwnedFD: ~Copyable, Sendable {
   @usableFromInline
   internal let _descriptor: FileDescriptor
@@ -44,6 +45,7 @@ public struct OwnedFD: ~Copyable, Sendable {
 }
 
 // Standard file descriptors.
+@available(System 199, *)
 extension OwnedFD {
   /// The standard input file descriptor, with a numeric value of 0.
   ///
@@ -59,6 +61,7 @@ extension OwnedFD {
 }
 
 // Ownership.
+@available(System 199, *)
 extension OwnedFD {
   /// Opens or creates a file for reading or writing.
   ///
@@ -128,6 +131,7 @@ extension OwnedFD {
 
 #if !os(WASI)
 // Pipes.
+@available(System 199, *)
 extension OwnedFD {
   /// Both ends of a pipe, each owned by an `OwnedFD`.
   ///
@@ -147,6 +151,7 @@ extension OwnedFD {
   /// to use the other end, so take both ends apart first
   /// if a closure needs one of them.
   @frozen
+  @available(System 199, *)
   public struct Pipe: ~Copyable, Sendable {
     /// The end of the pipe that reads data written to `writeEnd`.
     public var readEnd: OwnedFD
@@ -173,7 +178,15 @@ extension OwnedFD {
     return Pipe(
       readEnd: OwnedFD(taking: ends.readEnd), writeEnd: OwnedFD(taking: ends.writeEnd))
   }
+}
 
+// A member of a System 199 extension can't have an explicit OS floor of its
+// own: the ABI-stable build maps System 199 to a later OS release, and a
+// member can't be more available than its extension. So both attributes go
+// on the extension.
+@available(System 199, *)
+@available(macOS 27.0, iOS 27.0, watchOS 27.0, tvOS 27.0, visionOS 27.0, *)
+extension OwnedFD {
   /// Creates a unidirectional data channel with the given options,
   /// such as closing both ends on `exec`, atomically.
   ///
@@ -181,7 +194,6 @@ extension OwnedFD {
   ///
   /// The corresponding C function is `pipe2`.
   @_alwaysEmitIntoClient
-  @available(macOS 27.0, iOS 27.0, watchOS 27.0, tvOS 27.0, visionOS 27.0, *)
   public static func pipe(options: FileDescriptor.PipeOptions) throws(Errno) -> Pipe {
     let ends = try FileDescriptor._pipe(options: options.rawValue).get()
     return Pipe(
@@ -196,6 +208,7 @@ extension OwnedFD {
 // FileDescriptor method doesn't yet. Everything else goes through
 // `fileDescriptor`, so that new FileDescriptor API needs no OwnedFD change.
 // See Prototype/Forwarding for the costs of forwarding the rest.
+@available(System 199, *)
 extension OwnedFD {
   /// Repositions the offset for the file descriptor.
   ///
@@ -276,11 +289,16 @@ extension OwnedFD {
   ) throws(Errno) -> Int where S.Element == UInt8 {
     try _descriptor._writeAll(toAbsoluteOffset: offset, sequence).get()
   }
+}
 
+// Forwarded Span-based I/O, whose explicit OS floor goes on the extension
+// for the same reason as `pipe(options:)`'s.
+@available(System 199, *)
+@available(macOS 15, iOS 18, watchOS 11, tvOS 18, visionOS 2, *)
+extension OwnedFD {
   /// Writes the contents of a buffer at the current file offset.
   ///
   /// The corresponding C function is `write`.
-  @available(macOS 15, iOS 18, watchOS 11, tvOS 18, visionOS 2, *)
   @_alwaysEmitIntoClient
   public func write(
     _ data: RawSpan,
@@ -292,7 +310,6 @@ extension OwnedFD {
   /// Writes the contents of a buffer at the specified offset.
   ///
   /// The corresponding C function is `pwrite`.
-  @available(macOS 15, iOS 18, watchOS 11, tvOS 18, visionOS 2, *)
   @_alwaysEmitIntoClient
   public func write(
     toAbsoluteOffset offset: Int64,
@@ -306,7 +323,6 @@ extension OwnedFD {
   /// Writes the entire contents of a buffer, retrying on partial writes.
   ///
   /// The corresponding C function is `write`.
-  @available(macOS 15, iOS 18, watchOS 11, tvOS 18, visionOS 2, *)
   @_alwaysEmitIntoClient
   public func writeAll(
     _ data: RawSpan,
@@ -319,7 +335,6 @@ extension OwnedFD {
   /// retrying on partial writes.
   ///
   /// The corresponding C function is `pwrite`.
-  @available(macOS 15, iOS 18, watchOS 11, tvOS 18, visionOS 2, *)
   @_alwaysEmitIntoClient
   public func writeAll(
     toAbsoluteOffset offset: Int64,
@@ -333,7 +348,6 @@ extension OwnedFD {
   /// Reads bytes at the current file offset into a buffer.
   ///
   /// The corresponding C function is `read`.
-  @available(macOS 15, iOS 18, watchOS 11, tvOS 18, visionOS 2, *)
   @_alwaysEmitIntoClient
   public func read(
     into buffer: inout OutputRawSpan,
@@ -345,7 +359,6 @@ extension OwnedFD {
   /// Reads bytes at the specified offset into a buffer.
   ///
   /// The corresponding C function is `pread`.
-  @available(macOS 15, iOS 18, watchOS 11, tvOS 18, visionOS 2, *)
   @_alwaysEmitIntoClient
   public func read(
     fromAbsoluteOffset offset: Int64,
@@ -359,7 +372,6 @@ extension OwnedFD {
   /// Reads bytes into a buffer, retrying until it is full.
   ///
   /// The corresponding C function is `read`.
-  @available(macOS 15, iOS 18, watchOS 11, tvOS 18, visionOS 2, *)
   @_alwaysEmitIntoClient
   @discardableResult
   public func read(
@@ -373,7 +385,6 @@ extension OwnedFD {
   /// retrying until it is full.
   ///
   /// The corresponding C function is `pread`.
-  @available(macOS 15, iOS 18, watchOS 11, tvOS 18, visionOS 2, *)
   @_alwaysEmitIntoClient
   @discardableResult
   public func read(

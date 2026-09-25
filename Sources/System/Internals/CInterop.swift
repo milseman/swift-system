@@ -137,6 +137,7 @@ extension CInterop {
 }
 #endif // !os(WASI)
 
+@available(System 199, *)
 extension CInterop {
   public typealias ProcessID = pid_t
 }

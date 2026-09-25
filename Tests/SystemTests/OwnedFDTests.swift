@@ -19,6 +19,7 @@ import XCTest
 
 private struct BodyError: Error {}
 
+@available(System 199, *)
 final class OwnedFDTest: XCTestCase {
   #if ENABLE_MOCKING
   /// Drains the mocked syscall trace into `name(args)` strings.
