@@ -31,6 +31,7 @@ struct PlatformSamples: ParsableCommand {
       PlatformLibrary.self,
       PlatformOwned.self,
       PlatformProcess.self,
+      PlatformSocket.self,
       PlatformErrors.self,
       PlatformVariants.self,
     ])

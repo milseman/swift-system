@@ -270,8 +270,13 @@ extension Win32.Socket {
   /// The corresponding C function is `send`, called in a loop.
   @available(macOS 15, iOS 18, watchOS 11, tvOS 18, visionOS 2, *)
   func send(_ span: RawSpan) throws(Win32.Error) {
-    try Win32Simulation.posix {
+    do {
       _ = try FileDescriptor(rawValue: _descriptor).writeAll(span)
+    } catch Errno.brokenPipe {
+      // WinSock reports a send to a peer that closed as a reset connection.
+      throw Win32.Error(10054)  // WSAECONNRESET
+    } catch {
+      throw Win32Simulation.error(from: error)
     }
   }
 
