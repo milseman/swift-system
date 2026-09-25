@@ -55,4 +55,67 @@ final class TemporaryPathTest: XCTestCase {
       XCTAssertEqual(error as! Errno, Errno.noSuchFileOrDirectory)
     }
   }
+
+  #if !os(Windows)
+  @available(System 199, *)
+  func testCleanupNested() throws {
+    var thePath: FilePath? = nil
+
+    try withTemporaryFilePath(basename: "testCleanupNested") { path in
+      thePath = path
+      try makeNestedTree(in: path)
+    }
+
+    XCTAssertThrowsError(try FileDescriptor.open(thePath!, .readOnly)) {
+      XCTAssertEqual($0 as? Errno, .noSuchFileOrDirectory)
+    }
+  }
+
+  // withTemporaryFilePath ignores an error from removing the directory,
+  // so call _recursiveRemove directly to see one.
+  @available(System 199, *)
+  func testRecursiveRemove() throws {
+    try withTemporaryFilePath(basename: "testRecursiveRemove") { path in
+      let outside = path.appending("outside")
+      try outside.makeDirectory(permissions: .ownerReadWriteExecute)
+      try makeFile(at: outside.appending("keep"))
+
+      let top = path.appending("top")
+      try top.makeDirectory(permissions: .ownerReadWriteExecute)
+      try makeNestedTree(in: top)
+      try top.appending("a/b/outside").makeSymbolicLink(to: outside)
+
+      try _recursiveRemove(at: top)
+
+      XCTAssertThrowsError(try FileDescriptor.open(top, .readOnly)) {
+        XCTAssertEqual($0 as? Errno, .noSuchFileOrDirectory)
+      }
+      // The link to a directory outside was removed, not followed.
+      XCTAssertNoThrow(try FileDescriptor.open(outside.appending("keep"), .readOnly).close())
+    }
+  }
+  #endif // !os(Windows)
 }
+
+#if !os(Windows)
+/// Fills a directory with files and directories at several depths.
+///
+/// The same name appears at every depth, so an entry resolved against
+/// the wrong directory removes the wrong file, or none.
+@available(System 199, *)
+private func makeNestedTree(in directory: FilePath) throws {
+  for subdirectory in ["a", "a/b", "a/b/c", "a/empty", ".hidden"] {
+    try directory.appending(subdirectory).makeDirectory(permissions: .ownerReadWriteExecute)
+  }
+  for file in ["same", "a/same", "a/b/same", "a/b/c/same", ".hidden/..dots"] {
+    try makeFile(at: directory.appending(file))
+  }
+  try directory.appending("a/b/c/link").makeSymbolicLink(to: "../../same")
+}
+
+private func makeFile(at path: FilePath) throws {
+  let fd = try FileDescriptor.open(
+    path, .writeOnly, options: [.create, .exclusiveCreate], permissions: .ownerReadWrite)
+  try fd.close()
+}
+#endif // !os(Windows)

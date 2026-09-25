@@ -60,6 +60,10 @@ internal enum ForceErrno: Equatable {
 internal class MockingDriver {
   internal var trace = Trace()
   internal var forceErrno = ForceErrno.none
+
+  // Byte counts for successful mocked calls that return one, such as send
+  // and recv, to return in order. Once they run out, those calls return 0.
+  internal var byteCounts: [Int] = []
 }
 
 // TLS support
@@ -193,6 +197,10 @@ internal func _mock(
 internal func _mockInt(
   name: String = #function, _ args: AnyHashable...
 ) -> Int {
-  Int(mockImpl(name: name, args))
+  let result = Int(mockImpl(name: name, args))
+  guard result == 0, let driver = currentMockingDriver, !driver.byteCounts.isEmpty else {
+    return result
+  }
+  return driver.byteCounts.removeFirst()
 }
 #endif // ENABLE_MOCKING

@@ -56,6 +56,9 @@ target_compile_options(SystemPackage PRIVATE
   ${SWIFT_SYSTEM_AVAILABILITY_MACRO}
   "SHELL:-package-name swift-system")
 target_sources(SystemPackage PRIVATE
+  Directories/DirectoryStream.swift
+  Directories/DirectoryWalk.swift)
+target_sources(SystemPackage PRIVATE
   Events/EventCounter.swift
   Events/EventPoll.swift
   Events/IntervalTimer.swift
@@ -98,6 +101,7 @@ target_sources(SystemPackage PRIVATE
   Internals/Exports.swift
   Internals/Mocking.swift
   Internals/RawBuffer.swift
+  Internals/Syscalls+Directories.swift
   Internals/Syscalls+Events.swift
   Internals/Syscalls.swift
   Internals/WindowsSyscallAdapters.swift)

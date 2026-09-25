@@ -26,6 +26,7 @@ import Testing
 @Suite("ProcessID coding")
 private struct ProcessIDCodingTests {
 
+  @available(System 199, *)
   @Test func encodesAsABareInteger() throws {
     let single = try JSONEncoder().encode(ProcessID(42))
     #expect(String(decoding: single, as: UTF8.self) == "42")
@@ -34,6 +35,7 @@ private struct ProcessIDCodingTests {
     #expect(String(decoding: array, as: UTF8.self) == "[1,-1]")
   }
 
+  @available(System 199, *)
   @Test func decodesFromABareInteger() throws {
     #expect(try JSONDecoder().decode(ProcessID.self, from: Data("-7".utf8)) == ProcessID(-7))
     #expect(
@@ -41,12 +43,14 @@ private struct ProcessIDCodingTests {
         == [ProcessID(2), ProcessID(3)])
   }
 
+  @available(System 199, *)
   @Test func roundTripsTheFullRange() throws {
     let values = [CInterop.ProcessID.min, -1, 0, 1, CInterop.ProcessID.max].map { ProcessID($0) }
     let data = try JSONEncoder().encode(values)
     #expect(try JSONDecoder().decode([ProcessID].self, from: data) == values)
   }
 
+  @available(System 199, *)
   @Test func rejectsValuesOutsideTheRawType() {
     #expect(throws: DecodingError.self) {
       try JSONDecoder().decode(ProcessID.self, from: Data("4294967296".utf8))
@@ -60,6 +64,7 @@ private struct ProcessIDCodingTests {
   }
 
   #if !os(WASI)
+  @available(System 199, *)
   @Test func currentRoundTrips() throws {
     let data = try JSONEncoder().encode(ProcessID.current)
     #expect(String(decoding: data, as: UTF8.self) == "\(ProcessID.current.rawValue)")

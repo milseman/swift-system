@@ -12,6 +12,7 @@
 #if !os(Windows)
 /// A Swift wrapper of the C `pid_t` type.
 @frozen
+@available(System 199, *)
 public struct ProcessID: RawRepresentable, Sendable, Hashable, Codable {
 
   /// The raw C `pid_t`.
@@ -28,6 +29,7 @@ public struct ProcessID: RawRepresentable, Sendable, Hashable, Codable {
 }
 
 #if !os(WASI)
+@available(System 199, *)
 extension ProcessID {
   /// The process ID of the calling process.
   ///
