@@ -143,3 +143,41 @@ extern int csystem_tcgetsid(int fd) {
   return tcgetsid(fd);
 }
 #endif // __linux__
+
+#ifdef __linux__
+#include <pthread.h>
+#include <sched.h>
+
+// With _GNU_SOURCE, which this file defines on Linux, <pthread.h> and
+// <sched.h> declare these.
+
+extern int csystem_pthread_setname_np(pthread_t thread, const char *name) {
+  return pthread_setname_np(thread, name);
+}
+
+extern int csystem_pthread_getname_np(pthread_t thread, char *name, size_t length) {
+  #if defined(__ANDROID__) && __ANDROID_API__ < 26
+  return ENOSYS;
+  #else
+  return pthread_getname_np(thread, name, length);
+  #endif
+}
+
+extern int csystem_sched_setaffinity(pid_t pid, size_t size, const void *mask) {
+  return sched_setaffinity(pid, size, (const cpu_set_t *)mask);
+}
+
+extern int csystem_sched_getaffinity(pid_t pid, size_t size, void *mask) {
+  return sched_getaffinity(pid, size, (cpu_set_t *)mask);
+}
+
+#ifndef __ANDROID__
+extern int csystem_pthread_setaffinity_np(pthread_t thread, size_t size, const void *mask) {
+  return pthread_setaffinity_np(thread, size, (const cpu_set_t *)mask);
+}
+
+extern int csystem_pthread_getaffinity_np(pthread_t thread, size_t size, void *mask) {
+  return pthread_getaffinity_np(thread, size, (cpu_set_t *)mask);
+}
+#endif // !__ANDROID__
+#endif // __linux__
