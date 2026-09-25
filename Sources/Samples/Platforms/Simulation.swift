@@ -69,9 +69,9 @@ enum Simulation {
   /// A line describing the configuration, which each sample prints first.
   static var banner: String {
     if isSimulatedBuild {
-      return "[simulated build: every platform's cases exist; producing \(platform)'s]"
+      return "[simulated build: every platform's cases exist; this run produces \(platform) cases]"
     }
-    return "[real build: \(SimulatedPlatform.host)'s cases only]"
+    return "[real build: \(SimulatedPlatform.host) cases only]"
   }
 }
 
@@ -88,7 +88,7 @@ struct SimulationOptions: ParsableArguments {
     #if !SIMULATE_PLATFORMS
     guard platform == .host else {
       throw ValidationError(
-        "This build has only \(SimulatedPlatform.host)'s cases. To run \(platform)'s, build with"
+        "This build has only \(SimulatedPlatform.host) cases. To run \(platform) cases, build with"
           + " -Xswiftc -DSIMULATE_PLATFORMS (see Sources/Samples/Platforms/Simulation.swift)")
     }
     #endif
