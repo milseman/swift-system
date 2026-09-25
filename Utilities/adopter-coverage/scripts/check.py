@@ -37,7 +37,8 @@ PLATFORMS = package.PLATFORMS
 STATUSES = ("covered", "partial", "missing", "ignore")
 CATEGORIES = [
     "file I/O", "file system", "directories", "sockets", "name resolution", "network interfaces",
-    "event notification", "io_uring", "system calls", "processes", "signals", "threads & locks", "time", "memory",
+    "event notification", "io_uring", "system calls", "processes", "terminals", "signals", "threads & locks", "time",
+    "memory",
     "dynamic loading", "system info", "errno & errors", "dispatch", "Apple frameworks", "C libraries",
     "strings/ctype/libm/stdio", "atomics", "C language", "compiler intrinsics",
 ]

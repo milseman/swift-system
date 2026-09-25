@@ -144,6 +144,14 @@ def main():
     w("")
     w("Platforms: " + ", ".join(f"{ABBREV[p]} = {p}" for p in platforms) + ". Darwin means macOS.")
     w("")
+    sdep = ext.get("systemDependency")
+    if sdep:
+        w(f"{name}'s build fetched a released swift-system ({sdep.get('resolved') or '?'}, from its manifest's "
+          f"{code(sdep.get('requirement') or '?')}"
+          + (" by URL" if sdep.get("url") else "") + "), not the System commit above. That doesn't matter for the "
+          f"extraction, which is about what {name} uses; the System API {name} already calls is looked up on the "
+          "tip (see *System API " + name + " already uses*).")
+        w("")
 
     # ------------------------------------------------------------ check
     w("## Check")

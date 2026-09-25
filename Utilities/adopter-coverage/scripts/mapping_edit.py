@@ -71,13 +71,20 @@ class Mapping:
         by four spaces after the first."""
         sec = self.section(name)
         lines = value.split("\n")
-        text = f"{key} = {lines[0]}" + "".join("\n    " + x for x in lines[1:])
-        pat = r"^" + re.escape(key) + r" = .*(?:\n[ \t]+.*)*"
+        text = (f"{key} =" if lines[0] == "" else f"{key} = {lines[0]}") + "".join("\n    " + x for x in lines[1:])
+        pat = r"^" + re.escape(key) + r" =(?: .*)?(?:\n[ \t]+.*)*"
         if re.search(pat, sec, flags=re.M):
             sec = re.sub(pat, lambda _m: text, sec, count=1, flags=re.M)
         else:
             sec = sec.rstrip("\n") + "\n" + text + "\n"
         self._replace(name, sec)
+
+    def add_system(self, name, decls):
+        """Append System declarations to an entry's `system` key."""
+        sec = self.section(name)
+        m = re.search(r"^system =\n((?:[ \t]+.*\n?)*)", sec, flags=re.M)
+        cur = [x.strip() for x in m.group(1).split("\n") if x.strip()] if m else []
+        self.set_key(name, "system", "\n" + "\n".join(cur + [d for d in decls if d not in cur]))
 
     def add_entry(self, text, before=None, after=None):
         text = text.strip("\n") + "\n\n"
