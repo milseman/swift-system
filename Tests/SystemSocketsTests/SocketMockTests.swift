@@ -26,9 +26,11 @@ import Android
 @testable import SystemSockets
 import SystemPackage
 
-// Mock tests for SocketDescriptor.pair and the checked conversion from
-// FileDescriptor, using SystemSockets' own syscall mocking. A mocked call
-// records its name and arguments and returns 0, unless an errno is forced.
+// Mock tests for SocketDescriptor.pair, the checked conversion from
+// FileDescriptor, and the byte counts of sends and receives, using
+// SystemSockets' own syscall mocking. A mocked call records its name and
+// arguments and returns 0, unless an errno is forced or, for a call that
+// returns a byte count, MockingDriver.byteCounts supplies one.
 @Suite("Socket syscall mocks")
 private struct SocketMockTests {
 
@@ -108,6 +110,28 @@ private struct SocketMockTests {
         try SocketDescriptor.pair(.local, .stream)
       }
       #expect(drain(mocking).map(\.name) == ["socketpair"])
+    }
+  }
+
+  @available(System 199, *)
+  @Test func byteCountsAreTheResultsOfSuccessfulCalls() throws {
+    let socket = SocketDescriptor(rawValue: 42)
+    let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 8, alignment: 1)
+    defer { buffer.deallocate() }
+    // Every try is inside an #expect, so the closure needs an explicit throws.
+    try MockingDriver.withMockingEnabled { mocking throws in
+      // Successful calls return the counts in order, then 0.
+      mocking.byteCounts = [3, 5]
+      #expect(try socket.receive(into: buffer) == 3)
+      #expect(try socket.send(UnsafeRawBufferPointer(buffer)) == 5)
+      #expect(try socket.receive(into: buffer) == 0)
+
+      // A call that fails doesn't use a count.
+      mocking.byteCounts = [4]
+      mocking.forceErrno = .counted(errno: ECONNRESET, count: 1)
+      #expect(throws: Errno.connectionReset) { try socket.receive(into: buffer) }
+      #expect(try socket.receive(into: buffer) == 4)
+      #expect(drain(mocking).map(\.name) == ["recv", "send", "recv", "recv", "recv"])
     }
   }
 }
