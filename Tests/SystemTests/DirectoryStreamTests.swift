@@ -56,9 +56,9 @@ internal enum DirectoryFixture {
   /// Calls `body` with a new, empty temporary directory,
   /// which is removed afterward, with everything in it.
   ///
-  /// This removes the directory's contents first, because
-  /// `withTemporaryFilePath`'s own removal recurses with the wrong
-  /// descriptor: it leaves behind any directory that isn't empty, and
+  /// This removes the directory's contents with a postorder walk first,
+  /// because `withTemporaryFilePath`'s own removal recurses with the wrong
+  /// descriptor: it leaves behind any directory nested two deep, and
   /// crashes on a chain of directories that have the same name.
   static func withTemporaryDirectory<R>(
     _ basename: FilePath.Component, _ body: (FilePath) throws -> R
@@ -71,21 +71,13 @@ internal enum DirectoryFixture {
 
   /// Removes everything in a directory, as `rm -r` does.
   static func removeContents(of root: FilePath) throws {
-    var stream = try DirectoryStream.open(root)
-    try removeContents(&stream)
-  }
-
-  private static func removeContents(_ stream: inout DirectoryStream) throws {
-    while let entry = try stream.next() {
+    var walk = try DirectoryWalk(root, order: .postorder)
+    while let entry = try walk.next() {
       let name = FilePath(root: nil, components: entry.name)
       if entry.type == .directory {
-        var child = try DirectoryStream.open(
-          name, relativeTo: stream.fileDescriptor, options: .noFollow)
-        try removeContents(&child)
-        try child.close()
-        try name.removeDirectory(relativeTo: stream.fileDescriptor)
+        try name.removeDirectory(relativeTo: walk.parentDirectory)
       } else {
-        try name.unlink(relativeTo: stream.fileDescriptor)
+        try name.unlink(relativeTo: walk.parentDirectory)
       }
     }
   }

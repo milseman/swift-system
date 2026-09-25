@@ -56,7 +56,8 @@ target_compile_options(SystemPackage PRIVATE
   ${SWIFT_SYSTEM_AVAILABILITY_MACRO}
   "SHELL:-package-name swift-system")
 target_sources(SystemPackage PRIVATE
-  Directories/DirectoryStream.swift)
+  Directories/DirectoryStream.swift
+  Directories/DirectoryWalk.swift)
 target_sources(SystemPackage PRIVATE
   FilePath/FilePath.swift
   FilePath/FilePathComponents.swift

@@ -7,10 +7,11 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-// Tests that close a directory stream's descriptor behind its back.
-// swift-testing runs tests in parallel in one process, where another test
-// could reuse a closed descriptor's number, so these run as exit tests, each
-// in a child process of its own, as OwnedFDDeinitTests.swift's do.
+// Tests that close a directory stream's descriptor behind its back, or change
+// the process's descriptor limit. swift-testing runs tests in parallel in one
+// process, where another test could reuse a closed descriptor's number, or
+// run out of descriptors, so these run as exit tests, each in a child
+// process of its own, as OwnedFDDeinitTests.swift's do.
 //
 // A failed #expect in a child process isn't reported, so each case exits
 // with a status of its own instead.
@@ -94,6 +95,54 @@ private struct DirectoryStreamClosingTests {
       if fcntl(pipe.readEnd.rawValue, F_GETFD) != -1 || errno != EBADF { exit(3) }
     }
   }
+
+  // Only on macOS: RLIMIT_NOFILE's type differs between the C libraries,
+  // and this was only compiled against Darwin's.
+  #if os(macOS)
+  @available(System 199, *)
+  @Test func aWalkDeeperThanTheDescriptorLimitReportsIt() async {
+    await #expect(processExitsWith: .success) {
+      try DirectoryFixture.withTemporaryDirectory("DirectoryWalk_tooDeep") { root in
+        // 100 directories, each inside the last, made relative to each other.
+        var parent = try FileDescriptor.open(root, .readOnly, options: .directory)
+        for _ in 0..<100 {
+          try FilePath("d").makeDirectory(
+            relativeTo: parent, permissions: .ownerReadWriteExecute)
+          let child = try FileDescriptor.open(
+            "d", relativeTo: parent, .readOnly, options: .directory)
+          try parent.close()
+          parent = child
+        }
+        try parent.close()
+
+        // A walk holds a descriptor for each level, so a limit of 40 more
+        // than the lowest free descriptor stops it partway down. (A child
+        // process can start with many descriptors open.)
+        let probe = try FileDescriptor.open(root, .readOnly)
+        let lowestFree = probe.rawValue
+        try probe.close()
+        var limit = rlimit()
+        getrlimit(RLIMIT_NOFILE, &limit)
+        let original = limit.rlim_cur
+        limit.rlim_cur = rlim_t(lowestFree + 40)
+        setrlimit(RLIMIT_NOFILE, &limit)
+        var walk = try DirectoryWalk(root)
+        var deepest = 0
+        var tooMany = 0
+        while let entry = try walk.next() {
+          deepest = max(deepest, entry.depth)
+          if entry.error == .tooManyOpenFiles { tooMany += 1 }
+        }
+        // Raise the limit again, so that the cleanup can remove the tree.
+        limit.rlim_cur = original
+        setrlimit(RLIMIT_NOFILE, &limit)
+        // One directory didn't open, and the walk went no deeper.
+        if tooMany != 1 { exit(1) }
+        if deepest >= 100 || deepest < 10 { exit(2) }
+      }
+    }
+  }
+  #endif
 }
 
 #endif // os(macOS) || os(Linux) || os(FreeBSD) || os(OpenBSD)
