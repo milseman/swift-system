@@ -30,8 +30,11 @@ import Android
 ///
 /// A walk visits every entry under its root directory, depth first.
 /// It opens each directory relative to the directory that contains it,
-/// and never follows a symbolic link, so it stays within the tree
-/// even if the tree changes while the walk reads it.
+/// and never follows a symbolic link,
+/// so replacing a directory with a link while the walk reads the tree
+/// can't lead the walk out of it.
+/// A directory that the walk has opened stays open
+/// even if it's moved elsewhere, and the walk reads it where it is.
 ///
 ///     var walk = try DirectoryWalk("Sources")
 ///     while let entry = try walk.next() {
