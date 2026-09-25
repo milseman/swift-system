@@ -2,13 +2,14 @@
 # Typechecks System's Linux event notification code, which nothing on macOS
 # compiles, against LinuxModel/LinuxModel.h: EventPoll, EventCounter, and
 # IntervalTimer, the Linux parts of the syscall and constant files, their
-# tests, and the events-loop sample. Run `swift build` first, for the
-# sample's ArgumentParser.
+# tests, the events-loop sample, and ReadinessQueue.swift's epoll half. Run
+# `swift build` first, for the sample's ArgumentParser.
 #
 # It copies SystemPackage's sources to a scratch directory, turns on the
 # Linux conditions in those files, builds the module for macOS with the
-# model, and typechecks the tests and the sample against it: once with
-# glibc's declarations, and once with Bionic's nullability. It catches Swift
+# model, and compiles the tests, the sample, and the sketch against it,
+# through SIL so that the move checker runs: once with glibc's
+# declarations, and once with Bionic's nullability. It catches Swift
 # errors, not differences between the model and a real C library. Prints
 # each diagnostic, and exits nonzero if either pass fails.
 set -u
@@ -52,6 +53,10 @@ text = text.replace("#elseif os(Linux) || os(Android)\n", "#elseif true\n", 1)
 os.makedirs(os.path.join(work, "Samples"), exist_ok=True)
 open(os.path.join(work, "Samples/EventsLoop.swift"), "w").write(
     text + "\n// Util.swift's, which needs SystemSockets.\nfunc complain(_ message: String) {}\n")
+sketch = open(os.path.join(root, "Prototype/Events/ReadinessQueue.swift")).read()
+sketch = sketch.replace("canImport(Darwin) || os(FreeBSD) || os(OpenBSD)", "false")
+sketch = sketch.replace("os(Linux) || os(Android)", "true")
+open(os.path.join(work, "Samples/ReadinessQueue.swift"), "w").write(sketch)
 for relative in linux_files:
     text = open(os.path.join(root, relative)).read()
     text = text.replace("#if os(Linux) || os(Android)", "#if true // os(Linux) || os(Android)")
@@ -94,7 +99,7 @@ for libc in glibc bionic; do
   test_output=""
   test_status=1
   if [ $module_status -eq 0 ]; then
-    test_output=$(swiftc -typecheck -module-name SystemTests "${flags[@]}" \
+    test_output=$(swiftc -emit-sil -wmo -o /dev/null -module-name SystemTests "${flags[@]}" \
       -I "$work/$libc" -F "$platform/Library/Frameworks" -I "$platform/usr/lib" \
       "$work/Tests/SystemTests/EventPollTests.swift" \
       "$root/Tests/SystemTests/EventTestSupport.swift" \
@@ -102,19 +107,23 @@ for libc in glibc bionic; do
     test_status=$?
     # The sample needs ArgumentParser, from `swift build`. The model's
     # SystemPackage comes first in the search path.
-    sample_output=$(swiftc -typecheck -module-name Samples "${flags[@]}" \
+    sample_output=$(swiftc -emit-sil -o /dev/null -module-name Samples "${flags[@]}" \
       -I "$work/$libc" -I "$root/.build/debug/Modules" \
       "$work/Samples/EventsLoop.swift" 2>&1)
     [ $? -eq 0 ] || test_status=1
+    sketch_output=$(swiftc -emit-sil -o /dev/null -parse-as-library -module-name Sketch \
+      "${flags[@]}" -I "$work/$libc" "$work/Samples/ReadinessQueue.swift" 2>&1)
+    [ $? -eq 0 ] || test_status=1
     test_output="$test_output
-$sample_output"
+$sample_output
+$sketch_output"
   fi
   if [ $module_status -eq 0 ] && [ $test_status -eq 0 ]; then
-    echo "== $libc: the module, the tests, and the sample typecheck"
+    echo "== $libc: the module, the tests, the sample, and the sketch compile"
   elif [ $module_status -ne 0 ]; then
     echo "== $libc: the module fails"; status=1
   else
-    echo "== $libc: the tests or the sample fail"; status=1
+    echo "== $libc: the tests, the sample, or the sketch fail"; status=1
   fi
   printf '%s\n%s\n' "$module_output" "$test_output" \
     | grep -E "(error|warning):" | grep -v "^ *|" | sed "s|$work/||; s|$root/||" | sort -u
