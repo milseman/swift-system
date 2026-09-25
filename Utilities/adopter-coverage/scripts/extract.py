@@ -800,8 +800,13 @@ def main():
         member = None
         if usr.startswith("c:"):
             hint, cname, parent = c_usr_parts(usr)
+            enum = re.search(r"@E@([A-Za-z_]\w*)@([A-Za-z_]\w*)$", usr)
             if hint == "field":
                 key, member, kname = parent or base_name(name), cname, "type"
+            elif enum and base_name(name) != enum.group(2) and not literal(f, line, enum.group(2)):
+                # A C enumerator Swift renames into its enum, written
+                # `.E2BIG` for POSIXErrorCodeE2BIG: a member of the enum.
+                key, member, kname = enum.group(1), base_name(name), "type"
             else:
                 # The C name, even where Swift renames it: DispatchGroup's
                 # enter() is dispatch_group_enter.
@@ -828,6 +833,11 @@ def main():
         ent = lex.own_top.get(key) if f in swift_scans and not member else None
         if ent is not None:
             shadow = tuple(sorted(ent["platforms"]))
+        # A framework of the Darwin SDK (CryptoKit, Security) exists only on
+        # Darwin: where the same line compiles elsewhere, the name means
+        # something else there (swift-crypto's SHA256).
+        if mc == "os" and "/System/Library/Frameworks/" in (d[1] or ""):
+            shadow = tuple(sorted(set(shadow) | (set(PLATFORMS) - {"Darwin"})))
         ok = col.add(key, kname, scan, f, line, "index", called, member=member,
                      module=d[0] if mc == "os" else None, header=header_of(d[1]) if mc == "os" else None,
                      func=func, exclude_platforms=shadow)

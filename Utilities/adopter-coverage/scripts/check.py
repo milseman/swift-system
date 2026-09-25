@@ -38,8 +38,8 @@ STATUSES = ("covered", "partial", "missing", "ignore")
 CATEGORIES = [
     "file I/O", "file system", "directories", "sockets", "name resolution", "network interfaces",
     "event notification", "io_uring", "processes", "signals", "threads & locks", "time", "memory",
-    "dynamic loading", "system info", "errno & errors", "dispatch", "strings/ctype/libm/stdio",
-    "atomics", "C language", "compiler intrinsics",
+    "dynamic loading", "system info", "errno & errors", "dispatch", "Apple frameworks", "C libraries",
+    "strings/ctype/libm/stdio", "atomics", "C language", "compiler intrinsics",
 ]
 # Platforms an `@available(<name>, unavailable)` takes away.
 UNAVAILABLE_PLATFORMS = {"macOS": ["Darwin"], "Windows": ["Windows"], "Linux": ["Linux", "Musl"],
