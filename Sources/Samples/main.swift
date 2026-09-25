@@ -30,6 +30,9 @@ struct SystemSamples: ParsableCommand {
       OwnedPoll.self,
       OwnedLines.self,
       OwnedPipe.self,
+      // Event notification samples
+      EventsLoop.self,
+      EventsPoll.self,
       // Terminal samples
       PasswordReader.self,
       TerminalSize.self,

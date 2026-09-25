@@ -59,6 +59,14 @@ target_sources(SystemPackage PRIVATE
   Directories/DirectoryStream.swift
   Directories/DirectoryWalk.swift)
 target_sources(SystemPackage PRIVATE
+  Events/EventCounter.swift
+  Events/EventPoll.swift
+  Events/IntervalTimer.swift
+  Events/KernelEvent.swift
+  Events/KernelQueue.swift
+  Events/Poll.swift
+  Events/Timeouts.swift)
+target_sources(SystemPackage PRIVATE
   FilePath/FilePath.swift
   FilePath/FilePathComponents.swift
   FilePath/FilePathComponentView.swift
@@ -88,11 +96,13 @@ endif()
 target_sources(SystemPackage PRIVATE
   Internals/Backcompat.swift
   Internals/CInterop.swift
+  Internals/Constants+Events.swift
   Internals/Constants.swift
   Internals/Exports.swift
   Internals/Mocking.swift
   Internals/RawBuffer.swift
   Internals/Syscalls+Directories.swift
+  Internals/Syscalls+Events.swift
   Internals/Syscalls.swift
   Internals/WindowsSyscallAdapters.swift)
 target_sources(SystemPackage PRIVATE
