@@ -119,6 +119,11 @@ class SystemAPI:
             scope = ".".join(d["scopes"])
             kw = d["kw"].rstrip("?!")
             base = d["name"].split("(")[0].rstrip("?!")
+            # A keyword escaped as a name (`extension`), which api-delta's
+            # scanner records with the rest of the line.
+            m = re.match(r"^`([^`]+)`", base)
+            if m:
+                base = m.group(1)
             # `@available(*, unavailable)` (a renamed stub) can't be cited;
             # `@available(Windows, unavailable)` only takes Windows away.
             unavail = d.get("unavailable") or []
