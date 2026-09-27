@@ -148,6 +148,9 @@ target_sources(SystemPackage PRIVATE
   Internals/Syscalls+MachTime.swift
   MachTime/MachTime.swift)
 target_sources(SystemPackage PRIVATE
+  Internals/Syscalls+ProcessExit.swift
+  ProcessExit/ProcessExit.swift)
+target_sources(SystemPackage PRIVATE
   Internals/Constants+Processes.swift
   Internals/Syscalls+Processes.swift
   Processes/ChildProcess.swift
