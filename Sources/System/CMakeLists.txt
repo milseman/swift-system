@@ -110,10 +110,13 @@ target_sources(SystemPackage PRIVATE
   Internals/Syscalls+Directories.swift
   Internals/Syscalls+Environment.swift
   Internals/Syscalls+Events.swift
+  Internals/Syscalls+SystemIdentity.swift
   Internals/Syscalls+Time.swift
   Internals/Syscalls+VectoredIO.swift
   Internals/Syscalls.swift
   Internals/WindowsSyscallAdapters.swift)
+target_sources(SystemPackage PRIVATE
+  SystemIdentity/SystemIdentity.swift)
 target_sources(SystemPackage PRIVATE
   Terminal/BaudRate.swift
   Terminal/ControlCharacters.swift

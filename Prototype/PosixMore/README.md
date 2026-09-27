@@ -308,3 +308,60 @@ and Foundation's Swift sources in about 140, by grep.
 
 Unverified off Darwin: the accessor's Windows (`_get_errno`), WASI and
 Android branches, which copy `system_errno`'s in `Exports.swift`.
+
+## 4. System identity
+
+`Sources/System/SystemIdentity/SystemIdentity.swift` and
+`Sources/System/Internals/Syscalls+SystemIdentity.swift`.
+
+| API | C |
+|---|---|
+| `SystemIdentity`: `systemName`, `nodeName`, `release`, `version`, `machine` | `struct utsname`: `sysname`, `nodename`, `release`, `version`, `machine` |
+| `SystemIdentity.current() throws(Errno)` | `uname` |
+| `SystemIdentity.hostName() throws(Errno) -> String` | `gethostname` (Android: `uname`) |
+| `SystemIdentity.loginName() throws(Errno) -> String` | `getlogin_r` (Android: `getlogin`) |
+| (already there) `SystemConfig.value(.pageSize)` | `getpagesize`, `sysconf(_SC_PAGESIZE)` |
+
+Design calls:
+
+- **`SystemIdentity` is a value of `String`s**, decoded up to each array's
+  first null character or its end, rather than a wrapper of the C struct
+  as `Stat` is. `utsname` is five or six fixed character arrays (1.3 KB on
+  Darwin) with nothing to reach but the names. Rejected: `SystemName`
+  (POSIX's "get the name of the current system"), which reads as the host
+  name; and Linux's `domainname` field, which glibc declares only with
+  `_GNU_SOURCE`.
+- **Field names are the C ones, camel-cased**: `systemName`, `nodeName`,
+  `release`, `version`, `machine`. Rejected: coreutils' `kernelName` and
+  `kernelRelease`, which are more precise on Linux but not what POSIX calls
+  them.
+- **`hostName()` wraps `gethostname`**, though `uname`'s `nodename` is the
+  same value on Darwin, glibc and Bionic, because that's what adopters
+  call. On Android, where Bionic has `gethostname` only from API level 23,
+  it reads `uname`, as Bionic's `gethostname` does. Its buffer is 256
+  bytes, one more than the longest name Darwin and FreeBSD allow, and it
+  leaves the last byte zero, since `gethostname` needn't terminate a name
+  it truncates.
+- **`loginName()` throws when there's no login name**, as for a daemon,
+  with the platform's error (`ENXIO`, `ENOTTY` or `ENOENT`), rather than
+  returning `nil`: callers can `try?`, and the error says why. It uses
+  `getlogin_r`, which returns its error rather than setting `errno`, and
+  grows its buffer on `ERANGE`; Android has `getlogin_r` only from API
+  level 28, so there it's `getlogin`. It's on `SystemIdentity` with the
+  host name. Rejected: a static on `UserEntry`, since the login name
+  belongs to the session, not to a user ID.
+- **No page-size API**: `SystemConfig.value(.pageSize)` already covers
+  `getpagesize`, and the `uname` sample uses it.
+- Not added: `sethostname` (needs privileges), `getdomainname`, and
+  Darwin's `sysctl` names such as `hw.model`.
+
+Adopters: Foundation, by grep: `uname` for `operatingSystemVersion` and
+`operatingSystemVersionString` (`ProcessInfo.swift`), `gethostname` for
+`hostName` (`Platform.swift`), and `getpagesize`. NIO calls `uname` only
+from its C shims' `system_info` functions, which no Swift code calls.
+Subprocess's `getpagesize` is covered already. SwiftPM runs the `uname`
+program rather than calling it.
+
+Unverified off Darwin: the Android branches, `getlogin_r`'s `int` length
+on older FreeBSD (it's passed with `numericCast`), and glibc's `getlogin`
+errors without a controlling terminal.
