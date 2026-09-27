@@ -167,6 +167,24 @@ private struct StatFSTests {
   }
   #endif
 
+  #if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
+  // Only the default, which doesn't wait: waiting can hang on a network file
+  // system that doesn't answer. StatFSMockTests checks that the other mode
+  // asks for MNT_WAIT.
+  @available(System 199, *)
+  @Test func mountedFileSystemsIncludeRoot() throws {
+    let mounted = try StatFS.mountedFileSystems()
+    let root = try StatFS("/")
+    #expect(mounted.contains {
+      $0.mountPoint == root.mountPoint && $0.fileSystemID == root.fileSystemID
+    })
+    for fileSystem in mounted {
+      #expect(fileSystem.mountPoint.isAbsolute)
+      #expect(!fileSystem.typeName.isEmpty)
+    }
+  }
+  #endif
+
   #if SYSTEM_PACKAGE_DARWIN
   @available(System 199, *)
   @Test func typeAndSubtypeRoundTrip() throws {

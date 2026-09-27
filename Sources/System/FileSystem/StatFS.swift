@@ -757,4 +757,69 @@ extension FilePath {
   }
 }
 
+#if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
+// MARK: - Mounted File Systems
+
+@available(System 199, *)
+extension StatFS {
+  /// Returns a `StatFS` for each mounted file system.
+  ///
+  /// By default, this returns the statistics that the kernel has, without
+  /// asking each file system for new ones, so some of them can be out of
+  /// date. If `waitForUpdates` is `true`, it asks each file system first and
+  /// waits for the answers, which can take a long time, or never come, from a
+  /// network file system that can't respond.
+  ///
+  /// The corresponding C function is `getfsstat()`, with `MNT_NOWAIT`, or
+  /// with `MNT_WAIT` if `waitForUpdates` is `true`.
+  /// - Note: Only available on Darwin and BSD.
+  @_alwaysEmitIntoClient
+  public static func mountedFileSystems(
+    waitForUpdates: Bool = false,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) -> [StatFS] {
+    try _mountedFileSystems(
+      waitForUpdates: waitForUpdates, retryOnInterrupt: retryOnInterrupt
+    ).get()
+  }
+
+  @usableFromInline
+  internal static func _mountedFileSystems(
+    waitForUpdates: Bool,
+    retryOnInterrupt: Bool
+  ) -> Result<[StatFS], Errno> {
+    // Count the file systems, as getmntinfo does, then make room for one
+    // more than that. A full buffer means that one may have been mounted in
+    // between, and so may have been left out.
+    var capacity: Int
+    switch valueOrErrno(retryOnInterrupt: retryOnInterrupt, {
+      system_getfsstat(nil, 0, _MNT_NOWAIT)
+    }) {
+    case .success(let count): capacity = Int(count) + 1
+    case .failure(let error): return .failure(error)
+    }
+    let mode = waitForUpdates ? _MNT_WAIT : _MNT_NOWAIT
+    while true {
+      var buffer = Array(repeating: CInterop.StatFS(), count: capacity)
+      let filled = buffer.withUnsafeMutableBufferPointer { buffer in
+        valueOrErrno(retryOnInterrupt: retryOnInterrupt) {
+          system_getfsstat(
+            buffer.baseAddress,
+            buffer.count * MemoryLayout<CInterop.StatFS>.stride,
+            mode)
+        }
+      }
+      switch filled {
+      case .success(let filled) where Int(filled) < capacity:
+        return .success(buffer.prefix(Int(filled)).map(StatFS.init(rawValue:)))
+      case .success:
+        capacity *= 2
+      case .failure(let error):
+        return .failure(error)
+      }
+    }
+  }
+}
+#endif // SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
+
 #endif // !os(Windows)

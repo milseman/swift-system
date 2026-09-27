@@ -11,6 +11,20 @@
 
 import XCTest
 
+#if SYSTEM_PACKAGE_DARWIN
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif canImport(Musl)
+import Musl
+#elseif canImport(WASILibc)
+import WASILibc
+#elseif canImport(Android)
+import Android
+#else
+#error("Unsupported Platform")
+#endif
+
 #if SYSTEM_PACKAGE
 @testable import SystemPackage
 #else
@@ -66,6 +80,43 @@ final class StatFSMockTests: XCTestCase {
     syscallTestCases.forEach { $0.runAllTests() }
   }
 
+  #if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
+  // mountedFileSystems counts the file systems, and then reads them into room
+  // for one more. The mock counts none, and reads none.
+  func testMountedFileSystems() throws {
+    let size = MemoryLayout<CInterop.StatFS>.stride
+    try MockingDriver.withMockingEnabled { mocking in
+      XCTAssertEqual(try StatFS.mountedFileSystems().count, 0)
+      expectCall(mocking, "getfsstat", Wildcard(), 0, MNT_NOWAIT)
+      expectCall(mocking, "getfsstat", Wildcard(), size, MNT_NOWAIT)
+
+      // The count never waits.
+      _ = try StatFS.mountedFileSystems(waitForUpdates: true)
+      expectCall(mocking, "getfsstat", Wildcard(), 0, MNT_NOWAIT)
+      expectCall(mocking, "getfsstat", Wildcard(), size, MNT_WAIT)
+
+      mocking.forceErrno = .counted(errno: EINTR, count: 1)
+      XCTAssertThrowsError(try StatFS.mountedFileSystems(retryOnInterrupt: false)) {
+        XCTAssertEqual($0 as? Errno, .interrupted)
+      }
+      expectCall(mocking, "getfsstat", Wildcard(), 0, MNT_NOWAIT)
+
+      mocking.forceErrno = .counted(errno: EINTR, count: 2)
+      _ = try StatFS.mountedFileSystems()
+      for byteCount in [0, 0, 0, size] {
+        expectCall(mocking, "getfsstat", Wildcard(), byteCount, MNT_NOWAIT)
+      }
+
+      mocking.forceErrno = .always(errno: EIO)
+      XCTAssertThrowsError(try StatFS.mountedFileSystems()) {
+        XCTAssertEqual($0 as? Errno, .ioError)
+      }
+      expectCall(mocking, "getfsstat", Wildcard(), 0, MNT_NOWAIT)
+      XCTAssertTrue(mocking.trace.isEmpty)
+    }
+  }
+  #endif
+
   #if os(Linux) || os(Android)
   // FileSystemType's calls, which report the f_type that statvfs lacks.
   func testFileSystemTypeSyscalls() {
@@ -104,6 +155,19 @@ final class StatFSMockTests: XCTestCase {
     syscallTestCases.forEach { $0.runAllTests() }
   }
   #endif
+}
+
+private func expectCall(
+  _ mocking: MockingDriver, _ name: String, _ arguments: AnyHashable...,
+  file: StaticString = #filePath, line: UInt = #line
+) {
+  let expected = Trace.Entry(name: name, arguments)
+  guard let actual = mocking.trace.dequeue() else {
+    XCTFail("expected \(expected), but the trace is empty", file: file, line: line)
+    return
+  }
+  XCTAssertTrue(
+    expected.matches(actual), "expected \(expected), got \(actual)", file: file, line: line)
 }
 #endif // ENABLE_MOCKING
 

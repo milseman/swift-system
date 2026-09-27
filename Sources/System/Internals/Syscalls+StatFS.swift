@@ -7,10 +7,10 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-// The file system statistics calls behind StatFS: statfs and fstatfs on
-// Darwin and BSD, and statvfs and fstatvfs elsewhere, plus statfs and
-// fstatfs on Linux and Android for FileSystemType. The mocks record the
-// buffer as a pointer.
+// The file system statistics calls behind StatFS: statfs, fstatfs and
+// getfsstat on Darwin and BSD, and statvfs and fstatvfs elsewhere, plus
+// statfs and fstatfs on Linux and Android for FileSystemType. The mocks
+// record the buffer as a pointer.
 
 #if !os(Windows)
 
@@ -46,6 +46,18 @@ internal func system_fstatfs(
   if mockingEnabled { return _mock(fd, buffer) }
 #endif
   return fstatfs(fd, buffer)
+}
+
+// Records the buffer as a pointer, which is nil when counting.
+internal func system_getfsstat(
+  _ buffer: UnsafeMutablePointer<statfs>?, _ byteCount: Int, _ mode: CInt
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(buffer, byteCount, mode) }
+#endif
+  // The byte count is an int on Darwin, a long on FreeBSD, and a size_t on
+  // OpenBSD.
+  return getfsstat(buffer, numericCast(byteCount), mode)
 }
 #else
 internal func system_statvfs(

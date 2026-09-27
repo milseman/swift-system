@@ -372,6 +372,16 @@ internal var _MNT_NOPERM: CInterop.MountFlags { CInterop.MountFlags(truncatingIf
 internal var _MNT_WXALLOWED: CInterop.MountFlags { CInterop.MountFlags(truncatingIfNeeded: MNT_WXALLOWED) }
 #endif
 
+// MARK: - getfsstat Modes
+
+#if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
+@_alwaysEmitIntoClient
+internal var _MNT_WAIT: CInt { MNT_WAIT }
+
+@_alwaysEmitIntoClient
+internal var _MNT_NOWAIT: CInt { MNT_NOWAIT }
+#endif
+
 // MARK: - File System Magic Numbers
 
 // The f_type values that Linux's statfs reports, from <linux/magic.h>. That
