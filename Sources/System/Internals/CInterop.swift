@@ -147,22 +147,31 @@ extension CInterop {
 @available(System 199, *)
 extension CInterop {
   #if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
+  /// The C `statfs` structure of file system statistics, which `StatFS`
+  /// wraps.
   public typealias StatFS = statfs
   #else
+  /// The C `statvfs` structure of file system statistics, which `StatFS`
+  /// wraps.
   public typealias StatFS = statvfs
   #endif
 
   #if SYSTEM_PACKAGE_DARWIN || os(OpenBSD)
+  /// The C type of `statfs`'s `f_flags` field, which `MountFlags` wraps.
   public typealias MountFlags = UInt32
   #elseif os(FreeBSD)
+  /// The C type of `statfs`'s `f_flags` field, which `MountFlags` wraps.
   public typealias MountFlags = UInt64
   #else
+  /// The C type of `statvfs`'s `f_flag` field, which `MountFlags` wraps.
   public typealias MountFlags = CUnsignedLong
   #endif
 
   #if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
+  /// The C `fsid_t` type of a file system ID, which `FileSystemID` wraps.
   public typealias FileSystemID = fsid_t
   #else
+  /// The C type of `statvfs`'s `f_fsid` field, which `FileSystemID` wraps.
   public typealias FileSystemID = CUnsignedLong
   #endif
 }
