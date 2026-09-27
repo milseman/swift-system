@@ -138,5 +138,35 @@ explicit-availability builds show only the known failures.
 Tests after it: 428 XCTests (4 skipped) and 282 swift-testing tests in 37
 suites, all passing.
 
-Next: cluster 8 (getifaddrs, if_nametoindex, if_indextoname), then 9
-(extended attributes) and 10 (getentropy).
+## 8. Network interfaces: `53617e1`
+
+API: the `NetworkInterface` namespace, with:
+- `Addresses: ~Copyable`, the owned `getifaddrs` list, with `count` and `forEach(_:)`;
+- `Addresses.Entry: ~Escapable`, with `name`, `flags`, `addressFamily` and `unsafeNode`, plus `address`, `netmask`, `broadcastAddress` and `destinationAddress` as `RawSpan?`;
+- `Flags` (`IFF_*`);
+- `Index`, with `init?(name:) throws(Errno)` (`if_nametoindex`) and `name() throws(Errno)` (`if_indextoname`).
+
+Design calls:
+- **Entries can't outlive the list, and neither can their address spans.**
+  A compiler check, `Verify/P1_entry_escape.swift`, confirms it.
+  Iteration is `forEach`, since a `~Escapable` value can't be an element.
+- **Addresses are sockaddr bytes,** because SystemPackage can't name
+  `SocketAddress`. The `ifconfig` sample converts them with
+  `SocketAddress(_:)`.
+- **A sockaddr's length** is `sa_len` on Darwin and the BSDs, and the
+  family's size on Linux.
+- **A missing interface is `nil`, and other failures throw.** glibc's
+  `if_nametoindex` can fail with `EMFILE`.
+- **Swift 6.2:** `Optional.map` doesn't take a span, so optional spans are
+  unwrapped with `if let`.
+
+Adopters: NIO's `enumerateDevices` and `NIONetworkDevice` (48 lines).
+
+Unverified off Darwin: the Android `getifaddrs` shims (API level 24);
+glibc's `IFF_*`, which Swift imports as `Int`; the Linux address lengths.
+
+Tests after it: 430 XCTests (4 skipped) and 285 swift-testing tests in 38
+suites, all passing. The duplicate check finds nothing new, and the
+availability builds show only the known failures.
+
+Next: cluster 9 (extended attributes), then 10 (getentropy).
