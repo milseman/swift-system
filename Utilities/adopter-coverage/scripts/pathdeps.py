@@ -51,8 +51,11 @@ def is_swift_system(path, repo):
     return False
 
 
-def system_export(repo, commit, exports):
-    dest = os.path.join(exports, commit)
+def system_export(repo, commit, exports, name):
+    """An export of System at commit, in a directory named `name`: SwiftPM
+    takes a path package's identity from its directory's name, and the
+    manifest's targets refer to it by that (`package: "swift-system"`)."""
+    dest = os.path.join(exports, commit, name)
     if not os.path.isfile(os.path.join(dest, "Package.swift")):
         os.makedirs(dest, exist_ok=True)
         archive = subprocess.run(["git", "-C", repo, "archive", commit], capture_output=True, check=True).stdout
@@ -80,7 +83,7 @@ def rewrite(manifest, checkout, repo, commit, exports):
         else:
             target = os.path.normpath(os.path.join(checkout, rel))
         if os.path.isdir(target) and is_swift_system(target, repo):
-            new, kind = system_export(repo, commit, exports), "swift-system"
+            new, kind = system_export(repo, commit, exports, os.path.basename(target.rstrip("/"))), "swift-system"
         else:
             new, kind = target, "local"
         done.append({"from": rel, "to": new, "kind": kind,

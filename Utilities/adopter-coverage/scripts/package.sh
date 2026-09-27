@@ -71,7 +71,10 @@ build_failed() {
   [ -z "$PKG_BUILD_HINT" ] || echo "hint: $PKG_BUILD_HINT" >&2
   echo "warning: $1; the extraction falls back to the lexical rules (see $2)" >&2
   cp "$2" "$C/build.log" 2>/dev/null || true
-  echo "$1" > "$C/build-failed"
+  # The first compiler error says why (a newer Swift's feature, a
+  # platform the package doesn't build on).
+  why="$(grep -m 1 -E 'error: ' "$2" | sed -E 's/^.*error: //' | cut -c1-160 || true)"
+  echo "$1${why:+: $why}" > "$C/build-failed"
 }
 
 # <P>_REUSE_INDEX=1 reuses a dump of the same commit whatever made it: for

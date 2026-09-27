@@ -84,6 +84,12 @@ def main():
 
     run, covs = load_run(args.run, args.results)
     if not covs:
+        open(os.path.join(args.run, "COVERAGE.md"), "w").write(
+            f"# swift-system's adopters: OS interfaces and coverage\n\nRun `{run['id']}`: no package's check "
+            f"finished ({', '.join(run.get('failed') or []) or 'none ran'} failed); see the run's log.\n")
+        json.dump({"run": run, "packages": {}, "gaps": [], "shared": []},
+                  open(os.path.join(args.run, "coverage.json"), "w"), indent=1)
+        print("combine: no package finished")
         return
     names = {k: c["package"]["name"] for k, c in covs.items()}
     expected = [f[:-4] for f in sorted(os.listdir(args.packages))

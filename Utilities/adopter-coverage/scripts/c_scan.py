@@ -499,8 +499,16 @@ def integer_macros(path, defines=()):
     for i, line in enumerate(lines):
         m = INT_DEFINE.match(line)
         if m:
-            out.setdefault(m.group(1), []).append((int(m.group(2), 0), states[i], build[i]))
+            out.setdefault(m.group(1), []).append((c_int(m.group(2)), states[i], build[i]))
     return out
+
+
+def c_int(text):
+    """A C integer literal's value: `0x1F`, `42`, or octal `0060000`, which
+    Python's int(x, 0) rejects."""
+    if re.fullmatch(r"0[0-7]+", text):
+        return int(text, 8)
+    return int(text, 0)
 
 
 def scan_c_file(path, rel, defines=(), values=None):

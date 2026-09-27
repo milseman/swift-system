@@ -83,10 +83,10 @@ case "$cmd" in
     log "migration $name: $base (${before:0:10}) -> $ref (${after:0:10})"
     s1=0; s2=0
     "$TOOL/check.sh" "$name=$path@$before" || s1=$?
-    [ "$s1" -le 2 ] || fail "the run of $base failed"
+    [ "$s1" = 0 ] || [ "$s1" = 2 ] || fail "the run of $base failed"
     a="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$(abspath "${ADOPTER_COVERAGE_OUT:-$REPO/.build/adopter-coverage}")/run.json")"
     "$TOOL/check.sh" "$name=$path@$after" || s2=$?
-    [ "$s2" -le 2 ] || fail "the run of $ref failed"
+    [ "$s2" = 0 ] || [ "$s2" = 2 ] || fail "the run of $ref failed"
     b="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$(abspath "${ADOPTER_COVERAGE_OUT:-$REPO/.build/adopter-coverage}")/run.json")"
     exec python3 "$S/results.py" delta "$a" "$b" --results "$RESULTS" \
       --markdown "$RESULTS/runs/$b/migration-from-$a.md" ;;
