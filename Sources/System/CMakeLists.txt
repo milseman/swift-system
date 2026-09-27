@@ -172,6 +172,9 @@ target_sources(SystemPackage PRIVATE
   Internals/Syscalls+Pseudoterminals.swift
   Pseudoterminals/Pseudoterminal.swift)
 target_sources(SystemPackage PRIVATE
+  Internals/Syscalls+SendFile.swift
+  SendFile/SendFile.swift)
+target_sources(SystemPackage PRIVATE
   Internals/Constants+SystemControl.swift
   Internals/Syscalls+SystemControl.swift
   SystemControl/SystemControl.swift
