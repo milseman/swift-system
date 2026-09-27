@@ -218,3 +218,22 @@ extern char **csystem_environ(void) {
   #endif
 }
 #endif // !defined(_WIN32) && !defined(__wasi__)
+
+#ifdef __linux__
+#include <stdlib.h>
+#include <sys/auxv.h>
+
+extern int csystem_mkostemp(char *path_template, int flags) {
+  #if defined(__ANDROID__) && __ANDROID_API__ < 23
+  if (flags == 0) return mkstemp(path_template);
+  errno = ENOSYS;
+  return -1;
+  #else
+  return mkostemp(path_template, flags);
+  #endif
+}
+
+extern int csystem_is_secure_execution(void) {
+  return getauxval(AT_SECURE) != 0;
+}
+#endif // __linux__

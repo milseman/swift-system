@@ -365,3 +365,89 @@ program rather than calling it.
 Unverified off Darwin: the Android branches, `getlogin_r`'s `int` length
 on older FreeBSD (it's passed with `numericCast`), and glibc's `getlogin`
 errors without a controlling terminal.
+
+## 5. Paths and files
+
+`Sources/System/PathsAndFiles/` (`FilePath+Resolution.swift`,
+`UniqueFiles.swift`, `ProcessDefaults.swift`),
+`Sources/System/Internals/Syscalls+PathsAndFiles.swift`, and two CSystem
+shims for Linux.
+
+| API | C |
+|---|---|
+| `FilePath.canonicalized() throws(Errno) -> FilePath`, and a C-string form | `realpath` |
+| `FilePath.remove(retryOnInterrupt:)`, and a C-string form | `remove` |
+| `FilePath.makeUniqueFile(options:retryOnInterrupt:) -> (path:, descriptor:)`, and a C-string form that rewrites the template | `mkostemp` |
+| `FilePath.makeUniqueDirectory(retryOnInterrupt:) -> FilePath`, and a C-string form | `mkdtemp` |
+| `FilePath.temporaryDirectory() -> FilePath` | `TMPDIR`, then Darwin's `confstr(_CS_DARWIN_USER_TEMP_DIR)`, then `/data/local/tmp` or `/tmp` |
+| `FilePermissions.setCreationMask(_:) -> FilePermissions` | `umask` |
+| `FileDescriptor.currentWorkingDirectory` | `AT_FDCWD` |
+
+Design calls:
+
+- **`canonicalized()`** for `realpath`, after the "canonical, absolute"
+  form it returns, and beside `lexicallyNormalized()`, whose doc it
+  contrasts with. Rejected: `realPath()` (the C name), and
+  `resolvingSymbolicLinks()`, which undersells making the path absolute and
+  removing `..`.
+- **`remove()`** is C's name. It's a file system call beside `unlink()` and
+  `removeDirectory()`, and it throws, which keeps it apart from
+  `removeLastComponent()`, which edits the path. Rejected: `removeItem()`,
+  which is recursive in Foundation.
+- **Templates must end in six X's, on every platform.** POSIX requires it,
+  and glibc enforces it; Darwin's `mkstemp` accepted `report-XX`, and its
+  `mkdtemp` made a directory named exactly `scratch` from a template
+  without X's: a name anyone can guess. Found by the tests. Rejected:
+  passing Darwin's leniency through.
+- **`makeUniqueFile` is `mkostemp`**, so `options: .closeOnExec` makes the
+  descriptor without a window in which a child could inherit it. The
+  default is no options, as for `open`. glibc declares `mkostemp` only with
+  `_GNU_SOURCE`, and Bionic only from API level 23, so Linux goes through a
+  CSystem shim, which on older Android calls `mkstemp` for no options and
+  fails with `ENOSYS` for others. It returns the new path and the
+  descriptor, as `pipe()` returns its two. Rejected: returning an
+  `OwnedFD`, which `open` doesn't either; and a `permissions:` parameter,
+  which `mkstemp` doesn't have (the file is 0600 less the mask).
+- **A retried call starts from the original template**: a failed call can
+  leave the X's replaced, so `_retryingTemplate` saves and restores it.
+- **`temporaryDirectory()` reads `TMPDIR` first,** as POSIX and NIO do,
+  then Darwin's per-user directory, then `/data/local/tmp` on Android, as
+  NIO and Foundation do, then `/tmp`. A set-user-ID program ignores
+  `TMPDIR` (`issetugid`, or `getauxval(AT_SECURE)` through a shim on
+  Linux), as Foundation's `getEnvSecure` does. It's a method, not a
+  property, since `confstr` can create the directory. Rejected:
+  Foundation's order, which ignores the user's `TMPDIR` on Darwin. It
+  calls the existing `system_confstr`; the darwin-more lane's
+  `SystemConfig.string(.userTemporaryDirectory)` reads the same value, and
+  this should use it once both are merged.
+- **`setCreationMask(_:)` is `umask`'s exact shape**: it sets the mask and
+  returns the old one, with a discardable result. There's no getter,
+  because C has none: reading the mask means setting it and setting it
+  back, which another thread can see, and the documentation says so.
+  Foundation needs the value (to `fchmod` after `mkstemp`, its comment
+  says), which this leaves racy. `FileOperations.swift` already has an
+  internal `creationMask` property and `withCreationMask(_:body:)`, which
+  this lane didn't edit; making those public, or reading Linux's
+  `/proc/self/status`, is the choice left. Not on Windows, where System's
+  `umask` is its own emulation.
+- **`FileDescriptor.currentWorkingDirectory`** reads well where it's used,
+  `relativeTo: .currentWorkingDirectory`. Its documentation says it isn't
+  an open descriptor, and other calls on it throw `EBADF`. No `renamed:`
+  stub for `AT_FDCWD`, as the standard streams have none for
+  `STDIN_FILENO`.
+- Not added: `mkstemps` and `mkostemps` (a template with a suffix),
+  `mkdtempat` and a `realpath` relative to a directory, which don't exist
+  everywhere.
+
+Adopters:
+- NIO: `remove` in NIOFS and `NonBlockingFileIO` (3 lines); `AT_FDCWD` for
+  NIOFS's Linux paths (2); NIOFS's `temporaryDirectory`, which reads
+  `TMPDIR` and `confstr(_CS_DARWIN_USER_TEMP_DIR)` (3).
+- Foundation, by grep: `mkstemp` and `umask` in `Data+Writing`, `AT_FDCWD`,
+  and `NSTemporaryDirectory`'s `confstr` and `TMPDIR`.
+- SwiftPM: `mkdtemp` (1), and the per-user temporary directory for its
+  sandbox profile.
+
+Unverified off Darwin: the `mkostemp` and `getauxval` shims, glibc's
+`EINVAL` for bad templates (now caught first anyway), and Linux's `remove`
+error for a directory that isn't empty (the test accepts any `Errno`).

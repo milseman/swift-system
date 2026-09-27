@@ -78,6 +78,7 @@ struct SystemSamples: ParsableCommand {
       Clocks.self,
       ErrnoSample.self,
       Uname.self,
+      MkTemp.self,
     ])
 }
 

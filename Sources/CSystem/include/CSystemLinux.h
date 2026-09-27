@@ -86,3 +86,15 @@ extern int csystem_pthread_getaffinity_np(pthread_t thread, size_t size, void *m
 extern ssize_t csystem_preadv(int fd, const void *iov, int iovcnt, off_t offset);
 extern ssize_t csystem_pwritev(int fd, const void *iov, int iovcnt, off_t offset);
 #endif // __ANDROID__
+
+#ifdef __linux__
+// mkostemp, which glibc declares only with _GNU_SOURCE, and Bionic only from
+// API level 23; below it, this calls mkstemp when there are no flags, and
+// fails with ENOSYS when there are.
+extern int csystem_mkostemp(char *path_template, int flags);
+
+// Whether the process runs with privileges it didn't start with, as a
+// set-user-ID program does: getauxval(AT_SECURE). No C library's Swift module
+// includes <sys/auxv.h>.
+extern int csystem_is_secure_execution(void);
+#endif // __linux__
