@@ -47,11 +47,15 @@ private func makeDirectories(_ path: FilePath) throws -> Bool {
     let made: Bool
     do {
       (directory, made) = try openOrMake(name, in: parent)
-    } catch Errno.notDirectory {
-      complain("Error: \(soFar) exists, and isn't a directory")
-      return false
     } catch {
-      complain("Error: \(soFar): \(error)")
+      // A test rather than `catch Errno.notDirectory`, which Swift 6.3.3
+      // crashes on in a function with a var, as this one is
+      // (Prototype/LinuxBuild/Verify/LB1_pattern_catch_with_var.swift).
+      if (error as? Errno) == .notDirectory {
+        complain("Error: \(soFar) exists, and isn't a directory")
+      } else {
+        complain("Error: \(soFar): \(error)")
+      }
       return false
     }
     try parent.close()
@@ -70,17 +74,22 @@ private func openOrMake(
     // Checking for the directory and then making it would leave a window
     // in which another process could make it. Making it and accepting
     // EEXIST leaves none. The umask applies, as it does for mkdir(1).
+    // The catches test the error rather than match a pattern, such as
+    // `catch Errno.fileExists`, which Swift 6.3.3 crashes on in a function
+    // with a var (Prototype/LinuxBuild/Verify/LB1_pattern_catch_with_var.swift).
     var made = true
     do {
       try name.makeDirectory(relativeTo: parent, permissions: FilePermissions(rawValue: 0o777))
-    } catch Errno.fileExists {
+    } catch {
+      guard error == .fileExists else { throw error }
       made = false
     }
     // Something else of that name, such as a file, throws ENOTDIR.
     do {
       let directory = try FileDescriptor.open(name, relativeTo: parent, .readOnly, options: .directory)
       return (directory, made)
-    } catch Errno.noSuchFileOrDirectory where !made {
+    } catch {
+      guard error == .noSuchFileOrDirectory, !made else { throw error }
       // The name existed a moment ago. If it's a symbolic link to nothing,
       // give up. Otherwise, another process removed it, so make it again.
       if (try? name.stat(relativeTo: parent, flags: .symlinkNoFollow)) != nil {

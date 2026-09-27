@@ -62,7 +62,12 @@ struct Touch: ParsableCommand {
           // to the file, but any other change needs ownership.
           try path.setTimesToNow(access: access, modification: modification)
         }
-      } catch Errno.noSuchFileOrDirectory {
+      } catch {
+        // A guard rather than `catch Errno.noSuchFileOrDirectory`, which
+        // Swift 6.3.3 crashes on in a function with a var, which a string
+        // interpolation makes
+        // (Prototype/LinuxBuild/Verify/LB1_pattern_catch_with_var.swift).
+        guard error == .noSuchFileOrDirectory else { throw error }
         // Like touch(1), -c skips a missing file without an error.
         if !noCreate {
           try create(path, access: accessTime, modification: modificationTime)
