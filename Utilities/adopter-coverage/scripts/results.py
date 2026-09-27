@@ -275,7 +275,7 @@ def delta(old, new):
         "darwin": {"old": len(do), "new": len(dn), "added": sorted(dn - do), "removed": sorted(do - dn),
                    "oldByClass": collections.Counter(v["class"] for v in fo.values()),
                    "newByClass": collections.Counter(v["class"] for v in fn.values())},
-        "entries": {s: (so.get(s, sn.get(s))[2]) for s in newly + worse},
+        "entries": {s: (sn.get(s) or so.get(s))[2] for s in newly + better + worse},
     }
 
 
