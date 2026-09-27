@@ -284,6 +284,23 @@ extern ssize_t csystem_pwritev(int fd, const void *iov, int iovcnt, off_t offset
   return -1;
   #endif
 }
+
+#include <ifaddrs.h>
+
+extern int csystem_getifaddrs(void **list) {
+  #if __ANDROID_API__ >= 24
+  return getifaddrs((struct ifaddrs **)list);
+  #else
+  errno = ENOSYS;
+  return -1;
+  #endif
+}
+
+extern void csystem_freeifaddrs(void *list) {
+  #if __ANDROID_API__ >= 24
+  freeifaddrs((struct ifaddrs *)list);
+  #endif
+}
 #endif // __ANDROID__
 
 #if !defined(_WIN32) && !defined(__wasi__)

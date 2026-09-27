@@ -132,6 +132,12 @@ extern int csystem_pthread_getaffinity_np(pthread_t thread, size_t size, void *m
 // so that this header needn't include <sys/uio.h> (see the ioctl shims).
 extern ssize_t csystem_preadv(int fd, const void *iov, int iovcnt, off_t offset);
 extern ssize_t csystem_pwritev(int fd, const void *iov, int iovcnt, off_t offset);
+
+// getifaddrs and freeifaddrs, which Bionic declares only from API level 24;
+// below it, getifaddrs fails with ENOSYS. `list` points to a struct ifaddrs *,
+// untyped so that this header needn't include <ifaddrs.h>.
+extern int csystem_getifaddrs(void **list);
+extern void csystem_freeifaddrs(void *list);
 #endif // __ANDROID__
 
 #ifdef __linux__

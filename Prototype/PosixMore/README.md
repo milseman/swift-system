@@ -577,3 +577,61 @@ lane's file). NIO and Subprocess don't map memory.
 
 Unverified off Darwin: Bionic's non-optional `mmap` result, Linux's
 `unsigned char` `mincore` vector, and the Linux-only options.
+
+## 8. Network interfaces
+
+`Sources/System/NetworkInterfaces/NetworkInterface.swift`,
+`Sources/System/Internals/Syscalls+NetworkInterfaces.swift` and
+`Constants+NetworkInterfaces.swift`, and Android shims for `getifaddrs`.
+
+| API | C |
+|---|---|
+| `NetworkInterface` (a namespace) | |
+| `NetworkInterface.Addresses: ~Copyable`, `init() throws(Errno)`, `count`, `forEach(_:)` | `getifaddrs`, `freeifaddrs` |
+| `Addresses.Entry: ~Escapable`: `name`, `flags`, `addressFamily`, `unsafeNode` | `ifa_name`, `ifa_flags`, `sa_family`, `struct ifaddrs` |
+| `Entry.address`, `.netmask`, `.broadcastAddress`, `.destinationAddress`: `RawSpan?` (macOS 15) | `ifa_addr`, `ifa_netmask`, `ifa_broadaddr`/`ifa_dstaddr` |
+| `NetworkInterface.Flags`: `.up`, `.broadcast`, `.debug`, `.loopback`, `.pointToPoint`, `.running`, `.noARP`, `.promiscuous`, `.allMulticast`, `.multicast` | `IFF_*` |
+| `NetworkInterface.Index`, `init?(name:) throws(Errno)`, `name() throws(Errno) -> String?` | `if_nametoindex`, `if_indextoname` |
+
+Design calls:
+
+- **An owned list with entries that can't outlive it.** `Entry` is
+  `~Escapable`, with a lifetime borrowed from the list, and the address
+  spans copy that lifetime; `Prototype/PosixMore/Verify/P1_entry_escape.swift`
+  checks that keeping either fails to compile. Iteration is `forEach`,
+  since a `~Escapable` value can't be an `Array` element or a `Sequence`'s.
+  Rejected: copying every entry into a value (addresses as byte arrays) and
+  returning `[Entry]`, which is simpler but isn't an owned list and copies
+  what NIO converts right away; and entries that hold a raw pointer, which
+  a caller could keep past `freeifaddrs`.
+- **Addresses are the sockaddr's bytes, as spans.** SystemPackage can't name
+  SystemSockets' `SocketAddress`, which the fold-in will fix; until then,
+  `span.withUnsafeBytes { SocketAddress($0) }` converts, as the `ifconfig`
+  sample does. The length is `sa_len` on Darwin and the BSDs, and the
+  family's `sockaddr` size on Linux, which has no length field (20 bytes
+  for `AF_PACKET`'s `sockaddr_ll`, whose header Glibc's module lacks).
+  Darwin's netmasks can be shorter than their family's `sockaddr`, and the
+  documentation says so.
+- **Broadcast and destination addresses** share a C field; each property
+  answers only when the flags say that's what the field holds, as NIO
+  reads them. Linux and Android spell the field `ifa_ifu.ifu_dstaddr`.
+- **A missing interface is `nil`, and other failures throw**: glibc's
+  `if_nametoindex` opens a socket, so it can fail with `EMFILE`, which a
+  plain `nil` would report as "no such interface". Darwin reports a missing
+  one with `ENXIO` and Linux with `ENODEV`; both are `nil`.
+- **One top-level name**, `NetworkInterface`, holds `Addresses`, `Flags` and
+  `Index`. NIO's own types are `NIONetworkDevice` and `NIONetworkInterface`,
+  so nothing collides.
+- **Swift 6.2**: `Optional.map` requires an `Escapable` value, so an
+  optional span is unwrapped with `if let`.
+- Not added: `if_nameindex` and `if_freenameindex`, which list names and
+  indexes; per-interface statistics (`ifa_data`, `AF_LINK`), which
+  `unsafeNode` reaches.
+
+Adopters: NIO's `System.enumerateDevices` and `NIONetworkDevice`
+(`NIOCore/Interfaces.swift`), which walk the `ifaddrs` list and call
+`if_nametoindex` for each device (48 lines). No other adopter uses these.
+
+Unverified off Darwin: the Android shims; glibc's anonymous-enum `IFF_*`
+constants, which Swift imports as `Int` and this converts; and the Linux
+address lengths.

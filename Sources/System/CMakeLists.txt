@@ -126,6 +126,7 @@ target_sources(SystemPackage PRIVATE
   Internals/Constants+DynamicLoading.swift
   Internals/Constants+Events.swift
   Internals/Constants+MemoryMapping.swift
+  Internals/Constants+NetworkInterfaces.swift
   Internals/Constants+StatFS.swift
   Internals/Constants+Time.swift
   Internals/Constants.swift
@@ -137,6 +138,7 @@ target_sources(SystemPackage PRIVATE
   Internals/Syscalls+Environment.swift
   Internals/Syscalls+Events.swift
   Internals/Syscalls+MemoryMapping.swift
+  Internals/Syscalls+NetworkInterfaces.swift
   Internals/Syscalls+PathsAndFiles.swift
   Internals/Syscalls+StatFS.swift
   Internals/Syscalls+SystemIdentity.swift
@@ -156,6 +158,8 @@ target_sources(SystemPackage PRIVATE
   MachTime/MachTime.swift)
 target_sources(SystemPackage PRIVATE
   MemoryMapping/MemoryMapping.swift)
+target_sources(SystemPackage PRIVATE
+  NetworkInterfaces/NetworkInterface.swift)
 target_sources(SystemPackage PRIVATE
   PathsAndFiles/FilePath+Resolution.swift
   PathsAndFiles/ProcessDefaults.swift
