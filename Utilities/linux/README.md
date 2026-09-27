@@ -13,7 +13,7 @@ Utilities/linux/build.sh --swift 6.3 test             # swift:6.3-noble
 Utilities/linux/build.sh test -- --filter EventPollTests
 Utilities/linux/build.sh build -- --target SystemTests
 Utilities/linux/build.sh run -- system-samples platform process
-Utilities/linux/build.sh --user 1000:1000 test        # unprivileged, as CI is
+Utilities/linux/build.sh --user 1000:1000 test        # unprivileged
 Utilities/linux/build.sh shell                        # bash in the container
 ```
 
