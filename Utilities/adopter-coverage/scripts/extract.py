@@ -89,6 +89,24 @@ def load_json(path):
     return json.load(open(path))
 
 
+def relocate(index, root):
+    """An index dump read for an export other than the one it was built
+    from (a rerun from the results store) names the build's export in its
+    absolute paths: move them to this one, so the package's own
+    declarations are still its own."""
+    old = (index.get("srcRoot") or "").rstrip("/")
+    new = root.rstrip("/")
+    if not old or old == new:
+        return
+    for u, d in index["decls"].items():
+        if d[1] and (d[1] == old or d[1].startswith(old + "/")):
+            d[1] = new + d[1][len(old):]
+    for unit in index.get("units", []):
+        f = unit.get("mainFile") or ""
+        if f.startswith(old + "/"):
+            unit["mainFile"] = new + f[len(old):]
+
+
 def lowest_kind(mask):
     for k in range(63):
         if mask & (1 << k):
@@ -662,6 +680,7 @@ def main():
                  "vocab": load_json(args.vocab)["vocab"] if args.vocab else {}}
     else:
         index = load_json(args.index)
+        relocate(index, root)
     describe = json.load(open(args.describe))
     dump = json.load(open(args.dump))
     targets, skipped = load_targets(dump, describe,
