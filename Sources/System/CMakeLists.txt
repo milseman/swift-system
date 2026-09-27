@@ -111,9 +111,11 @@ target_sources(SystemPackage PRIVATE
   Internals/Syscalls+Processes.swift
   Processes/ChildProcess.swift
   Processes/CInterop+Processes.swift
+  Processes/Credentials.swift
   Processes/ExitStatus.swift
   Processes/ProcessGroups.swift
   Processes/ProcessWait.swift
+  Processes/ResourceLimits.swift
   Processes/Signal.swift
   Processes/SignalAction.swift
   Processes/SignalSending.swift
