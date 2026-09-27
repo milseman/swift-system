@@ -1,6 +1,5 @@
 #include <unistd.h>
 #include <sys/syscall.h>
-#include <sys/uio.h>
 #include <signal.h>
 
 #define __SWIFT_IORING_SQE_FALLBACK_STRUCT { \
