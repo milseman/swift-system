@@ -179,8 +179,8 @@ extension SystemConfig.Name {
   @available(*, unavailable, renamed: "maxTimeZoneNameBytes")
   public static var _SC_TZNAME_MAX: Self { maxTimeZoneNameBytes }
 
-  /// The version of POSIX job control that the system supports,
-  /// if it supports job control.
+  /// A positive value if the system supports job control:
+  /// on Darwin, the version of POSIX that it follows, and on glibc, 1.
   ///
   /// The corresponding C constant is `_SC_JOB_CONTROL`.
   @_alwaysEmitIntoClient
@@ -554,7 +554,8 @@ extension SystemConfig.PathName {
 
   /// The maximum number of bytes in a terminal's canonical input line.
   ///
-  /// Only a terminal has this value.
+  /// Only a terminal has this value on Darwin,
+  /// but glibc reports it for any file.
   ///
   /// The corresponding C constant is `_PC_MAX_CANON`.
   @_alwaysEmitIntoClient
@@ -566,7 +567,8 @@ extension SystemConfig.PathName {
 
   /// The number of bytes of input that a terminal can queue.
   ///
-  /// Only a terminal has this value.
+  /// Only a terminal has this value on Darwin,
+  /// but glibc reports it for any file.
   ///
   /// The corresponding C constant is `_PC_MAX_INPUT`.
   @_alwaysEmitIntoClient
@@ -634,7 +636,8 @@ extension SystemConfig.PathName {
 
   /// The value that disables a terminal's special character, if it has one.
   ///
-  /// Only a terminal has this value.
+  /// Only a terminal has this value on Darwin,
+  /// but glibc reports it for any file.
   ///
   /// The corresponding C constant is `_PC_VDISABLE`.
   @_alwaysEmitIntoClient
