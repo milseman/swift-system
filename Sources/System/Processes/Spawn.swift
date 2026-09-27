@@ -555,17 +555,32 @@ extension ProcessID {
   ) -> Result<ProcessID, Errno> {
     SpawnFileAction._withUnsafeFileActions(fileActions) { actions in
       attributes._withUnsafeAttributes(extraFlags: extraFlags) { attributes in
-        var pid: pid_t = 0
-        let environment = environment ?? UnsafePointer(system_spawn_environ())
-        return nothingOrReturnedErrno(retryOnInterrupt: false) {
-          if searchingPath {
-            return system_posix_spawnp(&pid, path, actions, attributes, arguments, environment)
-          }
-          return system_posix_spawn(&pid, path, actions, attributes, arguments, environment)
-        }.map { ProcessID(rawValue: pid) }
+        func spawn(
+          _ environment: UnsafePointer<UnsafeMutablePointer<CChar>?>
+        ) -> Result<ProcessID, Errno> {
+          var pid: pid_t = 0
+          return nothingOrReturnedErrno(retryOnInterrupt: false) {
+            if searchingPath {
+              return system_posix_spawnp(&pid, path, actions, attributes, arguments, environment)
+            }
+            return system_posix_spawn(&pid, path, actions, attributes, arguments, environment)
+          }.map { ProcessID(rawValue: pid) }
+        }
+        guard let environment else { return _withCallingEnvironment(spawn) }
+        return spawn(environment)
       }
     }
   }
+}
+
+// Calls `body` with the calling process's environment, or with an empty one
+// where environ is NULL, as glibc's clearenv leaves it.
+internal func _withCallingEnvironment<R>(
+  _ body: (UnsafePointer<UnsafeMutablePointer<CChar>?>) -> R
+) -> R {
+  if let environment = system_environ() { return body(environment) }
+  let end: UnsafeMutablePointer<CChar>? = nil
+  return withUnsafePointer(to: end) { body($0) }
 }
 
 // The C functions take `char *const []`, and don't change the strings.
@@ -744,7 +759,7 @@ extension ProcessID {
     arguments._withCStringArray { arguments in
       let arguments = _mutableCStrings(arguments)
       guard let environment else {
-        _ = system_execve(path, arguments, system_spawn_environ())
+        _ = _withCallingEnvironment { system_execve(path, arguments, $0) }
         return Errno.current
       }
       return environment._withCStringArray { environment in

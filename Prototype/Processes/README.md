@@ -139,8 +139,10 @@ Each with the alternative it rejects.
      can't express a first argument that isn't the path (login shells,
      multi-call binaries).
    - `environment` is `NAME=value` strings, or `nil` for the calling
-     process's, which a CSystem shim reads (`_NSGetEnviron()` on Darwin,
-     where a library can't refer to `environ`).
+     process's, which comes from the posix-more lane's `system_environ()`
+     (`_NSGetEnviron()` on Darwin, where a library can't refer to
+     `environ`); where `environ` is NULL, as glibc's `clearenv` leaves it,
+     the child gets an empty environment.
    - File actions are an array of an opaque `SpawnFileAction` built with
      static factories, so a spawn takes an array literal. Rejected: a
      public enum, whose platform-specific cases every switch would need
@@ -467,8 +469,7 @@ branch, anything Android-only, or differences from a real C library.
 Unverified:
 
 - the CSystem shims: the `W*` macros, the `siginfo_t` and `sigaction`
-  accessors, `csystem_environ` (glibc declares `environ` only with
-  `_GNU_SOURCE`, which `shims.c` defines), the chdir and closefrom spawn
+  accessors, the chdir and closefrom spawn
   actions and their `__GLIBC_PREREQ` and `__ANDROID_API__` checks, the raw
   `pidfd_open`, `pidfd_send_signal`, and `close_range` system calls, and the
   `signalfd_siginfo` mirror and its `_Static_assert`;

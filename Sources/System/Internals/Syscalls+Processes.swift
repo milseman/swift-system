@@ -430,12 +430,6 @@ internal func system_execvp(
 }
 #endif // !os(watchOS) && !os(tvOS) && !os(Android)
 
-// The environment that spawn and execute pass on by default. Not mockable:
-// it can't fail.
-internal func system_spawn_environ() -> UnsafeMutablePointer<UnsafeMutablePointer<CChar>?> {
-  csystem_spawn_environ()
-}
-
 // MARK: - Resource limits
 
 internal func system_getrlimit(_ resource: CInt, _ limit: UnsafeMutablePointer<rlimit>) -> CInt {

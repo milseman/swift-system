@@ -228,20 +228,8 @@ extern char **csystem_environ(void) {
 #include <unistd.h>
 #if defined(__APPLE__)
 #include <Availability.h>
-#include <crt_externs.h>
 #include <TargetConditionals.h>
-#elif !defined(__linux__)
-extern char **environ;
 #endif
-
-extern char **csystem_spawn_environ(void) {
-  #if defined(__APPLE__)
-  // Libraries on Darwin can't refer to environ directly.
-  return *_NSGetEnviron();
-  #else
-  return environ;
-  #endif
-}
 
 extern int csystem_wifexited(int status) { return WIFEXITED(status); }
 extern int csystem_wexitstatus(int status) { return WEXITSTATUS(status); }
