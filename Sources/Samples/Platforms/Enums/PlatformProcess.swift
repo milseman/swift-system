@@ -35,7 +35,11 @@ extension Platform {
     /// can name another process.
     case id(ProcessID)
 
-    #if os(Linux) || SIMULATE_PLATFORMS
+    // Real code would write `#if os(Linux)`, but System has no pidfd owner
+    // yet, so on Linux this case exists only in the simulated build, over
+    // the stand-in `ProcessDescriptor`, and a real Linux build has `.id`
+    // alone, as Darwin does. The case's other `#if`s say the same.
+    #if SIMULATE_PLATFORMS // || os(Linux), once System has a pidfd owner
     /// A process descriptor (pidfd), on Linux. It refers to one process for
     /// its lifetime, and polls readable when the process exits.
     case descriptor(ProcessDescriptor)
@@ -80,7 +84,7 @@ extension Platform.Process {
     switch self {
     case .id(let id):
       return id
-    #if os(Linux) || SIMULATE_PLATFORMS
+    #if SIMULATE_PLATFORMS // || os(Linux), once System has a pidfd owner
     case .descriptor(let descriptor):
       return descriptor.processID
     #endif
@@ -110,7 +114,7 @@ extension Platform.Process {
       // C: System has no kill wrapper.
       guard kill(id.rawValue, SIGKILL) == 0 else { throw Errno(rawValue: errno) }
       #endif
-    #if os(Linux) || SIMULATE_PLATFORMS
+    #if SIMULATE_PLATFORMS // || os(Linux), once System has a pidfd owner
     case .descriptor(let descriptor):
       try descriptor.sendSignal(SIGKILL)
     #endif
@@ -145,7 +149,7 @@ extension Platform.Process {
       }
       return Platform.ExitStatus(waitStatus: status)
       #endif
-    #if os(Linux) || SIMULATE_PLATFORMS
+    #if SIMULATE_PLATFORMS // || os(Linux), once System has a pidfd owner
     case .descriptor(let descriptor):
       return Platform.ExitStatus(waitStatus: try descriptor.wait())
     #endif
@@ -163,7 +167,7 @@ extension Platform.Process {
     switch consume self {
     case .id:
       break
-    #if os(Linux) || SIMULATE_PLATFORMS
+    #if SIMULATE_PLATFORMS // || os(Linux), once System has a pidfd owner
     case .descriptor(let descriptor):
       try descriptor.close()
     #endif
@@ -179,7 +183,7 @@ extension Platform.Process {
     switch self {
     case .id(let id):
       return ".id(\(id.rawValue))"
-    #if os(Linux) || SIMULATE_PLATFORMS
+    #if SIMULATE_PLATFORMS // || os(Linux), once System has a pidfd owner
     case .descriptor(let descriptor):
       return ".descriptor(fd \(descriptor.fileDescriptor.rawValue), pid \(descriptor.processID.rawValue))"
     #endif

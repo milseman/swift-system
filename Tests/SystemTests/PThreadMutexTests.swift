@@ -185,7 +185,9 @@ private struct PThreadMutexTests {
 
     var protect = PThread.Mutex.Attributes()
     protect.priorityProtocol = .protect
-    let range = try PThread.SchedulingPolicy.other.priorityRange()
+    // POSIX puts ceilings in SCHED_FIFO's range. glibc enforces that, and
+    // SCHED_OTHER's range there is 0...0, below it; Darwin allows either.
+    let range = try PThread.SchedulingPolicy.fifo.priorityRange()
     protect.priorityCeiling = range.upperBound
     let protecting = try PThread.Mutex(attributes: protect)
     #expect(try protecting.priorityCeiling() == range.upperBound)

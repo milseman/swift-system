@@ -137,6 +137,31 @@ extern int csystem_ptsname_r(int fd, char *buffer, size_t length) {
 #endif // __linux__
 
 #ifdef __linux__
+#include <sys/stat.h>
+
+_Static_assert(CSYSTEM_UTIME_NOW == UTIME_NOW, "CSYSTEM_UTIME_NOW");
+_Static_assert(CSYSTEM_UTIME_OMIT == UTIME_OMIT, "CSYSTEM_UTIME_OMIT");
+#endif // __linux__
+
+#ifdef __linux__
+#include <sys/timerfd.h>
+
+extern int csystem_timerfd_create(int clockid, int flags) {
+  return timerfd_create(clockid, flags);
+}
+
+extern int csystem_timerfd_settime(int fd, int flags,
+                                   const void *new_value, void *old_value) {
+  return timerfd_settime(fd, flags, (const struct itimerspec *)new_value,
+                         (struct itimerspec *)old_value);
+}
+
+extern int csystem_timerfd_gettime(int fd, void *curr_value) {
+  return timerfd_gettime(fd, (struct itimerspec *)curr_value);
+}
+#endif // __linux__
+
+#ifdef __linux__
 #include <termios.h>
 
 extern int csystem_tcgetsid(int fd) {

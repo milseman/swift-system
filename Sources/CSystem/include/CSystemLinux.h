@@ -9,15 +9,21 @@
 
 #ifdef __linux__
 
+// Swift attributes a C type that two modules declare to the module whose
+// copy it loads first, and SystemPackage loads CSystem's copy when it calls
+// a CSystem function that takes the type, as timerfd_settime took
+// itimerspec, and so timespec. MemberImportVisibility then hides the type's
+// members from clients, which don't import CSystem (#320). So beyond these,
+// this header includes none of the headers that glibc's Swift module
+// includes, and the shims below take their types as `void *`, while shims.c
+// includes the real headers. The thread shims need only <sys/types.h>'s
+// pthread_t and pid_t; <pthread.h> and <sched.h> would declare timespec and
+// sched_param here.
 #include <sys/epoll.h>
 #include <sys/eventfd.h>
-#include <sys/socket.h>
 #include <sys/sysinfo.h>
-#include <sys/timerfd.h>
 #include <sys/types.h>
 #include <errno.h>
-#include <pthread.h>
-#include <sched.h>
 #include <unistd.h>
 #include "io_uring.h"
 
@@ -27,6 +33,13 @@
 // import, so MemberImportVisibility hides those members from them (#320).
 int _system_ioctl_TIOCGWINSZ(int fd, void *ws);
 int _system_ioctl_TIOCSWINSZ(int fd, const void *ws);
+
+// timerfd. Each value points to a struct itimerspec, untyped so that this
+// header needn't include <sys/timerfd.h>, whose <time.h> declares timespec.
+extern int csystem_timerfd_create(int clockid, int flags);
+extern int csystem_timerfd_settime(int fd, int flags,
+                                   const void *new_value, void *old_value);
+extern int csystem_timerfd_gettime(int fd, void *curr_value);
 
 // The flags for renameat2. glibc only declares them, and renameat2 itself,
 // with _GNU_SOURCE, which can't be defined here; see shims.c.
@@ -48,6 +61,12 @@ extern int csystem_renameat2(int olddirfd, const char *oldpath,
 // _GNU_SOURCE, and Bionic defines as F_LINUX_SPECIFIC_BASE + 7 and + 8.
 #define CSYSTEM_F_SETPIPE_SZ 1031
 #define CSYSTEM_F_GETPIPE_SZ 1032
+
+// The special times for futimens and utimensat, which glibc and Bionic define
+// as expressions that Swift can't import. They have these values on every
+// architecture; shims.c checks them against <sys/stat.h>.
+#define CSYSTEM_UTIME_NOW 0x3fffffff
+#define CSYSTEM_UTIME_OMIT 0x3ffffffe
 
 // tcgetsid, which not every C library declares without feature macros
 // such as _GNU_SOURCE, which can't be defined here; see shims.c.
