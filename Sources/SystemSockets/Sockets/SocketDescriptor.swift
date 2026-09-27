@@ -197,6 +197,12 @@ extension SocketDescriptor {
     @_alwaysEmitIntoClient
     internal init(_ rawValue: CInt) { self.init(rawValue: rawValue) }
 
+    #if os(Linux) && canImport(Glibc)
+    // glibc declares the SOCK_* constants in an enum.
+    @_alwaysEmitIntoClient
+    internal init(_ rawValue: __socket_type) { self.init(rawValue: CInt(rawValue.rawValue)) }
+    #endif
+
     /// Sequenced, reliable, two-way, connection-based byte streams.
     ///
     /// The corresponding C constant is `SOCK_STREAM`.
@@ -271,37 +277,44 @@ extension SocketDescriptor {
     ///
     /// The corresponding C constant is `IPPROTO_IP`.
     @_alwaysEmitIntoClient
-    public static var ip: ProtocolID { Self(IPPROTO_IP) }
+    public static var ip: ProtocolID { Self(CInt(IPPROTO_IP)) }
 
     /// Transmission Control Protocol (TCP).
     ///
     /// The corresponding C constant is `IPPROTO_TCP`.
     @_alwaysEmitIntoClient
-    public static var tcp: ProtocolID { Self(IPPROTO_TCP) }
+    public static var tcp: ProtocolID { Self(CInt(IPPROTO_TCP)) }
 
     /// User Datagram Protocol (UDP).
     ///
     /// The corresponding C constant is `IPPROTO_UDP`.
     @_alwaysEmitIntoClient
-    public static var udp: ProtocolID { Self(IPPROTO_UDP) }
+    public static var udp: ProtocolID { Self(CInt(IPPROTO_UDP)) }
 
     /// IPv4 encapsulation.
     ///
-    /// The corresponding C constant is `IPPROTO_IPV4`.
+    /// The corresponding C constant is `IPPROTO_IPV4`,
+    /// or `IPPROTO_IPIP` on Linux.
     @_alwaysEmitIntoClient
-    public static var ipv4: ProtocolID { Self(IPPROTO_IPV4) }
+    public static var ipv4: ProtocolID {
+      #if os(Linux) || os(Android)
+      Self(CInt(IPPROTO_IPIP))
+      #else
+      Self(IPPROTO_IPV4)
+      #endif
+    }
 
     /// IPv6 header.
     ///
     /// The corresponding C constant is `IPPROTO_IPV6`.
     @_alwaysEmitIntoClient
-    public static var ipv6: ProtocolID { Self(IPPROTO_IPV6) }
+    public static var ipv6: ProtocolID { Self(CInt(IPPROTO_IPV6)) }
 
     /// Raw IP packet.
     ///
     /// The corresponding C constant is `IPPROTO_RAW`.
     @_alwaysEmitIntoClient
-    public static var raw: ProtocolID { Self(IPPROTO_RAW) }
+    public static var raw: ProtocolID { Self(CInt(IPPROTO_RAW)) }
 
     public var description: String {
       rawValue.description
@@ -333,50 +346,50 @@ extension SocketDescriptor {
     ///
     /// The corresponding C constant is `MSG_OOB`.
     @_alwaysEmitIntoClient
-    public static var outOfBand: MessageFlags { MessageFlags(MSG_OOB) }
+    public static var outOfBand: MessageFlags { MessageFlags(CInt(MSG_OOB)) }
 
     /// Bypass routing, use direct interface.
     ///
     /// The corresponding C constant is `MSG_DONTROUTE`.
     @_alwaysEmitIntoClient
-    public static var doNotRoute: MessageFlags { MessageFlags(MSG_DONTROUTE) }
+    public static var doNotRoute: MessageFlags { MessageFlags(CInt(MSG_DONTROUTE)) }
 
     /// Peek at incoming message without removing it.
     ///
     /// The corresponding C constant is `MSG_PEEK`.
     @_alwaysEmitIntoClient
-    public static var peek: MessageFlags { MessageFlags(MSG_PEEK) }
+    public static var peek: MessageFlags { MessageFlags(CInt(MSG_PEEK)) }
 
     /// Wait for full request or error.
     ///
     /// The corresponding C constant is `MSG_WAITALL`.
     @_alwaysEmitIntoClient
-    public static var waitForAll: MessageFlags { MessageFlags(MSG_WAITALL) }
+    public static var waitForAll: MessageFlags { MessageFlags(CInt(MSG_WAITALL)) }
 
     /// End-of-record marker.
     ///
     /// The corresponding C constant is `MSG_EOR`.
     @_alwaysEmitIntoClient
-    public static var endOfRecord: MessageFlags { MessageFlags(MSG_EOR) }
+    public static var endOfRecord: MessageFlags { MessageFlags(CInt(MSG_EOR)) }
 
     /// Data was truncated.
     ///
     /// The corresponding C constant is `MSG_TRUNC`.
     @_alwaysEmitIntoClient
-    public static var dataTruncated: MessageFlags { MessageFlags(MSG_TRUNC) }
+    public static var dataTruncated: MessageFlags { MessageFlags(CInt(MSG_TRUNC)) }
 
     /// Control data was truncated.
     ///
     /// The corresponding C constant is `MSG_CTRUNC`.
     @_alwaysEmitIntoClient
-    public static var controlTruncated: MessageFlags { MessageFlags(MSG_CTRUNC) }
+    public static var controlTruncated: MessageFlags { MessageFlags(CInt(MSG_CTRUNC)) }
 
     #if !SYSTEM_PACKAGE_DARWIN
     /// Do not generate SIGPIPE on broken pipe.
     ///
     /// The corresponding C constant is `MSG_NOSIGNAL`.
     @_alwaysEmitIntoClient
-    public static var noSignal: MessageFlags { MessageFlags(MSG_NOSIGNAL) }
+    public static var noSignal: MessageFlags { MessageFlags(CInt(MSG_NOSIGNAL)) }
     #endif
 
     public var description: String {
@@ -414,19 +427,19 @@ extension SocketDescriptor {
     ///
     /// The corresponding C constant is `SHUT_RD`.
     @_alwaysEmitIntoClient
-    public static var read: ShutdownKind { ShutdownKind(rawValue: SHUT_RD) }
+    public static var read: ShutdownKind { ShutdownKind(rawValue: CInt(SHUT_RD)) }
 
     /// Disallow further sends.
     ///
     /// The corresponding C constant is `SHUT_WR`.
     @_alwaysEmitIntoClient
-    public static var write: ShutdownKind { ShutdownKind(rawValue: SHUT_WR) }
+    public static var write: ShutdownKind { ShutdownKind(rawValue: CInt(SHUT_WR)) }
 
     /// Disallow further sends and receives.
     ///
     /// The corresponding C constant is `SHUT_RDWR`.
     @_alwaysEmitIntoClient
-    public static var readWrite: ShutdownKind { ShutdownKind(rawValue: SHUT_RDWR) }
+    public static var readWrite: ShutdownKind { ShutdownKind(rawValue: CInt(SHUT_RDWR)) }
 
     public var description: String {
       switch self {
