@@ -49,6 +49,12 @@ extern int csystem_renameat2(int olddirfd, const char *oldpath,
 #define CSYSTEM_F_SETPIPE_SZ 1031
 #define CSYSTEM_F_GETPIPE_SZ 1032
 
+// The special times for futimens and utimensat, which glibc and Bionic define
+// as expressions that Swift can't import. They have these values on every
+// architecture; shims.c checks them against <sys/stat.h>.
+#define CSYSTEM_UTIME_NOW 0x3fffffff
+#define CSYSTEM_UTIME_OMIT 0x3ffffffe
+
 // tcgetsid, which not every C library declares without feature macros
 // such as _GNU_SOURCE, which can't be defined here; see shims.c.
 extern int csystem_tcgetsid(int fd);

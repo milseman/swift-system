@@ -20,7 +20,8 @@ import XCTest
 #endif
 #if canImport(Android)
 import Android
-#elseif os(WASI)
+import CSystem
+#elseif os(Linux) || os(WASI)
 import CSystem
 #endif
 
@@ -33,8 +34,14 @@ final class FileTimesTest: XCTestCase {
     let path: FilePath = "a path"
     let access = timespec(tv_sec: 1, tv_nsec: 2)
     let modification = timespec(tv_sec: 3, tv_nsec: 4)
+    #if os(Linux) || os(Android)
+    // glibc's and Bionic's UTIME_NOW and UTIME_OMIT don't import.
+    let now = Int(CSYSTEM_UTIME_NOW)
+    let omit = Int(CSYSTEM_UTIME_OMIT)
+    #else
     let now = Int(UTIME_NOW)
     let omit = Int(UTIME_OMIT)
+    #endif
 
     let syscallTestCases: Array<MockTestCase> = [
       MockTestCase(name: "futimens", .interruptable, 1, 1, 2, 3, 4) { retryOnInterrupt in

@@ -137,6 +137,13 @@ extern int csystem_ptsname_r(int fd, char *buffer, size_t length) {
 #endif // __linux__
 
 #ifdef __linux__
+#include <sys/stat.h>
+
+_Static_assert(CSYSTEM_UTIME_NOW == UTIME_NOW, "CSYSTEM_UTIME_NOW");
+_Static_assert(CSYSTEM_UTIME_OMIT == UTIME_OMIT, "CSYSTEM_UTIME_OMIT");
+#endif // __linux__
+
+#ifdef __linux__
 #include <termios.h>
 
 extern int csystem_tcgetsid(int fd) {
