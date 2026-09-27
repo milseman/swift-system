@@ -19,8 +19,10 @@ extern int csystem_posix_dup3(int fildes, int fildes2, int flag);
 // <spawn.h>: members of a C type defined through a CSystem header can be
 // attributed to CSystem, which clients don't import (#320).
 
-// The calling process's environment: environ, or _NSGetEnviron() on Darwin.
-extern char **csystem_environ(void);
+// The calling process's environment, for posix_spawn and execve: environ, or
+// _NSGetEnviron() on Darwin. (The posix-more lane's csystem_environ is the
+// same; once it lands, this goes.)
+extern char **csystem_spawn_environ(void);
 
 // The wait status macros, which Swift can't import. Their encoding differs
 // between platforms, most of all for a continued process.

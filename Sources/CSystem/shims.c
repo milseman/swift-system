@@ -197,7 +197,7 @@ extern int csystem_pthread_getaffinity_np(pthread_t thread, size_t size, void *m
 extern char **environ;
 #endif
 
-extern char **csystem_environ(void) {
+extern char **csystem_spawn_environ(void) {
   #if defined(__APPLE__)
   // Libraries on Darwin can't refer to environ directly.
   return *_NSGetEnviron();

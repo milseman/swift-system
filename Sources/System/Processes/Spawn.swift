@@ -556,7 +556,7 @@ extension ProcessID {
     SpawnFileAction._withUnsafeFileActions(fileActions) { actions in
       attributes._withUnsafeAttributes(extraFlags: extraFlags) { attributes in
         var pid: pid_t = 0
-        let environment = environment ?? UnsafePointer(system_environ())
+        let environment = environment ?? UnsafePointer(system_spawn_environ())
         return nothingOrReturnedErrno(retryOnInterrupt: false) {
           if searchingPath {
             return system_posix_spawnp(&pid, path, actions, attributes, arguments, environment)
@@ -744,7 +744,7 @@ extension ProcessID {
     arguments._withCStringArray { arguments in
       let arguments = _mutableCStrings(arguments)
       guard let environment else {
-        _ = system_execve(path, arguments, system_environ())
+        _ = system_execve(path, arguments, system_spawn_environ())
         return Errno.current
       }
       return environment._withCStringArray { environment in
