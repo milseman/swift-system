@@ -67,6 +67,9 @@ target_sources(SystemPackage PRIVATE
   Events/Poll.swift
   Events/Timeouts.swift)
 target_sources(SystemPackage PRIVATE
+  Executable/CurrentExecutable.swift
+  Internals/Syscalls+Executable.swift)
+target_sources(SystemPackage PRIVATE
   FileCopying/FileClone.swift
   FileCopying/FileCopy.swift
   FileCopying/FileCopyState.swift
