@@ -115,6 +115,9 @@ class SystemAPI:
         self.by_name = collections.defaultdict(list)
         self.entries = []   # one per scanned declaration, in the scan's order
         self.unsupported = scan.get("moduleUnsupportedPlatforms", {})
+        # Public types. Their enum cases take the enum's access without
+        # spelling it, so api-delta's scanner doesn't list them.
+        self.public_types = {t["name"] for t in scan.get("types", []) if t.get("access") in ("public", "open")}
         for d in scan["declarations"]:
             scope = ".".join(d["scopes"])
             kw = d["kw"].rstrip("?!")
@@ -802,7 +805,15 @@ def find_used_symbol(api, demangled):
         want = base + labels
         exact = [c for c in cands if c["name"].rstrip("?!").replace("init?", "init") == want
                  or c["name"] == want]
+        # An enum case matched with its payload's labels, `.currentDirectory(_:)`
+        # for `case currentDirectory`.
+        if not exact and re.fullmatch(r"\((_:)+\)", labels):
+            exact = [c for c in cands if c["declaration"].startswith("case ")]
+        if not exact and re.fullmatch(r"\((_:)+\)", labels) and scope in api.public_types:
+            return [{"scope": scope, "name": base, "unscanned": "an enum case of a public enum"}]
         return exact or None
+    if not cands and scope in api.public_types and base[:1].islower():
+        return [{"scope": scope, "name": base, "unscanned": "an enum case of a public enum"}]
     return cands or None
 
 
