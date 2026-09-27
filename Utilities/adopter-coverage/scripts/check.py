@@ -264,7 +264,7 @@ class Derivation:
     system call's number `SYS_x` reads as `x`.
 
     The symbols that decide are the ones the package uses on the platform,
-    other than its own shims and the C names only its shims use. Where it
+    other than its own shims and the C names only its shims use there. Where it
     uses nothing else there, the entry's other symbols decide (NIO's Linux
     rename goes through its shim), what its shims call there
     (syscall(SYS_renameat2), which reads as renameat2); failing those, the
@@ -313,23 +313,27 @@ class Derivation:
                 return "impl", c, []
         return found or (None, None, [])
 
+    def in_shims(self, sym, plat=None):
+        """Whether every site of a symbol (on a platform) is in the
+        package's shim targets: a C name the package reaches only through
+        its shims there."""
+        sites = [x for x in self.interfaces[sym]["sites"] if plat is None or plat in x["platforms"]]
+        return bool(sites) and all(x["target"] in self.shim_targets for x in sites)
+
     def deciding(self, e, plat):
         """(basis, symbols) that decide the entry on a platform."""
         its = self.interfaces
         syms = e["symbols"]
         shim = {s for s in syms if its.get(s, {}).get("shim")}
-        internal = {s for s in syms if s in its and s not in shim and its[s]["targets"]
-                    and set(its[s]["targets"]) <= self.shim_targets}
-        used = [s for s in syms if its.get(s, {}).get("platforms", {}).get(plat)]
-        counted = [s for s in used if s not in shim and s not in internal]
+        used = [s for s in syms if its.get(s, {}).get("platforms", {}).get(plat) and s not in shim]
+        counted = [s for s in used if not self.in_shims(s, plat)]
         if counted:
             return "used", counted
         # Only shims here: what they call here, then how the package names
         # the concept elsewhere (NIO's Darwin renamex_np), then any C name.
-        counted = [s for s in used if s in internal]
-        if counted:
-            return "shim calls", counted
-        counted = [s for s in syms if s in its and s not in shim and s not in internal]
+        if used:
+            return "shim calls", used
+        counted = [s for s in syms if s in its and s not in shim and not self.in_shims(s)]
         if counted:
             return "spellings", counted
         counted = [s for s in syms if s in its and s not in shim]
