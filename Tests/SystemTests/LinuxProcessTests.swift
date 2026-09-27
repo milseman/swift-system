@@ -35,13 +35,15 @@ import Android
 final class LinuxProcessTests: XCTestCase {
   #if !os(Android)
   func testAProcessDescriptorSignalsAndWaitsForItsChild() throws {
-    let child = try ChildProcess.spawn("/bin/sleep", arguments: ["sleep", "10"])
-    let descriptor: ProcessDescriptor
+    // Swift 6.2's move checker rejects a noncopyable let that a do-catch
+    // initializes, so check for pidfds on this process first.
     do {
-      descriptor = try child.openDescriptor()
+      try ProcessDescriptor(ProcessID.current).close()
     } catch Errno.noFunction {
       throw XCTSkip("This kernel has no pidfd_open")
     }
+    let child = try ChildProcess.spawn("/bin/sleep", arguments: ["sleep", "10"])
+    let descriptor = try child.openDescriptor()
     XCTAssertEqual(descriptor.processID, child.id)
     try descriptor.sendSignal(nil)
     try descriptor.sendSignal(.terminate)
