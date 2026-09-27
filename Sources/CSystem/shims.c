@@ -485,4 +485,27 @@ extern int csystem_signalfd(int fd, const void *mask, int flags) {
 extern int csystem_accept4(int fd, void *addr, void *addrlen, int flags) {
   return accept4(fd, (struct sockaddr *)addr, (socklen_t *)addrlen, flags);
 }
+
+#include <stddef.h>
+#include <time.h>
+
+// CInterop.MMsgHdr, in Swift, is a struct msghdr and an unsigned int, laid
+// out as C lays out these two fields.
+struct csystem_mmsghdr_layout {
+  struct msghdr msg_hdr;
+  unsigned int msg_len;
+};
+_Static_assert(sizeof(struct mmsghdr) == sizeof(struct csystem_mmsghdr_layout),
+               "CInterop.MMsgHdr must match struct mmsghdr");
+_Static_assert(offsetof(struct mmsghdr, msg_len) ==
+                   offsetof(struct csystem_mmsghdr_layout, msg_len),
+               "CInterop.MMsgHdr must match struct mmsghdr");
+
+extern int csystem_sendmmsg(int fd, void *msgvec, unsigned int vlen, int flags) {
+  return sendmmsg(fd, (struct mmsghdr *)msgvec, vlen, flags);
+}
+
+extern int csystem_recvmmsg(int fd, void *msgvec, unsigned int vlen, int flags, void *timeout) {
+  return recvmmsg(fd, (struct mmsghdr *)msgvec, vlen, flags, (struct timespec *)timeout);
+}
 #endif // __linux__
