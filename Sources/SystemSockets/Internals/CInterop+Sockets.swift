@@ -78,6 +78,11 @@ extension CInterop {
   /// The corresponding C type is `sockaddr_un`.
   public typealias SockAddrUn = sockaddr_un
 
+  /// Socket address storage, large enough and aligned for any address family.
+  ///
+  /// The corresponding C type is `sockaddr_storage`.
+  public typealias SockAddrStorage = sockaddr_storage
+
   /// I/O vector structure for scatter/gather I/O.
   ///
   /// The corresponding C type is `iovec`.
