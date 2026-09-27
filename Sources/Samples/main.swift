@@ -75,6 +75,7 @@ struct SystemSamples: ParsableCommand {
       // Darwin samples
       CopyFile.self,
       Sysctl.self,
+      MachTime.self,
     ])
 }
 
