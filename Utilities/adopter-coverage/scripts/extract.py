@@ -40,6 +40,7 @@ import subprocess
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import c_scan  # noqa: E402
+import darwin  # noqa: E402
 import deps  # noqa: E402
 import package  # noqa: E402
 import platforms  # noqa: E402
@@ -77,6 +78,15 @@ DISPATCH_TYPES = {"OS_dispatch_queue": "DispatchQueue", "OS_dispatch_group": "Di
                   "OS_dispatch_semaphore": "DispatchSemaphore", "OS_dispatch_source": "DispatchSource",
                   "OS_dispatch_object": "DispatchObject", "OS_dispatch_io": "DispatchIO",
                   "OS_dispatch_data": "DispatchData"}
+
+
+def load_json(path):
+    """A JSON file, gzipped or not."""
+    if path.endswith(".gz"):
+        import gzip
+        with gzip.open(path, "rt", encoding="utf-8") as f:
+            return json.load(f)
+    return json.load(open(path))
 
 
 def lowest_kind(mask):
@@ -472,8 +482,10 @@ class Lexicon:
         # Inside an extension of an OS type (`extension siginfo_t`), a name
         # declared nowhere else is one of that type's members, such as
         # Glibc's `_sifields` field; it folds into the type.
+        # (Not a type the Swift libraries declare too: `extension UInt32`
+        # extends Swift's, not MacTypes'.)
         if use_os_vocab and c["types"] and c["types"][0] in self.os_types \
-                and c["types"][0] not in self.own_top_any:
+                and c["types"][0] not in self.own_top_any and c["types"][0] not in self.lib_vocab:
             return c["types"][0], "lexical-member", None, shadowed, name
         # The standard library's underscored internals (`_fastPath`,
         # `_typeName`) aren't all in its vocabulary; C's underscored names
@@ -632,13 +644,24 @@ def main():
     ap.add_argument("--dump", required=True)
     ap.add_argument("--describe", required=True)
     ap.add_argument("--out", required=True)
+    ap.add_argument("--lexical", action="store_true",
+                    help="no index: the lexical rules decide every line, with --vocab's names for the SDK")
+    ap.add_argument("--vocab", help="for --lexical: the SDK's and Swift libraries' names (vocab.py's output)")
+    ap.add_argument("--dep-reexports", help="darwin.py reexports' output for the build's dependency checkouts")
+    ap.add_argument("--sdk-probe-cache", help="where to keep the SDK modules' re-export answers")
     args = ap.parse_args()
 
     pkg = package.load(args.package)
     SHIM_TARGETS.update(pkg["shim-targets"])
     platforms.SDK_PATH = args.sdk
     root = os.path.realpath(args.root)
-    index = json.load(open(args.index))
+    if args.lexical:
+        # No build: every line is the lexical rules', and the vocabulary of
+        # the SDK and the Swift libraries comes from another build's index.
+        index = {"refs": [], "decls": {}, "units": [], "depGraph": None,
+                 "vocab": load_json(args.vocab)["vocab"] if args.vocab else {}}
+    else:
+        index = load_json(args.index)
     describe = json.load(open(args.describe))
     dump = json.load(open(args.dump))
     targets, skipped = load_targets(dump, describe,
@@ -677,6 +700,9 @@ def main():
         c_scans[rel] = c_scan.scan_c_file(os.path.join(root, rel), rel, cdefines.get(t["name"], {}), c_values)
         c_scans[rel]["target"] = t["c99name"]
     swift_scan.resolve_member_filter(list(swift_scans.values()))
+    if args.lexical:
+        for sc in list(swift_scans.values()) + list(c_scans.values()):
+            sc["build"] = [False] * len(sc["build"])
 
     # A target that reaches `#error` on a platform doesn't build there, and
     # none builds on a platform the package doesn't support (`platforms`).
@@ -692,6 +718,12 @@ def main():
                     error_sites[sc["target"]].append(f"{rel}:{idx + 1} ({p})")
 
     lex = Lexicon(index, swift_scans, c_scans, own, dep_modules)
+    if args.lexical:
+        # What the index would have said: the package's C targets declare
+        # these (CNIOAtomics' catmc_ functions), so they're its own.
+        for sc in c_scans.values():
+            lex.own_vocab.update(sc["declared"])
+            lex.own_vocab.update(sc.get("localDeclared", ()))
     col = Collector(unsupported)
 
     # ------------------------------------------------- index references
@@ -874,6 +906,7 @@ def main():
                 index_written[(f, line)][base_name(name)] = key
 
     # ------------------------------------------------ lexical candidates
+    unresolved_dropped = collections.Counter()
     cross = {"swift": collections.Counter(), "c": collections.Counter()}
     misses, false_pos, un_false_pos = (collections.defaultdict(list) for _ in range(3))
 
@@ -935,6 +968,9 @@ def main():
                                 f"build skips: {rel}:{line}")
             for c in cs:
                 r = lex.swift(c, sc, False)
+                if r and args.lexical and r[1] == "lexical-unresolved":
+                    unresolved_dropped[r[0]] += 1
+                    continue
                 if r:
                     key, evidence, via, shadowed, member = r
                     col.add(key, "type" if member else lex.guess_kind(key, c["called"]), sc, rel, line, evidence,
@@ -971,6 +1007,9 @@ def main():
                 continue
             for c in cs:
                 r = lex.c(c, target)
+                if r and args.lexical and r[1] == "lexical-unresolved":
+                    unresolved_dropped[r[0]] += 1
+                    continue
                 if r:
                     key, evidence, via, _ = r
                     col.add(key, lex.guess_kind(key, c["called"]), sc, rel, line, evidence, c["called"])
@@ -1070,6 +1109,12 @@ def main():
     dependencies = deps.analyze(index, cls, lib_names, lambda m: cls.module_class(m, None)[0] == "os", FOUNDATION,
                                 pkg["through"])
 
+    # --------------------------------------------------- Darwin module
+    dep_reexports = load_json(args.dep_reexports) if args.dep_reexports else {}
+    darwin_out = darwin.analyze(root, swift_scans, out_interfaces, own, dep_modules, dep_reexports,
+                                lambda mods: darwin.probe(mods, args.sdk_probe_cache), FOUNDATION, SWIFT_LIBS,
+                                SYSTEM_MODULES)
+
     # A target the package doesn't support on a platform isn't news; the
     # report lists only the ones that reach `#error`.
     not_supported = set(PLATFORMS) - set(pkg["platforms"])
@@ -1103,6 +1148,9 @@ def main():
             "unresolvedFalsePositives": ranked(un_false_pos),
         },
         "files": files,
+        "darwin": darwin_out,
+        "extraction": "lexical" if args.lexical else "index",
+        "lexicalUnresolvedDropped": dict(unresolved_dropped.most_common()),
         "warnings": warnings,
     }
     json.dump(out, open(args.out, "w"), indent=1, default=lambda o: sorted(o) if isinstance(o, set) else str(o))
