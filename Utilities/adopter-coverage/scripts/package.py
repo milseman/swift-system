@@ -30,7 +30,8 @@ LIST_KEYS = {"shim-targets", "skip-targets", "build-targets", "build-flags", "un
              "false-flags", "wrapper-files", "twin-targets", "through"}
 # Lists of paths, which can hold spaces: one per line.
 LINE_KEYS = {"wrapper-files"}
-KEYS = LIST_KEYS | {"title", "name", "variable", "checkout", "in-all", "build-hint", "swift-exec-note"}
+KEYS = LIST_KEYS | {"title", "name", "variable", "checkout", "in-all", "build-hint", "swift-exec-note", "strict",
+                   "note"}
 
 
 def load(path):
@@ -64,6 +65,9 @@ def load(path):
     pkg.setdefault("name", pkg["title"])
     pkg.setdefault("variable", re.sub(r"\W", "_", key).upper())
     pkg.setdefault("in-all", "yes")
+    pkg.setdefault("strict", "yes")
+    if pkg["strict"] not in ("yes", "no") or pkg["in-all"] not in ("yes", "no"):
+        raise SystemExit(f"{path}: strict and in-all take yes or no")
     pkg["platforms"] = pkg["platforms"] or list(PLATFORMS)
     bad = [p for p in pkg["platforms"] if p not in PLATFORMS]
     if bad:
@@ -100,7 +104,8 @@ def main():
         return
     pkg = load(os.path.join(packages, sys.argv[3] + ".ini"))
     out = {"PKG_TITLE": pkg["title"], "PKG_NAME": pkg["name"], "PKG_VAR": pkg["variable"],
-           "PKG_CHECKOUT": pkg.get("checkout", ""), "PKG_BUILD_HINT": pkg.get("build-hint", "")}
+           "PKG_CHECKOUT": pkg.get("checkout", ""), "PKG_BUILD_HINT": pkg.get("build-hint", ""),
+           "PKG_STRICT": pkg["strict"]}
     for k, v in out.items():
         print(f"{k}={shlex.quote(v)}")
     for k, var in (("build-targets", "PKG_BUILD_TARGETS"), ("build-flags", "PKG_BUILD_FLAGS"),

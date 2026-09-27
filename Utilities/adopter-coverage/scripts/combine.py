@@ -55,12 +55,16 @@ def main():
 
     # ------------------------------------------------------------ gaps
     gaps = collections.defaultdict(dict)   # entry -> package -> gap
+    entry_of = {}
     for k, c in covs.items():
+        cov_by_id = {e["id"]: e for e in c["entries"]}
         for g in c["gaps"]:
             gaps[g["id"]][k] = g
+            entry_of.setdefault(g["id"], cov_by_id.get(g["id"], {}))
     rows = []
     for gid, per in gaps.items():
-        e = by_id.get(gid, {})
+        # The status is the package's: derived, or the mapping's.
+        e = entry_of.get(gid) or by_id.get(gid, {})
         rows.append({"id": gid, "category": e.get("category", ""), "status": e.get("status", ""),
                      "adopters": sorted(per), "lines": {k: g["total"] for k, g in per.items()},
                      "total": sum(g["total"] for g in per.values()),

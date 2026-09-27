@@ -105,6 +105,8 @@ log "scanning System ${SYSTEM_COMMIT:0:10}"
 mkdir -p "$WORK/system/src"
 git -C "$REPO" archive "$SYSTEM_COMMIT" -- Sources | tar -x -C "$WORK/system/src"
 python3 "$TOOL/../api-delta/scripts/scan_sources.py" "$WORK/system/src" "$STAGE/system-api.json"
+log "deriving what System ${SYSTEM_COMMIT:0:10} covers"
+python3 "$S/derive.py" "$WORK/system/src" "$STAGE/system-api.json" "$STAGE/derived.json"
 
 # ------------------------------------------------------------- packages
 export TOOL S PACKAGES REPO WORK STAGE MAPPING SYSTEM_REF SYSTEM_COMMIT
@@ -130,7 +132,7 @@ for name in ${done_packages[@]+"${done_packages[@]}"}; do
   rm -rf "${OUT:?}/$name"
   mv "$STAGE/$name" "$OUT/$name"
 done
-cp "$STAGE/system-api.json" "$OUT/system-api.json"
+cp "$STAGE/system-api.json" "$STAGE/derived.json" "$OUT/"
 python3 "$S/combine.py" --out "$OUT" --mapping "$MAPPING" --packages "$PACKAGES"
 
 for name in ${done_packages[@]+"${done_packages[@]}"}; do

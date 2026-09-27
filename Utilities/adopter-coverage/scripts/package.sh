@@ -122,8 +122,11 @@ EOF
 
 log "checking the mapping"
 status=0
+strict=()
+[ "$PKG_STRICT" = no ] || strict=(--strict)
 python3 "$S/check.py" --package "$PACKAGES/$name.ini" --interfaces "$O/interfaces.json" --system "$STAGE/system-api.json" \
-  --mapping "$MAPPING" --meta "$O/meta.json" --out "$O/coverage.json" || status=$?
+  --derived "$STAGE/derived.json" --mapping "$MAPPING" --meta "$O/meta.json" --out "$O/coverage.json" \
+  ${strict[@]+"${strict[@]}"} || status=$?
 [ "$status" -le 2 ] || fail "check.py failed for $name"
 
 log "report"
