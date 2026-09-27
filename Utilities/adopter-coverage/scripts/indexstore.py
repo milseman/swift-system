@@ -8,6 +8,8 @@ language and roles, for Swift and C alike. This script reads it with ctypes,
 so it needs nothing beyond the toolchain's libIndexStore.dylib.
 
 Output (JSON):
+  srcRoot, depsRoot  SRC_ROOT and DEPS_ROOT, which the absolute paths below
+          are under
   refs    every reference occurrence in a file under SRC_ROOT:
           [usr, name, language, kind, file, line, column, roles]
   decls   for each referenced USR, the module and file that declare it
@@ -294,6 +296,9 @@ def main():
                  "sites": {p: {str(k): n for k, n in sorted(v.items()) if nodes[k][0] == -1}
                            for p, v in sorted(dep_sites.items())}}
     json.dump({
+        # The absolute paths below are under these; extract.py relocates
+        # them when the dump is read for an export somewhere else.
+        "srcRoot": src_root, "depsRoot": deps_root,
         "refs": refs,
         "decls": {u: decls[u] for u in referenced if u in decls},
         "vocab": vocab,

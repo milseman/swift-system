@@ -74,9 +74,15 @@ private struct SocketMockTests {
       _ = try SocketDescriptor.pair(.local, .stream, protocol: .tcp)
       let calls = drain(mocking)
       #expect(calls.map(\.name) == ["socketpair", "socketpair"])
+      #if os(Linux) && canImport(Glibc)
+      // glibc declares the SOCK_* constants in an enum.
+      let (datagram, stream) = (CInt(SOCK_DGRAM.rawValue), CInt(SOCK_STREAM.rawValue))
+      #else
+      let (datagram, stream) = (SOCK_DGRAM, SOCK_STREAM)
+      #endif
       #expect(calls.map { Array($0.arguments.prefix(3)) } == [
-        [PF_LOCAL, SOCK_DGRAM, 0],
-        [PF_LOCAL, SOCK_STREAM, CInt(IPPROTO_TCP)],
+        [PF_LOCAL, datagram, 0],
+        [PF_LOCAL, stream, CInt(IPPROTO_TCP)],
       ])
     }
   }

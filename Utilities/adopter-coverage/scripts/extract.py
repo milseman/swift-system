@@ -40,6 +40,7 @@ import subprocess
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import c_scan  # noqa: E402
+import darwin  # noqa: E402
 import deps  # noqa: E402
 import package  # noqa: E402
 import platforms  # noqa: E402
@@ -72,11 +73,67 @@ ROLE_CALL = 1 << 5
 # union, typealias, function, variable), as a mask over indexstore kinds.
 TOP_LEVEL_KINDS = sum(1 << k for k in (1, 4, 5, 6, 7, 8, 10, 11, 12, 13))
 FIELD_KINDS = 1 << 14
+# What C code can name: macros, types, functions, variables and enumerators,
+# not Objective-C's methods and properties (NSObject's `class`).
+C_NAMEABLE_KINDS = sum(1 << k for k in (4, 5, 6, 7, 10, 11, 12, 13, 15))
 TYPE_KINDS = sum(1 << k for k in (5, 6, 7, 8, 10, 11))
 DISPATCH_TYPES = {"OS_dispatch_queue": "DispatchQueue", "OS_dispatch_group": "DispatchGroup",
                   "OS_dispatch_semaphore": "DispatchSemaphore", "OS_dispatch_source": "DispatchSource",
                   "OS_dispatch_object": "DispatchObject", "OS_dispatch_io": "DispatchIO",
                   "OS_dispatch_data": "DispatchData"}
+
+
+def load_json(path):
+    """A JSON file, gzipped or not."""
+    if path.endswith(".gz"):
+        import gzip
+        with gzip.open(path, "rt", encoding="utf-8") as f:
+            return json.load(f)
+    return json.load(open(path))
+
+
+CXX_EXTENSIONS = {".cpp", ".cc", ".cxx", ".c++", ".C", ".mm", ".hpp", ".hh"}
+CXX_KEYWORDS = set("""bool true false class namespace template typename public private protected virtual using new
+delete this nullptr operator friend explicit mutable constexpr noexcept decltype thread_local alignas alignof override
+final try catch throw wchar_t char8_t char16_t char32_t concept requires co_await co_yield co_return""".split())
+# The C library's macros from textual headers, which the index doesn't
+# record as references.
+LIBC_MACROS = {"assert", "errno", "offsetof", "va_start", "va_end", "va_arg", "va_copy", "alloca", "setjmp",
+               "longjmp", "static_assert"}
+# Directory names that confine a C or C++ file to some platforms.
+PLATFORM_DIRS = {"windows": {"Windows"}, "win32": {"Windows"},
+                 "unix": {"Darwin", "Linux", "Musl", "Android", "FreeBSD", "OpenBSD"},
+                 "linux": {"Linux", "Musl", "Android"}, "android": {"Android"},
+                 "darwin": {"Darwin"}, "apple": {"Darwin"}, "macos": {"Darwin"},
+                 "freebsd": {"FreeBSD"}, "openbsd": {"OpenBSD"}, "wasi": {"WASI"}}
+
+
+def platform_dirs(rel):
+    """The platforms a file's directories confine it to, or None."""
+    allowed = None
+    for part in rel.split("/")[:-1]:
+        plats = PLATFORM_DIRS.get(part.lower())
+        if plats is not None:
+            allowed = plats if allowed is None else allowed & plats
+    return allowed
+
+
+def relocate(index, root):
+    """An index dump read for an export other than the one it was built
+    from (a rerun from the results store) names the build's export in its
+    absolute paths: move them to this one, so the package's own
+    declarations are still its own."""
+    old = (index.get("srcRoot") or "").rstrip("/")
+    new = root.rstrip("/")
+    if not old or old == new:
+        return
+    for u, d in index["decls"].items():
+        if d[1] and (d[1] == old or d[1].startswith(old + "/")):
+            d[1] = new + d[1][len(old):]
+    for unit in index.get("units", []):
+        f = unit.get("mainFile") or ""
+        if f.startswith(old + "/"):
+            unit["mainFile"] = new + f[len(old):]
 
 
 def lowest_kind(mask):
@@ -320,7 +377,10 @@ class Lexicon:
         for usr, d in index["decls"].items():
             if not d[0] and usr.startswith("c:") and d[1]:
                 n = c_usr_parts(usr)[1]
-                if n and ".sdk/" in d[1]:
+                # libc++ is in the SDK, but it's the C++ language's library.
+                if n and "/include/c++/" in d[1]:
+                    by_place.setdefault(n, "<c++>")
+                elif n and ".sdk/" in d[1]:
                     by_place.setdefault(n, "<sdk>")
                 elif n and "/checkouts/" in d[1]:
                     by_place.setdefault(n, "<dependency>/" + d[1].split("/checkouts/")[1].split("/")[0])
@@ -340,13 +400,17 @@ class Lexicon:
         # top-level Swift overlay declarations.
         self.os_vocab, self.lib_vocab, self.lib_vocab_all, self.own_vocab = {}, set(), set(), set()
         self.os_c_vocab = set()   # C declarations only: what C code can name
+        # The same, from named OS modules only, less ncurses: C++ code names
+        # libc++'s move and find, which the index files under <sdk> with the
+        # SDK's other textual headers, and ncurses has a move() too.
+        self.os_c_vocab_named = set()
         for module, names in vocab.items():
             top = module.split(".")[0]
             if top.startswith("<dependency>/"):
                 top = next(iter(dep_modules), top)    # a dependency's header, read textually
             elif top == "<sdk>":
                 top = "Darwin"                        # an SDK header, read textually
-            if top in SWIFT_LIBS or top in FOUNDATION or top in dep_modules or top in SYSTEM_MODULES:
+            if top in SWIFT_LIBS or top in FOUNDATION or top in dep_modules or top in SYSTEM_MODULES or top == "<c++>":
                 for n, (kinds, _langs) in names.items():
                     # Foundation's Objective-C classes are named in Swift
                     # without their prefix: NSURLSessionTask is
@@ -367,8 +431,10 @@ class Lexicon:
                     if (langs & 1 and kinds & ~FIELD_KINDS) or kinds & (TOP_LEVEL_KINDS | 1 << 9):
                         prev = self.os_vocab.get(n)
                         self.os_vocab[n] = ((prev[0] if prev else 0) | kinds, prev[1] if prev else module)
-                    if langs & 1 and kinds & ~FIELD_KINDS:
+                    if langs & 1 and kinds & C_NAMEABLE_KINDS:
                         self.os_c_vocab.add(n)
+                        if module not in ("<sdk>", "") and not module.startswith("Darwin.ncurses"):
+                            self.os_c_vocab_named.add(n)
         # The package's own top-level names, with the platforms that compile
         # them: a Windows-only `typealias socklen_t` doesn't shadow Glibc's.
         self.own_top = {}
@@ -472,8 +538,10 @@ class Lexicon:
         # Inside an extension of an OS type (`extension siginfo_t`), a name
         # declared nowhere else is one of that type's members, such as
         # Glibc's `_sifields` field; it folds into the type.
+        # (Not a type the Swift libraries declare too: `extension UInt32`
+        # extends Swift's, not MacTypes'.)
         if use_os_vocab and c["types"] and c["types"][0] in self.os_types \
-                and c["types"][0] not in self.own_top_any:
+                and c["types"][0] not in self.own_top_any and c["types"][0] not in self.lib_vocab:
             return c["types"][0], "lexical-member", None, shadowed, name
         # The standard library's underscored internals (`_fastPath`,
         # `_typeName`) aren't all in its vocabulary; C's underscored names
@@ -632,13 +700,25 @@ def main():
     ap.add_argument("--dump", required=True)
     ap.add_argument("--describe", required=True)
     ap.add_argument("--out", required=True)
+    ap.add_argument("--lexical", action="store_true",
+                    help="no index: the lexical rules decide every line, with --vocab's names for the SDK")
+    ap.add_argument("--vocab", help="for --lexical: the SDK's and Swift libraries' names (vocab.py's output)")
+    ap.add_argument("--dep-reexports", help="darwin.py reexports' output for the build's dependency checkouts")
+    ap.add_argument("--sdk-probe-cache", help="where to keep the SDK modules' re-export answers")
     args = ap.parse_args()
 
     pkg = package.load(args.package)
     SHIM_TARGETS.update(pkg["shim-targets"])
     platforms.SDK_PATH = args.sdk
     root = os.path.realpath(args.root)
-    index = json.load(open(args.index))
+    if args.lexical:
+        # No build: every line is the lexical rules', and the vocabulary of
+        # the SDK and the Swift libraries comes from another build's index.
+        index = {"refs": [], "decls": {}, "units": [], "depGraph": None,
+                 "vocab": load_json(args.vocab)["vocab"] if args.vocab else {}}
+    else:
+        index = load_json(args.index)
+        relocate(index, root)
     describe = json.load(open(args.describe))
     dump = json.load(open(args.dump))
     targets, skipped = load_targets(dump, describe,
@@ -677,6 +757,25 @@ def main():
         c_scans[rel] = c_scan.scan_c_file(os.path.join(root, rel), rel, cdefines.get(t["name"], {}), c_values)
         c_scans[rel]["target"] = t["c99name"]
     swift_scan.resolve_member_filter(list(swift_scans.values()))
+    if args.lexical:
+        for sc in list(swift_scans.values()) + list(c_scans.values()):
+            sc["build"] = [False] * len(sc["build"])
+    # A C or C++ file in a directory named for a platform (LLVM's Windows/
+    # and Unix/, llbuild's and indexstore-db's copies of them) is compiled
+    # only there, whatever its #if lines say; WindowsSupport.h has none. A
+    # file for other platforms than Darwin isn't in the Darwin build.
+    dir_excluded = {}
+    for rel, sc in c_scans.items():
+        allowed = platform_dirs(rel)
+        if allowed is not None:
+            dir_excluded[rel] = tuple(sorted(set(PLATFORMS) - allowed))
+            if "Darwin" not in allowed:
+                sc["build"] = [False] * len(sc["build"])
+    # C++ targets: the C scanner can't see C++'s declarations (classes,
+    # namespaces, members, locals), so a name it finds declared nowhere
+    # isn't presumed to be the C library's there.
+    cxx_targets = {t["c99name"] for t in targets
+                   if any(os.path.splitext(x)[1] in CXX_EXTENSIONS for x in t.get("sources", []))}
 
     # A target that reaches `#error` on a platform doesn't build there, and
     # none builds on a platform the package doesn't support (`platforms`).
@@ -692,6 +791,12 @@ def main():
                     error_sites[sc["target"]].append(f"{rel}:{idx + 1} ({p})")
 
     lex = Lexicon(index, swift_scans, c_scans, own, dep_modules)
+    if args.lexical:
+        # What the index would have said: the package's C targets declare
+        # these (CNIOAtomics' catmc_ functions), so they're its own.
+        for sc in c_scans.values():
+            lex.own_vocab.update(sc["declared"])
+            lex.own_vocab.update(sc.get("localDeclared", ()))
     col = Collector(unsupported)
 
     # ------------------------------------------------- index references
@@ -751,6 +856,11 @@ def main():
     excluded = collections.Counter()
     warnings = []
     seen = set()
+    index_any = collections.defaultdict(set)          # (file, line) -> every name the index referenced there
+    for usr, name, lang, kind, f, line, colm, roles in refs:
+        index_any[(f, line)].add(base_name(name))
+        if usr.startswith("c:"):
+            index_any[(f, line)].add(c_usr_parts(usr)[1])
     for usr, name, lang, kind, f, line, colm, roles in refs:
         target = cls.target_of(f)
         if target not in lib_names:
@@ -799,6 +909,11 @@ def main():
                 (index_hits_members if member else index_hits)[(f, line)].add(key)
                 if not member and base_name(name) != key:
                     index_written[(f, line)][base_name(name)] = key
+            continue
+        # C++'s standard library ships in the SDK (usr/include/c++), but it's
+        # the language's, not the OS's.
+        if "/include/c++/" in (d[1] or "") or usr.startswith(("c:@N@std@", "c:@N@__1@")):
+            excluded["C++ standard library"] += 1
             continue
         mc, mod = cls.module_class(d[0], d[1])
         # A name that isn't written on the line is an implicit reference:
@@ -874,6 +989,7 @@ def main():
                 index_written[(f, line)][base_name(name)] = key
 
     # ------------------------------------------------ lexical candidates
+    unresolved_dropped = collections.Counter()
     cross = {"swift": collections.Counter(), "c": collections.Counter()}
     misses, false_pos, un_false_pos = (collections.defaultdict(list) for _ in range(3))
 
@@ -935,6 +1051,9 @@ def main():
                                 f"build skips: {rel}:{line}")
             for c in cs:
                 r = lex.swift(c, sc, False)
+                if r and args.lexical and r[1] == "lexical-unresolved":
+                    unresolved_dropped[r[0]] += 1
+                    continue
                 if r:
                     key, evidence, via, shadowed, member = r
                     col.add(key, "type" if member else lex.guess_kind(key, c["called"]), sc, rel, line, evidence,
@@ -963,17 +1082,37 @@ def main():
                 compare("c", rel, line, keys, unresolved)
                 # The index doesn't record every macro use (assert, from the
                 # textual <assert.h>, is missing). Add calls it didn't see.
+                # In C++, where a declaration looks like a call to the C
+                # scanner, the index references std::string's append, and a
+                # template's dependent call (`Size(n)`) isn't resolved, the
+                # index is the word except for the C library's textual
+                # macros.
                 seen_here = index_hits.get((rel, line), set()) | index_hits_members.get((rel, line), set())
+                cxx = target in cxx_targets
+                if cxx:
+                    seen_here = seen_here | index_any.get((rel, line), set())
                 for c in cs:
                     r = lex.c(c, target)
-                    if r and c["called"] and r[0] not in seen_here and not r[0].startswith("__builtin_"):
+                    if r and c["called"] and r[0] not in seen_here and not r[0].startswith("__builtin_") \
+                            and (not cxx or r[0] in LIBC_MACROS):
                         col.add(r[0], "macro", sc, rel, line, "lexical-unindexed", True)
                 continue
             for c in cs:
                 r = lex.c(c, target)
+                if r and r[1] == "lexical-unresolved" and (args.lexical or target in cxx_targets):
+                    unresolved_dropped[r[0]] += 1
+                    continue
+                # A C++ identifier that some SDK header also declares (a
+                # parameter named `other`) is the C library's only when it
+                # looks like one: called, a macro's spelling, or a _t type.
+                if r and target in cxx_targets and r[1] == "lexical-darwin-name" and (
+                        r[0] in CXX_KEYWORDS or r[0] not in lex.os_c_vocab_named
+                        or not c["called"] and not re.fullmatch(r"_*[A-Z][A-Z0-9_]+|\w+_t|FILE|DIR", r[0])):
+                    continue
                 if r:
                     key, evidence, via, _ = r
-                    col.add(key, lex.guess_kind(key, c["called"]), sc, rel, line, evidence, c["called"])
+                    col.add(key, lex.guess_kind(key, c["called"]), sc, rel, line, evidence, c["called"],
+                            exclude_platforms=dir_excluded.get(rel, ()))
 
     # ------------------------------------------------- shim definitions
     # What each shim definition wraps (the other interfaces used inside
@@ -1070,6 +1209,12 @@ def main():
     dependencies = deps.analyze(index, cls, lib_names, lambda m: cls.module_class(m, None)[0] == "os", FOUNDATION,
                                 pkg["through"])
 
+    # --------------------------------------------------- Darwin module
+    dep_reexports = load_json(args.dep_reexports) if args.dep_reexports else {}
+    darwin_out = darwin.analyze(root, swift_scans, out_interfaces, own, dep_modules, dep_reexports,
+                                lambda mods: darwin.probe(mods, args.sdk_probe_cache), FOUNDATION, SWIFT_LIBS,
+                                SYSTEM_MODULES)
+
     # A target the package doesn't support on a platform isn't news; the
     # report lists only the ones that reach `#error`.
     not_supported = set(PLATFORMS) - set(pkg["platforms"])
@@ -1103,6 +1248,9 @@ def main():
             "unresolvedFalsePositives": ranked(un_false_pos),
         },
         "files": files,
+        "darwin": darwin_out,
+        "extraction": "lexical" if args.lexical else "index",
+        "lexicalUnresolvedDropped": dict(unresolved_dropped.most_common()),
         "warnings": warnings,
     }
     json.dump(out, open(args.out, "w"), indent=1, default=lambda o: sorted(o) if isinstance(o, set) else str(o))

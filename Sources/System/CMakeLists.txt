@@ -66,6 +66,10 @@ target_sources(SystemPackage PRIVATE
   Directories/DirectoryStream.swift
   Directories/DirectoryWalk.swift)
 target_sources(SystemPackage PRIVATE
+  Environment/ProcessEnvironment.swift)
+target_sources(SystemPackage PRIVATE
+  Errno/ErrnoAccess.swift)
+target_sources(SystemPackage PRIVATE
   Events/EventCounter.swift
   Events/EventPoll.swift
   Events/IntervalTimer.swift
@@ -114,12 +118,17 @@ target_sources(SystemPackage PRIVATE
   Internals/Backcompat.swift
   Internals/CInterop.swift
   Internals/Constants+Events.swift
+  Internals/Constants+Time.swift
   Internals/Constants.swift
   Internals/Exports.swift
   Internals/Mocking.swift
   Internals/RawBuffer.swift
   Internals/Syscalls+Directories.swift
+  Internals/Syscalls+Environment.swift
   Internals/Syscalls+Events.swift
+  Internals/Syscalls+SystemIdentity.swift
+  Internals/Syscalls+Time.swift
+  Internals/Syscalls+VectoredIO.swift
   Internals/Syscalls.swift
   Internals/WindowsSyscallAdapters.swift)
 target_sources(SystemPackage PRIVATE
@@ -133,10 +142,30 @@ target_sources(SystemPackage PRIVATE
   Internals/Syscalls+MachTime.swift
   MachTime/MachTime.swift)
 target_sources(SystemPackage PRIVATE
+  Internals/Constants+Processes.swift
+  Internals/Syscalls+Processes.swift
+  Processes/ChildProcess.swift
+  Processes/CInterop+Processes.swift
+  Processes/CloseDescriptors.swift
+  Processes/Credentials.swift
+  Processes/ExitStatus.swift
+  Processes/ProcessDescriptor.swift
+  Processes/ProcessGroups.swift
+  Processes/ProcessWait.swift
+  Processes/ResourceLimits.swift
+  Processes/Signal.swift
+  Processes/SignalAction.swift
+  Processes/SignalDescriptor.swift
+  Processes/SignalSending.swift
+  Processes/SignalSet.swift
+  Processes/Spawn.swift)
+target_sources(SystemPackage PRIVATE
   Internals/Constants+SystemControl.swift
   Internals/Syscalls+SystemControl.swift
   SystemControl/SystemControl.swift
   SystemControl/SystemControlNames.swift)
+target_sources(SystemPackage PRIVATE
+  SystemIdentity/SystemIdentity.swift)
 target_sources(SystemPackage PRIVATE
   Internals/Constants+SystemPaths.swift
   Internals/Syscalls+SystemPaths.swift
@@ -166,6 +195,11 @@ target_sources(SystemPackage PRIVATE
   Threads/PThreadNames.swift
   Threads/PThreadReadWriteLock.swift
   Threads/PThreadScheduling.swift)
+target_sources(SystemPackage PRIVATE
+  Time/ClockID.swift
+  Time/Sleep.swift)
+target_sources(SystemPackage PRIVATE
+  VectoredIO/VectoredIO.swift)
 target_link_libraries(SystemPackage PUBLIC
   CSystem)
 

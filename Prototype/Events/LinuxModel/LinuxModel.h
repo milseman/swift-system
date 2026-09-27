@@ -1,7 +1,7 @@
 // A model of the C declarations that System's Linux event notification code
 // calls, for Prototype/Events/check-linux.sh to typecheck that code on macOS.
 // It declares only what the code uses. The function types follow glibc 2.35's
-// <sys/epoll.h>, <sys/eventfd.h>, and <sys/timerfd.h>. With MODEL_BIONIC, the
+// <sys/epoll.h> and <sys/eventfd.h>, and CSystemLinux.h's timerfd shims. With MODEL_BIONIC, the
 // pointers carry Bionic's nullability, which changes how Swift imports them.
 // The constants aren't modeled: System spells out their values.
 
@@ -46,8 +46,7 @@ struct itimerspec {
   struct timespec it_value;
 };
 
-int timerfd_create(int clockid, int flags);
-int timerfd_settime(
-  int fd, int flags, const struct itimerspec *MODEL_NONNULL new_value,
-  struct itimerspec *MODEL_NULLABLE old_value);
-int timerfd_gettime(int fd, struct itimerspec *MODEL_NONNULL curr_value);
+// CSystemLinux.h's timerfd shims, which take the itimerspec untyped.
+int csystem_timerfd_create(int clockid, int flags);
+int csystem_timerfd_settime(int fd, int flags, const void *new_value, void *old_value);
+int csystem_timerfd_gettime(int fd, void *curr_value);

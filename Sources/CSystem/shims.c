@@ -137,6 +137,31 @@ extern int csystem_ptsname_r(int fd, char *buffer, size_t length) {
 #endif // __linux__
 
 #ifdef __linux__
+#include <sys/stat.h>
+
+_Static_assert(CSYSTEM_UTIME_NOW == UTIME_NOW, "CSYSTEM_UTIME_NOW");
+_Static_assert(CSYSTEM_UTIME_OMIT == UTIME_OMIT, "CSYSTEM_UTIME_OMIT");
+#endif // __linux__
+
+#ifdef __linux__
+#include <sys/timerfd.h>
+
+extern int csystem_timerfd_create(int clockid, int flags) {
+  return timerfd_create(clockid, flags);
+}
+
+extern int csystem_timerfd_settime(int fd, int flags,
+                                   const void *new_value, void *old_value) {
+  return timerfd_settime(fd, flags, (const struct itimerspec *)new_value,
+                         (struct itimerspec *)old_value);
+}
+
+extern int csystem_timerfd_gettime(int fd, void *curr_value) {
+  return timerfd_gettime(fd, (struct itimerspec *)curr_value);
+}
+#endif // __linux__
+
+#ifdef __linux__
 #include <termios.h>
 
 extern int csystem_tcgetsid(int fd) {
@@ -180,4 +205,217 @@ extern int csystem_pthread_getaffinity_np(pthread_t thread, size_t size, void *m
   return pthread_getaffinity_np(thread, size, (cpu_set_t *)mask);
 }
 #endif // !__ANDROID__
+#endif // __linux__
+
+#ifdef __ANDROID__
+#include <sys/uio.h>
+
+extern ssize_t csystem_preadv(int fd, const void *iov, int iovcnt, off_t offset) {
+  #if __ANDROID_API__ >= 24
+  return preadv(fd, (const struct iovec *)iov, iovcnt, offset);
+  #else
+  errno = ENOSYS;
+  return -1;
+  #endif
+}
+
+extern ssize_t csystem_pwritev(int fd, const void *iov, int iovcnt, off_t offset) {
+  #if __ANDROID_API__ >= 24
+  return pwritev(fd, (const struct iovec *)iov, iovcnt, offset);
+  #else
+  errno = ENOSYS;
+  return -1;
+  #endif
+}
+#endif // __ANDROID__
+
+#if !defined(_WIN32) && !defined(__wasi__)
+#if defined(__APPLE__)
+#include <crt_externs.h>
+#endif
+
+extern char **csystem_environ(void) {
+  #if defined(__APPLE__)
+  return *_NSGetEnviron();
+  #else
+  extern char **environ;
+  return environ;
+  #endif
+}
+#endif // !defined(_WIN32) && !defined(__wasi__)
+
+// MARK: - Processes and signals
+
+#if !defined(_WIN32) && !defined(__wasi__)
+#include <signal.h>
+#include <spawn.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#if defined(__APPLE__)
+#include <Availability.h>
+#include <TargetConditionals.h>
+#endif
+
+extern int csystem_wifexited(int status) { return WIFEXITED(status); }
+extern int csystem_wexitstatus(int status) { return WEXITSTATUS(status); }
+extern int csystem_wifsignaled(int status) { return WIFSIGNALED(status); }
+extern int csystem_wtermsig(int status) { return WTERMSIG(status); }
+extern int csystem_wcoredump(int status) {
+  #ifdef WCOREDUMP
+  return WCOREDUMP(status) != 0;
+  #else
+  return 0;
+  #endif
+}
+extern int csystem_wifstopped(int status) { return WIFSTOPPED(status); }
+extern int csystem_wstopsig(int status) { return WSTOPSIG(status); }
+extern int csystem_wifcontinued(int status) { return WIFCONTINUED(status); }
+
+extern int csystem_siginfo_pid(const void *info) {
+  return ((const siginfo_t *)info)->si_pid;
+}
+
+extern unsigned int csystem_siginfo_uid(const void *info) {
+  return ((const siginfo_t *)info)->si_uid;
+}
+
+extern int csystem_siginfo_status(const void *info) {
+  return ((const siginfo_t *)info)->si_status;
+}
+
+extern void *csystem_siginfo_addr(const void *info) {
+  return ((const siginfo_t *)info)->si_addr;
+}
+
+// POSIX requires a function pointer to survive a round trip through void *,
+// as dlsym's does.
+extern void *csystem_sigaction_handler(const void *action) {
+  return (void *)((const struct sigaction *)action)->sa_handler;
+}
+
+extern void csystem_sigaction_set_handler(void *action, void *handler) {
+  ((struct sigaction *)action)->sa_handler = (void (*)(int))handler;
+}
+
+// Darwin has the _np forms from macOS 10.15, and the POSIX forms from macOS
+// 26 (in SDKs that declare them), on macOS only. glibc has the _np forms from 2.29, Bionic from API
+// level 34, and Musl and FreeBSD have them; OpenBSD has neither.
+#if defined(__APPLE__)
+#if TARGET_OS_OSX
+#define CSYSTEM_HAVE_SPAWN_CHDIR_NP 1
+#endif
+#elif defined(__GLIBC__)
+#if __GLIBC_PREREQ(2, 29)
+#define CSYSTEM_HAVE_SPAWN_CHDIR_NP 1
+#endif
+#elif defined(__ANDROID__)
+#if __ANDROID_API__ >= 34
+#define CSYSTEM_HAVE_SPAWN_CHDIR_NP 1
+#endif
+#elif defined(__linux__) || defined(__FreeBSD__)
+#define CSYSTEM_HAVE_SPAWN_CHDIR_NP 1
+#endif
+
+#if defined(__APPLE__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#endif
+
+extern int csystem_posix_spawn_file_actions_addchdir(void *actions, const char *path) {
+  #if defined(__APPLE__) && defined(CSYSTEM_HAVE_SPAWN_CHDIR_NP)
+  #if defined(__MAC_26_0)
+  if (__builtin_available(macOS 26.0, *)) {
+    return posix_spawn_file_actions_addchdir(actions, path);
+  }
+  #endif
+  if (__builtin_available(macOS 10.15, *)) {
+    return posix_spawn_file_actions_addchdir_np(actions, path);
+  }
+  return ENOSYS;
+  #elif defined(CSYSTEM_HAVE_SPAWN_CHDIR_NP)
+  return posix_spawn_file_actions_addchdir_np(actions, path);
+  #else
+  return ENOSYS;
+  #endif
+}
+
+extern int csystem_posix_spawn_file_actions_addfchdir(void *actions, int fd) {
+  #if defined(__APPLE__) && defined(CSYSTEM_HAVE_SPAWN_CHDIR_NP)
+  #if defined(__MAC_26_0)
+  if (__builtin_available(macOS 26.0, *)) {
+    return posix_spawn_file_actions_addfchdir(actions, fd);
+  }
+  #endif
+  if (__builtin_available(macOS 10.15, *)) {
+    return posix_spawn_file_actions_addfchdir_np(actions, fd);
+  }
+  return ENOSYS;
+  #elif defined(CSYSTEM_HAVE_SPAWN_CHDIR_NP)
+  return posix_spawn_file_actions_addfchdir_np(actions, fd);
+  #else
+  return ENOSYS;
+  #endif
+}
+
+#if defined(__APPLE__)
+#pragma clang diagnostic pop
+#endif
+
+// glibc has addclosefrom_np from 2.34, and FreeBSD from 13.1.
+#if defined(__GLIBC__)
+#if __GLIBC_PREREQ(2, 34)
+#define CSYSTEM_HAVE_SPAWN_CLOSEFROM_NP 1
+#endif
+#elif defined(__FreeBSD__)
+#include <sys/param.h>
+#if __FreeBSD_version >= 1301000
+#define CSYSTEM_HAVE_SPAWN_CLOSEFROM_NP 1
+#endif
+#endif
+
+extern int csystem_posix_spawn_file_actions_addclosefrom(void *actions, int from) {
+  #if defined(CSYSTEM_HAVE_SPAWN_CLOSEFROM_NP)
+  return posix_spawn_file_actions_addclosefrom_np(actions, from);
+  #else
+  (void)actions;
+  (void)from;
+  return ENOSYS;
+  #endif
+}
+#endif // !defined(_WIN32) && !defined(__wasi__)
+
+#ifdef __linux__
+#include <sys/signalfd.h>
+#include <sys/syscall.h>
+
+// These system calls have the same numbers on every architecture that Swift
+// supports, and older kernel headers lack them.
+#ifndef SYS_pidfd_send_signal
+#define SYS_pidfd_send_signal 424
+#endif
+#ifndef SYS_pidfd_open
+#define SYS_pidfd_open 434
+#endif
+#ifndef SYS_close_range
+#define SYS_close_range 436
+#endif
+
+_Static_assert(sizeof(struct csystem_signalfd_siginfo) == sizeof(struct signalfd_siginfo),
+               "csystem_signalfd_siginfo must match signalfd_siginfo");
+
+extern int csystem_pidfd_open(int pid, unsigned int flags) {
+  return (int)syscall(SYS_pidfd_open, pid, flags);
+}
+
+extern int csystem_pidfd_send_signal(int pidfd, int sig, void *info, unsigned int flags) {
+  return (int)syscall(SYS_pidfd_send_signal, pidfd, sig, info, flags);
+}
+
+extern int csystem_close_range(unsigned int first, unsigned int last, unsigned int flags) {
+  return (int)syscall(SYS_close_range, first, last, flags);
+}
+
+extern int csystem_signalfd(int fd, const void *mask, int flags) {
+  return signalfd(fd, (const sigset_t *)mask, flags);
+}
 #endif // __linux__

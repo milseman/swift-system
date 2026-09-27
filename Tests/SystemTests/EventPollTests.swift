@@ -29,6 +29,11 @@ import Android
 #else
 @testable import System
 #endif
+// On glibc, SystemPackage's module refers to CSystem's copy of sigset_t,
+// which EventPoll's wait(into:timeout:signalMask:retryOnInterrupt:) takes,
+// so a client that builds a mask can't see its initializer without
+// importing CSystem. The tests work around that; clients can't.
+import CSystem
 
 @available(System 199, *)
 final class EventPollTests: XCTestCase {

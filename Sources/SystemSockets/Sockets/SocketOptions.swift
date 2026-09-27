@@ -44,25 +44,25 @@ extension SocketDescriptor {
     ///
     /// The corresponding C constant is `IPPROTO_IP`.
     @_alwaysEmitIntoClient
-    public static var ip: OptionLevel { OptionLevel(rawValue: IPPROTO_IP) }
+    public static var ip: OptionLevel { OptionLevel(rawValue: CInt(IPPROTO_IP)) }
 
     /// IPv6 protocol options.
     ///
     /// The corresponding C constant is `IPPROTO_IPV6`.
     @_alwaysEmitIntoClient
-    public static var ipv6: OptionLevel { OptionLevel(rawValue: IPPROTO_IPV6) }
+    public static var ipv6: OptionLevel { OptionLevel(rawValue: CInt(IPPROTO_IPV6)) }
 
     /// TCP protocol options.
     ///
     /// The corresponding C constant is `IPPROTO_TCP`.
     @_alwaysEmitIntoClient
-    public static var tcp: OptionLevel { OptionLevel(rawValue: IPPROTO_TCP) }
+    public static var tcp: OptionLevel { OptionLevel(rawValue: CInt(IPPROTO_TCP)) }
 
     /// UDP protocol options.
     ///
     /// The corresponding C constant is `IPPROTO_UDP`.
     @_alwaysEmitIntoClient
-    public static var udp: OptionLevel { OptionLevel(rawValue: IPPROTO_UDP) }
+    public static var udp: OptionLevel { OptionLevel(rawValue: CInt(IPPROTO_UDP)) }
   }
 }
 

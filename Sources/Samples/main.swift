@@ -33,6 +33,12 @@ struct SystemSamples: ParsableCommand {
       // Event notification samples
       EventsLoop.self,
       EventsPoll.self,
+      // Process and signal samples
+      ProcessExec.self,
+      ProcessLimits.self,
+      ProcessPipeline.self,
+      ProcessRun.self,
+      ProcessSignals.self,
       // Terminal samples
       PasswordReader.self,
       TerminalSize.self,
@@ -72,6 +78,12 @@ struct SystemSamples: ParsableCommand {
       ThreadsPool.self,
       ThreadsLocal.self,
       ThreadsInfo.self,
+      // Portable POSIX samples
+      Vectored.self,
+      Env.self,
+      Clocks.self,
+      ErrnoSample.self,
+      Uname.self,
       // Darwin samples
       CopyFile.self,
       Sysctl.self,
