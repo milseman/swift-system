@@ -38,9 +38,6 @@ internal var _PROC_PPID_ONLY: UInt32 { UInt32(PROC_PPID_ONLY) }
 // MARK: proc_pidinfo flavors
 
 @_alwaysEmitIntoClient
-internal var _PROC_PIDLISTFDS: CInt { PROC_PIDLISTFDS }
-
-@_alwaysEmitIntoClient
 internal var _PROC_PIDTBSDINFO: CInt { PROC_PIDTBSDINFO }
 
 @_alwaysEmitIntoClient

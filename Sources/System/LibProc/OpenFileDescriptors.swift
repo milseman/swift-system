@@ -74,7 +74,7 @@ extension ProcessID {
       let filled = entries.withUnsafeMutableBytes { buffer in
         Int(
           system_proc_pidinfo(
-            rawValue, _PROC_PIDLISTFDS, 0, buffer.baseAddress!, CInt(buffer.count)))
+            rawValue, PROC_PIDLISTFDS, 0, buffer.baseAddress!, CInt(buffer.count)))
       }
       if filled == 0 && system_errno != 0 { return .failure(.current) }
       let count = filled / stride
