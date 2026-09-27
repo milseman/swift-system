@@ -14,6 +14,13 @@ extern int csystem_posix_pipe2(int fildes[2], int flag);
 extern int csystem_posix_dup3(int fildes, int fildes2, int flag);
 
 #if !defined(_WIN32) && !defined(__wasi__)
+// The process's environ array. Darwin's is _NSGetEnviron's, since a library
+// can't link to environ there, and not every other C library declares
+// environ without feature macros.
+extern char **csystem_environ(void);
+#endif
+
+#if !defined(_WIN32) && !defined(__wasi__)
 // Processes and signals, for Sources/System/Processes; see shims.c. The C
 // types are untyped here, so that this header needn't include <signal.h> or
 // <spawn.h>: members of a C type defined through a CSystem header can be

@@ -1522,15 +1522,40 @@ extension Errno {
 
 @available(System 0.0.1, *)
 extension Errno {
-  // TODO: We want to provide safe access to `errno`, but we need a
-  // release-barrier to do so.
+  // PROTOTYPE: public access to errno, which needs a release barrier to be
+  // safe. Whether to offer it is still open; see Prototype/PosixMore.
+  // It's emitted into clients, and so it has no symbol, which lets it keep
+  // this extension's availability, as System's own uses of it need.
 
-  /// The current error value, set by system calls if an error occurs.
+  /// The calling thread's error value, which C functions set when they fail.
+  ///
+  /// - Important: The value is reliable only when it's read immediately
+  ///   after the C call that set it, because Swift can run other code
+  ///   between the call and the read: releasing a value can run
+  ///   a deinitializer that calls `free` or `close`, which changes `errno`.
+  ///   Instead of making a C call and then reading this property,
+  ///   make the call inside ``check(retryOnInterrupt:_:)``,
+  ///   which reads `errno` as soon as the call returns.
+  ///
+  /// Most C functions leave `errno` alone when they succeed, so its value
+  /// means something only after a call that reported a failure.
+  /// A function that can't report failure through its result,
+  /// such as `readdir`, which returns `NULL` both at the end
+  /// of the directory and on an error,
+  /// needs `errno` cleared first, which setting this property does:
+  ///
+  ///     Errno.current = Errno(rawValue: 0)
+  ///     let entry = readdir(directory)
+  ///     if entry == nil && Errno.current.rawValue != 0 { throw Errno.current }
+  ///
+  /// ``checkOptional(retryOnInterrupt:_:)`` does both steps.
+  /// Each thread has its own `errno`.
   ///
   /// The corresponding C global variable is `errno`.
-  internal static var current: Errno {
-    get { Errno(rawValue: system_errno) }
-    set { system_errno = newValue.rawValue }
+  @_alwaysEmitIntoClient
+  public static var current: Errno {
+    get { Errno(rawValue: _errnoValue) }
+    set { _errnoValue = newValue.rawValue }
   }
 }
 

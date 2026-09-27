@@ -78,6 +78,12 @@ struct SystemSamples: ParsableCommand {
       ThreadsPool.self,
       ThreadsLocal.self,
       ThreadsInfo.self,
+      // Portable POSIX samples
+      Vectored.self,
+      Env.self,
+      Clocks.self,
+      ErrnoSample.self,
+      Uname.self,
     ])
 }
 

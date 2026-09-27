@@ -182,6 +182,43 @@ extern int csystem_pthread_getaffinity_np(pthread_t thread, size_t size, void *m
 #endif // !__ANDROID__
 #endif // __linux__
 
+#ifdef __ANDROID__
+#include <sys/uio.h>
+
+extern ssize_t csystem_preadv(int fd, const void *iov, int iovcnt, off_t offset) {
+  #if __ANDROID_API__ >= 24
+  return preadv(fd, (const struct iovec *)iov, iovcnt, offset);
+  #else
+  errno = ENOSYS;
+  return -1;
+  #endif
+}
+
+extern ssize_t csystem_pwritev(int fd, const void *iov, int iovcnt, off_t offset) {
+  #if __ANDROID_API__ >= 24
+  return pwritev(fd, (const struct iovec *)iov, iovcnt, offset);
+  #else
+  errno = ENOSYS;
+  return -1;
+  #endif
+}
+#endif // __ANDROID__
+
+#if !defined(_WIN32) && !defined(__wasi__)
+#if defined(__APPLE__)
+#include <crt_externs.h>
+#endif
+
+extern char **csystem_environ(void) {
+  #if defined(__APPLE__)
+  return *_NSGetEnviron();
+  #else
+  extern char **environ;
+  return environ;
+  #endif
+}
+#endif // !defined(_WIN32) && !defined(__wasi__)
+
 // MARK: - Processes and signals
 
 #if !defined(_WIN32) && !defined(__wasi__)
