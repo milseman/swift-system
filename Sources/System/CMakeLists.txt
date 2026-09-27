@@ -105,6 +105,7 @@ target_sources(SystemPackage PRIVATE
   Internals/CInterop.swift
   Internals/Constants+DynamicLoading.swift
   Internals/Constants+Events.swift
+  Internals/Constants+MemoryMapping.swift
   Internals/Constants+Time.swift
   Internals/Constants.swift
   Internals/Exports.swift
@@ -114,12 +115,15 @@ target_sources(SystemPackage PRIVATE
   Internals/Syscalls+DynamicLoading.swift
   Internals/Syscalls+Environment.swift
   Internals/Syscalls+Events.swift
+  Internals/Syscalls+MemoryMapping.swift
   Internals/Syscalls+PathsAndFiles.swift
   Internals/Syscalls+SystemIdentity.swift
   Internals/Syscalls+Time.swift
   Internals/Syscalls+VectoredIO.swift
   Internals/Syscalls.swift
   Internals/WindowsSyscallAdapters.swift)
+target_sources(SystemPackage PRIVATE
+  MemoryMapping/MemoryMapping.swift)
 target_sources(SystemPackage PRIVATE
   PathsAndFiles/FilePath+Resolution.swift
   PathsAndFiles/ProcessDefaults.swift

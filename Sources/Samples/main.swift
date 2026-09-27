@@ -80,6 +80,7 @@ struct SystemSamples: ParsableCommand {
       Uname.self,
       MkTemp.self,
       DLSym.self,
+      MMap.self,
     ])
 }
 

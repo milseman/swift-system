@@ -511,3 +511,69 @@ Adopters:
 Unverified off Darwin: the `RTLD_NOLOAD` and `RTLD_NODELETE` values on
 FreeBSD and Bionic, OpenBSD's lack of them, and Android's linking of
 `libdl`.
+
+## 7. Memory mapping
+
+`Sources/System/MemoryMapping/MemoryMapping.swift`,
+`Sources/System/Internals/Syscalls+MemoryMapping.swift` and
+`Constants+MemoryMapping.swift`.
+
+| API | C |
+|---|---|
+| `MemoryMapping: ~Copyable`, `init(byteCount:protection:options:)` | `mmap` with `MAP_ANON` |
+| `init(file:offset:byteCount:protection:options:)` | `mmap` |
+| `bytes: RawSpan`, `mutableBytes: MutableRawSpan` (macOS 15, as the Span I/O) | |
+| `setProtection(_:range:)` | `mprotect` |
+| `synchronize(asynchronously:invalidatingCaches:range:)` | `msync` |
+| `advise(_:range:)` with `Advice`: `.normal`, `.random`, `.sequential`, `.willNeed`, `.doNotNeed`, `.free` | `madvise` |
+| `residentPages() -> [Bool]` (not OpenBSD) | `mincore` |
+| `unmap() throws(Errno)`, `deinit`, `relinquish()`, `init(unsafeTaking:byteCount:)`, `unsafeBuffer` | `munmap` |
+| `Protection` (`.read`, `.write`, `.execute`), `Options` (`.shared`, `.private`; `.noReserve`, `.populate` on Linux) | `PROT_*`, `MAP_*` |
+
+Design calls:
+
+- **The owner is the span audit's shape**: spans through a borrow and a
+  mutation, which are sound because the address never moves, and
+  `OwnedFD`'s pattern for the rest: a consuming `unmap()` that reports, a
+  `deinit` that drops, and `relinquish()`. The adopting initializer is
+  `init(unsafeTaking:byteCount:)`, where `OwnedFD`'s is `init(taking:)`:
+  unmapping memory that something else uses is undefined behavior, which
+  closing the wrong descriptor isn't.
+- **Hazards are documented, not typed away**: another process changing a
+  shared mapping under a span, `SIGBUS` past the end of a truncated file,
+  and a crash for writing through `mutableBytes` to memory that doesn't
+  allow it. Rejected: separate read-only and writable mapping types, which
+  would double the API for a check that `mprotect` can undo anyway.
+- **No `MAP_FIXED`**, which silently replaces whatever was mapped at the
+  address; code that needs it is placing memory by hand, and can use C.
+  The address is always the system's choice.
+- **Defaults**: an anonymous mapping is `[.read, .write]` and `.private`; a
+  file's is `.read` and `.shared`. Foundation maps files `MAP_PRIVATE`,
+  which for a read-only mapping differs only in whether others' writes are
+  guaranteed to show.
+- **`msync`'s flags are two `Bool`s**, since it needs exactly one of
+  `MS_SYNC` and `MS_ASYNC`, which an option set can't express.
+- **`residentPages()` returns `[Bool]`**, one per page, reading only the low
+  bit (Darwin uses the others). Rejected: filling a caller's
+  `MutableSpan<UInt8>` (the audit's suggestion), which would expose the
+  per-platform `char` and `unsigned char` vectors and Darwin's extra bits.
+- **Platform differences stay visible**: `.doNotNeed` discards a private
+  mapping's pages at once on Linux and is a hint elsewhere, which its
+  documentation says; Linux rejects advice that starts inside a page and
+  Darwin rounds it down, which a test found.
+- **Swift 6.2 limit, found by the sample**: a `let` owner can't be consumed
+  (by `unmap()`) anywhere after a span has borrowed it, even once the span
+  is gone; a `var` owner can, with a spurious "never mutated" warning. The
+  `mmap` sample reads its span in a helper that takes the mapping
+  `borrowing`, which works. Worth reporting upstream.
+- Not added: `mlock`/`munlock`, `mremap` (Linux), `MAP_JIT` (Darwin), and
+  huge pages.
+
+Adopters: Foundation's `Data(contentsOf:options: .alwaysMapped)`
+(`Data+Reading.swift`), which compares with `MAP_FAILED` on most platforms
+and with `-1` on Android, and unmaps in `Data`'s deallocator. The `extents`
+sample calls `mmap` and `mincore` from C, and could use this (the demos
+lane's file). NIO and Subprocess don't map memory.
+
+Unverified off Darwin: Bionic's non-optional `mmap` result, Linux's
+`unsigned char` `mincore` vector, and the Linux-only options.
