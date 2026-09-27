@@ -138,10 +138,11 @@ extension FileDescriptor {
   #if os(macOS)
   // The calling process's open descriptors, from libproc.
   internal static func _openDescriptors() -> Result<[CInt], Errno> {
-    // A process rarely has more descriptors open than its soft limit; if
-    // the list fills the buffer, try again with a larger one.
-    var capacity = max(Int(getdtablesize()), 64)
-    for _ in 0..<8 {
+    // If the list fills the buffer, it may be cut short, so try again with
+    // a larger one, up to about a million descriptors. The soft limit is no
+    // guide: it can be a million, or unlimited.
+    var capacity = 256
+    for _ in 0..<13 {
       var entries = [proc_fdinfo](repeating: proc_fdinfo(), count: capacity)
       let size = CInt(clamping: capacity * MemoryLayout<proc_fdinfo>.stride)
       let filled = entries.withUnsafeMutableBytes {

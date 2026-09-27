@@ -30,7 +30,9 @@ import Android
 /// A signal descriptor receives the signals in its set
 /// that are pending for the process or the reading thread.
 /// Those signals must be blocked, in every thread,
-/// or the system delivers them as usual instead:
+/// or the system delivers them as usual instead,
+/// and their actions mustn't be ``Signal/Action/ignore``,
+/// or the system discards them:
 ///
 ///     let signals: SignalSet = [.interrupt, .terminate]
 ///     PThread.blockSignals(signals)    // before starting other threads

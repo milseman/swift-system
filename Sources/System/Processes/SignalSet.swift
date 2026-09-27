@@ -365,6 +365,14 @@ extension PThread {
   /// Taking a signal removes it from the pending signals
   /// without running its handler.
   ///
+  /// A signal whose action is ``Signal/Action/ignore``
+  /// is discarded when it arrives, even while it's blocked,
+  /// so this method never takes it.
+  /// A process can start with signals ignored:
+  /// a shell starts a background job with ``Signal/interrupt``
+  /// and ``Signal/quit`` ignored,
+  /// so give each signal that you wait for its default action first.
+  ///
   ///     let signals: SignalSet = [.interrupt, .terminate]
   ///     PThread.blockSignals(signals)
   ///     let signal = try PThread.waitForSignal(in: signals)

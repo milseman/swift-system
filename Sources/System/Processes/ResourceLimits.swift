@@ -208,10 +208,9 @@ extension ResourceLimit {
 
     /// One more than the highest file descriptor the process can open.
     ///
-    /// On Darwin, the soft limit can't exceed `OPEN_MAX` (10240),
-    /// or the `kern.maxfilesperproc` setting,
-    /// so setting it to ``Value/unlimited``
-    /// throws ``Errno/invalidArgument``.
+    /// Older releases of macOS reject a soft limit above `OPEN_MAX` (10240),
+    /// including ``Value/unlimited``, with ``Errno/invalidArgument``;
+    /// macOS 26 accepts any soft limit up to the hard limit.
     ///
     /// The corresponding C constant is `RLIMIT_NOFILE`.
     @_alwaysEmitIntoClient
