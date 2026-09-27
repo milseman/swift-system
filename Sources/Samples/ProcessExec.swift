@@ -70,8 +70,9 @@ struct ProcessExec: ParsableCommand {
       try ProcessID.execute(
         "/usr/bin/env", arguments: ["env"] + command,
         fileActions: [.inherit(.standardInput), .inherit(.standardOutput), .inherit(.standardError)],
-        attributes: SpawnAttributes(
-          flags: .closeOnExecByDefault, signalMask: [], defaultSignals: .all))
+        // The attributes' defaults empty the signal mask
+        // and reset every signal's action.
+        attributes: SpawnAttributes(flags: .closeOnExecByDefault))
     }
     #endif
 

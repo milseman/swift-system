@@ -94,8 +94,9 @@ private func runCommand(_ command: [String], timeout: Int, grace: Int) throws ->
   let flags: SpawnAttributes.Flags = []
   let closeTheRest: [SpawnFileAction] = []
   #endif
-  let attributes = SpawnAttributes(
-    flags: flags, processGroup: .new, signalMask: [], defaultSignals: .all)
+  // SpawnAttributes' defaults also leave nothing blocked or ignored, whatever
+  // this thread blocks and this process ignores.
+  let attributes = SpawnAttributes(flags: flags, processGroup: .new)
 
   var child = try spawn(
     command, fileActions: actions, closingTheRest: closeTheRest, attributes: attributes)

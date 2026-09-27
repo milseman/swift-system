@@ -211,17 +211,31 @@ final class SpawnTests: XCTestCase {
       .signaled(.userDefined1, coreDumped: false))
   }
 
+  func testByDefaultAChildBlocksNothing() throws {
+    // C passes on the spawning thread's mask; SpawnAttributes() doesn't,
+    // unless its signalMask is nil.
+    let previous = PThread.blockSignals([.userDefined1])
+    defer { PThread.setCurrentSignalMask(previous) }
+    let script = "kill -USR1 $$; exit 0"
+    XCTAssertEqual(
+      try runShell(script).status, .signaled(.userDefined1, coreDumped: false))
+    XCTAssertEqual(
+      try runShell(script, attributes: SpawnAttributes(signalMask: nil)).status, .exited(0))
+  }
+
   func testDefaultSignals() throws {
-    // A child inherits the signals its parent ignores, unless reset.
+    // C passes on the signals the parent ignores; SpawnAttributes()
+    // resets them, unless its defaultSignals is nil.
     let previous = try Signal.userDefined1.setAction(.ignore)
     defer { _ = try? Signal.userDefined1.setAction(previous) }
     let script = "kill -USR1 $$; exit 0"
-    XCTAssertEqual(try runShell(script).status, .exited(0))
+    XCTAssertEqual(
+      try runShell(script).status, .signaled(.userDefined1, coreDumped: false))
+    XCTAssertEqual(
+      try runShell(script, attributes: SpawnAttributes(defaultSignals: nil)).status,
+      .exited(0))
     XCTAssertEqual(
       try runShell(script, attributes: SpawnAttributes(defaultSignals: [.userDefined1])).status,
-      .signaled(.userDefined1, coreDumped: false))
-    XCTAssertEqual(
-      try runShell(script, attributes: SpawnAttributes(defaultSignals: .all)).status,
       .signaled(.userDefined1, coreDumped: false))
   }
 

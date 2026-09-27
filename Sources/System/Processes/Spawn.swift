@@ -31,15 +31,17 @@ import Musl
 /// its process group, its signals, and on some platforms,
 /// its session and the descriptors that it inherits.
 ///
-/// A child inherits its parent's signal mask,
-/// and every signal that its parent ignores.
-/// To start it with no signals blocked and every signal's default action,
-/// as a shell does:
-///
-///     var attributes = SpawnAttributes()
-///     attributes.signalMask = []
-///     attributes.defaultSignals = .all
-///
+/// By default, a child starts with no signals blocked
+/// and every signal's default action,
+/// as a program expects to start.
+/// C's `posix_spawn` instead passes on the signal mask of the thread
+/// that spawns the child, and every signal that the process ignores:
+/// Swift concurrency's threads block ``Signal/terminate``, among others,
+/// so a child spawned from async code wouldn't end on it,
+/// and a library such as NIO ignores ``Signal/brokenPipe``
+/// for the whole process.
+/// To pass them on, as a shell's `nohup` does, set
+/// ``signalMask`` and ``defaultSignals`` to `nil`.
 /// Each property that's `nil` leaves the child as `posix_spawn` would.
 ///
 /// The corresponding C type is `posix_spawnattr_t`.
@@ -57,7 +59,9 @@ public struct SpawnAttributes: Hashable, Sendable {
   public var processGroup: ProcessGroup?
 
   /// The signals for the child to block,
-  /// or `nil` for the parent's signal mask.
+  /// or `nil` for the signal mask of the thread that spawns it.
+  ///
+  /// The default is none.
   ///
   /// The corresponding C function is `posix_spawnattr_setsigmask`,
   /// with the `POSIX_SPAWN_SETSIGMASK` flag.
@@ -66,6 +70,8 @@ public struct SpawnAttributes: Hashable, Sendable {
   /// The signals for the child to take the default action for,
   /// even if the parent ignores them,
   /// or `nil` to reset none.
+  ///
+  /// The default is ``SignalSet/all``.
   ///
   /// Signals that the parent catches with a handler
   /// always have their default action in the child.
@@ -97,15 +103,17 @@ public struct SpawnAttributes: Hashable, Sendable {
   ///   - processGroup: The process group to put the child in,
   ///     or `nil` for the parent's group.
   ///   - signalMask: The signals for the child to block,
-  ///     or `nil` for the parent's signal mask.
+  ///     or `nil` for the signal mask of the thread that spawns it.
+  ///     The default is none.
   ///   - defaultSignals: The signals for the child to take
   ///     the default action for, or `nil` to reset none.
+  ///     The default is ``SignalSet/all``.
   @_alwaysEmitIntoClient
   public init(
     flags: Flags = [],
     processGroup: ProcessGroup? = nil,
-    signalMask: SignalSet? = nil,
-    defaultSignals: SignalSet? = nil
+    signalMask: SignalSet? = SignalSet(),
+    defaultSignals: SignalSet? = .all
   ) {
     self.flags = flags
     self.processGroup = processGroup
