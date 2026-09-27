@@ -169,4 +169,36 @@ Tests after it: 430 XCTests (4 skipped) and 285 swift-testing tests in 38
 suites, all passing. The duplicate check finds nothing new, and the
 availability builds show only the known failures.
 
-Next: cluster 9 (extended attributes), then 10 (getentropy).
+## 9. Extended attributes: `e17daad`
+
+API:
+- On `FilePath` (with `followTargetSymlink:`), on `FileDescriptor`, and as `FilePath` statics over C strings: `extendedAttributeNames()`, `extendedAttribute(_:) -> [UInt8]?`, `setExtendedAttribute(_:to:options:)` and `removeExtendedAttribute(_:)`.
+- `ExtendedAttributeOptions` (`.create`, `.replace`).
+- `Errno.attributeNotFound`, now also on Linux and Android, as `ENODATA`.
+
+Design calls:
+- **One set of signatures over two.** Darwin's `position` is always 0, and
+  `XATTR_NOFOLLOW` versus Linux's `l` calls is `followTargetSymlink:`, as
+  `stat` names it.
+- **A missing attribute reads as `nil`,** where Darwin reports `ENOATTR`
+  and Linux `ENODATA`.
+- **`Errno.attributeNotFound` works on both** for the calls that throw it:
+  on Linux it's `ENODATA`, which libattr also names `ENOATTR`.
+- **Values are read in two calls,** the size and then the value, and again
+  after an `ERANGE`. Setting takes any `Sequence<UInt8>`.
+- **`CSystemLinux.h` includes `<sys/xattr.h>`,** which Glibc's module
+  lacks. It declares no types.
+- **FreeBSD's and OpenBSD's `extattr_*` calls aren't wrapped.**
+
+Adopters: NIOFS's `FileHandle` attribute methods (22 lines); Foundation's
+`FileManager` extended attributes.
+
+Unverified off Darwin: every Linux branch, and user attributes on CI's file
+systems (the tests skip on `ENOTSUP`).
+
+Tests after it: 433 XCTests (4 skipped) and 290 swift-testing tests in 39
+suites, all passing. The duplicate check finds only `_XATTR_CREATE` and
+`_XATTR_REPLACE`, which are complementary Darwin and Linux branches. The
+availability builds show only the known failures.
+
+Next: cluster 10 (getentropy), the last.
