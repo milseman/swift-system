@@ -59,6 +59,7 @@ for directory, _, files in os.walk(src):
             shutil.copy(path, target)
 
 for relative in [
+    "Sources/System/FileSystem/DiskQuota.swift",
     "Sources/System/FileSystem/FileSystemType+Linux.swift",
     "Sources/System/FileSystem/MountFlags.swift",
     "Sources/System/FileSystem/StatFS.swift",
