@@ -14,6 +14,7 @@
 // wrap it on Android; see Internals/Syscalls+Processes.swift.
 #if !os(Windows) && !os(WASI) && !os(watchOS) && !os(tvOS) && !os(Android)
 
+import CSystem
 #if SYSTEM_PACKAGE_DARWIN
 import Darwin
 #elseif canImport(Glibc)

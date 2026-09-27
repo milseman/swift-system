@@ -12,6 +12,7 @@
 
 #if !os(Windows) && !os(WASI)
 
+import CSystem
 #if SYSTEM_PACKAGE_DARWIN
 import Darwin
 #elseif canImport(Glibc)
