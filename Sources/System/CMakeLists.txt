@@ -109,7 +109,12 @@ target_sources(SystemPackage PRIVATE
 target_sources(SystemPackage PRIVATE
   Internals/Constants+Processes.swift
   Internals/Syscalls+Processes.swift
-  Processes/CInterop+Processes.swift)
+  Processes/CInterop+Processes.swift
+  Processes/ProcessGroups.swift
+  Processes/Signal.swift
+  Processes/SignalAction.swift
+  Processes/SignalSending.swift
+  Processes/SignalSet.swift)
 target_sources(SystemPackage PRIVATE
   Terminal/BaudRate.swift
   Terminal/ControlCharacters.swift
