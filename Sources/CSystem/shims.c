@@ -203,3 +203,18 @@ extern ssize_t csystem_pwritev(int fd, const void *iov, int iovcnt, off_t offset
   #endif
 }
 #endif // __ANDROID__
+
+#if !defined(_WIN32) && !defined(__wasi__)
+#if defined(__APPLE__)
+#include <crt_externs.h>
+#endif
+
+extern char **csystem_environ(void) {
+  #if defined(__APPLE__)
+  return *_NSGetEnviron();
+  #else
+  extern char **environ;
+  return environ;
+  #endif
+}
+#endif // !defined(_WIN32) && !defined(__wasi__)

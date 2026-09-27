@@ -59,6 +59,8 @@ target_sources(SystemPackage PRIVATE
   Directories/DirectoryStream.swift
   Directories/DirectoryWalk.swift)
 target_sources(SystemPackage PRIVATE
+  Environment/ProcessEnvironment.swift)
+target_sources(SystemPackage PRIVATE
   Events/EventCounter.swift
   Events/EventPoll.swift
   Events/IntervalTimer.swift
@@ -103,6 +105,7 @@ target_sources(SystemPackage PRIVATE
   Internals/Mocking.swift
   Internals/RawBuffer.swift
   Internals/Syscalls+Directories.swift
+  Internals/Syscalls+Environment.swift
   Internals/Syscalls+Events.swift
   Internals/Syscalls+VectoredIO.swift
   Internals/Syscalls.swift

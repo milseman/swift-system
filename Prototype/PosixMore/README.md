@@ -93,3 +93,68 @@ calls, because nothing here builds for it. On Android, `preadv` and
 `pwritev` go through CSystem shims that fail with `ENOSYS` below API level
 24, the pattern `pthread_getname_np`'s shim uses; the shim and its Swift
 call are compiled only there.
+
+## 2. Environment
+
+`Sources/System/Environment/ProcessEnvironment.swift`,
+`Sources/System/Internals/Syscalls+Environment.swift`, and
+`csystem_environ` in CSystem.
+
+| API | C |
+|---|---|
+| `ProcessEnvironment.value(of:) -> String?` | `getenv` |
+| `ProcessEnvironment.set(_:to:overwrite:) throws(Errno)` | `setenv` |
+| `ProcessEnvironment.remove(_:) throws(Errno)` | `unsetenv` |
+| `ProcessEnvironment.entries() -> [(name: String, value: String)]` | `environ` |
+| `ProcessEnvironment.withUnsafeEntries(_:)` | `environ`, as `posix_spawn` and `execve` take it |
+
+Design calls:
+
+- **The namespace is `ProcessEnvironment`.** Rejected: `Environment`, which
+  swift-subprocess and SwiftPM's Basics each declare at top level.
+  Subprocess's clients import System for `FilePath`, so a System
+  `Environment` would make their `Environment.inherit` ambiguous.
+- **Values are copied out**, as `String`s. `getenv`'s pointer dangles after
+  the next `setenv` or `unsetenv` of that variable, which is the hazard to
+  remove. The race with other threads is inherent, and documented: C gives
+  the environment no lock.
+- **No lock on Darwin.** Foundation and Subprocess take `environ_lock_np`
+  when they can, but it's private SPI (`libc_private.h`), and System ships
+  in the SDK. Rejected: declaring the SPI.
+- **Names and values are checked before the call.** An empty name, or one
+  with `=`, is `EINVAL` from `setenv` anyway; a null character in a Swift
+  string would cut the C string short, and set or remove a different
+  variable. `value(of:)` returns `nil` for an invalid name.
+- **`entries()` keeps the environment's order and its duplicates**, and
+  skips entries without `=`, as Foundation does. It splits each entry's
+  bytes, not a `String`: a `String` splits only between characters, and a
+  value can start with a combining mark. Rejected: a dictionary, which loses
+  the order that `execve` passes on and hides duplicates.
+- **Strings are repaired** (U+FFFD) where the bytes aren't UTF-8;
+  `withUnsafeEntries` reaches the bytes, and is what `posix_spawn` needs.
+  Rejected: a lossless value type. `SystemString` is internal, and a public
+  byte-string type is a bigger question than this lane.
+- **The `environ` array comes from a C shim**: Darwin's `_NSGetEnviron`,
+  since a library can't link `environ` there, and `environ` elsewhere, which
+  glibc declares only with `_GNU_SOURCE`. An empty array (glibc's
+  `clearenv` sets `environ` to NULL) is passed as one null entry.
+- **Unix only, not WASI or Windows.** On Windows the CRT's copy of the
+  environment and the Win32 block diverge (`_putenv` changes both,
+  `SetEnvironmentVariableW` only the latter), and SwiftPM uses both; that's
+  for the Win32 work to design. wasi-libc builds `environ` lazily
+  (`__wasilibc_get_environ`), which nothing here can test.
+- Not added: `secure_getenv` and `issetugid` (Foundation's `getEnvSecure`),
+  `clearenv` (not on Darwin), and `putenv` (which keeps the caller's
+  string).
+
+Adopters:
+- NIO: `getenv` for `SWIFTNIO_STRICT`, NIOSingletons' and NIOEmbedded's
+  settings, and NIOFS's `HOME`, `USERPROFILE` and `TMPDIR` (8 lines).
+- SwiftPM: Basics' `Environment` calls `setenv` and `unsetenv` (6 lines).
+- Subprocess: `Environment.inherit` copies the environment block
+  (`_subprocess_get_environ`, 3 lines).
+- Foundation, by grep: `ProcessInfo.environment` reads `_NSGetEnviron` or
+  `environ`, and `String+Path` reads `HOME` and `CFFIXED_USER_HOME`.
+
+Unverified off Darwin: the `environ` shim on Linux, Android, FreeBSD and
+OpenBSD, which declares `extern char **environ` itself.
