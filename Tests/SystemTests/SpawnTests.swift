@@ -125,7 +125,9 @@ final class SpawnTests: XCTestCase {
       try? pipe.readEnd.close()
       try? pipe.writeEnd.close()
     }
-    let script = "echo x >&\(pipe.writeEnd.rawValue) 2>/dev/null; echo $?"
+    // Through /dev/fd, since dash, Debian's and Ubuntu's sh, takes only
+    // single-digit descriptor numbers in `>&n`.
+    let script = "echo x > /dev/fd/\(pipe.writeEnd.rawValue) 2>/dev/null; echo $?"
     XCTAssertEqual(try runShell(script).output, "0\n")
     let closed = try runShell(script, fileActions: [.close(pipe.writeEnd)])
     XCTAssertNotEqual(closed.output, "0\n")
