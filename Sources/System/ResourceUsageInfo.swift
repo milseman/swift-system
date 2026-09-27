@@ -407,16 +407,11 @@ extension ProcessID.ResourceUsageInfo {
 
 // Converts Mach absolute time units, which are nanoseconds on Intel
 // processors but not on Apple silicon, saturating rather than overflowing.
+@available(System 199, *)
 @available(macOS 13.0, *)
 @usableFromInline
 internal func _duration(machAbsoluteTime ticks: UInt64) -> Duration {
-  var timebase = mach_timebase_info_data_t()
-  _ = mach_timebase_info(&timebase)
-  let numerator = UInt64(timebase.numer)
-  let denominator = UInt64(timebase.denom)
-  let product = ticks.multipliedFullWidth(by: numerator)
-  guard product.high < denominator else { return .nanoseconds(UInt64.max) }
-  return .nanoseconds(denominator.dividingFullWidth(product).quotient)
+  Mach.Timebase.current.duration(ofTicks: ticks)
 }
 
 #endif // os(macOS)

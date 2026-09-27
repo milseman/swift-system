@@ -56,6 +56,13 @@ target_compile_options(SystemPackage PRIVATE
   ${SWIFT_SYSTEM_AVAILABILITY_MACRO}
   "SHELL:-package-name swift-system")
 target_sources(SystemPackage PRIVATE
+  AttributeLists/Attribute.swift
+  AttributeLists/Attributes.swift
+  AttributeLists/GetAttributes.swift
+  AttributeLists/VolumeCapabilities.swift
+  Internals/Constants+AttributeLists.swift
+  Internals/Syscalls+AttributeLists.swift)
+target_sources(SystemPackage PRIVATE
   Directories/DirectoryStream.swift
   Directories/DirectoryWalk.swift)
 target_sources(SystemPackage PRIVATE
@@ -70,6 +77,15 @@ target_sources(SystemPackage PRIVATE
   Events/KernelQueue.swift
   Events/Poll.swift
   Events/Timeouts.swift)
+target_sources(SystemPackage PRIVATE
+  Executable/CurrentExecutable.swift
+  Internals/Syscalls+Executable.swift)
+target_sources(SystemPackage PRIVATE
+  FileCopying/FileClone.swift
+  FileCopying/FileCopy.swift
+  FileCopying/FileCopyState.swift
+  Internals/Constants+FileCopying.swift
+  Internals/Syscalls+FileCopying.swift)
 target_sources(SystemPackage PRIVATE
   FilePath/FilePath.swift
   FilePath/FilePathComponents.swift
@@ -116,6 +132,16 @@ target_sources(SystemPackage PRIVATE
   Internals/Syscalls.swift
   Internals/WindowsSyscallAdapters.swift)
 target_sources(SystemPackage PRIVATE
+  Internals/Constants+LibProc.swift
+  Internals/Syscalls+LibProc.swift
+  LibProc/BSDInfo.swift
+  LibProc/OpenFileDescriptors.swift
+  LibProc/ProcessList.swift
+  LibProc/ProcessPaths.swift)
+target_sources(SystemPackage PRIVATE
+  Internals/Syscalls+MachTime.swift
+  MachTime/MachTime.swift)
+target_sources(SystemPackage PRIVATE
   Internals/Constants+Processes.swift
   Internals/Syscalls+Processes.swift
   Processes/ChildProcess.swift
@@ -134,7 +160,17 @@ target_sources(SystemPackage PRIVATE
   Processes/SignalSet.swift
   Processes/Spawn.swift)
 target_sources(SystemPackage PRIVATE
+  Internals/Constants+SystemControl.swift
+  Internals/Syscalls+SystemControl.swift
+  SystemControl/SystemControl.swift
+  SystemControl/SystemControlNames.swift)
+target_sources(SystemPackage PRIVATE
   SystemIdentity/SystemIdentity.swift)
+target_sources(SystemPackage PRIVATE
+  Internals/Constants+SystemPaths.swift
+  Internals/Syscalls+SystemPaths.swift
+  SystemPaths/ConfigurationStrings.swift
+  SystemPaths/MakePath.swift)
 target_sources(SystemPackage PRIVATE
   Terminal/BaudRate.swift
   Terminal/ControlCharacters.swift

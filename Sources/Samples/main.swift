@@ -84,6 +84,14 @@ struct SystemSamples: ParsableCommand {
       Clocks.self,
       ErrnoSample.self,
       Uname.self,
+      // Darwin samples
+      CopyFile.self,
+      Sysctl.self,
+      MachTime.self,
+      ConfStr.self,
+      MkPath.self,
+      LsProc.self,
+      GetAttrList.self,
     ])
 }
 
