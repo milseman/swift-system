@@ -258,8 +258,10 @@ internal var _P_PIDFD: idtype_t { 3 }
 #endif
 
 // MARK: - posix_spawn flags
+//
+// posix_spawn is wrapped where Syscalls+Processes.swift wraps it.
 
-#if !os(watchOS) && !os(tvOS)
+#if !os(watchOS) && !os(tvOS) && !os(Android)
 @_alwaysEmitIntoClient
 internal var _POSIX_SPAWN_RESETIDS: CShort { CShort(POSIX_SPAWN_RESETIDS) }
 
@@ -284,12 +286,12 @@ internal var _POSIX_SPAWN_START_SUSPENDED: CShort { CShort(POSIX_SPAWN_START_SUS
 
 @_alwaysEmitIntoClient
 internal var _POSIX_SPAWN_CLOEXEC_DEFAULT: CShort { CShort(POSIX_SPAWN_CLOEXEC_DEFAULT) }
-#elseif os(Linux) || os(Android)
-// glibc and Bionic declare it only with _GNU_SOURCE.
+#elseif os(Linux)
+// glibc declares it only with _GNU_SOURCE.
 @_alwaysEmitIntoClient
 internal var _POSIX_SPAWN_SETSID: CShort { 0x80 }
 #endif
-#endif // !os(watchOS) && !os(tvOS)
+#endif // !os(watchOS) && !os(tvOS) && !os(Android)
 
 // MARK: - Resource limits
 
@@ -413,14 +415,16 @@ internal var _SFD_NONBLOCK: CInt { O_NONBLOCK }
 
 @_alwaysEmitIntoClient
 internal var _SFD_CLOEXEC: CInt { O_CLOEXEC }
-
-@_alwaysEmitIntoClient
-internal var _CLOSE_RANGE_UNSHARE: CUnsignedInt { 1 << 1 }
 #endif
 
 #if os(Linux) || os(Android) || os(FreeBSD)
 @_alwaysEmitIntoClient
 internal var _CLOSE_RANGE_CLOEXEC: CUnsignedInt { 1 << 2 }
+#endif
+
+#if os(macOS)
+@_alwaysEmitIntoClient
+internal var _PROC_PIDLISTFDS: CInt { PROC_PIDLISTFDS }
 #endif
 
 #endif // !os(Windows) && !os(WASI)
