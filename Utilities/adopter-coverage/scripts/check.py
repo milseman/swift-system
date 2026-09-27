@@ -260,13 +260,16 @@ class Derivation:
                   declaration names it (a deinit's pthread_mutex_destroy);
       elsewhere   named, but by declarations not built there.
     A symbol reads as another C name where the mapping says so
-    (`same.<symbol>`), and on Windows ucrt's `_x` reads as `x`.
+    (`same.<symbol>`), on Windows ucrt's `_x` reads as `x`, and a raw
+    system call's number `SYS_x` reads as `x`.
 
     The symbols that decide are the ones the package uses on the platform,
     other than its own shims and the C names only its shims use. Where it
     uses nothing else there, the entry's other symbols decide (NIO's Linux
-    rename goes through its shim; System's rename names renamex_np and
-    renameat2), and failing those, what the shims wrap.
+    rename goes through its shim), what its shims call there
+    (syscall(SYS_renameat2), which reads as renameat2); failing those, the
+    entry's other symbols (NIO's Darwin renamex_np, which System's rename
+    names too), then what the shims wrap.
 
     Covered: every deciding symbol has doc or impl evidence, and one has
     doc. Partial: some have doc, or the best is restricted. Missing:
@@ -286,6 +289,11 @@ class Derivation:
         cands = ([same[sym]] if sym in same else []) + [sym]
         if plat == "Windows" and re.match(r"^_[A-Za-z]", sym):
             cands.append(sym[1:])
+        # A raw system call's number stands for the call: NIO's shim calls
+        # syscall(SYS_renameat2) where glibc lacks renameat2.
+        m = re.match(r"^SYS_(\w+)$", sym)
+        if m:
+            cands.append(m.group(1))
         found = None
         for c in cands:
             n = self.names.get(c)
@@ -316,12 +324,17 @@ class Derivation:
         counted = [s for s in used if s not in shim and s not in internal]
         if counted:
             return "used", counted
+        # Only shims here: what they call here, then how the package names
+        # the concept elsewhere (NIO's Darwin renamex_np), then any C name.
+        counted = [s for s in used if s in internal]
+        if counted:
+            return "shim calls", counted
         counted = [s for s in syms if s in its and s not in shim and s not in internal]
         if counted:
             return "spellings", counted
         counted = [s for s in syms if s in its and s not in shim]
         if counted:
-            return "shim calls", counted
+            return "shim calls elsewhere", counted
         wraps = set()
         for s in used:
             wraps.update((its[s].get("shim") or {}).get("wraps", {}).get(plat, []))
@@ -398,7 +411,8 @@ def derived_reason(d, plat):
         bits.append("with what System's implementation handles: " + ", ".join(by["impl"]))
     if d["basis"] != "used":
         bits.append({"spellings": "decided by the entry's other spellings",
-                     "shim calls": "decided by the C names the package's shims call",
+                     "shim calls": "decided by the C names the package's shims call here",
+                     "shim calls elsewhere": "decided by the C names the package's shims call elsewhere",
                      "shim wraps": "decided by what the package's shims wrap",
                      "mapping": "decided by the mapping's symbols"}[d["basis"]])
     return "; ".join(bits)
