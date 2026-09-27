@@ -102,9 +102,10 @@ extension FileDescriptor {
     }
     #if os(Linux) || os(Android) || os(FreeBSD)
     let flags = markingCloseOnExec ? _CLOSE_RANGE_CLOEXEC : 0
+    // With no last descriptor, ~0U, as close_range's documentation writes it.
     return nothingOrErrno(retryOnInterrupt: false) {
       system_close_range(
-        CUnsignedInt(first.rawValue), CUnsignedInt(last?.rawValue ?? .max), flags)
+        CUnsignedInt(first.rawValue), last.map { CUnsignedInt($0.rawValue) } ?? .max, flags)
     }
     #elseif os(OpenBSD)
     guard let last else {
