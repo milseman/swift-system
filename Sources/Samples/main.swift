@@ -76,6 +76,8 @@ struct SystemSamples: ParsableCommand {
       CopyFile.self,
       Sysctl.self,
       MachTime.self,
+      ConfStr.self,
+      MkPath.self,
     ])
 }
 

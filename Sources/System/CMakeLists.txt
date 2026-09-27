@@ -121,6 +121,11 @@ target_sources(SystemPackage PRIVATE
   SystemControl/SystemControl.swift
   SystemControl/SystemControlNames.swift)
 target_sources(SystemPackage PRIVATE
+  Internals/Constants+SystemPaths.swift
+  Internals/Syscalls+SystemPaths.swift
+  SystemPaths/ConfigurationStrings.swift
+  SystemPaths/MakePath.swift)
+target_sources(SystemPackage PRIVATE
   Terminal/BaudRate.swift
   Terminal/ControlCharacters.swift
   Terminal/TerminalAttributes.swift
