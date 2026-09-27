@@ -516,3 +516,80 @@ the `pty-run` sample, in a new "More system call samples" group in `main.swift`.
   44 suites pass.
 - Linux (swift:6.2-noble): XCTest 369 run, 2 skipped, 0 failures;
   swift-testing 319 tests in 46 suites pass.
+
+## 5. TCP connection information
+
+### Commits and API
+
+`4d2b1e6`, in SystemSockets (`Sockets/SocketTCPInfo.swift`).
+
+| API | C |
+|---|---|
+| `SocketDescriptor.TCPState` (`.closed` … `.timeWait`) | Darwin `TSI_S_*` (`<sys/proc_info.h>`), Linux `TCP_*` states |
+| `SocketDescriptor.TCPConnectionOptions` | `TCPCI_OPT_*`, `TCPI_OPT_*` |
+| Darwin: `tcpConnectionInfo() throws(Errno) -> TCPConnectionInfo`, `TCPOption.connectionInfo`, `CInterop.TCPConnectionInfo` | `TCP_CONNECTION_INFO`, `struct tcp_connection_info` |
+| Linux: `tcpInfo() throws(Errno) -> TCPInfo`, `TCPOption.info`, `CInterop.TCPInfo` | `TCP_INFO`, `struct tcp_info` |
+
+`TCPConnectionInfo` has typed properties for every field but the TCP Fast
+Open bits; `TCPInfo` for every field glibc declares and, as optionals, the
+kernel's newer ones through `tcpi_snd_wnd` (Linux 5.4).
+
+### Design calls
+
+- **Two types, one per platform**, since the C types differ in their
+  fields and units: Darwin's windows are bytes and its times milliseconds,
+  Linux's congestion window is segments and its times microseconds. The
+  state and options are shared types, since they're the same concepts, and
+  the option bits agree. Rejected: one cross-platform struct of the common
+  fields, which would hide the units and drop half of each.
+- **Linux's newer fields are optionals, read past glibc's struct.** glibc
+  2.39 declares the first 104 bytes of `struct tcp_info`; Linux 6.18's is
+  248. `tcpInfo()` asks for 256 bytes and keeps the count the kernel
+  filled, reads glibc's fields through its declaration, and the newer ones
+  by their `<linux/tcp.h>` offsets (checked with `offsetof` in the
+  container), `nil` when the kernel is too old for them. Rejected: glibc's
+  104 bytes alone, which is what NIO's `getTCPInfo()` returns, and misses
+  byte counters and the minimum RTT; a CSystem mirror struct, which
+  `<linux/tcp.h>` can't be included beside glibc's `<netinet/tcp.h>` to
+  check.
+- **Times are `Duration`s** (macOS 13, in a separate extension), sizes
+  and counts `Int`, and 64-bit counters `UInt64`, with each property's doc
+  naming the C field and its unit.
+- **The states' raw values are each platform's own**, as `Signal`'s are.
+
+### Findings
+
+- Darwin reported `tcpi_rto` as 0 for an idle loopback connection; the
+  docs say so.
+- On Linux, `tcpi_bytes_acked` came out one more than `tcpi_bytes_sent`
+  for 1000 bytes of data (the SYN's sequence number, it seems).
+- Right after the server reads the client's FIN, the client can still be
+  in `finWait1` on Linux; the test accepts either `finWait1` or
+  `finWait2`.
+
+### What it replaces in the adopters
+
+- NIO `Sources/NIOCore/SocketOptionProvider.swift` `getTCPConnectionInfo()`
+  (Darwin) and `getTCPInfo()` (Linux, FreeBSD, Android), and the
+  `TCP_CONNECTION_INFO` of `Sources/NIOCore/BSDSocketAPI.swift`'s
+  `// SYSTEM-GAP: SO_RCVTIMEO, SO_TIMESTAMP, TCP_CONNECTION_INFO`, now
+  cleared with cluster 4. The public signatures return the C types, so
+  NIO's `tcp_connection_info` import stays for them.
+- NIO `Tests/NIOPosixTests/SocketOptionProviderTest.swift`
+  (`TSI_S_ESTABLISHED` becomes `.established`).
+- Not `mptcp_info` (NIO's `getMPTCPInfo`), which is Linux's MPTCP level.
+
+### Platforms
+
+- Built and tested: macOS 26.3, Linux swift:6.2-noble (kernel 6.18).
+- Unverified: Android (Bionic's `tcp_info` is the kernel's, so more of it
+  is declared) and Musl; FreeBSD's `tcp_info`, which differs again, isn't
+  wrapped.
+
+### Tests
+
+- New: `SocketTCPInfoTests` (3; one binds).
+- macOS: XCTest 430 run, 4 skipped, 0 failures; swift-testing 320 tests in
+  45 suites pass.
+- Linux (swift:6.2-noble): XCTest 369 run, 2 skipped, 0 failures;
+  swift-testing 322 tests in 47 suites pass.
