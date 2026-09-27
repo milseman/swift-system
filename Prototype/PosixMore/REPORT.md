@@ -201,4 +201,68 @@ suites, all passing. The duplicate check finds only `_XATTR_CREATE` and
 `_XATTR_REPLACE`, which are complementary Darwin and Linux branches. The
 availability builds show only the known failures.
 
-Next: cluster 10 (getentropy), the last.
+## 10. Random bytes: `5fb9a17`, and `8d60190`, the ifaddrs probe
+
+API: `Entropy.fill(_:)`, over an `UnsafeMutableRawBufferPointer` or an
+`inout MutableRawSpan`, and `Entropy.bytes(count:) -> [UInt8]`, which wrap
+`getentropy`.
+
+Design calls:
+- **Any size, in 256-byte calls,** the most one `getentropy` call fills.
+- **`getentropy`, not `getrandom` or `arc4random_buf`:** Darwin lacks
+  `getrandom`, and `arc4random_buf` can't report a failure.
+- **It throws,** where `SystemRandomNumberGenerator` traps.
+- **`CSystemDarwin.h` includes `<sys/random.h>`,** which the Darwin module
+  doesn't export.
+- **Bionic below API level 28** gets `ENOSYS` from a shim.
+
+Adopters: none; NIO and Foundation use `SystemRandomNumberGenerator`.
+
+Unverified off Darwin: the Linux, BSD and Android declarations.
+
+Tests after it: 434 XCTests (4 skipped) and 293 swift-testing tests in 40
+suites, all passing. The duplicate check finds nothing new, and the
+availability builds show only the known failures. A MemberImportVisibility
+probe now covers `struct ifaddrs`, which `Entry.unsafeNode` vends.
+
+## The lane is done
+
+All ten clusters and the errno prototype are committed, on `posix-more`
+after the merge of system-next at `f620a84`. system-next hadn't moved
+since, at the last check.
+
+Still open, for you to decide:
+- **Public errno, item 46.** The prototype is `3ccc4dd`; its alternatives
+  are in README.md.
+- **Deinits that drop errors.** `DynamicLibrary` and `MemoryMapping`
+  follow `OwnedFD`'s current default, so item 54's answer should cover
+  them too.
+- **The umask.** A race-free read is still missing. Foundation needs it;
+  the options are making `FileOperations.swift`'s internal `creationMask`
+  public, or reading Linux's `/proc/self/status`.
+- **Span floors.** All of this lane's Span API carries the existing macOS 15
+  floor, so a `SystemWithSpan` macro should replace them all at once.
+
+For other lanes:
+- **Coverage lane:** `mapping.ini` entries can now cite this lane's API
+  for writev, getenv/setenv/unsetenv, the environment block, clock_gettime,
+  usleep, gettimeofday, uname and gethostname, errno, remove, AT_FDCWD, the
+  temporary directory, mkdtemp, dlopen/dlsym, getifaddrs, if_nametoindex,
+  and the extended attributes.
+- **Demos lane:** the `extents` sample's `mmap` and `mincore` could use
+  `MemoryMapping`.
+- **SystemSockets fold-in:** delete SystemSockets' `CInterop.IOVec`, and
+  give `NetworkInterface.Addresses.Entry` `SocketAddress` properties.
+- **Upstream Swift:** two 6.2 limits are recorded in Verify/P2 and in
+  README.md. A `let` owner can't be consumed after a span has borrowed it,
+  and `Optional.map` doesn't take a span.
+
+Unverified off Darwin, in general: nothing here compiles for Linux,
+Android, the BSDs, WASI or Windows. The riskiest pieces:
+- the Android API-level shims (`preadv`/`pwritev` 24, `getifaddrs` 24,
+  `mkostemp` 23, `getentropy` 28);
+- the Linux `mkostemp` and `AT_SECURE` shims;
+- the glibc-only spellings: `<sys/xattr.h>` through CSystem,
+  `ifa_ifu.ifu_dstaddr`, and `IFF_*` imported as `Int`;
+- the Linux clock and `XATTR_*` values, which are hard-coded kernel values;
+- the `environ` shim.
