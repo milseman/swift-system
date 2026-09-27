@@ -100,6 +100,7 @@ target_sources(SystemPackage PRIVATE
   Internals/Backcompat.swift
   Internals/CInterop.swift
   Internals/Constants+Events.swift
+  Internals/Constants+StatFS.swift
   Internals/Constants.swift
   Internals/Exports.swift
   Internals/Mocking.swift
