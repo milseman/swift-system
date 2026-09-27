@@ -12,7 +12,8 @@ on, so that `CInterop.StatFS` is Darwin's own `statvfs`, which has the same
 fields as Linux's in different widths. `LinuxModel/StatFSLinuxModel.h`
 declares what Darwin lacks, as `CSystemLinux.h` does. Then it builds the
 module for macOS, and compiles StatFS's tests and the `statfs` sample
-against it, through SIL.
+against it, through SIL. `SampleSupport.swift` stands in for the sample's
+helpers from `Sources/Samples/Util.swift`, which imports SystemSockets.
 
 ```sh
 swift build                        # for the sample's ArgumentParser

@@ -126,7 +126,7 @@ if [ $? -eq 0 ]; then
   sample_output=""
   if [ -f "$work/Sources/Samples/StatFS.swift" ]; then
     # The model's SystemPackage comes first in the search path.
-    sample_output=$(swiftc -emit-sil -o /dev/null -parse-as-library -module-name Samples \
+    sample_output=$(swiftc -emit-sil -wmo -o /dev/null -parse-as-library -module-name Samples \
       "${flags[@]}" -I "$work/module" -I "$root/.build/debug/Modules" \
       "$work/Sources/Samples/StatFS.swift" \
       "$root/Prototype/StatFS/SampleSupport.swift" 2>&1)
