@@ -109,6 +109,7 @@ target_sources(SystemPackage PRIVATE
 target_sources(SystemPackage PRIVATE
   Internals/Constants+Processes.swift
   Internals/Syscalls+Processes.swift
+  Processes/ChildProcess.swift
   Processes/CInterop+Processes.swift
   Processes/ExitStatus.swift
   Processes/ProcessGroups.swift
@@ -116,7 +117,8 @@ target_sources(SystemPackage PRIVATE
   Processes/Signal.swift
   Processes/SignalAction.swift
   Processes/SignalSending.swift
-  Processes/SignalSet.swift)
+  Processes/SignalSet.swift
+  Processes/Spawn.swift)
 target_sources(SystemPackage PRIVATE
   Terminal/BaudRate.swift
   Terminal/ControlCharacters.swift
