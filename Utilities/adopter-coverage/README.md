@@ -100,7 +100,7 @@ On an M1 Max with Swift 6.2. A package's first run at a commit builds it and rea
 | swift-foundation | about 120 s (lexical, after the build fails with 6.2) | about 15 s |
 | all four | about 6 minutes | about 70 s; `results.sh verify` about 80 s |
 
-The ecosystem report gives the ecosystem run's times.
+The ecosystem (21 packages): about 35 minutes the first time, most of it swift-build's, SwiftPM's and swift-driver's builds; about 4 minutes when every index is stored.
 
 ## Requirements
 

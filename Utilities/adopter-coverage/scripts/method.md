@@ -79,8 +79,8 @@ Each is listed with the alternative it rejected.
     - What System's syscall layer calls: that's what System uses, not what its API offers (EventCounter calls read; nothing makes it a read wrapper).
 22. **Read each sentence with a small grammar: its first name is its subject, and the words before each later name make it an alternative, an argument or a condition.** `fcntl`, with the `F_GETFL` command covers F_GETFL and covers fcntl only for that use; `chmod`, or `lchmod` if `followTargetSymlink` is `false` covers chmod and lchmod and drops the condition's names.
     *Rejected:* taking every backticked name: `wait` (a parameter in a condition) would cover wait(2), and `fcntl` would count as covered by each command's accessor.
-23. **Decide by entry, not by symbol: the symbols a package uses on a platform decide, less its own shims and the C names only its shims use; when nothing else is left, the entry's other spellings, then what the shims wrap.** An entry groups one concept's symbols, and System can never name a package's shims (CNIOLinux_renameat2), so an entry is covered where the concept is.
-    *Rejected:* deciding each symbol alone, which makes every entry with a shim partial; the section name as the only anchor, which many entries don't have.
+23. **Decide by entry, not by symbol: the symbols a package uses on a platform decide, less its own shims and the C names only its shims use there; when nothing else is left, what its shims call there (`SYS_renameat2` reads as renameat2), then the entry's other spellings, then what the shims wrap.** An entry groups one concept's symbols, and System can never name a package's shims (CNIOLinux_renameat2), so an entry is covered where the concept is. "Only its shims" is per platform: NIO's Swift calling pthread_setname_np on Darwin doesn't hide what its Android shim calls.
+    *Rejected:* deciding each symbol alone, which makes every entry with a shim partial; the section name as the only anchor, which many entries don't have; the entry's other spellings before the shims' calls, which after the ../adopters migration let Windows' SetThreadDescription decide NIO's Linux thread names.
 24. **What System's implementation uses completes an entry but never decides one.** pthread_mutex_destroy (a deinit's), UTIME_OMIT and freeaddrinfo are handled for the adopter by API that names their companions.
     *Rejected:* counting System's own uses as coverage, which would make ioctl covered because TerminalDescriptor calls it for two requests.
 25. **An operation needs one of its functions named.** System names CLOCK_MONOTONIC for its condition variables and QoS classes for its threads, which covers neither clock_gettime nor posix_spawn.
@@ -110,6 +110,8 @@ Each is listed with the alternative it rejected.
     *Rejected:* building the runtime to index it, which takes a toolchain build.
 36. **Assign lanes by ordered rules in mapping.ini (`lanes`): by symbol, category or the platforms a gap is on.**
     *Rejected:* a lane key per entry, which interfaces with no entry can't have.
+37. **Read C++ as C++.** In a target with C++ sources, the C scanner's *unresolved* rule is off (it can't see C++'s classes, namespaces or locals), a lexical Darwin name must come from a named OS module (not libc++'s headers, which the index files with the SDK's), and on lines the Darwin build compiled only the C library's textual macros are added to the index; libc++'s declarations are never OS interfaces; and a C or C++ file in a directory named for a platform (LLVM's Windows/, Unix/) is compiled only there. The toolchain's llbuild and indexstore-db vendor LLVM's Support library.
+    *Rejected:* the C rules for C++, which counted 4109 interfaces in llbuild (now 206); skipping C++ targets, which would miss their libc calls.
 
 ### Blind spots
 
@@ -135,6 +137,7 @@ Each is listed with the alternative it rejected.
 - **Lexical extractions** (a package that didn't build) see only the names the Darwin SDK declares, or that are qualified or imported explicitly: names only Linux, Windows or WASI declare are dropped, so those platforms are undercounted.
 - **The ecosystem's packages** have no mapping entries: their interfaces are grouped by name, and categorized, and so given lanes, by header and name rules.
 - **The Darwin metric** reads imports lexically, and dependencies' re-exports from their sources' `@_exported import` lines, without their `#if` conditions.
+- **C++** is read by a C scanner with C++'s blind spots switched off: a C library call inside a template the index couldn't resolve, or in a header no build here includes, isn't counted.
 
 ### Outputs
 
