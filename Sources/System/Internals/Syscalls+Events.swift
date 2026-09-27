@@ -122,7 +122,7 @@ internal func system_timerfd_create(_ clockid: CInt, _ flags: CInt) -> CInt {
 #if ENABLE_MOCKING
   if mockingEnabled { return _mock(clockid, flags) }
 #endif
-  return timerfd_create(.init(clockid), flags)
+  return csystem_timerfd_create(clockid, flags)
 }
 
 // timerfd_settime
@@ -140,7 +140,7 @@ internal func system_timerfd_settime(
       Int(new.pointee.it_interval.tv_sec), Int(new.pointee.it_interval.tv_nsec))
   }
 #endif
-  return timerfd_settime(fd, flags, new, old)
+  return csystem_timerfd_settime(fd, flags, new, old)
 }
 
 // timerfd_gettime
@@ -150,7 +150,7 @@ internal func system_timerfd_gettime(
 #if ENABLE_MOCKING
   if mockingEnabled { return _mock(fd) }
 #endif
-  return timerfd_gettime(fd, current)
+  return csystem_timerfd_gettime(fd, current)
 }
 #endif // os(Linux) || os(Android)
 

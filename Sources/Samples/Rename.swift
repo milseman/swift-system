@@ -46,15 +46,23 @@ struct Rename: ParsableCommand {
     if swap { options.insert(.swap) }
     do {
       try source.rename(to: destination, options: options)
-    } catch Errno.fileExists {
-      // Checking for the destination and then renaming would leave a window
-      // in which another process could create it.
-      complain("Error: \(destination) exists, so --exclusive left both files in place")
-      throw ExitCode.failure
-    } catch Errno.directoryNotEmpty {
-      complain("Error: rename can't replace \(destination), a directory with files in it,"
-        + " but --swap can exchange it")
-      throw ExitCode.failure
+    } catch {
+      // A switch, since Swift 6.3.3 crashes on `catch Errno.fileExists` in a
+      // function with a var, which a string interpolation makes
+      // (Prototype/LinuxBuild/Verify/LB1_pattern_catch_with_var.swift).
+      switch error {
+      case .fileExists:
+        // Checking for the destination and then renaming would leave a
+        // window in which another process could create it.
+        complain("Error: \(destination) exists, so --exclusive left both files in place")
+        throw ExitCode.failure
+      case .directoryNotEmpty:
+        complain("Error: rename can't replace \(destination), a directory with files in it,"
+          + " but --swap can exchange it")
+        throw ExitCode.failure
+      default:
+        throw error
+      }
     }
 
     print(swap ? "Swapped \(source) and \(destination)" : "Renamed \(source) to \(destination)")

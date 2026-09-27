@@ -33,6 +33,12 @@ struct SystemSamples: ParsableCommand {
       // Event notification samples
       EventsLoop.self,
       EventsPoll.self,
+      // Process and signal samples
+      ProcessExec.self,
+      ProcessLimits.self,
+      ProcessPipeline.self,
+      ProcessRun.self,
+      ProcessSignals.self,
       // Terminal samples
       PasswordReader.self,
       TerminalSize.self,
@@ -42,6 +48,8 @@ struct SystemSamples: ParsableCommand {
       // Directory samples
       Ls.self,
       RmR.self,
+      // File system statistics samples
+      DiskFree.self,
       // File and process samples
       PIDFile.self,
       AtomicWrite.self,
@@ -81,6 +89,14 @@ struct SystemSamples: ParsableCommand {
       MkTemp.self,
       DLSym.self,
       MMap.self,
+      // Darwin samples
+      CopyFile.self,
+      Sysctl.self,
+      MachTime.self,
+      ConfStr.self,
+      MkPath.self,
+      LsProc.self,
+      GetAttrList.self,
     ])
 }
 

@@ -88,15 +88,21 @@ private func remove(_ path: FilePath, verbose: Bool) throws -> Bool {
 /// Opens `path` if it's a directory, or returns `nil` if it's a file or a
 /// symbolic link, even one to a directory.
 ///
-/// (The pattern catch is in a function of its own because Swift 6.2 crashes
-/// compiling one followed by a call that converts an owner, such as
-/// `DirectoryStream(top)` above.)
+/// (The catch is in a function of its own because Swift 6.2 crashes
+/// compiling a pattern catch followed by a call that converts an owner, such
+/// as `DirectoryStream(top)` above. It's a switch rather than the pattern
+/// catch it was, `catch let error where ... || ...`, because Swift 6.3.3
+/// crashes on a where clause's `||`:
+/// Prototype/LinuxBuild/Verify/LB2_catch_where_or.swift.)
 private func openDirectoryWithoutFollowing(_ path: FilePath) throws -> OwnedFD? {
   do {
     return try OwnedFD.open(path, .readOnly, options: [.directory, .noFollow])
-  } catch let error where error == .notDirectory || error == .tooManySymbolicLinkLevels {
+  } catch {
     // POSIX has O_NOFOLLOW fail on a link with ELOOP. Darwin fails with
     // ENOTDIR instead when O_DIRECTORY is set too.
-    return nil
+    switch error {
+    case .notDirectory, .tooManySymbolicLinkLevels: return nil
+    default: throw error
+    }
   }
 }

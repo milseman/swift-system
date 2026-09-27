@@ -73,8 +73,9 @@ final class SystemConfigTest: XCTestCase {
     XCTAssertGreaterThan(try XCTUnwrap(SystemConfig.value(.physicalMemoryPages)), 0)
     XCTAssertGreaterThan(try XCTUnwrap(SystemConfig.value(.clockTicksPerSecond)), 0)
     XCTAssertGreaterThan(try XCTUnwrap(SystemConfig.value(.maxArgumentBytes)), 0)
-    // POSIX has required job control since 2001.
-    XCTAssertGreaterThanOrEqual(try XCTUnwrap(SystemConfig.value(.jobControl)), 200112)
+    // POSIX has required job control since 2001, and requires only that its
+    // value be positive: Darwin gives 200112, and glibc 1.
+    XCTAssertGreaterThan(try XCTUnwrap(SystemConfig.value(.jobControl)), 0)
     XCTAssertGreaterThanOrEqual(try XCTUnwrap(SystemConfig.value(.posixVersion)), 200112)
     if let maxOpenFiles = try SystemConfig.value(.maxOpenFiles) {
       XCTAssertGreaterThan(maxOpenFiles, 0)
@@ -110,12 +111,18 @@ final class SystemConfigTest: XCTestCase {
         XCTAssertEqual(try SystemConfig.value(.maxFileNameBytes, for: fd), nameLength)
       }
 
-      // Terminal variables don't apply to a directory.
+      // Terminal variables don't apply to a directory. Darwin reports that,
+      // and glibc gives the value a terminal would have, MAX_CANON.
+      #if os(Linux)
+      XCTAssertEqual(
+        try SystemConfig.value(.maxTerminalCanonicalLineBytes, for: directory), 255)
+      #else
       XCTAssertThrowsError(
         try SystemConfig.value(.maxTerminalCanonicalLineBytes, for: directory)
       ) {
         XCTAssertEqual($0 as? Errno, .invalidArgument)
       }
+      #endif
       XCTAssertThrowsError(
         try SystemConfig.value(SystemConfig.PathName(rawValue: -1), for: directory)
       ) {

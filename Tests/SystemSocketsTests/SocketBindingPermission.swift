@@ -46,7 +46,12 @@ extension Trait where Self == ConditionTrait {
 /// Only a permission error counts as a denial;
 /// after any other failure the tests still run, and report it.
 private let socketBindingIsPermitted: Bool = {
+  #if os(Linux) && canImport(Glibc)
+  // glibc declares the SOCK_* constants in an enum.
+  let fd = socket(AF_INET, CInt(SOCK_STREAM.rawValue), 0)
+  #else
   let fd = socket(AF_INET, SOCK_STREAM, 0)
+  #endif
   guard fd >= 0 else { return true }
   defer { close(fd) }
 

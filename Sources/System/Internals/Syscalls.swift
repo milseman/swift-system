@@ -323,15 +323,23 @@ internal func system_rmdir(
 
 #if SYSTEM_PACKAGE_DARWIN
 internal let SYSTEM_CS_DARWIN_USER_TEMP_DIR = _CS_DARWIN_USER_TEMP_DIR
+#endif // SYSTEM_PACKAGE_DARWIN
 
+// Bionic has no confstr.
+#if !os(Windows) && !os(WASI) && !os(Android)
 internal func system_confstr(
   _ name: CInt,
-  _ buf: UnsafeMutablePointer<CInterop.PlatformChar>,
+  _ buf: UnsafeMutablePointer<CInterop.PlatformChar>?,
   _ len: Int
 ) -> Int {
+#if ENABLE_MOCKING
+  // Returns 0, which is also what confstr returns for a variable without
+  // a value.
+  if mockingEnabled { return _mockInt(name, len) }
+#endif
   return confstr(name, buf, len)
 }
-#endif // SYSTEM_PACKAGE_DARWIN
+#endif // !os(Windows) && !os(WASI) && !os(Android)
 
 #if !os(Windows)
 internal let SYSTEM_AT_REMOVE_DIR = AT_REMOVEDIR

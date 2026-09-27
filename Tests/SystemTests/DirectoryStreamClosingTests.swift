@@ -84,15 +84,19 @@ private struct DirectoryStreamClosingTests {
   @Test func convertingAnOwnerThatIsntADirectoryClosesIt() async {
     await #expect(processExitsWith: .success) {
       let pipe = try FileDescriptor.pipe()
-      try pipe.writeEnd.close()
       do throws(Errno) {
         _ = try DirectoryStream(OwnedFD(taking: pipe.readEnd))
         exit(1)
       } catch {
         if error != .notDirectory { exit(2) }
       }
-      // The descriptor is closed.
-      if fcntl(pipe.readEnd.rawValue, F_GETFD) != -1 || errno != EBADF { exit(3) }
+      // The descriptor is closed, so the pipe has no reader, and a write
+      // fails. Checking the descriptor's number with fcntl can be fooled:
+      // with Swift 6.3 on Linux, something in the child process sometimes
+      // reused it.
+      _ = signal(SIGPIPE, SIG_IGN)
+      var byte: UInt8 = 0
+      if write(pipe.writeEnd.rawValue, &byte, 1) != -1 || errno != EPIPE { exit(3) }
     }
   }
 

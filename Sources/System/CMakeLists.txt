@@ -1,7 +1,7 @@
 #[[
 This source file is part of the Swift System open source project
 
-Copyright (c) 2020 Apple Inc. and the Swift System project authors
+Copyright (c) 2020 - 2026 Apple Inc. and the Swift System project authors
 Licensed under Apache License v2.0 with Runtime Library Exception
 
 See https://swift.org/LICENSE.txt for license information
@@ -56,6 +56,13 @@ target_compile_options(SystemPackage PRIVATE
   ${SWIFT_SYSTEM_AVAILABILITY_MACRO}
   "SHELL:-package-name swift-system")
 target_sources(SystemPackage PRIVATE
+  AttributeLists/Attribute.swift
+  AttributeLists/Attributes.swift
+  AttributeLists/GetAttributes.swift
+  AttributeLists/VolumeCapabilities.swift
+  Internals/Constants+AttributeLists.swift
+  Internals/Syscalls+AttributeLists.swift)
+target_sources(SystemPackage PRIVATE
   Directories/DirectoryStream.swift
   Directories/DirectoryWalk.swift)
 target_sources(SystemPackage PRIVATE
@@ -73,6 +80,15 @@ target_sources(SystemPackage PRIVATE
   Events/Poll.swift
   Events/Timeouts.swift)
 target_sources(SystemPackage PRIVATE
+  Executable/CurrentExecutable.swift
+  Internals/Syscalls+Executable.swift)
+target_sources(SystemPackage PRIVATE
+  FileCopying/FileClone.swift
+  FileCopying/FileCopy.swift
+  FileCopying/FileCopyState.swift
+  Internals/Constants+FileCopying.swift
+  Internals/Syscalls+FileCopying.swift)
+target_sources(SystemPackage PRIVATE
   FilePath/FilePath.swift
   FilePath/FilePathComponents.swift
   FilePath/FilePathComponentView.swift
@@ -84,13 +100,17 @@ target_sources(SystemPackage PRIVATE
   FilePath/FilePathTempWindows.swift
   FilePath/FilePathWindows.swift)
 target_sources(SystemPackage PRIVATE
+  FileSystem/DiskQuota.swift
   FileSystem/FileFlags.swift
   FileSystem/FileMode.swift
   FileSystem/FilePathOperations.swift
+  FileSystem/FileSystemType+Linux.swift
   FileSystem/FileTimes.swift
   FileSystem/FileType.swift
   FileSystem/Identifiers.swift
-  FileSystem/Stat.swift)
+  FileSystem/MountFlags.swift
+  FileSystem/Stat.swift
+  FileSystem/StatFS.swift)
 if(CMAKE_SYSTEM_NAME STREQUAL Linux)
   target_sources(SystemPackage PRIVATE
     IORing/IOCompletion.swift
@@ -106,6 +126,7 @@ target_sources(SystemPackage PRIVATE
   Internals/Constants+DynamicLoading.swift
   Internals/Constants+Events.swift
   Internals/Constants+MemoryMapping.swift
+  Internals/Constants+StatFS.swift
   Internals/Constants+Time.swift
   Internals/Constants.swift
   Internals/Exports.swift
@@ -117,11 +138,22 @@ target_sources(SystemPackage PRIVATE
   Internals/Syscalls+Events.swift
   Internals/Syscalls+MemoryMapping.swift
   Internals/Syscalls+PathsAndFiles.swift
+  Internals/Syscalls+StatFS.swift
   Internals/Syscalls+SystemIdentity.swift
   Internals/Syscalls+Time.swift
   Internals/Syscalls+VectoredIO.swift
   Internals/Syscalls.swift
   Internals/WindowsSyscallAdapters.swift)
+target_sources(SystemPackage PRIVATE
+  Internals/Constants+LibProc.swift
+  Internals/Syscalls+LibProc.swift
+  LibProc/BSDInfo.swift
+  LibProc/OpenFileDescriptors.swift
+  LibProc/ProcessList.swift
+  LibProc/ProcessPaths.swift)
+target_sources(SystemPackage PRIVATE
+  Internals/Syscalls+MachTime.swift
+  MachTime/MachTime.swift)
 target_sources(SystemPackage PRIVATE
   MemoryMapping/MemoryMapping.swift)
 target_sources(SystemPackage PRIVATE
@@ -129,7 +161,35 @@ target_sources(SystemPackage PRIVATE
   PathsAndFiles/ProcessDefaults.swift
   PathsAndFiles/UniqueFiles.swift)
 target_sources(SystemPackage PRIVATE
+  Internals/Constants+Processes.swift
+  Internals/Syscalls+Processes.swift
+  Processes/ChildProcess.swift
+  Processes/CInterop+Processes.swift
+  Processes/CloseDescriptors.swift
+  Processes/Credentials.swift
+  Processes/ExitStatus.swift
+  Processes/ProcessDescriptor.swift
+  Processes/ProcessGroups.swift
+  Processes/ProcessWait.swift
+  Processes/ResourceLimits.swift
+  Processes/Signal.swift
+  Processes/SignalAction.swift
+  Processes/SignalDescriptor.swift
+  Processes/SignalSending.swift
+  Processes/SignalSet.swift
+  Processes/Spawn.swift)
+target_sources(SystemPackage PRIVATE
+  Internals/Constants+SystemControl.swift
+  Internals/Syscalls+SystemControl.swift
+  SystemControl/SystemControl.swift
+  SystemControl/SystemControlNames.swift)
+target_sources(SystemPackage PRIVATE
   SystemIdentity/SystemIdentity.swift)
+target_sources(SystemPackage PRIVATE
+  Internals/Constants+SystemPaths.swift
+  Internals/Syscalls+SystemPaths.swift
+  SystemPaths/ConfigurationStrings.swift
+  SystemPaths/MakePath.swift)
 target_sources(SystemPackage PRIVATE
   Terminal/BaudRate.swift
   Terminal/ControlCharacters.swift

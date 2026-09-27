@@ -1193,11 +1193,20 @@ internal var _X_OK: CInt { X_OK }
 
 // MARK: - File Times
 
+#if os(Linux) || os(Android)
+// glibc and Bionic define these as expressions that Swift can't import.
+@_alwaysEmitIntoClient
+internal var _UTIME_NOW: Int { Int(CSYSTEM_UTIME_NOW) }
+
+@_alwaysEmitIntoClient
+internal var _UTIME_OMIT: Int { Int(CSYSTEM_UTIME_OMIT) }
+#else
 @_alwaysEmitIntoClient
 internal var _UTIME_NOW: Int { Int(UTIME_NOW) }
 
 @_alwaysEmitIntoClient
 internal var _UTIME_OMIT: Int { Int(UTIME_OMIT) }
+#endif
 
 // MARK: - Rename Flags
 

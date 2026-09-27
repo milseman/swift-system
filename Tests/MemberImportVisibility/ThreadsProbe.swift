@@ -11,10 +11,11 @@
 // See Probe.swift.
 //
 // PThread.Condition.wait(on:until:) and PThread.Mutex.lock(until:) take a
-// timespec deadline. CSystemLinux.h includes <pthread.h>, which declares
-// timespec through <time.h>, so its members could be attributed to CSystem.
-// The other C types that PThread vends are integers, pointers, or structures
-// that clients only pass by address.
+// timespec deadline, whose members could be attributed to CSystem, since
+// CSystem's headers declare timespec too (see TimespecProbe.swift).
+// CSystemLinux.h no longer includes <pthread.h> or <sched.h>, which also
+// declared sched_param there. The other C types that PThread vends are
+// integers, pointers, or structures that clients only pass by address.
 
 #if canImport(Glibc) || canImport(Musl) || canImport(Android)
 #if canImport(Glibc)

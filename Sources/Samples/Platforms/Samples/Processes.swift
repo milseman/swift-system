@@ -93,9 +93,8 @@ func spawnChild(_ arguments: [String]) throws -> Platform.Process {
   case .darwin:
     return .id(id)
   }
-  #elseif os(Linux)
-  return .descriptor(try ProcessDescriptor(id))
   #else
+  // On Linux too, until System has a pidfd owner.
   return .id(id)
   #endif
   #endif
@@ -116,7 +115,7 @@ func requestStop(_ process: borrowing Platform.Process) throws -> String {
     guard kill(id.rawValue, SIGTERM) == 0 else { throw Errno(rawValue: errno) }
     return "SIGTERM, through kill"
     #endif
-  #if os(Linux) || SIMULATE_PLATFORMS
+  #if SIMULATE_PLATFORMS // || os(Linux), once System has a pidfd owner
   case .descriptor(let descriptor):
     // pidfd_send_signal: it can't reach another process.
     try descriptor.sendSignal(SIGTERM)

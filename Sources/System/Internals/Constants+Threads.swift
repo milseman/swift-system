@@ -104,7 +104,7 @@ internal var _SCHED_FIFO: CInt { CInt(SCHED_FIFO) }
 @_alwaysEmitIntoClient
 internal var _SCHED_RR: CInt { CInt(SCHED_RR) }
 
-// MARK: - Clocks for condition variables
+// MARK: - Clocks for condition variables and interval timers
 
 #if !SYSTEM_PACKAGE_DARWIN
 @_alwaysEmitIntoClient
