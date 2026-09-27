@@ -431,6 +431,10 @@ extension PThread.Mutex {
     /// for the ``PriorityProtocol-swift.struct/protect`` protocol,
     /// or `nil` for the system's default.
     ///
+    /// POSIX limits a ceiling to the priorities of
+    /// ``PThread/SchedulingPolicy/fifo``, and glibc rejects any other
+    /// with ``Errno/invalidArgument``.
+    ///
     /// The corresponding C function is `pthread_mutexattr_setprioceiling`.
     /// - Note: Not available on Android.
     public var priorityCeiling: CInt?
