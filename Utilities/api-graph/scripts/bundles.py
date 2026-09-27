@@ -1,0 +1,577 @@
+#!/usr/bin/env python3
+"""Write a carve-out bundle for each cluster, ranked part, and batch.
+
+A bundle is the input an AI pitch-writing session needs for one carve-out,
+self-contained so the session doesn't have to search the repository:
+
+  bundle.md    the brief: what's in it, the open questions it depends on,
+               what it needs first, its declarations with their C
+               counterparts, source ranges, tests, samples, and prior text
+               (proposals, prototype write-ups, Win32 drafts, and the
+               commits that wrote the code, whose bodies in this repository
+               already discuss shape, naming and precedent)
+  bundle.json  the same data, machine-readable
+  sources.md   the code: every block of the carve-out's API, and the new
+               internal declarations and C shims it needs
+  tests.md     the test functions that exercise it
+  samples.md   the samples that use it
+
+It isn't a pitch and doesn't draft one; `Proposals/` has the house format.
+
+Usage: bundles.py --graph graph.json --clusters clusters.json --root DIR
+                  --repo DIR --base COMMIT --head COMMIT --out DIR
+                  [--drafts DIR]
+"""
+
+import argparse
+import collections
+import json
+import os
+import re
+import subprocess
+
+PLATFORMS = ["Darwin", "Linux", "Musl", "Android", "FreeBSD", "OpenBSD", "WASI", "Windows"]
+MAX_TESTS_MD = 60          # test functions quoted in tests.md
+MAX_COMMITS_FULL = 6       # commit messages quoted in full
+MAX_SAMPLES_MD = 8         # samples quoted in samples.md
+
+
+def load(p):
+    return json.load(open(p))
+
+
+def git(repo, *args):
+    return subprocess.run(["git", "-C", repo, *args], capture_output=True, text=True).stdout
+
+
+def md_code(s):
+    s = s.replace("`", "'")
+    return f"`{s}`"
+
+
+def fence_lang(path):
+    return "swift" if path.endswith(".swift") else "c" if path.endswith((".c", ".h")) else ""
+
+
+def platform_text(ps):
+    ps = [p for p in PLATFORMS if p in (ps or [])]
+    return ", ".join(ps) if ps else "?"
+
+
+class Source:
+    def __init__(self, root):
+        self.root = root
+        self.cache = {}
+
+    def lines(self, rel):
+        if rel not in self.cache:
+            p = os.path.join(self.root, rel)
+            self.cache[rel] = open(p, encoding="utf-8", errors="replace").read().split("\n") if os.path.exists(p) else []
+        return self.cache[rel]
+
+    def excerpt(self, rel, start, end):
+        return "\n".join(self.lines(rel)[start - 1:end])
+
+
+def merge_ranges(ranges):
+    """[(file, start, end, label)] -> merged per file, labels joined."""
+    by_file = collections.defaultdict(list)
+    for f, s, e, label in ranges:
+        by_file[f].append([s, e, [label]])
+    out = []
+    for f in sorted(by_file):
+        rs = sorted(by_file[f])
+        merged = [rs[0]]
+        for s, e, labels in rs[1:]:
+            if s <= merged[-1][1] + 1:
+                merged[-1][1] = max(merged[-1][1], e)
+                merged[-1][2] += [l for l in labels if l not in merged[-1][2]]
+            else:
+                merged.append([s, e, labels])
+        out += [(f, s, e, labels) for s, e, labels in merged]
+    return out
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--graph", required=True)
+    ap.add_argument("--clusters", required=True)
+    ap.add_argument("--root", required=True)
+    ap.add_argument("--repo", required=True)
+    ap.add_argument("--base", required=True)
+    ap.add_argument("--head", required=True)
+    ap.add_argument("--drafts")
+    ap.add_argument("--out", required=True)
+    a = ap.parse_args()
+
+    g = load(a.graph)
+    cl = load(a.clusters)
+    nodes, atoms, tests, samples = g["nodes"], g["atoms"], g["tests"], g["samples"]
+    conts = {c["id"]: c for c in cl["contingencies"]}
+    src = Source(a.root)
+    os.makedirs(a.out, exist_ok=True)
+
+    units = {}
+    for c in cl["clusters"]:
+        units[c["id"]] = c
+        for p in c["parts"]:
+            units[p["id"]] = p
+    for b in cl["batches"]:
+        units[b["id"]] = b
+    ranked = {x["id"]: x for x in cl["candidates"]}
+
+    def rank_of(uid):
+        if uid in ranked:
+            return ranked[uid]["rank"]
+        return units.get(uid, {}).get("rank") or "—"
+
+    # Commits: every one between the two commits, and who last touched each
+    # line of the files the bundles cite.
+    log = git(a.repo, "log", "--no-show-signature", "--format=%H%x00%an%x00%ad%x00%s%x00%b%x1e", "--date=short",
+              f"{a.base}..{a.head}")
+    commits = {}
+    for rec in log.split("\x1e"):
+        rec = rec.strip("\n")
+        if not rec:
+            continue
+        h, author, date, subject, body = (rec.split("\x00") + ["", "", "", "", ""])[:5]
+        commits[h] = {"hash": h, "author": author, "date": date, "subject": subject, "body": body.strip()}
+    blame_cache = {}
+
+    def blame(rel):
+        if rel not in blame_cache:
+            out = git(a.repo, "blame", "--porcelain", "-w", a.head, "--", rel)
+            lines, cur = {}, None
+            for line in out.split("\n"):
+                m = re.match(r"^([0-9a-f]{40}) \d+ (\d+)", line)
+                if m:
+                    cur = m.group(1)
+                    lines[int(m.group(2))] = cur
+            blame_cache[rel] = lines
+        return blame_cache[rel]
+
+    # CMake: which line lists each SystemPackage file.
+    cmake_path = "Sources/System/CMakeLists.txt"
+    cmake_lines = src.lines(cmake_path)
+
+    def cmake_entry(rel):
+        if not rel.startswith("Sources/System/"):
+            return None
+        short = rel[len("Sources/System/"):]
+        for i, line in enumerate(cmake_lines, 1):
+            if line.strip() == short:
+                return i
+        return None
+
+    # House format, from the proposals on the head commit.
+    proposals_dir = os.path.join(a.root, "Proposals")
+    house = []
+    if os.path.isdir(proposals_dir):
+        for f in sorted(os.listdir(proposals_dir)):
+            if f.endswith(".md"):
+                heads = [l.strip() for l in open(os.path.join(proposals_dir, f), encoding="utf-8")
+                         if re.match(r"^##\s", l)]
+                title = next((l.strip("# \n") for l in open(os.path.join(proposals_dir, f), encoding="utf-8")
+                              if l.startswith("# ")), f)
+                house.append({"file": f"Proposals/{f}", "title": title, "sections": [h[3:] for h in heads]})
+
+    index = []
+    for uid, u in sorted(units.items()):
+        nids = u["nodes"]
+        ns = [nodes[i] for i in nids]
+        api = [n for n in ns if n["hiddenClass"] != "unavailable"]
+        stubs = [n for n in ns if n["hiddenClass"] == "unavailable"]
+        m = u["metrics"]
+        d = os.path.join(a.out, uid)
+        os.makedirs(d, exist_ok=True)
+
+        # --------------------------------------------------------- ranges
+        api_ranges = []
+        for x in u["atoms"]:
+            at = atoms[x]
+            label = (f"{at['kind']} {at['subject']}" if not at["loose"] else nodes[at["nodes"][0]]["path"])
+            if at["mark"]:
+                label += f" (MARK: {at['mark']})"
+            api_ranges.append((at["file"], at["start"], at["end"], label))
+        pieces = {}
+        shared_pieces = collections.defaultdict(set)
+        mine = set(nids)
+        for n in ns:
+            for p in n.get("implementation", []):
+                key = (p["file"], p["start"], p["end"])
+                pieces.setdefault(key, dict(p, usedBy=set()))["usedBy"].add(n["path"])
+        # A piece another carve-out's API also reaches is shared: whichever
+        # lands first brings it.
+        for nid, n in nodes.items():
+            if nid in mine:
+                continue
+            for p in n.get("implementation", []):
+                key = (p["file"], p["start"], p["end"])
+                if key in pieces:
+                    shared_pieces[key].add(n["path"])
+        impl_ranges = [(f, s, e, f"{p['kind']} {p['name']}") for (f, s, e), p in pieces.items()]
+        cmake = sorted({(f, cmake_entry(f)) for f, _, _, _ in api_ranges + impl_ranges if cmake_entry(f)})
+
+        # --------------------------------------------------------- tests and samples
+        test_ids = sorted({t for n in ns for t in n["tests"]})
+        covers = collections.defaultdict(list)
+        for n in api:
+            for t in n["tests"]:
+                covers[t].append(n["path"])
+        test_recs = [dict(tests[t], covers=sorted(covers.get(t, []))) for t in test_ids if t in tests]
+        test_recs.sort(key=lambda t: (-len(t["covers"]), t["file"], t["line"]))
+        sample_uses = collections.defaultdict(list)
+        for n in api:
+            for s in n["samples"]:
+                sample_uses[s].append(n["path"])
+        # The samples that use most of it first: many use ProcessID.current
+        # only to name a scratch file.
+        sample_recs = [dict(samples[s], uses=sorted(set(v))) for s, v in sorted(sample_uses.items()) if s in samples]
+        sample_recs.sort(key=lambda s: (-len(s["uses"]), s["file"]))
+        untested = [n["path"] for n in api if not n["tests"]]
+
+        # --------------------------------------------------------- commits
+        touch = collections.Counter()
+        for f, s, e, _ in api_ranges + impl_ranges:
+            b = blame(f)
+            for ln in range(s, e + 1):
+                h = b.get(ln)
+                if h in commits:
+                    touch[h] += 1
+        top_commits = [dict(commits[h], lines=cnt) for h, cnt in touch.most_common()]
+        total_lines = sum(touch.values()) or 1
+        # Quote a commit in full when it wrote a real share of these lines.
+        quoted = [c for c in top_commits if c["lines"] >= 5 and c["lines"] * 20 >= total_lines][:MAX_COMMITS_FULL]
+
+        # --------------------------------------------------------- prior text
+        prior = list(u["prior"])
+        for cid in list(u["direct"]) + list(u["inherited"]):
+            for w in conts[cid].get("writeups", []):
+                if not any(p["file"] == w for p in prior):
+                    prior.append({"file": w, "kind": "contingency write-up", "score": 0,
+                                  "names": [conts[cid]["title"]]})
+
+        # --------------------------------------------------------- bundle.json
+        data = {
+            "id": uid, "kind": u["kind"], "name": u["name"], "cluster": u.get("cluster"),
+            "rank": ranked.get(uid, {}).get("rank", u.get("rank")), "score": u.get("score"),
+            "reason": u.get("reason"), "batch": u.get("batch"), "members": u.get("members"),
+            "metrics": m,
+            "contingencies": {"direct": u["direct"], "inherited": u["inherited"]},
+            "prerequisites": u["prerequisites"], "allPrerequisites": u["allPrerequisites"],
+            "implementationPrerequisites": u.get("implPrerequisites", {}),
+            "dependents": u.get("dependents", []),
+            "parts": [{"id": p["id"], "name": p["name"], "declarations": p["metrics"]["declarations"],
+                       "prerequisites": list(p["prerequisites"])} for p in u.get("parts", [])],
+            "declarations": [{k: n.get(k) for k in ("path", "kind", "decl", "availability", "platforms", "hasDoc",
+                                                    "docSummary", "cNames", "cCalls", "file", "line", "start", "end",
+                                                    "tests", "samples", "status", "hiddenClass", "renamedTo",
+                                                    "module", "usr")} for n in ns],
+            "sourceRanges": [{"file": f, "start": s, "end": e, "what": l} for f, s, e, l in merge_ranges(api_ranges)],
+            "implementationRanges": [{"file": f, "start": s, "end": e, "what": p["kind"] + " " + p["name"],
+                                      "usedBy": sorted(p["usedBy"]),
+                                      "alsoUsedBy": sorted(shared_pieces.get((f, s, e), []))[:10]}
+                                     for (f, s, e), p in sorted(pieces.items())],
+            "cmake": [{"file": cmake_path, "line": ln, "entry": f} for f, ln in cmake],
+            "tests": test_recs, "untested": untested, "samples": sample_recs,
+            "prior": prior, "commits": [{k: c[k] for k in ("hash", "date", "author", "subject", "lines")}
+                                        for c in top_commits],
+            "sharedAliases": u.get("sharedAliases", []),
+            "vocabulary": u.get("vocabulary", {}),
+            "houseFormat": house,
+        }
+        json.dump(data, open(os.path.join(d, "bundle.json"), "w"), indent=1, default=sorted)
+
+        # --------------------------------------------------------- bundle.md
+        L = []
+        w = L.append
+        kind_text = {"cluster": "cluster", "part": f"part of cluster `{u.get('cluster')}`",
+                     "batch": "batch of small clusters"}[u["kind"]]
+        w(f"# Carve-out bundle: {u['name']}")
+        w("")
+        w(f"`{uid}`, a {kind_text}" + (f", ranked {data['rank']} of {len(cl['candidates'])}" if data["rank"] else "")
+          + (f" (in batch `{u['batch']}`)" if u.get("batch") else "") + ".")
+        w("")
+        w("This is input for writing a pitch, not a pitch. It was generated by `Utilities/api-graph` from "
+          f"`{a.head[:10]}` against `{a.base[:10]}`. The open questions below are open: don't settle them in the "
+          "pitch, and don't present a current default as a decision.")
+        w("")
+        w("| | |")
+        w("|---|---|")
+        w(f"| Declarations | {m['declarations']} ({m['types']} types)"
+          + (f", plus {m['stubs']} `unavailable` fix-it stubs" if m["stubs"] else "") + " |")
+        w(f"| Modules | {', '.join(m['modules'])} |")
+        w(f"| Platforms (from `#if`) | {platform_text(m['platforms'])} |")
+        ver = "; ".join(f"{', '.join(v['platforms'])}: {v['level']} by `{v['source']}`" for v in m["verifiedOffDarwin"])
+        w(f"| Checked off Darwin | {ver or 'nothing: no evidence that any of it has been compiled off Darwin'} |")
+        if m["offDarwinOnly"]:
+            w(f"| Not compiled on Darwin | {m['offDarwinOnly']} declarations, never compiled by this tool's build |")
+        w("| Availability | " + ", ".join(f"{k} ×{v}" for k, v in m["availability"].items()) + " |")
+        w(f"| Documented | {m['documented']} of {m['declarations']} |")
+        w(f"| Tested | {m['tested']} of {m['declarations']}"
+          + (f" ({m['lexicallyTested']} matched by name, since they aren't compiled here)" if m["lexicallyTested"] else "")
+          + f", by {len(m['tests'])} tests ({len(m['mockTests'])} mock) |")
+        w(f"| Samples | {len(m['samples'])} |")
+        w(f"| C API | {', '.join('`' + c + '`' for c in m['cNames'][:24]) or '—'} |")
+        w("")
+        if u.get("reason"):
+            w(f"**Ranking:** {u['reason']}.")
+            w("")
+        if u.get("parts"):
+            w(f"**This cluster has {len(u['parts'])} parts** that could be pitched separately, each with a bundle "
+              "of its own, listed under Parts below. A pitch session is better off starting from one of them.")
+            w("")
+        if u.get("members"):
+            w("**Members of this batch**, each a cluster with its own bundle: "
+              + ", ".join(f"`{x}`" for x in u["members"]) + ".")
+            w("")
+
+        w("## Open questions it depends on")
+        w("")
+        if not u["direct"] and not u["inherited"]:
+            w("None of the tracked contingencies applies to this carve-out, or to anything it needs.")
+            w("")
+        for cid, info in u["direct"].items():
+            c = conts[cid]
+            w(f"### {c['title']} (decisions {c['decisions']})")
+            w("")
+            w(c["question"])
+            w("")
+            if c.get("deliberatelyOpen"):
+                w(f"**Deliberately open.** {c['deliberatelyOpen']}")
+                w("")
+            w(f"Why it applies ({info['count']} declarations):")
+            w("")
+            for ev in info["evidence"]:
+                w(f"- {ev}")
+            if c.get("writeups"):
+                w("")
+                w("Write-ups: " + ", ".join(f"`{x}`" for x in c["writeups"]) + ".")
+            w("")
+        for cid, info in u["inherited"].items():
+            c = conts[cid]
+            how = {"api": "through its signatures", "implementation": "through its implementation only",
+                   "nesting": "through nesting only: it needs the name, not the answer"}[info["through"]]
+            w(f"### {c['title']} (decisions {c['decisions']}), inherited")
+            w("")
+            w(f"From `{info['via']}`, {how}. {c['question']}")
+            if c.get("deliberatelyOpen"):
+                w("")
+                w(f"**Deliberately open.** {c['deliberatelyOpen']}")
+            w("")
+
+        w("## What it needs, and what needs it")
+        w("")
+        if u["allPrerequisites"]:
+            w("Land these first, or include them. Shared vocabulary that's new on this branch counts:")
+            w("")
+            for pid, info in u["allPrerequisites"].items():
+                direct = u["prerequisites"].get(pid)
+                how = ""
+                if direct:
+                    how = " — " + "; ".join(f"`{e[0]}` {e[2]} `{e[1]}`" for e in direct["edges"][:4])
+                w(f"- `{pid}` (rank {rank_of(pid)})"
+                  + (", nesting only" if info["namespaceOnly"] else "") + how)
+            w("")
+        else:
+            w("Nothing new on this branch: only API that's already on the base commit.")
+            w("")
+        if u.get("implPrerequisites"):
+            w("Its implementation also uses new public API from these, which no signature shows:")
+            w("")
+            for pid, evs in u["implPrerequisites"].items():
+                w(f"- `{pid}` — " + "; ".join(f"`{x}` uses `{y}`" for x, y in evs[:4]))
+            w("")
+        if u.get("dependents"):
+            w("Carve-outs that need this one: " + ", ".join(f"`{x}`" for x in u["dependents"]) + ".")
+            w("")
+        if u.get("vocabulary"):
+            w("Existing API it builds on: " + ", ".join(f"`{k}` ×{v}" for k, v in u["vocabulary"].items()) + ".")
+            w("")
+        if u.get("sharedAliases"):
+            w("CInterop aliases it shares with other carve-outs: " + "; ".join(
+                f"`{s['alias']}` (also {', '.join(s['alsoUsedBy'])})" for s in u["sharedAliases"]) + ".")
+            w("")
+
+        if u.get("parts"):
+            w("## Parts")
+            w("")
+            w("The pieces of this cluster that could be pitched separately, each with what it needs within "
+              "the cluster. Each ranked part has a bundle of its own.")
+            w("")
+            w("| Part | Declarations | Needs |")
+            w("|---|---:|---|")
+            for p in u["parts"]:
+                w(f"| `{p['id']}` — {p['name']} | {p['metrics']['declarations']} | "
+                  + (", ".join(f"`{x}`" for x in p["prerequisites"]) or "—") + " |")
+            w("")
+
+        w("## Declarations")
+        w("")
+        by_group = collections.OrderedDict()
+        for n in sorted(api, key=lambda n: (n["file"] or "", n["line"] or 0)):
+            grp = n["path"] if n["isType"] else (n["parentPath"] or "(top level)")
+            by_group.setdefault(grp, []).append(n)
+        for grp, items in by_group.items():
+            w(f"### `{grp}`")
+            w("")
+            for n in items:
+                bits = [n["availability"]]
+                if set(n["platforms"] or []) != set(m["platforms"]):
+                    bits.append(platform_text(n["platforms"]))
+                if n["source"] == "scan":
+                    bits.append("not compiled on Darwin" if n["hiddenClass"] == "platform" else n["hiddenClass"])
+                if not n["hasDoc"]:
+                    bits.append("**no doc comment**")
+                if n["cNames"]:
+                    bits.append("C: " + ", ".join(n["cNames"]))
+                bits.append(f"{len(n['tests'])} tests" if n["tests"] else "**untested**")
+                w(f"- {md_code(n['decl'])} — {' · '.join(bits)} — `{n['file']}:{n['line']}`")
+                if n["docSummary"]:
+                    w(f"  {n['docSummary']}")
+            w("")
+        if stubs:
+            w(f"**Fix-it stubs** ({len(stubs)}): `@available(*, unavailable, renamed:)` spellings of the C "
+              "names: " + ", ".join(f"`{n['title']}` → `{n.get('renamedTo')}`" for n in stubs[:40])
+              + (f", and {len(stubs) - 40} more" if len(stubs) > 40 else "") + ".")
+            w("")
+
+        mapping = [(n["path"], n["cNames"] or n["cCalls"]) for n in api if n["cNames"] or n["cCalls"]]
+        if mapping:
+            w("## Swift API to C mapping")
+            w("")
+            w("From each declaration's \"The corresponding C ...\" doc line, else the C functions its "
+              "implementation calls.")
+            w("")
+            w("| Swift | C |")
+            w("|---|---|")
+            for p, cs in mapping:
+                w(f"| {md_code(p)} | {', '.join('`' + c + '`' for c in cs)} |")
+            w("")
+
+        w("## Source")
+        w("")
+        w("The API's blocks (a block is a type declaration or one `extension`, doc comments and attributes "
+          "included), then the new internal code they reach. `sources.md` quotes all of it.")
+        w("")
+        for f, s, e, labels in merge_ranges(api_ranges):
+            w(f"- `{f}:{s}-{e}` — {'; '.join(labels)}")
+        if impl_ranges:
+            w("")
+            w("New internal code it needs (layer 1 and 2 of each wrapper, constants, C shims):")
+            w("")
+            for (f, s, e), p in sorted(pieces.items()):
+                shared = shared_pieces.get((f, s, e))
+                w(f"- `{f}:{s}-{e}` — {p['kind']} `{p['name']}`"
+                  + (f"; also used by {len(shared)} declarations outside this carve-out, such as `{sorted(shared)[0]}`"
+                     if shared else ""))
+        if cmake:
+            w("")
+            w("CMake: " + ", ".join(f"`{cmake_path}:{ln}` lists `{f[len('Sources/System/'):]}`" for f, ln in cmake) + ".")
+        w("")
+
+        w("## Tests")
+        w("")
+        if not test_recs:
+            w("No test references this carve-out's API.")
+        else:
+            w(f"{len(test_recs)} tests reference its API, found from the index store"
+              + (" (and, for code not compiled here, by name)" if m["lexicallyTested"] else "")
+              + ". `tests.md` quotes them.")
+            w("")
+            w("| Test | Framework | Covers |")
+            w("|---|---|---|")
+            for t in test_recs[:80]:
+                cov = ", ".join(md_code(x.split(".")[-1]) for x in t["covers"][:6]) + (
+                    f" +{len(t['covers']) - 6}" if len(t["covers"]) > 6 else "")
+                w(f"| `{t['file'].split('/')[-1]}` {md_code(t['scope'] + '.' + t['name'] if t['scope'] else t['name'])}"
+                  f" | {t['framework']}{', mock' if t['mock'] else ''} | {cov} |")
+            if len(test_recs) > 80:
+                w(f"| … and {len(test_recs) - 80} more | | |")
+        if untested:
+            w("")
+            w(f"Untested declarations ({len(untested)}): " + ", ".join(md_code(x) for x in untested[:40])
+              + (f", and {len(untested) - 40} more" if len(untested) > 40 else "") + ".")
+        w("")
+
+        w("## Samples")
+        w("")
+        if not sample_recs:
+            w("No sample uses this carve-out's API.")
+        else:
+            for s in sample_recs:
+                cmd = ", ".join(f"`system-samples {c}`" for c in s["commands"]) or "(no command)"
+                w(f"- `{s['file']}` — {cmd}: {s['abstract'] or ''} Uses "
+                  + ", ".join(md_code(x) for x in s["uses"][:8]) + (f" +{len(s['uses']) - 8}" if len(s["uses"]) > 8 else "")
+                  + ".")
+            w("")
+            w(f"`samples.md` quotes the first {min(MAX_SAMPLES_MD, len(sample_recs))}.")
+        w("")
+
+        w("## Prior text")
+        w("")
+        if prior:
+            for p in prior:
+                w(f"- `{p['file']}` ({p['kind']})" + (f": mentions {', '.join('`' + x + '`' for x in p['names'])}"
+                                                    if p.get("names") and p["kind"] != "contingency write-up" else ""))
+        else:
+            w("No proposal, prototype write-up or draft mentions this carve-out's types or C calls.")
+        if cl.get("gists"):
+            w("")
+            w("Gists named in the docs: " + ", ".join(cl["gists"]))
+        w("")
+        if top_commits:
+            w(f"Commits that last touched its lines ({len(top_commits)}), by lines touched. The messages of "
+              f"the {len(quoted)} that wrote at least 5 lines and 5% of them are quoted in full below.")
+            w("")
+            for c in top_commits[:25]:
+                w(f"- `{c['hash'][:10]}` {c['date']} ({c['lines']} lines) {c['subject']}")
+            if len(top_commits) > 25:
+                w(f"- … and {len(top_commits) - 25} more")
+            w("")
+            for c in quoted:
+                w(f"#### `{c['hash'][:10]}` {c['subject']}")
+                w("")
+                if c["body"]:
+                    w("> " + c["body"].replace("\n", "\n> "))
+                else:
+                    w("(no body)")
+                w("")
+        w("## House format")
+        w("")
+        w("The proposals in `Proposals/` use these sections. SYS-0007 is the closest model for a small set of "
+          "wrappers, and SYS-0006 for new types; SYS-0006's appendix maps Swift API to C as the table above does.")
+        w("")
+        for h in house:
+            w(f"- `{h['file']}` ({h['title']}): " + " · ".join(h["sections"]))
+        w("")
+        open(os.path.join(d, "bundle.md"), "w").write("\n".join(L) + "\n")
+
+        # --------------------------------------------------------- excerpts
+        S = [f"# Sources: {u['name']}", ""]
+        for f, s, e, labels in merge_ranges(api_ranges) + merge_ranges(impl_ranges):
+            S += [f"## `{f}:{s}-{e}`", "", "; ".join(labels), "", f"```{fence_lang(f)}", src.excerpt(f, s, e), "```", ""]
+        open(os.path.join(d, "sources.md"), "w").write("\n".join(S) + "\n")
+        T = [f"# Tests: {u['name']}", ""]
+        for t in test_recs[:MAX_TESTS_MD]:
+            T += [f"## `{t['file']}:{t['start']}-{t['end']}` {t['scope'] + '.' if t['scope'] else ''}{t['name']}", "",
+                  f"{t['framework']}{', mock' if t['mock'] else ''}; covers " + ", ".join(md_code(x) for x in t["covers"]),
+                  "", "```swift", src.excerpt(t["file"], t["start"], t["end"]), "```", ""]
+        if len(test_recs) > MAX_TESTS_MD:
+            T.append(f"… and {len(test_recs) - MAX_TESTS_MD} more tests, listed in bundle.json.")
+        open(os.path.join(d, "tests.md"), "w").write("\n".join(T) + "\n")
+        P = [f"# Samples: {u['name']}", ""]
+        for s in sample_recs[:MAX_SAMPLES_MD]:
+            lines = src.lines(s["file"])
+            P += [f"## `{s['file']}`", "", "```swift", "\n".join(lines).rstrip(), "```", ""]
+        open(os.path.join(d, "samples.md"), "w").write("\n".join(P) + "\n")
+        index.append({"id": uid, "kind": u["kind"], "name": u["name"], "rank": data["rank"],
+                      "declarations": m["declarations"], "path": os.path.join(uid, "bundle.md")})
+
+    json.dump(sorted(index, key=lambda x: (x["rank"] or 10 ** 6, x["id"])), open(os.path.join(a.out, "index.json"), "w"),
+              indent=1)
+    print(f"bundles: {len(index)} bundles -> {a.out}")
+
+
+if __name__ == "__main__":
+    main()
