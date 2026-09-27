@@ -81,6 +81,7 @@ target_sources(SystemPackage PRIVATE
   FileSystem/FileFlags.swift
   FileSystem/FileMode.swift
   FileSystem/FilePathOperations.swift
+  FileSystem/FileSystemType+Linux.swift
   FileSystem/FileTimes.swift
   FileSystem/FileType.swift
   FileSystem/Identifiers.swift

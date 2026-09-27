@@ -147,6 +147,31 @@ extern int csystem_renameat2(int olddirfd, const char *oldpath,
 #endif // __linux__
 
 #ifdef __linux__
+#include <sys/vfs.h>
+
+// f_type is a long on glibc, an unsigned long on Musl, and a uint64_t or
+// uint32_t on Bionic. The magic numbers it holds all fit in 32 bits.
+
+extern int csystem_statfs_type(const char *path, unsigned long *type) {
+  struct statfs buffer;
+  int result = statfs(path, &buffer);
+  if (result == 0) {
+    *type = (unsigned long)buffer.f_type;
+  }
+  return result;
+}
+
+extern int csystem_fstatfs_type(int fd, unsigned long *type) {
+  struct statfs buffer;
+  int result = fstatfs(fd, &buffer);
+  if (result == 0) {
+    *type = (unsigned long)buffer.f_type;
+  }
+  return result;
+}
+#endif // __linux__
+
+#ifdef __linux__
 #include <stdlib.h>
 
 // With _GNU_SOURCE, which this file defines on Linux, <stdlib.h> declares these.

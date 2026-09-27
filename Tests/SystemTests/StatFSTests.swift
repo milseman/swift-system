@@ -386,6 +386,96 @@ private struct StatFSTests {
   }
   #endif
 
+  #if os(Linux) || os(Android)
+  @available(System 199, *)
+  @Test func fileSystemTypeInitializersAgree() throws {
+    // /proc is always the proc file system.
+    let proc: FilePath = "/proc"
+    #expect(try proc.fileSystemType() == .proc)
+    #expect(try FileSystemType(proc) == .proc)
+    #expect(try proc.withPlatformString { try FileSystemType($0) } == .proc)
+
+    let fd = try FileDescriptor.open(proc, .readOnly)
+    defer { try? fd.close() }
+    #expect(try fd.fileSystemType() == .proc)
+    #expect(try FileSystemType(fd) == .proc)
+  }
+
+  @available(System 199, *)
+  @Test func fileSystemTypeOfPipe() throws {
+    let (readEnd, writeEnd) = try FileDescriptor.pipe()
+    defer {
+      try? readEnd.close()
+      try? writeEnd.close()
+    }
+    #expect(try readEnd.fileSystemType() == .pipefs)
+    #expect(try writeEnd.fileSystemType() == .pipefs)
+  }
+
+  @available(System 199, *)
+  @Test func fileSystemTypeErrors() {
+    #expect(throws: Errno.noSuchFileOrDirectory) {
+      _ = try FilePath("/var/empty/definitely/does/not/exist").fileSystemType()
+    }
+    #expect(throws: Errno.badFileDescriptor) {
+      _ = try FileDescriptor(rawValue: -1).fileSystemType()
+    }
+  }
+  #endif
+
+  #if os(Linux)
+  // Cross-check the named magic numbers against the kernel's, through
+  // /proc/self/mounts, which names each mount's file system type: where a
+  // type has a constant, statfs of the mount point must report it.
+  @available(System 199, *)
+  @Test func fileSystemTypesMatchProcMounts() throws {
+    let contents = try _readEntireFile("/proc/self/mounts")
+
+    // Not autofs, whose mount points mount another file system when statfs
+    // looks at them, nor NFS or FUSE, whose statfs can wait on a server that
+    // doesn't answer.
+    let constants: [String: FileSystemType] = [
+      "tmpfs": .tmpfs, "ramfs": .ramfs, "proc": .proc, "sysfs": .sysfs,
+      "devpts": .devpts, "cgroup": .cgroup, "cgroup2": .cgroup2,
+      "debugfs": .debugfs, "tracefs": .tracefs, "securityfs": .securityfs,
+      "bpf": .bpf, "nsfs": .nsfs, "efivarfs": .efivarfs,
+      "hugetlbfs": .hugetlbfs, "mqueue": .mqueue, "overlay": .overlay,
+      "ext2": .ext2, "ext3": .ext3, "ext4": .ext4, "btrfs": .btrfs,
+      "xfs": .xfs, "f2fs": .f2fs, "erofs": .erofs, "squashfs": .squashfs,
+      "msdos": .msdos, "vfat": .msdos, "iso9660": .iso9660, "9p": .v9fs,
+    ]
+
+    // Fields: device, mountPoint, fsType, options, dump, pass. A later entry
+    // shadows an earlier one at the same mount point, as statfs also sees,
+    // so key on mount point to keep the one on top.
+    var mounts: [String: String] = [:]
+    for line in contents.split(separator: "\n") {
+      let fields = line.split(separator: " ")
+      guard fields.count >= 3 else { continue }
+      let mountPoint = String(fields[1])
+      // Skip octal-escaped paths (spaces, tabs, etc.).
+      if mountPoint.contains(where: { $0 == "\\" }) { continue }
+      mounts[mountPoint] = String(fields[2])
+    }
+
+    var verified = 0
+    for (mountPoint, name) in mounts {
+      guard let expected = constants[name],
+            let type = try? FilePath(mountPoint).fileSystemType()
+      else { continue }
+      #expect(
+        type == expected,
+        "\(mountPoint): \(name) reports 0x\(String(type.rawValue, radix: 16))"
+      )
+      verified += 1
+    }
+
+    // Guard against a parser that silently matched nothing: /proc is always
+    // mounted.
+    #expect(verified > 0)
+  }
+  #endif
+
   #if os(WASI)
   @available(System 199, *)
   @Test func wasiThrowsNoFunction() async throws {

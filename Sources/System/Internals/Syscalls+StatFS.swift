@@ -8,7 +8,8 @@
 */
 
 // The file system statistics calls behind StatFS: statfs and fstatfs on
-// Darwin and BSD, and statvfs and fstatvfs elsewhere. The mocks record the
+// Darwin and BSD, and statvfs and fstatvfs elsewhere, plus statfs and
+// fstatfs on Linux and Android for FileSystemType. The mocks record the
 // buffer as a pointer.
 
 #if !os(Windows)
@@ -65,5 +66,27 @@ internal func system_fstatvfs(
   return fstatvfs(fd, buffer)
 }
 #endif // SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
+
+#if os(Linux) || os(Android)
+// statfs and fstatfs, for FileSystemType: the f_type field, which statvfs
+// doesn't have. The shims return only that field; see CSystemLinux.h.
+internal func system_statfs(
+  _ path: UnsafePointer<CChar>, _ type: UnsafeMutablePointer<CUnsignedLong>
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(path: path, type) }
+#endif
+  return csystem_statfs_type(path, type)
+}
+
+internal func system_fstatfs(
+  _ fd: CInt, _ type: UnsafeMutablePointer<CUnsignedLong>
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(fd, type) }
+#endif
+  return csystem_fstatfs_type(fd, type)
+}
+#endif // os(Linux) || os(Android)
 
 #endif // !os(Windows)

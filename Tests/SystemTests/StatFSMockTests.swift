@@ -65,6 +65,45 @@ final class StatFSMockTests: XCTestCase {
 
     syscallTestCases.forEach { $0.runAllTests() }
   }
+
+  #if os(Linux) || os(Android)
+  // FileSystemType's calls, which report the f_type that statvfs lacks.
+  func testFileSystemTypeSyscalls() {
+    let path: FilePath = "/a/path"
+    let fd = FileDescriptor(rawValue: 42)
+
+    let syscallTestCases: [MockTestCase] = [
+      MockTestCase(name: "statfs", .interruptable, "/a/path", Wildcard()) {
+        retryOnInterrupt in
+        _ = try FileSystemType(path, retryOnInterrupt: retryOnInterrupt)
+      },
+
+      MockTestCase(name: "statfs", .interruptable, "/a/path", Wildcard()) {
+        retryOnInterrupt in
+        _ = try path.withPlatformString {
+          try FileSystemType($0, retryOnInterrupt: retryOnInterrupt)
+        }
+      },
+
+      MockTestCase(name: "statfs", .interruptable, "/a/path", Wildcard()) {
+        retryOnInterrupt in
+        _ = try path.fileSystemType(retryOnInterrupt: retryOnInterrupt)
+      },
+
+      MockTestCase(name: "fstatfs", .interruptable, 42, Wildcard()) {
+        retryOnInterrupt in
+        _ = try FileSystemType(fd, retryOnInterrupt: retryOnInterrupt)
+      },
+
+      MockTestCase(name: "fstatfs", .interruptable, 42, Wildcard()) {
+        retryOnInterrupt in
+        _ = try fd.fileSystemType(retryOnInterrupt: retryOnInterrupt)
+      },
+    ]
+
+    syscallTestCases.forEach { $0.runAllTests() }
+  }
+  #endif
 }
 #endif // ENABLE_MOCKING
 

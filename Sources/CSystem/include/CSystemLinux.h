@@ -72,6 +72,14 @@ uint64_t _system_get_ST_WRITE(void);
 uint64_t _system_get_ST_APPEND(void);
 uint64_t _system_get_ST_IMMUTABLE(void);
 #endif
+
+// statfs and fstatfs, for the one field that statvfs lacks: f_type, the
+// file system's magic number. They return only that field. glibc's module
+// doesn't declare statfs, and a struct statfs declared through this header
+// would have its members attributed to CSystem, which clients don't import
+// (see the ioctl shims above). See shims.c.
+extern int csystem_statfs_type(const char *path, unsigned long *type);
+extern int csystem_fstatfs_type(int fd, unsigned long *type);
 #endif
 
 #ifdef __linux__

@@ -124,13 +124,24 @@ extension FileSystemID: Codable {
 extension FileSystemID: Equatable, Hashable, Codable {}
 #endif
 
-#if SYSTEM_PACKAGE_DARWIN || os(FreeBSD)
+#if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(Linux) || os(Android)
 // MARK: - FileSystemType
 
 /// A Swift wrapper of the C `f_type` file system type found in a `statfs`
-/// struct on Darwin and FreeBSD.
+/// struct.
 ///
-/// - Note: Only available on Darwin and FreeBSD.
+/// On Darwin and FreeBSD, `StatFS.type` reports it. There it's an index that
+/// the kernel assigns to each kind of file system it has loaded, with no
+/// stable, public constants.
+///
+/// On Linux and Android, where `StatFS` wraps `statvfs`, which has no
+/// `f_type`, get it with `FilePath.fileSystemType()` or
+/// `FileDescriptor.fileSystemType()`. There it's the file system's magic
+/// number, such as `TMPFS_MAGIC`, which is stable: the named constants, such
+/// as `tmpfs`, are the ones in `<linux/magic.h>`. The kernel reports these in
+/// a field as wide as a `long`, but all of them fit in `rawValue`.
+///
+/// - Note: Only available on Darwin, FreeBSD, Linux, and Android.
 @frozen
 @available(System 199, *)
 public struct FileSystemType: RawRepresentable, Sendable, Hashable, Codable {

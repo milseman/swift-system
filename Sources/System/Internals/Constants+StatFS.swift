@@ -372,4 +372,112 @@ internal var _MNT_NOPERM: CInterop.MountFlags { CInterop.MountFlags(truncatingIf
 internal var _MNT_WXALLOWED: CInterop.MountFlags { CInterop.MountFlags(truncatingIfNeeded: MNT_WXALLOWED) }
 #endif
 
+// MARK: - File System Magic Numbers
+
+// The f_type values that Linux's statfs reports, from <linux/magic.h>. That
+// is a kernel header, which no C library module includes, and older copies
+// lack some of these, so they are spelled out here. They are the kernel's
+// ABI, the same on every architecture.
+
+#if os(Linux) || os(Android)
+@_alwaysEmitIntoClient
+internal var _TMPFS_MAGIC: UInt32 { 0x01021994 }
+
+@_alwaysEmitIntoClient
+internal var _RAMFS_MAGIC: UInt32 { 0x858458F6 }
+
+@_alwaysEmitIntoClient
+internal var _PROC_SUPER_MAGIC: UInt32 { 0x9FA0 }
+
+@_alwaysEmitIntoClient
+internal var _SYSFS_MAGIC: UInt32 { 0x62656572 }
+
+@_alwaysEmitIntoClient
+internal var _DEVPTS_SUPER_MAGIC: UInt32 { 0x1CD1 }
+
+@_alwaysEmitIntoClient
+internal var _CGROUP_SUPER_MAGIC: UInt32 { 0x27E0EB }
+
+@_alwaysEmitIntoClient
+internal var _CGROUP2_SUPER_MAGIC: UInt32 { 0x63677270 }
+
+@_alwaysEmitIntoClient
+internal var _DEBUGFS_MAGIC: UInt32 { 0x64626720 }
+
+@_alwaysEmitIntoClient
+internal var _TRACEFS_MAGIC: UInt32 { 0x74726163 }
+
+@_alwaysEmitIntoClient
+internal var _SECURITYFS_MAGIC: UInt32 { 0x73636673 }
+
+@_alwaysEmitIntoClient
+internal var _BPF_FS_MAGIC: UInt32 { 0xCAFE4A11 }
+
+@_alwaysEmitIntoClient
+internal var _NSFS_MAGIC: UInt32 { 0x6E736673 }
+
+@_alwaysEmitIntoClient
+internal var _EFIVARFS_MAGIC: UInt32 { 0xDE5E81E4 }
+
+@_alwaysEmitIntoClient
+internal var _HUGETLBFS_MAGIC: UInt32 { 0x958458F6 }
+
+@_alwaysEmitIntoClient
+internal var _MQUEUE_MAGIC: UInt32 { 0x19800202 }
+
+@_alwaysEmitIntoClient
+internal var _AUTOFS_SUPER_MAGIC: UInt32 { 0x0187 }
+
+@_alwaysEmitIntoClient
+internal var _FUSE_SUPER_MAGIC: UInt32 { 0x65735546 }
+
+@_alwaysEmitIntoClient
+internal var _OVERLAYFS_SUPER_MAGIC: UInt32 { 0x794C7630 }
+
+@_alwaysEmitIntoClient
+internal var _EXT2_SUPER_MAGIC: UInt32 { 0xEF53 }
+
+@_alwaysEmitIntoClient
+internal var _EXT3_SUPER_MAGIC: UInt32 { 0xEF53 }
+
+@_alwaysEmitIntoClient
+internal var _EXT4_SUPER_MAGIC: UInt32 { 0xEF53 }
+
+@_alwaysEmitIntoClient
+internal var _BTRFS_SUPER_MAGIC: UInt32 { 0x9123683E }
+
+@_alwaysEmitIntoClient
+internal var _XFS_SUPER_MAGIC: UInt32 { 0x58465342 }
+
+@_alwaysEmitIntoClient
+internal var _F2FS_SUPER_MAGIC: UInt32 { 0xF2F52010 }
+
+@_alwaysEmitIntoClient
+internal var _EROFS_SUPER_MAGIC_V1: UInt32 { 0xE0F5E1E2 }
+
+@_alwaysEmitIntoClient
+internal var _SQUASHFS_MAGIC: UInt32 { 0x73717368 }
+
+@_alwaysEmitIntoClient
+internal var _MSDOS_SUPER_MAGIC: UInt32 { 0x4D44 }
+
+@_alwaysEmitIntoClient
+internal var _ISOFS_SUPER_MAGIC: UInt32 { 0x9660 }
+
+@_alwaysEmitIntoClient
+internal var _NFS_SUPER_MAGIC: UInt32 { 0x6969 }
+
+@_alwaysEmitIntoClient
+internal var _V9FS_MAGIC: UInt32 { 0x01021997 }
+
+@_alwaysEmitIntoClient
+internal var _PIPEFS_MAGIC: UInt32 { 0x50495045 }
+
+@_alwaysEmitIntoClient
+internal var _SOCKFS_MAGIC: UInt32 { 0x534F434B }
+
+@_alwaysEmitIntoClient
+internal var _ANON_INODE_FS_MAGIC: UInt32 { 0x09041934 }
+#endif // os(Linux) || os(Android)
+
 #endif // !os(Windows)
