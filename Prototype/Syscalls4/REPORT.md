@@ -196,3 +196,82 @@ the `pty-run` sample, in a new "More system call samples" group in `main.swift`.
   suites pass.
 - Linux (swift:6.2-noble): XCTest 369 run, 2 skipped, 0 failures;
   swift-testing 277 tests in 37 suites pass.
+
+## 2. Socket creation and accept flags
+
+### Commits and API
+
+`1428285`, in SystemSockets (`Sockets/SocketOpenOptions.swift`,
+`Internals/SocketSyscalls+OpenOptions.swift`, and `csystem_accept4`).
+
+| API | C |
+|---|---|
+| `SocketDescriptor.OpenOptions`: `.nonBlocking`, `.closeOnExec` | `SOCK_NONBLOCK`, `SOCK_CLOEXEC` |
+| `SocketDescriptor.open(_:_:protocol:options:retryOnInterrupt:) throws(Errno)` | `socket`, with the flags in the type |
+| `SocketDescriptor.pair(_:_:protocol:options:retryOnInterrupt:) throws(Errno)` | `socketpair`, likewise |
+| `accept(options:retryOnInterrupt:)`, `accept(client:options:retryOnInterrupt:) throws(Errno)` | `accept4` |
+
+### Design calls
+
+- **Darwin emulates the options with `fcntl`**, after `socket`,
+  `socketpair`, or `accept`, closing the new socket (both, for a pair) if
+  that fails. Rejected: omitting them on Darwin, which leaves every portable
+  caller to write NIO's `#if os(Linux)` and the same `fcntl`, with the same
+  race. The race is inherent (Darwin has no atomic way), and
+  `.closeOnExec`'s docs name it and point to
+  `SpawnAttributes.Flags.closeOnExecByDefault`.
+- **`accept(options:)` has `accept4`'s semantics everywhere**: the new
+  socket is nonblocking exactly when the options say so. Darwin's `accept`
+  passes on the listener's `O_NONBLOCK` (a C probe showed it, and not
+  `FD_CLOEXEC`), so the emulation also clears it when it wasn't asked for,
+  at the cost of an `F_GETFL`. Plain `accept()` keeps each platform's
+  behavior. Rejected: inheriting on Darwin, so that one call's result
+  differs by platform.
+- **The type is `SocketDescriptor.OpenOptions`**, after
+  `FileDescriptor.OpenOptions`, whose `.closeOnExec` and `.nonBlocking` it
+  mirrors, and it's one type for all three calls, since `socket`,
+  `socketpair`, and `accept4` take the same flags. Rejected: `Options`, too
+  near `SocketOption` (`SO_*`), and one type per call, as
+  `PipeOptions`/`DuplicateOptions` are for `pipe2`/`dup3`, whose flags
+  differ from `open`'s.
+- **New overloads with a required `options:`**, typed-throwing, beside the
+  untyped `open`, `pair`, and `accept`, which don't change. Rejected: an
+  `options: = []` parameter on the existing methods (an edit to their file,
+  and a change of their throws type).
+- **The raw values on Darwin are FreeBSD's `SOCK_*` bits**, System's own
+  stand-ins, which it never passes to a call.
+- **`csystem_accept4`**, since glibc and Musl declare `accept4` only with
+  `_GNU_SOURCE`, takes untyped address arguments so that `CSystemLinux.h`
+  needn't include `<sys/socket.h>` (whose `sockaddr` members would then be
+  attributed to CSystem). The lane's shims go in a block of their own at the
+  end of `CSystemLinux.h` and `shims.c`, away from the other lanes'
+  insertions.
+- `EAGAIN` from a nonblocking listener stays an error (`.wouldBlock`), as
+  the existing `accept` reports it. NIO maps it to `nil`; that's NIO's
+  convention.
+
+### What it replaces in the adopters
+
+- NIO `Sources/NIOPosix/BaseSocket.swift` `makeSocket` (`SOCK_NONBLOCK` on
+  Linux, `fcntl` elsewhere), `Sources/NIOPosix/ServerSocket.swift` `accept`
+  (`accept4` on Linux, `accept` and `fcntl` elsewhere),
+  `Sources/NIOPosix/Linux.swift` (`SOCK_CLOEXEC`, `SOCK_NONBLOCK` per C
+  library, and `accept4` over `CNIOLinux_accept4`). NIO's migration left
+  these Linux paths unchanged, so no `SYSTEM-GAP` line names them.
+
+### Platforms
+
+- Built and tested: macOS 26.3, and Linux swift:6.2-noble (the accept test
+  binds loopback; it ran on both).
+- Unverified: Musl and Android (`SOCK_*` as macros; Bionic has `accept4` at
+  API level 21), and FreeBSD, which takes the Glibc branch of SystemSockets
+  with macro constants.
+
+### Tests
+
+- New: `SocketOpenOptionsTests` (4, swift-testing; one needs bind),
+  `SocketOpenOptionsMockTests` (6).
+- macOS: XCTest 430 run, 4 skipped, 0 failures; swift-testing 286 tests in
+  38 suites pass.
+- Linux (swift:6.2-noble): XCTest 369 run, 2 skipped, 0 failures;
+  swift-testing 287 tests in 39 suites pass.
