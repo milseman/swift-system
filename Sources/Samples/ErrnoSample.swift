@@ -55,7 +55,12 @@ struct ErrnoSample: ParsableCommand {
     // getpriority can return -1 without failing, so only errno tells:
     // clear it, make the call, and read it right after.
     Errno.current = Errno(rawValue: 0)
+    #if os(Linux) && canImport(Glibc)
+    // glibc declares PRIO_PROCESS in an enum, whose type isn't getpriority's.
+    let priority = getpriority(__priority_which_t(PRIO_PROCESS.rawValue), 0)
+    #else
     let priority = getpriority(PRIO_PROCESS, 0)
+    #endif
     let error = Errno.current
     if priority == -1 && error.rawValue != 0 { throw error }
     print("This process's nice value is \(priority)")
