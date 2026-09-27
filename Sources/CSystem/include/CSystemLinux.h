@@ -175,3 +175,10 @@ struct csystem_signalfd_siginfo {
   unsigned char __pad[28];
 };
 #endif // __linux__
+
+#ifdef __linux__
+// accept4, which glibc and Musl declare only with _GNU_SOURCE; see shims.c.
+// `addr` points to a struct sockaddr and `addrlen` to a socklen_t, untyped so
+// that this header needn't include <sys/socket.h> (see the ioctl shims).
+extern int csystem_accept4(int fd, void *addr, void *addrlen, int flags);
+#endif // __linux__

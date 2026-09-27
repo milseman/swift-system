@@ -476,3 +476,13 @@ extern int csystem_signalfd(int fd, const void *mask, int flags) {
   return signalfd(fd, (const sigset_t *)mask, flags);
 }
 #endif // __linux__
+
+#ifdef __linux__
+#include <sys/socket.h>
+
+// With _GNU_SOURCE, which this file defines on Linux, <sys/socket.h>
+// declares accept4.
+extern int csystem_accept4(int fd, void *addr, void *addrlen, int flags) {
+  return accept4(fd, (struct sockaddr *)addr, (socklen_t *)addrlen, flags);
+}
+#endif // __linux__
