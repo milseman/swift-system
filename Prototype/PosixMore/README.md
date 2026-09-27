@@ -451,3 +451,63 @@ Adopters:
 Unverified off Darwin: the `mkostemp` and `getauxval` shims, glibc's
 `EINVAL` for bad templates (now caught first anyway), and Linux's `remove`
 error for a directory that isn't empty (the test accepts any `Errno`).
+
+## 6. Dynamic loading
+
+`Sources/System/DynamicLoading/DynamicLibrary.swift`,
+`Sources/System/Internals/Syscalls+DynamicLoading.swift` and
+`Constants+DynamicLoading.swift`.
+
+| API | C |
+|---|---|
+| `DynamicLibrary: ~Copyable`, `init(_:options:) throws(LoaderError)` (`FilePath` and C string) | `dlopen` |
+| `DynamicLibrary.mainProgram(options:)` | `dlopen(NULL, …)` |
+| `address(of:) -> UnsafeMutableRawPointer?` (`String` and C string) | `dlsym` |
+| `close() throws(LoaderError)`, `deinit`, `relinquish()`, `init(taking:)`, `handle` | `dlclose` |
+| `DynamicLibrary.LoaderError` (`message`) | `dlerror` |
+| `DynamicLibrary.OpenOptions`: `.lazy`, `.now`, `.global`, `.local`, `.noLoad`, `.noDelete` (not OpenBSD), `.first` (Darwin) | `RTLD_*` |
+
+Design calls:
+
+- **An owned handle, on `OwnedFD`'s pattern**: `init(taking:)`, a consuming
+  `close()` that reports an error, a `deinit` that drops one, `relinquish()`,
+  and a `handle` property for calls it doesn't wrap. Whether a deinit should
+  drop close errors is `OwnedFD`'s open question (`Prototype/CloseErrors`);
+  this follows its current default without deciding it. It's
+  `@unchecked Sendable`, since the dl* calls are thread-safe and the handle
+  is a raw pointer.
+- **Errors are `LoaderError`s with `dlerror`'s message, not `Errno`**: the
+  dynamic linker doesn't report through `errno`. SwiftPM's `PackagePlugin`
+  keeps the same message in its own `LibraryOpenError`. For the same reason
+  the wrappers have no mock hooks, which set `errno`.
+- **A missing symbol is `nil`, not an error**, as NIO, SwiftPM and
+  Foundation treat it. `address(of:)` clears `dlerror` first, so a caller can
+  still tell a symbol whose value is null from a missing one.
+- **The default options are `[.now, .local]` everywhere.** Darwin makes a
+  library global when neither `.local` nor `.global` is given, and Linux
+  local, so the default names one; and `.now` fails at load rather than
+  crashing at a lazy call later. Rejected: `.lazy` (C's usual choice).
+- **`mainProgram()` is `dlopen(NULL)`**, which NIO and SwiftPM use to find
+  symbols in the running process. Rejected: `RTLD_DEFAULT` (a pseudo-handle
+  glibc declares only with `_GNU_SOURCE`, and whose value differs by
+  platform).
+- **Addresses are raw pointers**, and the documentation says a function's
+  must be cast with `unsafeBitCast(_:to:)`, which nothing checks. Rejected:
+  a generic `address<T>(of:as:)` that casts, which hides the unchecked
+  cast.
+- Not added: `dladdr` (glibc declares it only with `_GNU_SOURCE`), `dlinfo`,
+  `dlvsym`, and `RTLD_NEXT`. Glibc's module links `libdl`, which glibc
+  before 2.34, on Ubuntu 20.04, still needs.
+
+Adopters:
+- NIO: `dlopen(nil, RTLD_NOW)` and `dlsym` to find
+  `swift_task_enqueueGlobal_hook` (`PosixSingletons+ConcurrencyTakeOver`).
+- SwiftPM: `PackagePlugin`'s `LibraryHandle` (`dlopen(nil, RTLD_NOW | RTLD_LOCAL)`,
+  `dlsym`, `dlerror`), and the testing helper's `dlopen` of a test bundle,
+  `dlsym(image, "main")` and `dlclose`.
+- Foundation: `AttributeScope`'s `dlopen(path, RTLD_NOLOAD | RTLD_FIRST)`,
+  `dlsym` and `dlclose`.
+
+Unverified off Darwin: the `RTLD_NOLOAD` and `RTLD_NODELETE` values on
+FreeBSD and Bionic, OpenBSD's lack of them, and Android's linking of
+`libdl`.

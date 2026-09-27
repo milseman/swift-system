@@ -59,6 +59,8 @@ target_sources(SystemPackage PRIVATE
   Directories/DirectoryStream.swift
   Directories/DirectoryWalk.swift)
 target_sources(SystemPackage PRIVATE
+  DynamicLoading/DynamicLibrary.swift)
+target_sources(SystemPackage PRIVATE
   Environment/ProcessEnvironment.swift)
 target_sources(SystemPackage PRIVATE
   Errno/ErrnoAccess.swift)
@@ -101,6 +103,7 @@ endif()
 target_sources(SystemPackage PRIVATE
   Internals/Backcompat.swift
   Internals/CInterop.swift
+  Internals/Constants+DynamicLoading.swift
   Internals/Constants+Events.swift
   Internals/Constants+Time.swift
   Internals/Constants.swift
@@ -108,6 +111,7 @@ target_sources(SystemPackage PRIVATE
   Internals/Mocking.swift
   Internals/RawBuffer.swift
   Internals/Syscalls+Directories.swift
+  Internals/Syscalls+DynamicLoading.swift
   Internals/Syscalls+Environment.swift
   Internals/Syscalls+Events.swift
   Internals/Syscalls+PathsAndFiles.swift

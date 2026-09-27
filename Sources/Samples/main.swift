@@ -79,6 +79,7 @@ struct SystemSamples: ParsableCommand {
       ErrnoSample.self,
       Uname.self,
       MkTemp.self,
+      DLSym.self,
     ])
 }
 
