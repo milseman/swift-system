@@ -1,10 +1,13 @@
 // A model of the C declarations that System's Linux-only process and signal
 // code uses and Darwin lacks, for Prototype/Processes/check-linux.sh to
 // typecheck that code on macOS: the CSystem shims that CSystemLinux.h
-// declares under __linux__, and SIGPWR. It declares only what the code
-// uses, with the types that CSystemLinux.h and glibc 2.35 give them.
+// declares under __linux__, SIGPWR, and _NSIG. It declares only what the
+// code uses, with the types that CSystemLinux.h and glibc 2.35 give them.
 
 #define SIGPWR 30
+
+// Linux's C libraries declare _NSIG, and System uses theirs on Linux.
+#define _NSIG 65
 
 extern int csystem_pidfd_open(int pid, unsigned int flags);
 extern int csystem_pidfd_send_signal(int pidfd, int sig, void *info, unsigned int flags);
