@@ -86,6 +86,8 @@ struct SystemSamples: ParsableCommand {
       Clocks.self,
       ErrnoSample.self,
       Uname.self,
+      // More system call samples
+      PtyRun.self,
       // Darwin samples
       CopyFile.self,
       Sysctl.self,
