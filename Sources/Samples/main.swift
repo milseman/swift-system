@@ -90,6 +90,7 @@ struct SystemSamples: ParsableCommand {
       DLSym.self,
       MMap.self,
       IfConfig.self,
+      XAttr.self,
       // Darwin samples
       CopyFile.self,
       Sysctl.self,

@@ -635,3 +635,62 @@ Adopters: NIO's `System.enumerateDevices` and `NIONetworkDevice`
 Unverified off Darwin: the Android shims; glibc's anonymous-enum `IFF_*`
 constants, which Swift imports as `Int` and this converts; and the Linux
 address lengths.
+
+## 9. Extended attributes
+
+`Sources/System/ExtendedAttributes/ExtendedAttributes.swift`,
+`Sources/System/Internals/Syscalls+ExtendedAttributes.swift` and
+`Constants+ExtendedAttributes.swift`, and `<sys/xattr.h>` in
+`CSystemLinux.h`.
+
+| API | Darwin | Linux |
+|---|---|---|
+| `FilePath.extendedAttributeNames(followTargetSymlink:retryOnInterrupt:)` | `listxattr`, with `XATTR_NOFOLLOW` | `listxattr`, `llistxattr` |
+| `FilePath.extendedAttribute(_:followTargetSymlink:retryOnInterrupt:) -> [UInt8]?` | `getxattr` | `getxattr`, `lgetxattr` |
+| `FilePath.setExtendedAttribute(_:to:options:followTargetSymlink:retryOnInterrupt:)` | `setxattr` | `setxattr`, `lsetxattr` |
+| `FilePath.removeExtendedAttribute(_:followTargetSymlink:retryOnInterrupt:)` | `removexattr` | `removexattr`, `lremovexattr` |
+| The same four on `FileDescriptor`, and as `FilePath` statics over C strings | `f…xattr` | `f…xattr` |
+| `ExtendedAttributeOptions`: `.create`, `.replace` | `XATTR_CREATE`, `XATTR_REPLACE` | the same |
+| `Errno.attributeNotFound` on Linux and Android | (`ENOATTR`, as before) | `ENODATA` |
+
+Design calls:
+
+- **One set of signatures over two.** Darwin's calls take a `position`,
+  used only for resource forks, which is always 0 here, and options that
+  include `XATTR_NOFOLLOW`; Linux has an `l` form of each path call instead.
+  `followTargetSymlink:` picks between them, named as `stat`'s parameter is.
+  Rejected: exposing `position` and Darwin's other options
+  (`XATTR_SHOWCOMPRESSION`, `XATTR_NOSECURITY`), which Linux has no
+  equivalent for; and FreeBSD's `extattr_*` calls, whose namespaces are an
+  argument rather than a prefix, and which would need a different shape.
+- **A missing attribute reads as `nil`**, where Darwin says `ENOATTR` and
+  Linux `ENODATA`. For the calls that still throw it, `remove` and `set`
+  with `.replace`, **`Errno.attributeNotFound` is now portable**: on Linux
+  and Android it's `ENODATA`, which Linux's attribute library also names
+  `ENOATTR`. The existing Darwin and FreeBSD declaration is unchanged; the
+  Linux one is in this lane's file. Rejected: throwing each platform's own
+  error, which makes every caller check two names.
+- **Values are `[UInt8]` read in two calls**: the size, then the value, and
+  again if the value grew in between (`ERANGE`). Setting takes any
+  `Sequence<UInt8>`, as `writeAll` does, so `Array`, `Data` and
+  `String.UTF8View` all work. Names are `[String]`, repaired if they aren't
+  UTF-8. Rejected: span-based reads into a caller's buffer, which save a
+  copy that attribute sizes rarely justify; a later overload can add them.
+- **Glibc's module doesn't include `<sys/xattr.h>`**, so `CSystemLinux.h`
+  includes it; it declares no types, so no C members move to CSystem.
+  Musl's and Bionic's modules include it anyway. The Linux values of
+  `XATTR_CREATE` and `XATTR_REPLACE` are the kernel's 1 and 2, since glibc
+  declares them in an enum.
+- **Tests skip a file system without extended attributes** (`ENOTSUP`),
+  such as tmpfs before Linux 6.6, rather than fail.
+- Not added: Linux 6.13's `getxattrat` family, and a view of the names as a
+  span.
+
+Adopters: NIO's NIOFS `FileHandle.attributeNames`, `valueForAttribute`,
+`updateValueForAttribute` and `removeValueForAttribute`, over the
+descriptor forms (22 lines, and its own `XATTR_MAXNAMELEN`); Foundation's
+`FileManager` extended attributes, by grep (`getxattr`, `setxattr`,
+`listxattr`, and their `f` forms).
+
+Unverified off Darwin: every Linux branch (the `l` calls, the CSystem
+include, `ENODATA`), and user attributes on the CI's file systems.

@@ -141,6 +141,10 @@ extern void csystem_freeifaddrs(void *list);
 #endif // __ANDROID__
 
 #ifdef __linux__
+// The extended attribute calls, which glibc's Swift module doesn't include.
+// The header declares no types, so nothing's members move to CSystem.
+#include <sys/xattr.h>
+
 // mkostemp, which glibc declares only with _GNU_SOURCE, and Bionic only from
 // API level 23; below it, this calls mkstemp when there are no flags, and
 // fails with ENOSYS when there are.

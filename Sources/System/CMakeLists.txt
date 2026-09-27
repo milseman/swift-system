@@ -83,6 +83,8 @@ target_sources(SystemPackage PRIVATE
   Executable/CurrentExecutable.swift
   Internals/Syscalls+Executable.swift)
 target_sources(SystemPackage PRIVATE
+  ExtendedAttributes/ExtendedAttributes.swift)
+target_sources(SystemPackage PRIVATE
   FileCopying/FileClone.swift
   FileCopying/FileCopy.swift
   FileCopying/FileCopyState.swift
@@ -125,6 +127,7 @@ target_sources(SystemPackage PRIVATE
   Internals/CInterop.swift
   Internals/Constants+DynamicLoading.swift
   Internals/Constants+Events.swift
+  Internals/Constants+ExtendedAttributes.swift
   Internals/Constants+MemoryMapping.swift
   Internals/Constants+NetworkInterfaces.swift
   Internals/Constants+StatFS.swift
@@ -137,6 +140,7 @@ target_sources(SystemPackage PRIVATE
   Internals/Syscalls+DynamicLoading.swift
   Internals/Syscalls+Environment.swift
   Internals/Syscalls+Events.swift
+  Internals/Syscalls+ExtendedAttributes.swift
   Internals/Syscalls+MemoryMapping.swift
   Internals/Syscalls+NetworkInterfaces.swift
   Internals/Syscalls+PathsAndFiles.swift
