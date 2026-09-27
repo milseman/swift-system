@@ -39,7 +39,11 @@ final class LinuxProcessTests: XCTestCase {
     // initializes, so check for pidfds on this process first.
     do {
       try ProcessDescriptor(ProcessID.current).close()
-    } catch Errno.noFunction {
+    } catch {
+      // A test rather than `catch Errno.noFunction`: Swift 6.2 crashes in
+      // IRGen on a pattern catch in a function that then gets an owner from
+      // an owner, as openDescriptor() does below.
+      guard error == .noFunction else { throw error }
       throw XCTSkip("This kernel has no pidfd_open")
     }
     let child = try ChildProcess.spawn("/bin/sleep", arguments: ["sleep", "10"])
