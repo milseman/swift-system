@@ -33,9 +33,10 @@ def plat_status(entry, platforms):
     return " · ".join(parts) if parts else "not used"
 
 
-def api_cell(entry):
+def api_cell(entry, cap=4):
     lines = []
-    for a in entry["apis"]:
+    apis = entry["apis"]
+    for a in apis[:cap]:
         tag = ""
         if a["matched"]:
             h = a["matched"][0]
@@ -54,6 +55,8 @@ def api_cell(entry):
         else:
             tag = " (**not on the tip**)"
         lines.append(code(a["text"]) + esc(tag))
+    if len(apis) > cap:
+        lines.append(f"and {len(apis) - cap} more")
     return "<br>".join(lines)
 
 
@@ -139,9 +142,29 @@ def main():
       f"{esc(meta.get('subject', ''))} |")
     w("")
     w(f"Generated {meta.get('date', '')} on {meta.get('host', '')} with {meta.get('swift', '')}, by "
-      f"`Utilities/adopter-coverage/check.sh {pkg['key']}` from `Utilities/adopter-coverage/mapping.ini`. The last "
-      f"section says how.")
+      f"`Utilities/adopter-coverage/check.sh {pkg['key']}` (tool `{meta.get('tool', '?')}`) from "
+      f"`Utilities/adopter-coverage/mapping.ini`, with System's coverage derived from its sources at the commit "
+      f"above. The last section says how.")
     w("")
+    mode = ext.get("mode", "index")
+    if mode == "lexical":
+        why = meta.get("buildFailed") or "the build was skipped"
+        w(f"**Lexical extraction.** {name} didn't build here ({esc(why)}), so the lexical rules read every line, "
+          "with the Darwin SDK's names from another package's index store. On NIO they find about 94% of the "
+          "Darwin interfaces the index finds, with no false positives. Names declared nowhere the rules can see "
+          "(only on Linux or Windows, or in a dependency) are dropped rather than presumed to be the C library's, "
+          "so other platforms are undercounted: "
+          f"{sum(ext.get('lexicalUnresolvedDropped', {}).values())} such references, the most frequent "
+          + ", ".join(code(k) for k in list(ext.get("lexicalUnresolvedDropped", {}))[:10]) + ".")
+        w("")
+    for pd in meta.get("pathDependencies") or []:
+        if pd["kind"] == "swift-system":
+            w(f"The manifest's path dependency {code(pd['from'])} is a swift-system checkout; the build used an "
+              "export of the System commit above instead, so it depends on commits only.")
+        else:
+            w(f"The manifest's path dependency {code(pd['from'])} was built from {code(pd['to'])} as it stood, "
+              "a working tree rather than a commit.")
+        w("")
     w("Platforms: " + ", ".join(f"{ABBREV[p]} = {p}" for p in platforms) + ". Darwin means macOS.")
     w("")
     sdep = ext.get("systemDependency")
@@ -204,6 +227,34 @@ def main():
         w("Stale notes: " + "; ".join(f"[{s['entry']}]" for s in stale) + ".")
     w("")
 
+    # ------------------------------------------------------- derivation
+    der = cov.get("derivation") or {}
+    de = der.get("entries", {})
+    ds = der.get("system", {})
+    w("## Derivation")
+    w("")
+    w(f"What System covers comes from its sources at the commit above: {ds.get('declarations', '?')} public "
+      f"declarations, {ds.get('documented', '?')} of them with a *The corresponding C ...* sentence, and "
+      f"{ds.get('typealiases', '?')} CInterop typealiases, name {der.get('systemNames', '?')} C interfaces. Of the "
+      f"{sum(1 for e in entries if e.get('used'))} entries {name} uses, the derivation decides "
+      f"**{de.get('derived', 0)}**"
+      + (f" ({de.get('auto', 0)} of them interfaces no entry names)" if de.get("auto") else "")
+      + f", a hand status in the mapping decides {de.get('hand', 0)}"
+      + (f", and a per-platform override {de.get('override', 0)}" if de.get("override") else "") + ". "
+      "The derivation runs for those too; where it disagrees, the rows below say why.")
+    w("")
+    dis = der.get("disagreements", [])
+    if dis:
+        w("| Entry | Hand | Derived | Where | Why the derivation differs |")
+        w("|---|---|---|---|---|")
+        for d in dis:
+            byst = collections.defaultdict(list)
+            for p, v in d["platforms"].items():
+                byst[(v["hand"], v["derived"], v["reason"])].append(ABBREV[p])
+            for (h, dv, why), ps in sorted(byst.items()):
+                w(f"| {esc(d['entry'])} | {h} | {dv} | {' '.join(ps)} | {esc(why) or '—'} |")
+        w("")
+
     # ---------------------------------------------------------- summary
     swift_alts_f, swift_alts_a = collections.Counter(), collections.Counter()
     for e in entries:
@@ -214,8 +265,8 @@ def main():
     w("")
     w(f"Each cell is **covered / partial / missing**, counting the OS and C-library symbols {name}'s library targets "
       "use there (the extractor's names: a function, type, constant or variable). A symbol counts as covered on a "
-      "platform only if a System declaration its entry cites is built there, so an entry covered on Linux can be "
-      "missing on Windows. *All platforms* counts each symbol once, at its worst status over the platforms that "
+      "platform only if a System declaration that covers its entry (named by System's doc comments, or cited by "
+      "the mapping) is built there, so an entry covered on Linux can be missing on Windows. *All platforms* counts each symbol once, at its worst status over the platforms that "
       "use it. *Stdlib alternative* counts the missing symbols whose entry names a Swift standard library "
       "replacement.")
     w("")
@@ -286,10 +337,11 @@ def main():
             tg = ", ".join(f"{t} {n}" for t, n in sorted(e["targets"].items(), key=lambda kv: -kv[1])[:4])
             reason = "; ".join(sorted({f"{ABBREV[p]}: {v['reason']}" for p, v in e["platformStatus"].items()
                                         if v.get("reason")}))
-            status = plat_status(e, platforms) + (f" ({esc(reason)})" if reason else "")
+            status = plat_status(e, platforms) + (f" ({esc(reason)})" if reason else "") + \
+                {"hand": " *(hand)*", "override": " *(override)*"}.get(e.get("decidedBy"), "")
             note = note_text(e) + (f" *Swift:* {e['swift']}." if e.get("swift") else "")
-            w(f"| {esc(e['id'])} | {sym_cell} | {status} | {api_cell(e) or '—'} | {e['sites']} ({esc(tg)}) | "
-              f"{esc(note)} |")
+            w(f"| {esc(e['id'])}{' *(no entry)*' if e.get('auto') else ''} | {sym_cell} | {status} | "
+              f"{api_cell(e) or '—'} | {e['sites']} ({esc(tg)}) | {esc(note)} |")
         w("")
     ignored = [e for e in entries if e["status"] == "ignore"]
     if ignored:
@@ -297,6 +349,48 @@ def main():
         w("")
         for e in ignored:
             w(f"- [{esc(e['id'])}] {', '.join(code(s) for s in e['symbols'])}: {esc(note_text(e))}")
+        w("")
+
+    # ---------------------------------------------------------- Darwin
+    dz = cov.get("darwin") or {}
+    if dz:
+        sm = dz.get("summary", {})
+        bc = sm.get("byClass", {})
+        w("## The Darwin module")
+        w("")
+        w(f"How {name}'s {sm.get('swiftFiles', 0)} library Swift files see the Darwin module on Darwin "
+          "(`scripts/darwin.py`): "
+          + ", ".join(f"{bc.get(c, 0)} {c}" for c in ("direct", "module re-export", "package re-export", "Foundation",
+                                                      "SDK re-export"))
+          + f", and {sm.get('noDarwin', 0)} not at all. *Direct* is a file that imports it in any form; *module "
+          "re-export*, one whose module re-exports it from another file; *package re-export*, one that imports a "
+          "module of the package or a dependency that re-exports it; *Foundation* and *SDK re-export*, one that "
+          "sees it only through Apple Foundation's re-export or another SDK module's.")
+        w("")
+        if dz.get("reexportShims"):
+            w("Re-export shims (files whose `@_exported import` makes Darwin visible to other files): "
+              + ", ".join(code(x) for x in dz["reexportShims"]) + ". Re-exporting modules: "
+              + ", ".join(f"{m} ({esc(c)})" for m, c in dz.get("reexportModules", {}).items()) + ".")
+            w("")
+        files = dz.get("files", {})
+        direct = sorted(r for r, f in files.items() if f.get("class") == "direct")
+        if direct:
+            w(f"<details><summary>The {len(direct)} files that import Darwin</summary>")
+            w("")
+            for r in direct:
+                f = files[r]
+                w(f"- `{r}`: " + "; ".join(code(d["text"]) for d in f["direct"][:3]))
+            w("")
+            w("</details>")
+            w("")
+        ibc = dz.get("interfacesByClass", {})
+        via = ibc.get("Foundation", [])
+        w(f"Darwin interfaces {name} uses, by the most direct way a file that uses them sees Darwin: "
+          + ", ".join(f"{len(ibc.get(c, []))} {c}" for c in ("direct", "module re-export", "package re-export",
+                                                             "Foundation", "SDK re-export") if ibc.get(c)) + ". "
+          + (f"Reached only through Foundation's re-export: " + ", ".join(
+              f"{code(x['name'])} ({x['sites']})" for x in via[:40]) + "." if via else
+             "None is reached only through Foundation's re-export."))
         w("")
 
     # --------------------------------------------------- per interface
