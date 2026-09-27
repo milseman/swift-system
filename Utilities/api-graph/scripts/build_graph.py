@@ -112,6 +112,8 @@ def main():
     ap.add_argument("--diff", required=True)
     ap.add_argument("--root", required=True)
     ap.add_argument("--namespaces", default="CInterop")
+    ap.add_argument("--lexical-samples", action="store_true",
+                    help="match samples by name: Samples wasn't built, so the index doesn't have them")
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
 
@@ -141,12 +143,9 @@ def main():
             module = "SystemSockets" if target_usr.startswith("s:13SystemSockets") else "SystemPackage"
             vocabulary[target_usr] = {"id": target_usr, "path": path, "module": module, "why": "base"}
         else:
-            module = ("Swift" if target_usr.startswith(("s:s", "s:Sb", "s:Si", "s:SS", "s:Sa", "s:Sq", "s:SU", "s:Sp",
-                                                         "s:SP", "s:Sv", "s:SV", "s:Sw", "s:SW", "s:Su", "s:Sd",
-                                                         "s:Sf", "s:SD", "s:Sh", "s:SQ", "s:SH", "s:SL", "s:SE",
-                                                         "s:Se", "s:ST", "s:Sl", "s:SK", "s:SM", "s:Sm", "s:SN",
-                                                         "s:Sz", "s:SZ", "s:SY", "s:Sy", "s:Sj", "s:SJ", "s:Sx"))
-                      else "C" if target_usr.startswith("c:") else "other")
+            # The standard library's USRs start s:s or, abbreviated, s:S.
+            module = ("Swift" if target_usr.startswith(("s:s", "s:S")) else
+                      "C" if target_usr.startswith("c:") else "other")
             vocabulary[target_usr] = {"id": target_usr, "path": spelling, "module": module, "why": "external"}
         return target_usr
 
@@ -328,25 +327,28 @@ def main():
             par = head.parent.get(nid)
             if par:
                 edge(nid, par, "nestedIn" if n["isType"] else "memberOf", head.path(par))
-            # A member typealias named through its parent (`CInterop.Termios`)
-            # comes as `CInterop` with a USR, then `.`, then `Termios`
-            # without one: rebuild the qualified name and look it up.
-            qualified, prev_type = None, False
+            # A qualified name, `PThread.Mutex.Kind`, comes as one type
+            # identifier per component, separated by `.`. Only the whole name
+            # is a reference; its qualifiers are namespaces, which the named
+            # type's own nesting records. A member typealias named through
+            # its parent (`CInterop.Termios`) has no USR on its last
+            # component, so the qualified name is looked up.
             frags = s.get("declarationFragments", [])
-            for k, fr in enumerate(frags):
-                t = fr.get("preciseIdentifier")
+            chain, k = [], 0
+            while k < len(frags):
+                fr = frags[k]
                 if fr.get("kind") == "typeIdentifier":
-                    after_dot = prev_type and k >= 1 and frags[k - 1].get("spelling") == "."
-                    qualified = (qualified + "." + fr["spelling"]) if after_dot and qualified else fr["spelling"]
-                    if not t:
-                        t = type_by_path.get(qualified)
+                    chain.append((fr["spelling"], fr.get("preciseIdentifier")))
+                    if k + 2 < len(frags) and frags[k + 1].get("spelling") == "." \
+                            and frags[k + 2].get("kind") == "typeIdentifier":
+                        k += 2
+                        continue
+                    qualified = ".".join(sp for sp, _ in chain)
+                    t = chain[-1][1] or type_by_path.get(qualified)
                     if t and t != nid:
                         edge(nid, t, "references", qualified)
-                    prev_type = True
-                elif fr.get("spelling") == "." and prev_type:
-                    continue
-                else:
-                    prev_type, qualified = False, None
+                    chain = []
+                k += 1
             for tgt, fb in head.conforms.get(nid, ()):
                 if tgt in nodes:
                     edge(nid, tgt, "conformsTo", fb)
@@ -375,7 +377,6 @@ def main():
         info = sindex.get(rel) if rel else None
         if not d or not info:
             continue
-        top = d if d["block"] is None else info["decls"][info["blocks"][d["block"]]["decl"]]
         blk = info["blocks"][d["block"]] if d["block"] is not None else None
         if blk is None:
             continue
@@ -396,7 +397,6 @@ def main():
         atoms[key]["nodes"].append(nid)
         node_atom[nid] = key
         n["atom"] = key
-        del top
     # Nodes with no location (synthesized members) join their parent's atom.
     for nid, n in nodes.items():
         if nid in node_atom:
@@ -437,7 +437,11 @@ def main():
         if rel not in samples:
             path = os.path.join(a.root, rel)
             text = open(path, encoding="utf-8").read() if os.path.exists(path) else ""
-            names = re.findall(r'commandName:\s*"([^"]+)"', text)
+            names = list(dict.fromkeys(re.findall(r'commandName:\s*"([^"]+)"', text)))
+            if not names:
+                # ArgumentParser's default: the type's name in kebab case.
+                names = [re.sub(r"(?<!^)(?=[A-Z])", "-", t).lower()
+                         for t in re.findall(r"struct\s+(\w+)\s*:\s*(?:Async)?ParsableCommand", text)]
             abstract = re.findall(r'abstract:\s*"((?:[^"\\]|\\.)*)"', text)
             samples[rel] = {"file": rel, "commands": names, "abstract": abstract[0] if abstract else "",
                             "unavailableStub": bool(abstract and abstract[0].startswith("Unavailable:"))}
@@ -478,7 +482,12 @@ def main():
         if (rel.startswith("Tests/") or rel.startswith("Sources/Samples/")) and rel.endswith(".swift"):
             lexical_files[rel] = open(os.path.join(a.root, rel), encoding="utf-8").read().split("\n")
     for nid, n in nodes.items():
-        if n["source"] != "scan" or n["hiddenClass"] == "unavailable":
+        if n["hiddenClass"] == "unavailable":
+            continue
+        # Graph nodes too when Samples couldn't be built and indexed.
+        want_tests = n["source"] == "scan"
+        want_samples = want_tests or a.lexical_samples
+        if not want_samples:
             continue
         own = n["path"].split(".")[-1]
         simple = re.sub(r"\(.*$", "", own)
@@ -493,6 +502,8 @@ def main():
             need = re.compile(rf"\b{re.escape(parent_simple)}\b") if parent_simple else None
         for rel, lines in lexical_files.items():
             info = sindex[rel]
+            if not want_tests and not rel.startswith("Sources/Samples/"):
+                continue
             if rel.startswith("Sources/Samples/"):
                 text = "\n".join(lines)
                 if pat.search(text) and (need is None or need.search(text)):
@@ -518,13 +529,24 @@ def main():
     for rel, f in refs["files"].items():
         refs_by_file[rel] = sorted(f["references"])
 
-    def refs_in(rel, start, end):
+    def refs_in(rel, start, end, uses=False):
+        """USRs referenced in lines start...end of rel. With uses, leave out
+        a type named only to qualify a nested one (the `PThread` of
+        `PThread.Mutex`), which the index records as a reference too."""
         rs = refs_by_file.get(rel, [])
         k = bisect.bisect_left(rs, [start, -1, "", 0])
         out = []
+        lines = code_lines(rel) if uses else None
         while k < len(rs) and rs[k][0] <= end:
-            out.append(rs[k][2])
+            line, col, usr = rs[k][0], rs[k][1], rs[k][2]
             k += 1
+            if uses and line - 1 < len(lines):
+                name = re.sub(r"\(.*$", "", syms.get(usr, {}).get("name", ""))
+                text = lines[line - 1]
+                after = text[col - 1 + len(name):col + len(name) + 1] if text[col - 1:col - 1 + len(name)] == name else ""
+                if re.match(r"\.[A-Z]", after):
+                    continue
+            out.append(usr)
         return out
 
     def is_new(rel, line):
@@ -591,7 +613,11 @@ def main():
         n["cCalls"] = sorted(c_calls[nid])
         # Other new public API its implementation uses, such as a CInterop
         # alias no signature names.
-        n["implUses"] = sorted(usr_node[u] for u in seen if u in usr_node and usr_node[u] != nid)
+        used = set(refs_in(n["file"], n["start"], n["end"], uses=True))
+        for p in pieces:
+            if not p["kind"].startswith("c-"):
+                used |= set(refs_in(p["file"], p["start"], p["end"], uses=True))
+        n["implUses"] = sorted({usr_node[u] for u in used if u in usr_node and usr_node[u] != nid})
 
     for n in nodes.values():
         n["tests"] = sorted(n.get("tests", ()))

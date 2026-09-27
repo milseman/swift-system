@@ -82,7 +82,7 @@
       "deliberatelyOpen": "Item 80: PThread's deinit joins, or detaches when it runs on the thread itself. That's a default to measure the others against, not a decision.",
       "writeups": ["Prototype/ThreadDeinit/README.md", "Prototype/Threads/README.md"],
       "rules": [
-        {"kind": "pathRegex", "pattern": "^PThread($|\\.[a-z_][^.]*$)", "weight": 1, "evidence": "{path} is PThread's own API"}
+        {"kind": "pathRegex", "pattern": "^PThread$", "weight": 1, "evidence": "{path} is the owned thread, whose deinit is the question"}
       ]
     },
     {

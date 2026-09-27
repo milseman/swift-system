@@ -274,7 +274,7 @@ def main():
     groups0 = collections.defaultdict(list)
     for x, c in comp.items():
         groups0[c].append(x)
-    attached = {}
+    attached, attached_info = {}, []
     for root, xs in sorted(groups0.items()):
         if root in touching:
             continue
@@ -284,8 +284,11 @@ def main():
         files = {atoms[x]["file"] for x in xs}
         if len(users) == 1:
             (target,) = users
-            if files & {atoms[y]["file"] for y in groups0[target]}:
+            shared_files = files & {atoms[y]["file"] for y in groups0[target]}
+            if shared_files:
                 attached[root] = target
+                attached_info.append({"from": root, "into": target, "file": sorted(shared_files)[0],
+                                      "types": sorted(nodes[t]["path"] for t in types)})
     for x, c in list(comp.items()):
         while c in attached:
             c = attached[c]
@@ -687,6 +690,15 @@ def main():
             parts[0]["key"] = c["key"]
 
     # Ids from names: stable across runs as long as the names are.
+    # Units named alike (two blocks wrapping the same C calls) are told
+    # apart by the file most of their declarations are in.
+    name_count = collections.Counter((u["kind"], u["name"]) for u in units.values())
+    for u in units.values():
+        if name_count[(u["kind"], u["name"])] > 1:
+            files = collections.Counter(nodes[i]["file"] for i in u["nodes"] if nodes[i]["file"])
+            if files:
+                stem = os.path.splitext(os.path.basename(files.most_common(1)[0][0]))[0]
+                u["name"] = f"{u['name']} ({stem})"
     used = collections.Counter()
     for key in sorted(units, key=lambda k: (units[k]["kind"] != "cluster", k)):
         u = units[key]
@@ -750,6 +762,53 @@ def main():
         return seen
 
     strength = {"api": 3, "implementation": 2, "nesting": 1}
+
+    def type_of(nid):
+        """The type a member belongs to."""
+        for e in edges_from[nid]:
+            if e["kind"] in ("memberOf", "nestedIn") and e["to"] in nodes:
+                return e["to"]
+        return None
+
+    part_key = {}
+    for c in clusters:
+        for p in c["parts"]:
+            for x in p["atoms"]:
+                part_key[x] = p["key"]
+
+    closure_memo = {}
+
+    def node_closure(x, stack=()):
+        """The contingencies using declaration x involves: its own tags;
+        its parent's, since a member needs its type (route api) and a nested
+        type needs its parent's name (route nesting); and those of the types
+        its signature names (route api). A type's other members don't count:
+        taking an OwnedFD doesn't involve OwnedFD's Span-based read.
+        {cid: (route, weight, via)}"""
+        if x in closure_memo:
+            return closure_memo[x]
+        if x in stack:
+            return {}
+        out = {}
+
+        def put(cid_, route, w, via):
+            cur = out.get(cid_)
+            if cur is None or strength[route] > strength[cur[0]] or (route == cur[0] and w > cur[1]):
+                out[cid_] = (route, w, via)
+        for cid_, w, ev, inherit in node_tags.get(x, ()):
+            if inherit:
+                put(cid_, "api", w, nodes[x]["path"])
+        for e in edges_from[x]:
+            r = e["to"]
+            if r == x or r not in nodes:
+                continue
+            route = "nesting" if e["kind"] == "nestedIn" else "api"
+            for cid_, (st, w, via) in node_closure(r, stack + (x,)).items():
+                put(cid_, min(route, st, key=lambda q: strength[q]), w, via)
+        if len(stack) == 0:
+            closure_memo[x] = out
+        return out
+
     for key, u in units.items():
         pre = all_prereqs(key)
         u["allPrerequisites"] = {k: {"namespaceOnly": v} for k, v in sorted(pre.items())}
@@ -772,24 +831,28 @@ def main():
                 if len(ip[tgt]) < 6:
                     ip[tgt].append([nodes[nid]["path"], nodes[used]["path"]])
         u["implPrerequisites"] = dict(sorted(ip.items()))
+        # Inherited: what each declaration this unit uses from outside
+        # involves (node_closure), by the route it's used through.
         inh = {}
-
-        def consider(cid_, via, through, weight):
-            if cid_ in u["direct"]:
-                return
-            cur = inh.get(cid_)
-            if cur is None or strength[through] > strength[cur["through"]] or (
-                    through == cur["through"] and weight > cur["weight"]):
-                inh[cid_] = {"via": units[via]["id"], "through": through, "weight": weight,
-                             "namespaceOnly": through == "nesting"}
-        for k, v in pre.items():
-            for cid_, info in units[k]["direct"].items():
-                if info["inheritWeight"]:
-                    consider(cid_, k, "nesting" if v else "api", info["inheritWeight"])
-        for k in ip:
-            for cid_, info in units[k]["direct"].items():
-                if info["inheritWeight"]:
-                    consider(cid_, k, "implementation", info["inheritWeight"])
+        outside = collections.defaultdict(set)   # node -> routes it's reached by
+        for nid in u["nodes"]:
+            for e in edges_from[nid]:
+                t = e["to"]
+                if t in nodes and t not in mine_nodes:
+                    outside[t].add("nesting" if e["kind"] == "nestedIn" else "api")
+            for used in nodes[nid].get("implUses", ()):
+                if used not in mine_nodes and node_atom.get(used) not in loose:
+                    outside[used].add("implementation")
+        for t, routes in outside.items():
+            route = max(routes, key=lambda r: strength[r])
+            for cid_, (st, w, via) in node_closure(t).items():
+                if cid_ in u["direct"]:
+                    continue
+                through = min(route, st, key=lambda r: strength[r])
+                cur = inh.get(cid_)
+                if cur is None or strength[through] > strength[cur["through"]] or (
+                        through == cur["through"] and w > cur["weight"]):
+                    inh[cid_] = {"via": via, "through": through, "weight": w, "namespaceOnly": through == "nesting"}
         u["inherited"] = dict(sorted(inh.items()))
         u["cyclic"] = key in pre
 
@@ -818,6 +881,8 @@ def main():
         add("prerequisites", W["prerequisite"] * len(u["allPrerequisites"]))
         if any(p["kind"] == "proposal" and p["score"] >= 5 for p in u["prior"]):
             add("prior proposal", W["priorProposal"])
+        u["openScore"] = round(sum(v for k, v in parts if k.startswith(("open:", "inherits "))), 1)
+        u["effortScore"] = round(sum(v for k, v in parts if not k.startswith(("open:", "inherits "))), 1)
         return round(sum(v for _, v in parts), 1), parts
 
     def reason(u):
@@ -915,7 +980,9 @@ def main():
             return batched[k]
         return units[k]["cluster"] if units[k]["cluster"] in cand_set else None
     needs = {k: {as_candidate(p) for p in units[k]["allPrerequisites"]} - {None, k} for k in candidates}
-    order_key = {k: (units[k]["score"], units[k]["metrics"]["declarations"], units[k]["id"]) for k in candidates}
+    # Open questions first, whatever the size; then effort.
+    order_key = {k: (units[k]["openScore"], units[k]["effortScore"], units[k]["metrics"]["declarations"], units[k]["id"])
+                 for k in candidates}
     placed, ordered = set(), []
     remaining = set(candidates)
     while remaining:
@@ -976,10 +1043,13 @@ def main():
         "candidates": [{"id": units[k]["id"], "kind": units[k]["kind"],
                         "cluster": units[units[k]["cluster"]]["id"] if units[k]["cluster"] else None,
                         "name": units[k]["name"], "rank": units[k]["rank"], "score": units[k]["score"],
+                        "openScore": units[k]["openScore"], "effortScore": units[k]["effortScore"],
                         "reason": units[k]["reason"], "declarations": units[k]["metrics"]["declarations"]}
                        for k in candidates],
         "batches": [unit_out(k) for k in sorted(units) if units[k]["kind"] == "batch"],
         "gists": gists,
+        "attached": [dict(x, into=units[cluster_of_atom[x["into"]]]["id"]) for x in attached_info],
+        "aliasAttachment": {nodes[atoms[L]["nodes"][0]]["path"]: v for L, v in sorted(loose_via.items())},
         "nodeTags": {k: v for k, v in node_tags.items()},
     }, open(a.out, "w"), indent=1, default=lambda o: sorted(o) if isinstance(o, set) else str(o))
     print(f"cluster: {len(promoted)} promoted types, {len(clusters)} clusters, "
