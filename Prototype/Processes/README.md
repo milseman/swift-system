@@ -339,8 +339,9 @@ No policy is free, and the costs differ from the thread case.
   until the parent exits, and a long-running server that forgets them runs
   out.
 - **Trap** turns a forgotten `wait()` into a crash where it happened, error
-  unwinding included; satisfying it costs a `do`/`catch` per throwing scope,
-  since `defer` can't consume (V11a).
+  unwinding included: it trapped in 11 of the 13 ordinary scenarios.
+  Satisfying it costs a `do`/`catch` per throwing scope, since `defer` can't
+  consume (V11a).
 
 Every policy that waits or signals acts on an ID that something else may
 already have reaped (`reaped-through-hatch`, `SIGCHLD-ignored`). A reaped ID

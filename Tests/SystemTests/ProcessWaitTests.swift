@@ -232,9 +232,9 @@ final class ChildProcessTests: XCTestCase {
   }
 
   #if ENABLE_MOCKING
-  func testDestroyingSignalsOnlyAnUnreapedChild() throws {
+  func testDestroyingSignalsOnlyAnUnreapedChild() {
     let id = ProcessID(rawValue: 4242)
-    try MockingDriver.withMockingEnabled { mocking in
+    MockingDriver.withMockingEnabled { mocking in
       // The peek reports a running child: kill it, then reap it.
       do { _ = ChildProcess(taking: id) }
       let expected = [
