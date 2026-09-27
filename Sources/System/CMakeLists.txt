@@ -113,6 +113,13 @@ target_sources(SystemPackage PRIVATE
   Internals/Syscalls.swift
   Internals/WindowsSyscallAdapters.swift)
 target_sources(SystemPackage PRIVATE
+  Internals/Constants+LibProc.swift
+  Internals/Syscalls+LibProc.swift
+  LibProc/BSDInfo.swift
+  LibProc/OpenFileDescriptors.swift
+  LibProc/ProcessList.swift
+  LibProc/ProcessPaths.swift)
+target_sources(SystemPackage PRIVATE
   Internals/Syscalls+MachTime.swift
   MachTime/MachTime.swift)
 target_sources(SystemPackage PRIVATE

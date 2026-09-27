@@ -78,6 +78,7 @@ struct SystemSamples: ParsableCommand {
       MachTime.self,
       ConfStr.self,
       MkPath.self,
+      LsProc.self,
     ])
 }
 
