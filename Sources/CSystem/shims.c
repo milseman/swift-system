@@ -137,10 +137,12 @@ extern int csystem_ptsname_r(int fd, char *buffer, size_t length) {
 #endif // __linux__
 
 #ifdef __linux__
+#include <signal.h>
 #include <sys/stat.h>
 
 _Static_assert(CSYSTEM_UTIME_NOW == UTIME_NOW, "CSYSTEM_UTIME_NOW");
 _Static_assert(CSYSTEM_UTIME_OMIT == UTIME_OMIT, "CSYSTEM_UTIME_OMIT");
+_Static_assert(CSYSTEM_KERNEL_SIGSET_SIZE == _NSIG / 8, "CSYSTEM_KERNEL_SIGSET_SIZE");
 #endif // __linux__
 
 #ifdef __linux__
