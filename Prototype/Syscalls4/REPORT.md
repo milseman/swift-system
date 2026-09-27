@@ -352,3 +352,167 @@ the `pty-run` sample, in a new "More system call samples" group in `main.swift`.
   40 suites pass.
 - Linux (swift:6.2-noble): XCTest 369 run, 2 skipped, 0 failures;
   swift-testing 297 tests in 42 suites pass.
+
+## 4. IP and IPv6 socket options
+
+### Commits and API
+
+`b5887c3`, in SystemSockets: `Sockets/SocketAddress+Host.swift`,
+`SocketOptions+IP.swift`, `SocketOptions+Timeouts.swift`,
+`SocketMessages+IP.swift`, and one alias in `Internals/CInterop+Sockets.swift`.
+
+| API | C |
+|---|---|
+| `IPv4Address.Host`: `init?(_:)`, `description`, `init(_:_:_:_:)`, `init(integerValue:)`, `integerValue`, `init?(bytes:)`, `withUnsafeBytes` | `in_addr`, `inet_pton`/`inet_ntop` with `AF_INET` |
+| `IPv4Address.Host.any`, `.loopback`, `.broadcast` | `INADDR_ANY`, `INADDR_LOOPBACK`, `INADDR_BROADCAST` |
+| `IPv6Address.Host`: `init?(_:)`, `description`, `init?(bytes:)`, `withUnsafeBytes`, `.any`, `.loopback` | `in6_addr`, `inet_pton`/`inet_ntop` with `AF_INET6`, `in6addr_any`, `in6addr_loopback` |
+| `IPv4Address(host:port:)`, `.host`; `IPv6Address(host:port:flowLabel:scopeID:)`, `.host` | `sin_addr`, `sin6_addr` |
+| `SocketDescriptor.IPOption`, `IPv6Option`; `getIPOption`/`setIPOption`, `getIPv6Option`/`setIPv6Option` | the `IP_*` and `IPV6_*` names, `getsockopt`/`setsockopt` |
+| `timeToLive()`/`setTimeToLive(_:)` | `IP_TTL` |
+| `typeOfService()`/`setTypeOfService(_:)`, `receivesTypeOfService()`/`setReceivesTypeOfService(_:)` | `IP_TOS`, `IP_RECVTOS` |
+| `receivesIPv4PacketInfo()`/`setReceivesIPv4PacketInfo(_:)` | `IP_RECVPKTINFO` (Linux: `IP_PKTINFO`) |
+| `includesIPHeader()`/`setIncludesIPHeader(_:)` | `IP_HDRINCL` |
+| `multicastTimeToLive`, `ipv4MulticastLoopback`, `ipv4MulticastInterface` (and setters) | `IP_MULTICAST_TTL`, `IP_MULTICAST_LOOP`, `IP_MULTICAST_IF` |
+| `joinMulticastGroup(_:interface:)`, `leaveMulticastGroup(_:interface:)` | `IP_ADD_MEMBERSHIP`, `IP_DROP_MEMBERSHIP`, `ip_mreq` |
+| `isIPv6Only()`/`setIPv6Only(_:)` | `IPV6_V6ONLY` |
+| `unicastHops`, `trafficClass`, `receivesTrafficClass`, `receivesIPv6PacketInfo` (and setters) | `IPV6_UNICAST_HOPS`, `IPV6_TCLASS`, `IPV6_RECVTCLASS`, `IPV6_RECVPKTINFO` |
+| `multicastHops`, `ipv6MulticastLoopback`, `ipv6MulticastInterface` (and setters) | `IPV6_MULTICAST_HOPS`, `IPV6_MULTICAST_LOOP`, `IPV6_MULTICAST_IF` |
+| `joinMulticastGroup(_:interfaceIndex:)`, `leaveMulticastGroup(_:interfaceIndex:)` | `IPV6_JOIN_GROUP`, `IPV6_LEAVE_GROUP`, `ipv6_mreq` |
+| `receiveTimeout()`/`setReceiveTimeout(_: Duration?)`, `sendTimeout`/`setSendTimeout` | `SO_RCVTIMEO`, `SO_SNDTIMEO`, `timeval` |
+| `linger()`/`setLinger(_: Duration?)` | `SO_LINGER` (Darwin: `SO_LINGER_SEC`), `struct linger` |
+| `receivesTimestamps()`/`setReceivesTimestamps(_:)` | `SO_TIMESTAMP` |
+| `SocketOption.receiveTimeout`, `.sendTimeout`, `.timestamp`, Darwin `.lingerSeconds` | `SO_RCVTIMEO`, `SO_SNDTIMEO`, `SO_TIMESTAMP`, `SO_LINGER_SEC` |
+| `Message.typeOfService`, `.trafficClass`, `.ipv4PacketInfo`, `.ipv6PacketInfo`, `.timestamp` (both message types) | `IP_RECVTOS`/`IP_TOS`, `IPV6_TCLASS`, `IP_PKTINFO`/`in_pktinfo`, `IPV6_PKTINFO`/`in6_pktinfo`, `SCM_TIMESTAMP` |
+| `SocketDescriptor.IPv4PacketInfo` (`destination`, `localAddress`, `interfaceIndex`), `IPv6PacketInfo` | `in_pktinfo`, `in6_pktinfo` |
+| `AncillaryMessageBuffer.appendTypeOfService(_:)`, `appendTrafficClass(_:)` | `IP_TOS`, `IPV6_TCLASS` control messages |
+| `CInterop.SockAddrStorage` | `sockaddr_storage` |
+
+### Design calls
+
+- **Typed get/set pairs**, one per option, as NIO's `SocketOptionProvider`
+  (`setIPMulticastTTL`, `getSoLinger`) and Rust's socket2 have, with noun
+  getters as SystemPackage's newer API spells them (`windowSize()`,
+  `setWindowSize(_:)`). Rejected: phantom-typed option keys
+  (`socket.setOption(.multicastHops, to: 3)`), which are more compact but
+  need a public value protocol whose conversions are unsafe to expose; and
+  getters prefixed with `get`, as SystemSockets' older `getSocketOption`.
+- **Each IP version's own terms**: time to live and type of service for
+  IPv4, hops and traffic class for IPv6, so most names don't collide;
+  an `ipv4`/`ipv6` prefix only where both have the option (multicast
+  loopback and interface, packet info). `joinMulticastGroup` overloads by
+  the group's type.
+- **The option names stay available** (`IPOption`, `IPv6Option`, as
+  `SocketOption` and `TCPOption` are), for the generic `getOption` and for
+  comparing a control message's type.
+- **Host addresses are a nested `Host`**, since SystemSockets'
+  `IPv4Address` is a socket address, `sockaddr_in`. Rejected: an
+  `IPv4Address` with a meaningless port for multicast groups; extending
+  `in_addr` itself; a new top-level type. The `Host` wraps the C struct as
+  its `rawValue` (as `Stat` does), and nothing a client needs reads a
+  member. `integerValue` is the address as a number, first byte most
+  significant (`127.0.0.1` is `0x7F00_0001`), so byte order never leaks.
+- **Timeouts are `Duration?`**: `nil` waits indefinitely, and a duration
+  rounds up to a microsecond, so `.zero` or a negative duration times out
+  at once. C's zero means "no timeout", the classic surprise. Rejected:
+  passing zero through; trapping on it.
+- **Linger is `Duration?`**: `nil` is off, a duration rounds up to a whole
+  second, and `.zero` is an abortive close (a TCP reset), as C's
+  `l_linger = 0` is. On Darwin it uses `SO_LINGER_SEC` (below).
+- **Single-byte options are `UInt8`** where the BSDs take a `u_char`
+  (`IP_MULTICAST_TTL`, `IP_MULTICAST_LOOP`); Linux accepts a byte too, and
+  returns one for a one-byte buffer. IPv6's loop and interface are
+  `u_int`s everywhere.
+- **Control-message payloads are read by their layout**, `in_pktinfo`'s
+  index, local address and destination, and `in6_pktinfo`'s destination
+  and index, because glibc declares `in6_pktinfo` only with
+  `_GNU_SOURCE`. The layouts are the same on every platform.
+- **Sending TOS and traffic class** takes an `int` payload, as NIO sends
+  and both kernels accept; there's no send-side packet info (choosing a
+  source address), which no adopter does.
+- No ECN type: the docs point at the low two bits; NIO keeps its own
+  `NIOExplicitCongestionNotificationState`.
+
+### Findings
+
+- **Darwin's `SO_LINGER` is in clock ticks**, hundredths of a second: a C
+  probe that set `SO_LINGER_SEC` to 5 read `SO_LINGER` back as 500, and
+  `SO_LINGER` 300 as `SO_LINGER_SEC` 3. Code that sets `SO_LINGER` in
+  seconds on Darwin (NIO's `setSoLinger` passes the caller's `linger`
+  through) lingers a hundredth as long as it means.
+- **Darwin hides RFC 3542's IPv6 packet-info names**: `IPV6_RECVPKTINFO`
+  (61) and `IPV6_PKTINFO` (46) exist only with `__APPLE_USE_RFC_3542`,
+  which Swift's Darwin module doesn't define, so NIO shims them in
+  CNIODarwin. System spells them out; the IPv6 loopback test checks both
+  against the kernel.
+- **Darwin's `inet_pton` accepts a scope**: `"fe80::1%en0"` parses as
+  `fe80:e::1`, the interface's index (14) written into the second 16 bits
+  (the KAME convention); `"%1"` and an unknown name are ignored; Linux
+  rejects all of them. `IPv6Address.Host` rejects `%` everywhere.
+- Darwin sends a received IPv4 TOS as `IP_RECVTOS`, Linux as `IP_TOS`, as
+  NIO's parser already knows.
+- On 64-bit glibc, `SO_RCVTIMEO`, `SO_SNDTIMEO`, `SO_TIMESTAMP` and
+  `SCM_TIMESTAMP` import as constants; NIO's `CNIOLinux_SO_RCVTIMEO`
+  works around 32-bit glibc, where they're expressions. Swift's Linux
+  platforms are 64-bit.
+- Joining multicast groups on the loopback interface works on macOS
+  (`lo0`) and in the Linux container (`lo`), so the membership tests need
+  no network.
+
+### What it replaces in the adopters
+
+- NIO `Sources/NIOCore/BSDSocketAPI.swift`: the `NIOBSDSocket.Option`
+  constants for every `IP_*`, `IPV6_*`, `SO_RCVTIMEO` and `SO_TIMESTAMP`
+  name, clearing `// SYSTEM-GAP: IP_* and IPV6_* socket options` and, but
+  for `TCP_CONNECTION_INFO` (cluster 5), `// SYSTEM-GAP: SO_RCVTIMEO,
+  SO_TIMESTAMP, TCP_CONNECTION_INFO`.
+- NIO `Sources/NIOCore/SocketOptionProvider.swift`: the implementations
+  of `setSoLinger`/`getSoLinger`, `setIPMulticastIF`/`TTL`/`Loop`, and
+  `setIPv6MulticastIF`/`Hops`/`Loop`. Their public signatures take C types
+  (`linger`, `in_addr`), which NIO can't change without breaking clients,
+  so the `SYSTEM-GAP: linger, in_addr, tcp_connection_info` import stays
+  for the signatures.
+- NIO `Sources/NIOPosix/SocketChannel.swift`: multicast join and leave
+  (`ip_mreq`, `ipv6_mreq`, `INADDR_ANY`), clearing `// SYSTEM-GAP: ip_mreq,
+  ipv6_mreq, INADDR_ANY`.
+- NIO `Sources/NIOPosix/ControlMessage.swift`: ECN from `IP_TOS`,
+  `IP_RECVTOS` and `IPV6_TCLASS`, and `in_pktinfo`/`in6_pktinfo`
+  decoding, clearing `// SYSTEM-GAP: IP_TOS, IP_RECVTOS, IPV6_TCLASS and
+  the packet-info structs`; with cluster 6, CNIODarwin's `IPV6_*PKTINFO`
+  shims too.
+- NIO `Sources/NIOPosix/BSDSocketAPICommon.swift` (`IP_RECVTOS`,
+  `IPV6_RECVTCLASS`) and `Sources/NIOPosix/System.swift` (`IP_RECVPKTINFO`,
+  `IP_PKTINFO`, and the `sockaddr_storage` alias of `// SYSTEM-GAP:
+  CInterop has no alias for sockaddr_storage, nfds_t or timespec`).
+- NIO tests: `NIOEmbeddedTests` `EmbeddedChannelTest.swift` and
+  `AsyncTestingChannelTests.swift` (`IP_TTL`), `NIOPosixTests`
+  `SystemTest.swift` (`IP_RECVDSTADDR`, `IP_RECVTOS`),
+  `SocketChannelTest.swift` (`linger`).
+- The ecosystem report's `sockets` lane entries for multicast, TOS and
+  packet info, and `INADDR_ANY`.
+
+### Not added
+
+- `IP_RECVDSTADDR`'s decoding (the name is there, on Darwin),
+  `IP_RECVORIGDSTADDR`, `IPV6_RECVHOPLIMIT`, source-specific multicast
+  (`IP_ADD_SOURCE_MEMBERSHIP`, `MCAST_JOIN_GROUP`), and `ip_mreqn`.
+- A probe in `Tests/MemberImportVisibility` for `CInterop.SockAddrStorage`:
+  that target depends only on SystemPackage, and adding SystemSockets to it
+  means editing `Package.swift`. The new API reads no C member in client
+  code, so there's nothing else to probe.
+
+### Platforms
+
+- Built and tested: macOS 26.3; Linux swift:6.2-noble (as root, so the
+  raw-socket `IP_HDRINCL` test runs; on macOS it returns early).
+- Unverified: Musl and Android (their `IP_RECVTOS`, `IPV6_JOIN_GROUP` and
+  `SO_RCVTIMEO` spellings), and FreeBSD.
+
+### Tests
+
+- New: `SocketAddressHostTests` (6), `SocketIPOptionsTests` (11),
+  `SocketIPMessagesTests` (4, two binding), `SocketIPOptionsMockTests` (1,
+  24 setters).
+- macOS: XCTest 430 run, 4 skipped, 0 failures; swift-testing 317 tests in
+  44 suites pass.
+- Linux (swift:6.2-noble): XCTest 369 run, 2 skipped, 0 failures;
+  swift-testing 319 tests in 46 suites pass.
