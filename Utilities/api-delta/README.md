@@ -2,6 +2,8 @@
 
 `regenerate.sh` reports the public API delta between two commits for the `SystemPackage` and `SystemSockets` modules, and builds DocC archives for both commits. The report lists every added, removed, and changed declaration. It also flags missing availability and doc comments, underscored and SPI API, new ABI surface, and public API that only other platforms compile.
 
+`Utilities/api-graph` builds on this report: it clusters the added declarations into carve-outs for pitches, tags the open design questions each depends on, and ranks them.
+
 ## Running it
 
 ```sh
