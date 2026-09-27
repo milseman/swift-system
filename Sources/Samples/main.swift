@@ -72,6 +72,8 @@ struct SystemSamples: ParsableCommand {
       ThreadsPool.self,
       ThreadsLocal.self,
       ThreadsInfo.self,
+      // Darwin samples
+      CopyFile.self,
     ])
 }
 
