@@ -308,13 +308,8 @@ internal var _TFD_TIMER_ABSTIME: CInt { 1 << 0 }
 @_alwaysEmitIntoClient
 internal var _TFD_TIMER_CANCEL_ON_SET: CInt { 1 << 1 }
 
-// The clocks that timerfd accepts.
-@_alwaysEmitIntoClient
-internal var _CLOCK_REALTIME: CInt { 0 }
-
-@_alwaysEmitIntoClient
-internal var _CLOCK_MONOTONIC: CInt { 1 }
-
+// The clocks that timerfd accepts, besides _CLOCK_REALTIME and
+// _CLOCK_MONOTONIC in Constants+Threads.swift.
 @_alwaysEmitIntoClient
 internal var _CLOCK_BOOTTIME: CInt { 7 }
 
