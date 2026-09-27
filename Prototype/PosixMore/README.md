@@ -158,3 +158,84 @@ Adopters:
 
 Unverified off Darwin: the `environ` shim on Linux, Android, FreeBSD and
 OpenBSD, which declares `extern char **environ` itself.
+
+## 3. Time
+
+`Sources/System/Time/ClockID.swift`, `Sources/System/Time/Sleep.swift`,
+`Sources/System/Internals/Syscalls+Time.swift` and `Constants+Time.swift`.
+
+| API | C |
+|---|---|
+| `CInterop.ClockID`, `ClockID` | `clockid_t` |
+| `.realtime`, `.monotonic`, `.processCPUTime`, `.threadCPUTime` | `CLOCK_REALTIME`, `CLOCK_MONOTONIC`, `CLOCK_PROCESS_CPUTIME_ID`, `CLOCK_THREAD_CPUTIME_ID` |
+| `.monotonicRaw` (Darwin, Linux, Android) | `CLOCK_MONOTONIC_RAW` |
+| `.monotonicRawApproximate`, `.uptimeRaw`, `.uptimeRawApproximate` (Darwin) | `CLOCK_MONOTONIC_RAW_APPROX`, `CLOCK_UPTIME_RAW`, `CLOCK_UPTIME_RAW_APPROX` |
+| `.boottime`, `.realtimeCoarse`, `.monotonicCoarse`, `.tai` (Linux, Android) | `CLOCK_BOOTTIME`, `CLOCK_REALTIME_COARSE`, `CLOCK_MONOTONIC_COARSE`, `CLOCK_TAI` |
+| `ClockID.currentTime() throws(Errno) -> Duration` | `clock_gettime` |
+| `ClockID.resolution() throws(Errno) -> Duration` | `clock_getres` |
+| `PThread.sleep(for:retryOnInterrupt:) throws(Errno)` | `nanosleep` |
+
+Design calls:
+
+- **The type is `ClockID`,** after `clockid_t`, as `ProcessID` and `UserID`
+  are after theirs. Rejected: `Clock`, which would shadow the standard
+  library's `Clock` protocol in every client that imports System.
+  `IntervalTimer.Clock` (the events lane's, for timerfd) is nested, so it
+  doesn't; it could take a `ClockID` later.
+- **Readings are `Duration`s,** so these methods carry macOS 13.
+  Rejected: returning `timespec`, which back-deploys further but hands the
+  caller the normalization rules; and offering both, which doubles the API.
+- **No `timespec` and `Duration` conversions.** The platform overlays
+  already declare `Duration(timespec)` and `timespec(Duration)` (and
+  `timeval`'s): Darwin's from macOS 13, and Glibc's under `os(Linux)`,
+  which covers Musl. The same initializers in System would make every use
+  of them ambiguous there. Rejected: declaring them for Android, FreeBSD
+  and OpenBSD only, where an overlay could add them later and break
+  clients the same way. System's own `_timespec(_:)` and `_duration(_:)`
+  (`Events/Timeouts.swift`) do the work inside; note that the overlay's
+  `timespec(Duration)` gives a negative duration a negative `tv_nsec`.
+- **The `_CLOCK_` constants reuse what exists**: `_CLOCK_REALTIME` and
+  `_CLOCK_MONOTONIC` from `Constants+Threads.swift` (`clockid_t`, not on
+  Darwin), and Linux's `_CLOCK_BOOTTIME` from `Constants+Events.swift` (a
+  `CInt`, the same type as `clockid_t` there). Darwin's C library names its
+  enumerators `_CLOCK_REALTIME` and so on, but Swift renames them to the
+  macros' `CLOCK_` names and makes the underscored ones unavailable, so
+  `Constants+Time.swift` defines the Darwin set. The linux-build lane's
+  `e63b366` removes the Events copies of `_CLOCK_REALTIME` and
+  `_CLOCK_MONOTONIC`, which collide with the Threads ones on Linux today.
+  Linux-only values are the kernel's, the same on every architecture, as
+  the Events lane's are.
+- **`.monotonic`'s meaning differs by platform, and says so.** Darwin's
+  counts while the system sleeps, Linux's doesn't; `.uptimeRaw` and
+  `.boottime` are the other behavior on each. Rejected: renaming either to
+  hide it, since it's the same C name.
+- **Sleeping is `PThread.sleep(for:)`**, beside `PThread.yield()`, and
+  `noasync` like it: it blocks the calling thread. Rejected: a static on
+  `ClockID` (`nanosleep` measures no chosen clock) and a new namespace.
+  `clock_nanosleep`, which does take a clock, isn't on Darwin, and isn't
+  added.
+- **An interrupted sleep resumes with the time the kernel says is left**,
+  not the original request, which would oversleep once per signal. Without
+  `retryOnInterrupt` it throws `.interrupted`, as other System calls do,
+  and the time left is lost. A negative duration sleeps for none; a
+  positive one rounds up to a nanosecond.
+- Files that use `timespec()` or its members import CSystem on Linux,
+  where glibc's `timespec` comes through CSystem's headers (the linux-build
+  lane's `9d8e5bf`).
+- Not added: `clock_settime`, `clock_getcpuclockid` and
+  `pthread_getcpuclockid` (another process's or thread's CPU clock; not on
+  Darwin), and FreeBSD's and OpenBSD's own clocks, such as `CLOCK_UPTIME`.
+
+Adopters:
+- NIO: `clock_gettime(CLOCK_MONOTONIC)` for `NIODeadline.now()`
+  (`NIOCore/EventLoop.swift`), `usleep` in io_uring's backoff,
+  `gettimeofday` for `ConditionLock`'s deadline, and `timespec` in 51
+  lines, mostly kqueue and io_uring timeouts, which System's own event API
+  takes as `Duration`.
+- Foundation, by grep: `clock_gettime` for `Date.now`, UUID timestamps, and
+  `ProcessInfo.systemUptime` (`CLOCK_MONOTONIC_RAW` on Linux).
+- Subprocess: `timespec` for a kqueue timeout.
+
+Unverified off Darwin: the Linux, Android, FreeBSD and OpenBSD clock
+constants, and `clockid_t`'s being `CInt` there (which reusing
+`_CLOCK_BOOTTIME` assumes).

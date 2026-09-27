@@ -100,6 +100,7 @@ target_sources(SystemPackage PRIVATE
   Internals/Backcompat.swift
   Internals/CInterop.swift
   Internals/Constants+Events.swift
+  Internals/Constants+Time.swift
   Internals/Constants.swift
   Internals/Exports.swift
   Internals/Mocking.swift
@@ -107,6 +108,7 @@ target_sources(SystemPackage PRIVATE
   Internals/Syscalls+Directories.swift
   Internals/Syscalls+Environment.swift
   Internals/Syscalls+Events.swift
+  Internals/Syscalls+Time.swift
   Internals/Syscalls+VectoredIO.swift
   Internals/Syscalls.swift
   Internals/WindowsSyscallAdapters.swift)
@@ -134,6 +136,9 @@ target_sources(SystemPackage PRIVATE
   Threads/PThreadNames.swift
   Threads/PThreadReadWriteLock.swift
   Threads/PThreadScheduling.swift)
+target_sources(SystemPackage PRIVATE
+  Time/ClockID.swift
+  Time/Sleep.swift)
 target_sources(SystemPackage PRIVATE
   VectoredIO/VectoredIO.swift)
 target_link_libraries(SystemPackage PUBLIC

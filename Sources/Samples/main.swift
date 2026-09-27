@@ -75,6 +75,7 @@ struct SystemSamples: ParsableCommand {
       // Portable POSIX samples
       Vectored.self,
       Env.self,
+      Clocks.self,
     ])
 }
 
