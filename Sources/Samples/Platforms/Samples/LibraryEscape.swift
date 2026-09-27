@@ -31,6 +31,12 @@ import SystemPackage
 
 #if SYSTEM_PACKAGE_DARWIN
 import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif canImport(Musl)
+import Musl
+#elseif canImport(Android)
+import Android
 #endif
 
 // MARK: - The cross-platform library

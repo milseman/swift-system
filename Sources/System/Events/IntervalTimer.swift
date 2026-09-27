@@ -14,7 +14,6 @@
 #if os(Linux) || os(Android)
 
 // Must import here to use the C itimerspec type in @_alwaysEmitIntoClient APIs.
-import CSystem
 #if canImport(Glibc)
 import Glibc
 #elseif canImport(Musl)

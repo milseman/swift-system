@@ -8,6 +8,7 @@ documented in packages/README.md. check.sh reads a package's settings
 through `package.py shell`, and the other scripts import `load`.
 
 Usage: package.py shell PACKAGES_DIR NAME   shell assignments, for eval
+       package.py path PACKAGES_DIR NAME    the package's file (in PACKAGES_DIR or its ecosystem/)
        package.py list PACKAGES_DIR         the packages `all` runs
        package.py roots PACKAGES_DIR NAME DUMP.json
                                             the library targets no other
@@ -30,7 +31,8 @@ LIST_KEYS = {"shim-targets", "skip-targets", "build-targets", "build-flags", "un
              "false-flags", "wrapper-files", "twin-targets", "through"}
 # Lists of paths, which can hold spaces: one per line.
 LINE_KEYS = {"wrapper-files"}
-KEYS = LIST_KEYS | {"title", "name", "variable", "checkout", "in-all", "build-hint", "swift-exec-note"}
+KEYS = LIST_KEYS | {"title", "name", "variable", "checkout", "in-all", "build-hint", "swift-exec-note", "strict",
+                   "note"}
 
 
 def load(path):
@@ -64,12 +66,43 @@ def load(path):
     pkg.setdefault("name", pkg["title"])
     pkg.setdefault("variable", re.sub(r"\W", "_", key).upper())
     pkg.setdefault("in-all", "yes")
+    pkg.setdefault("strict", "yes")
+    if pkg["strict"] not in ("yes", "no") or pkg["in-all"] not in ("yes", "no"):
+        raise SystemExit(f"{path}: strict and in-all take yes or no")
     pkg["platforms"] = pkg["platforms"] or list(PLATFORMS)
     bad = [p for p in pkg["platforms"] if p not in PLATFORMS]
     if bad:
         raise SystemExit(f"{path}: unknown platforms {', '.join(bad)}")
     pkg["skip-targets"] = sorted(set(pkg["skip-targets"]) | set(pkg["skipReasons"]))
     return pkg
+
+
+# Where package files are found, in order: the audited adopters, then the
+# generated files of the toolchain's other packages (ecosystem.sh).
+SEARCH = ("", "ecosystem")
+
+
+def path_of(packages, name):
+    for sub in SEARCH:
+        p = os.path.join(packages, sub, name + ".ini")
+        if os.path.isfile(p):
+            return p
+    return None
+
+
+def root_of(path):
+    """The packages directory a package file is in."""
+    d = os.path.dirname(os.path.abspath(path))
+    return os.path.dirname(d) if os.path.basename(d) in SEARCH[1:] else d
+
+
+def all_names(packages):
+    out = set()
+    for sub in SEARCH:
+        d = os.path.join(packages, sub)
+        if os.path.isdir(d):
+            out.update(f[:-4] for f in os.listdir(d) if f.endswith(".ini"))
+    return out
 
 
 def library_roots(pkg, dump):
@@ -90,7 +123,7 @@ def main():
     cmd, packages = sys.argv[1], sys.argv[2]
     if cmd == "roots":
         import json
-        pkg = load(os.path.join(packages, sys.argv[3] + ".ini"))
+        pkg = load(path_of(packages, sys.argv[3]))
         print("\n".join(library_roots(pkg, json.load(open(sys.argv[4])))))
         return
     if cmd == "list":
@@ -98,9 +131,16 @@ def main():
             if f.endswith(".ini") and load(os.path.join(packages, f))["in-all"] == "yes":
                 print(f[:-4])
         return
-    pkg = load(os.path.join(packages, sys.argv[3] + ".ini"))
-    out = {"PKG_TITLE": pkg["title"], "PKG_NAME": pkg["name"], "PKG_VAR": pkg["variable"],
-           "PKG_CHECKOUT": pkg.get("checkout", ""), "PKG_BUILD_HINT": pkg.get("build-hint", "")}
+    if cmd == "path":
+        p = path_of(packages, sys.argv[3])
+        if not p:
+            sys.exit(1)
+        print(p)
+        return
+    pkg = load(path_of(packages, sys.argv[3]))
+    out = {"PKG_FILE": path_of(packages, sys.argv[3]), "PKG_TITLE": pkg["title"], "PKG_NAME": pkg["name"], "PKG_VAR": pkg["variable"],
+           "PKG_CHECKOUT": pkg.get("checkout", ""), "PKG_BUILD_HINT": pkg.get("build-hint", ""),
+           "PKG_STRICT": pkg["strict"]}
     for k, v in out.items():
         print(f"{k}={shlex.quote(v)}")
     for k, var in (("build-targets", "PKG_BUILD_TARGETS"), ("build-flags", "PKG_BUILD_FLAGS"),

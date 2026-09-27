@@ -1,0 +1,19 @@
+{
+  "_comment": [
+    "Evidence that code has been checked on a platform other than the one this",
+    "tool runs on. Without an entry, platforms a declaration's #if allows are",
+    "only claimed. A source is either a script whose quoted Sources/ and Tests/",
+    "paths are the files it checks (kind: script), or an explicit list of",
+    "files (kind: files). Add an entry when a lane builds or runs code off",
+    "Darwin, with the level it reached: typechecked, built, or tested."
+  ],
+  "sources": [
+    {
+      "kind": "script",
+      "path": "Prototype/Events/check-linux.sh",
+      "platforms": ["Linux", "Musl", "Android"],
+      "level": "typechecked",
+      "detail": "compiled on macOS against LinuxModel.h, a model of glibc's and Bionic's declarations, through SIL; not built with a real C library, and not run"
+    }
+  ]
+}

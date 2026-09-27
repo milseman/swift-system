@@ -38,8 +38,14 @@ private struct SocketDescriptorTests {
   }
 
   @Test func connectionTypeValues() {
+    #if os(Linux) && canImport(Glibc)
+    // glibc declares the SOCK_* constants in an enum.
+    #expect(SocketDescriptor.ConnectionType.stream.rawValue == CInt(SOCK_STREAM.rawValue))
+    #expect(SocketDescriptor.ConnectionType.datagram.rawValue == CInt(SOCK_DGRAM.rawValue))
+    #else
     #expect(SocketDescriptor.ConnectionType.stream.rawValue == SOCK_STREAM)
     #expect(SocketDescriptor.ConnectionType.datagram.rawValue == SOCK_DGRAM)
+    #endif
   }
 
   @Test func protocolValues() {

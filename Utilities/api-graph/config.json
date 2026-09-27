@@ -1,0 +1,35 @@
+{
+  "_comment": [
+    "Settings for cluster.py. Each is described in scripts/method.md.",
+    "namespaces: vocabulary types whose extension blocks hold unrelated",
+    "  members (raw C types), so each member is an atom of its own.",
+    "promoteMinPlaces: a new type becomes shared vocabulary when code in at",
+    "  least this many places outside its home depends on it. A place is a",
+    "  directory under the module, or a file in the module's root.",
+    "promote / demote: type paths to promote regardless, or never.",
+    "partsForClustersOver: parts of clusters with more declarations than",
+    "  this are ranked as carve-outs of their own.",
+    "weights: the ranking's penalties; see method.md."
+  ],
+  "namespaces": ["CInterop"],
+  "promoteMinPlaces": 2,
+  "promote": [],
+  "demote": [],
+  "partsForClustersOver": 30,
+  "weights": {
+    "declaration": 1.0,
+    "type": 1.0,
+    "undocumented": 1.0,
+    "untested": 0.5,
+    "offDarwinOnly": 2.0,
+    "unverifiedPlatforms": 5.0,
+    "platformVariant": 2.0,
+    "availabilityOddity": 1.0,
+    "contingency": 100.0,
+    "inheritedContingency": 60.0,
+    "implementationContingency": 40.0,
+    "namespaceContingency": 25.0,
+    "prerequisite": 5.0,
+    "priorProposal": -5.0
+  }
+}

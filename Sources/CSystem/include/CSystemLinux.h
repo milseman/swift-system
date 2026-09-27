@@ -9,15 +9,21 @@
 
 #ifdef __linux__
 
+// Swift attributes a C type that two modules declare to the module whose
+// copy it loads first, and SystemPackage loads CSystem's copy when it calls
+// a CSystem function that takes the type, as timerfd_settime took
+// itimerspec, and so timespec. MemberImportVisibility then hides the type's
+// members from clients, which don't import CSystem (#320). So beyond these,
+// this header includes none of the headers that glibc's Swift module
+// includes, and the shims below take their types as `void *`, while shims.c
+// includes the real headers. The thread shims need only <sys/types.h>'s
+// pthread_t and pid_t; <pthread.h> and <sched.h> would declare timespec and
+// sched_param here.
 #include <sys/epoll.h>
 #include <sys/eventfd.h>
-#include <sys/socket.h>
 #include <sys/sysinfo.h>
-#include <sys/timerfd.h>
 #include <sys/types.h>
 #include <errno.h>
-#include <pthread.h>
-#include <sched.h>
 #include <unistd.h>
 #include "io_uring.h"
 
@@ -27,6 +33,13 @@
 // import, so MemberImportVisibility hides those members from them (#320).
 int _system_ioctl_TIOCGWINSZ(int fd, void *ws);
 int _system_ioctl_TIOCSWINSZ(int fd, const void *ws);
+
+// timerfd. Each value points to a struct itimerspec, untyped so that this
+// header needn't include <sys/timerfd.h>, whose <time.h> declares timespec.
+extern int csystem_timerfd_create(int clockid, int flags);
+extern int csystem_timerfd_settime(int fd, int flags,
+                                   const void *new_value, void *old_value);
+extern int csystem_timerfd_gettime(int fd, void *curr_value);
 
 // The flags for renameat2. glibc only declares them, and renameat2 itself,
 // with _GNU_SOURCE, which can't be defined here; see shims.c.
@@ -48,6 +61,12 @@ extern int csystem_renameat2(int olddirfd, const char *oldpath,
 // _GNU_SOURCE, and Bionic defines as F_LINUX_SPECIFIC_BASE + 7 and + 8.
 #define CSYSTEM_F_SETPIPE_SZ 1031
 #define CSYSTEM_F_GETPIPE_SZ 1032
+
+// The special times for futimens and utimensat, which glibc and Bionic define
+// as expressions that Swift can't import. They have these values on every
+// architecture; shims.c checks them against <sys/stat.h>.
+#define CSYSTEM_UTIME_NOW 0x3fffffff
+#define CSYSTEM_UTIME_OMIT 0x3ffffffe
 
 // tcgetsid, which not every C library declares without feature macros
 // such as _GNU_SOURCE, which can't be defined here; see shims.c.
@@ -105,4 +124,54 @@ extern int csystem_sched_getaffinity(pid_t pid, size_t size, void *mask);
 extern int csystem_pthread_setaffinity_np(pthread_t thread, size_t size, const void *mask);
 extern int csystem_pthread_getaffinity_np(pthread_t thread, size_t size, void *mask);
 #endif // !__ANDROID__
+#endif // __linux__
+
+#ifdef __ANDROID__
+// preadv and pwritev, which Bionic declares only from API level 24; below
+// it, these fail with ENOSYS. `iov` points to `iovcnt` struct iovecs, untyped
+// so that this header needn't include <sys/uio.h> (see the ioctl shims).
+extern ssize_t csystem_preadv(int fd, const void *iov, int iovcnt, off_t offset);
+extern ssize_t csystem_pwritev(int fd, const void *iov, int iovcnt, off_t offset);
+#endif // __ANDROID__
+
+#ifdef __linux__
+// Process descriptors, signal descriptors, and closing ranges of
+// descriptors, through raw system calls, since not every C library has
+// wrappers for them: glibc added pidfd_open in 2.36, and close_range in
+// 2.34, and Musl has neither. These return -1 and set errno to ENOSYS where
+// the kernel lacks them. `info` points to a siginfo_t, and `mask` to a
+// sigset_t.
+extern int csystem_pidfd_open(int pid, unsigned int flags);
+extern int csystem_pidfd_send_signal(int pidfd, int sig, void *info, unsigned int flags);
+extern int csystem_close_range(unsigned int first, unsigned int last, unsigned int flags);
+extern int csystem_signalfd(int fd, const void *mask, int flags);
+
+// The record that reading a signal descriptor returns, which is struct
+// signalfd_siginfo; shims.c checks the two agree. It's declared here rather
+// than through <sys/signalfd.h>, which glibc's and Bionic's Swift modules
+// don't include, for the reason above.
+struct csystem_signalfd_siginfo {
+  unsigned int ssi_signo;
+  int ssi_errno;
+  int ssi_code;
+  unsigned int ssi_pid;
+  unsigned int ssi_uid;
+  int ssi_fd;
+  unsigned int ssi_tid;
+  unsigned int ssi_band;
+  unsigned int ssi_overrun;
+  unsigned int ssi_trapno;
+  int ssi_status;
+  int ssi_int;
+  unsigned long long ssi_ptr;
+  unsigned long long ssi_utime;
+  unsigned long long ssi_stime;
+  unsigned long long ssi_addr;
+  unsigned short ssi_addr_lsb;
+  unsigned short __pad2;
+  int ssi_syscall;
+  unsigned long long ssi_call_addr;
+  unsigned int ssi_arch;
+  unsigned char __pad[28];
+};
 #endif // __linux__

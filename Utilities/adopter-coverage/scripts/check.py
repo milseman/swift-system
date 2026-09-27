@@ -40,7 +40,7 @@ CATEGORIES = [
     "event notification", "io_uring", "system calls", "processes", "terminals", "signals", "threads & locks", "time",
     "memory",
     "dynamic loading", "system info", "errno & errors", "dispatch", "Apple frameworks", "C libraries",
-    "strings/ctype/libm/stdio", "atomics", "C language", "compiler intrinsics",
+    "strings/ctype/libm/stdio", "atomics", "C language", "compiler intrinsics", "uncategorized",
 ]
 # Platforms an `@available(<name>, unavailable)` takes away.
 UNAVAILABLE_PLATFORMS = {"macOS": ["Darwin"], "Windows": ["Windows"], "Linux": ["Linux", "Musl"],
@@ -52,6 +52,10 @@ OUT_OF_SCOPE = {"dispatch", "Apple frameworks", "C libraries", "strings/ctype/li
                 "compiler intrinsics"}
 # A function too long to be a thin wrapper counts only its call-site lines.
 THIN_WRAPPER_LINES = 40
+# [config] keys in mapping.ini.
+CONFIG_KEYS = {"secondary", "header-category", "name-category", "lanes"}
+# Evidence levels, strongest first (see Derivation).
+EVIDENCE = ("doc", "restricted", "impl", "elsewhere")
 
 ACCESS = r"\b(public|open|internal|package|fileprivate|private)(\((set|get)\))?\s+"
 ATTRIBUTE = r"@[A-Za-z_][\w.]*(\((?:[^()]|\((?:[^()]|\([^()]*\))*\))*\))?\s*"
@@ -109,11 +113,20 @@ class SystemAPI:
     def __init__(self, scan):
         self.by_key = collections.defaultdict(list)
         self.by_name = collections.defaultdict(list)
+        self.entries = []   # one per scanned declaration, in the scan's order
         self.unsupported = scan.get("moduleUnsupportedPlatforms", {})
+        # Public types. Their enum cases take the enum's access without
+        # spelling it, so api-delta's scanner doesn't list them.
+        self.public_types = {t["name"] for t in scan.get("types", []) if t.get("access") in ("public", "open")}
         for d in scan["declarations"]:
             scope = ".".join(d["scopes"])
             kw = d["kw"].rstrip("?!")
             base = d["name"].split("(")[0].rstrip("?!")
+            # A keyword escaped as a name (`extension`), which api-delta's
+            # scanner records with the rest of the line.
+            m = re.match(r"^`([^`]+)`", base)
+            if m:
+                base = m.group(1)
             # `@available(*, unavailable)` (a renamed stub) can't be cited;
             # `@available(Windows, unavailable)` only takes Windows away.
             unavail = d.get("unavailable") or []
@@ -128,6 +141,7 @@ class SystemAPI:
                 "unavailable": any(re.search(r"\(\s*\*\s*,\s*unavailable", a) for a in unavail),
                 "unavailableOn": sorted(gone),
             }
+            self.entries.append(entry)
             self.by_key[(scope, entry["declaration"])].append(entry)
             self.by_name[(scope, base)].append(entry)
 
@@ -182,13 +196,14 @@ def load_mapping(path, packages=()):
             for k in config:
                 if k == "wrapper-files":
                     problems.append("[config]: wrapper-files belongs in the package's file under packages/")
-                elif k != "secondary":
+                elif k not in CONFIG_KEYS:
                     problems.append(f"[config]: unknown key {k!r}")
             continue
+        hand = items.get("status", "").strip() or None
         e = {"id": sec, "symbols": (items.get("symbols") or sec).split(),
-             "category": items.get("category", "").strip(), "status": items.get("status", "").strip(),
+             "category": items.get("category", "").strip(), "status": hand, "hand": hand,
              "note": " ".join(items.get("note", "").split()), "swift": " ".join(items.get("swift", "").split()),
-             "notes": {}, "apis": [], "overrides": {}, "wrap": items.get("wrap", "yes").strip()}
+             "notes": {}, "apis": [], "overrides": {}, "same": {}, "wrap": items.get("wrap", "yes").strip()}
         for line in (items.get("system") or "").split("\n"):
             if line.strip():
                 scope, decl = parse_api_line(line)
@@ -199,6 +214,15 @@ def load_mapping(path, packages=()):
                 if packages and m.group(1) not in packages:
                     problems.append(f"[{sec}]: {k} names no package in packages/")
                 e["notes"][m.group(1)] = " ".join(v.split())
+                continue
+            m = re.match(r"^same\.(\S+)$", k)
+            if m:
+                if m.group(1) not in e["symbols"]:
+                    problems.append(f"[{sec}]: {k} names a symbol the entry doesn't have")
+                elif not re.match(r"^[A-Za-z_]\w*$", v.strip()):
+                    problems.append(f"[{sec}]: {k} = {v}: the value must be one C name")
+                else:
+                    e["same"][m.group(1)] = v.strip()
                 continue
             m = re.match(r"^status\.(\w+)$", k)
             if m:
@@ -212,14 +236,16 @@ def load_mapping(path, packages=()):
                 problems.append(f"[{sec}]: unknown key {k!r}")
         if e["wrap"] not in ("yes", "no"):
             problems.append(f"[{sec}]: wrap must be yes or no, not {e['wrap']!r}")
-        if e["status"] not in STATUSES:
-            problems.append(f"[{sec}]: status must be one of {', '.join(STATUSES)}, not {e['status']!r}")
-        if e["status"] != "ignore" and e["category"] not in CATEGORIES:
+        if hand is not None and hand not in STATUSES:
+            problems.append(f"[{sec}]: status must be one of {', '.join(STATUSES)}, not {hand!r}")
+        if hand != "ignore" and e["category"] not in CATEGORIES:
             problems.append(f"[{sec}]: unknown category {e['category']!r}")
-        if e["status"] in ("covered", "partial") and not e["apis"]:
-            problems.append(f"[{sec}]: a {e['status']} entry needs a `system` declaration")
-        if e["status"] in ("partial", "ignore") and not e["note"] and not e["notes"]:
-            problems.append(f"[{sec}]: a {e['status']} entry needs a note")
+        if hand in ("covered", "partial") and not e["apis"]:
+            problems.append(f"[{sec}]: a {hand} entry needs a `system` declaration")
+        if hand is None and e["apis"]:
+            problems.append(f"[{sec}]: `system` needs a `status`; without one, the derivation finds System's API")
+        if hand in ("partial", "ignore") and not e["note"] and not e["notes"]:
+            problems.append(f"[{sec}]: a {hand} entry needs a note")
         entries.append(e)
     return config, entries, problems
 
@@ -228,14 +254,209 @@ def is_function_like(it):
     return "function" in it["kinds"] or ("macro" in it["kinds"] and any(s["called"] for s in it["sites"]))
 
 
+class Derivation:
+    """An entry's status per platform, from what System's sources say they
+    cover (derive.py's output) rather than from the mapping.
+
+    Each symbol gets the strongest evidence it has on a platform:
+      doc         a public declaration built there names it in its doc
+                  comment ("The corresponding C function is `x`.") or is a
+                  CInterop typealias of it;
+      restricted  only declarations that name it for one use (`fcntl`,
+                  with the `F_GETFL` command);
+      impl        System's own code uses it there, but no public
+                  declaration names it (a deinit's pthread_mutex_destroy);
+      elsewhere   named, but by declarations not built there.
+    A symbol reads as another C name where the mapping says so
+    (`same.<symbol>`), on Windows ucrt's `_x` reads as `x`, and a raw
+    system call's number `SYS_x` reads as `x`.
+
+    The symbols that decide are the ones the package uses on the platform,
+    other than its own shims and the C names only its shims use there. Where it
+    uses nothing else there, the entry's other symbols decide (NIO's Linux
+    rename goes through its shim), what its shims call there
+    (syscall(SYS_renameat2), which reads as renameat2); failing those, the
+    entry's other symbols (NIO's Darwin renamex_np, which System's rename
+    names too), then what the shims wrap.
+
+    Covered: every deciding symbol has doc or impl evidence, and one has
+    doc. Partial: some have doc, or the best is restricted. Missing:
+    otherwise, including an entry whose own name is one of its deciding
+    symbols and isn't named: System's QoS constants don't make posix_spawn
+    partial."""
+
+    def __init__(self, derived, interfaces, shim_targets, owner):
+        self.names = derived.get("names", {})
+        self.impl = derived.get("implementation", {})
+        self.interfaces = interfaces
+        self.shim_targets = set(shim_targets)
+        self.owner = owner
+
+    def evidence(self, sym, plat, same):
+        """(level or None, the C name it was found as, declarations)."""
+        cands = ([same[sym]] if sym in same else []) + [sym]
+        if plat == "Windows" and re.match(r"^_[A-Za-z]", sym):
+            cands.append(sym[1:])
+        # A raw system call's number stands for the call: NIO's shim calls
+        # syscall(SYS_renameat2) where glibc lacks renameat2.
+        m = re.match(r"^SYS_(\w+)$", sym)
+        if m:
+            cands.append(m.group(1))
+        found = None
+        for c in cands:
+            n = self.names.get(c)
+            if not n:
+                continue
+            if plat in n["platforms"]:
+                return "doc", c, [d for d in n["declarations"] if not d["restricted"] and plat in d["platforms"]]
+            if plat in n["partialPlatforms"]:
+                if found is None or found[0] != "restricted":
+                    found = ("restricted", c, [d for d in n["declarations"] if plat in d["platforms"]])
+            elif found is None:
+                found = ("elsewhere", c, n["declarations"])
+        if found and found[0] == "restricted":
+            return found
+        for c in cands:
+            if plat in self.impl.get(c, ()):
+                return "impl", c, []
+        return found or (None, None, [])
+
+    def in_shims(self, sym, plat=None):
+        """Whether every site of a symbol (on a platform) is in the
+        package's shim targets: a C name the package reaches only through
+        its shims there."""
+        sites = [x for x in self.interfaces[sym]["sites"] if plat is None or plat in x["platforms"]]
+        return bool(sites) and all(x["target"] in self.shim_targets for x in sites)
+
+    def deciding(self, e, plat):
+        """(basis, symbols) that decide the entry on a platform."""
+        its = self.interfaces
+        syms = e["symbols"]
+        shim = {s for s in syms if its.get(s, {}).get("shim")}
+        used = [s for s in syms if its.get(s, {}).get("platforms", {}).get(plat) and s not in shim]
+        counted = [s for s in used if not self.in_shims(s, plat)]
+        if counted:
+            return "used", counted
+        # Only shims here: what they call here, then how the package names
+        # the concept elsewhere (NIO's Darwin renamex_np), then any C name.
+        if used:
+            return "shim calls", used
+        counted = [s for s in syms if s in its and s not in shim and not self.in_shims(s)]
+        if counted:
+            return "spellings", counted
+        counted = [s for s in syms if s in its and s not in shim]
+        if counted:
+            return "shim calls elsewhere", counted
+        wraps = set()
+        for s in used:
+            wraps.update((its[s].get("shim") or {}).get("wraps", {}).get(plat, []))
+        counted = sorted(w for w in wraps if w in self.owner and self.owner[w].get("hand") != "ignore"
+                         and self.owner[w]["category"] not in OUT_OF_SCOPE)
+        if counted:
+            return "shim wraps", counted
+        return "mapping", [s for s in syms if s not in shim]
+
+    def entry(self, e, plats):
+        """{platform: {status, basis, evidence: {symbol: [level, as, declaration keys]}}}, and the
+        declarations that cover the entry anywhere."""
+        out, decls = {}, {}
+        # The functions the package calls for the entry anywhere, its shims'
+        # calls included (pdfork, inside Subprocess's C shim), though not the
+        # shims themselves.
+        its = self.interfaces
+        all_funcs = [s for s in e["symbols"] if s in its and not its[s].get("shim") and self.function_like(s)]
+        for p in plats:
+            basis, counted = self.deciding(e, p)
+            ev = {}
+            for s in counted:
+                level, name, ds = self.evidence(s, p, e["same"])
+                ev[s] = [level, name, [f"{d['file']}:{d['line']}" for d in ds[:6]]]
+                if level in ("doc", "restricted"):
+                    for d in ds:
+                        decls.setdefault(f"{d['file']}:{d['line']}", d)
+            levels = [v[0] for v in ev.values()]
+            named = ("doc", "restricted")
+            # An operation isn't covered by its constants: System naming
+            # CLOCK_MONOTONIC (for its condition variables) doesn't cover
+            # clock_gettime. Where functions decide, one must be named.
+            funcs = all_funcs
+            rule = None
+            if e["id"] in e["symbols"] and e["id"] not in self.names:
+                st, rule = "missing", f"System names no {e['id']}"
+            elif e["id"] in ev and ev[e["id"]][0] not in named:
+                st, rule = "missing", f"System doesn't name {e['id']} here"
+            elif funcs and not any(self.evidence(s, p, e["same"])[0] in named for s in funcs):
+                st, rule = "missing", "System names none of its functions"
+            elif levels and all(x in ("doc", "impl") for x in levels) and "doc" in levels:
+                st = "covered"
+            elif "doc" in levels or "restricted" in levels:
+                st = "partial"
+            else:
+                st = "missing"
+            out[p] = {"status": st, "basis": basis, "evidence": ev, "rule": rule}
+        return out, decls
+
+    def function_like(self, sym):
+        it = self.interfaces.get(sym)
+        if it is not None:
+            return is_function_like(it)
+        return "function" in self.names.get(sym, {}).get("kinds", [])
+
+
+def derived_reason(d, plat):
+    """What decided a derived status, for the report."""
+    ev = d["evidence"]
+    by = collections.defaultdict(list)
+    for s, (level, name, _ds) in ev.items():
+        by[level].append(s if name in (s, None) else f"{s} (as {name})")
+    bits = [d["rule"]] if d.get("rule") else []
+    if d["status"] != "covered":
+        if by.get("restricted"):
+            bits.append("named only for some uses: " + ", ".join(by["restricted"]))
+        if by.get("elsewhere"):
+            bits.append(f"System's API that names them isn't built on {plat}: " + ", ".join(by["elsewhere"]))
+        if by.get(None):
+            bits.append("not named by System: " + ", ".join(by[None]))
+        if by.get("impl") and d["status"] == "missing":
+            bits.append("used by System's implementation only: " + ", ".join(by["impl"]))
+    elif by.get("impl"):
+        bits.append("with what System's implementation handles: " + ", ".join(by["impl"]))
+    if d["basis"] != "used":
+        bits.append({"spellings": "decided by the entry's other spellings",
+                     "shim calls": "decided by the C names the package's shims call here",
+                     "shim calls elsewhere": "decided by the C names the package's shims call elsewhere",
+                     "shim wraps": "decided by what the package's shims wrap",
+                     "mapping": "decided by the mapping's symbols"}[d["basis"]])
+    return "; ".join(bits)
+
+
+def auto_category(it, config):
+    """A category for an interface no entry names: by the header that
+    declares it, then by its name ([config] header-category and
+    name-category in mapping.ini)."""
+    for line in (config.get("header-category") or "").split("\n"):
+        globs, _, cat = line.rpartition(":")
+        for h in it.get("headers") or []:
+            if any(fnmatch.fnmatch(h, g) for g in globs.split()):
+                return cat.strip()
+    for line in (config.get("name-category") or "").split("\n"):
+        pat, _, cat = line.rpartition(":")
+        if pat.strip() and re.search(pat.strip(), it["name"]):
+            return cat.strip()
+    return "uncategorized"
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--package")
     ap.add_argument("--interfaces")
     ap.add_argument("--system")
+    ap.add_argument("--derived", help="derive.py's output for the same System commit")
     ap.add_argument("--mapping")
     ap.add_argument("--meta")
     ap.add_argument("--out")
+    ap.add_argument("--strict", action="store_true",
+                    help="unmapped interfaces are problems (the audited adopters); otherwise they're classified")
     ap.add_argument("--summary")
     args = ap.parse_args()
     if args.summary:
@@ -245,8 +466,9 @@ def main():
     platforms = [p for p in PLATFORMS if p in pkg["platforms"]]
     ext = json.load(open(args.interfaces))
     api = SystemAPI(json.load(open(args.system)))
+    derived = json.load(open(args.derived)) if args.derived else {}
     meta = json.load(open(args.meta)) if args.meta else {}
-    known = {f[:-4] for f in os.listdir(os.path.dirname(os.path.abspath(args.package))) if f.endswith(".ini")}
+    known = package.all_names(package.root_of(args.package))
     config, entries, malformed = load_mapping(args.mapping, known)
     interfaces = {i["name"]: i for i in ext["interfaces"]}
     for e in entries:
@@ -263,12 +485,22 @@ def main():
                 problems["duplicate"].append(f"{s} is in both [{owner[s]['id']}] and [{e['id']}]")
             else:
                 owner[s] = e
-    for name, it in interfaces.items():
-        if name not in owner:
-            problems["unmapped"].append({"name": name, "kinds": it["kinds"], "evidence": it["evidence"],
-                                         "platforms": it["platforms"], "targets": it["targets"],
-                                         "headers": it["headers"] or it["reachedThrough"],
-                                         "examples": [f"{s['file']}:{s['line']}" for s in it["sites"][:3]]})
+    # An interface no entry names gets an entry of its own, derived like
+    # any other, in the category its header or name suggests. For the
+    # audited adopters (--strict) it's also a problem to fix in the mapping.
+    for name, it in sorted(interfaces.items()):
+        if name in owner:
+            continue
+        cat = auto_category(it, config)
+        problems["unmapped"].append({"name": name, "kinds": it["kinds"], "evidence": it["evidence"],
+                                     "platforms": it["platforms"], "targets": it["targets"],
+                                     "headers": it["headers"] or it["reachedThrough"], "category": cat,
+                                     "examples": [f"{s['file']}:{s['line']}" for s in it["sites"][:3]]})
+        e = {"id": name, "symbols": [name], "category": cat, "status": None, "hand": None, "note": "",
+             "swift": "", "notes": {}, "apis": [], "overrides": {}, "same": {}, "wrap": "yes", "packageNote": "",
+             "auto": True}
+        entries.append(e)
+        owner[name] = e
     # A note for this package on an entry it no longer uses. (Symbols no
     # package uses are the combined report's to find.)
     for e in entries:
@@ -281,13 +513,16 @@ def main():
             hits, near = api.find(a["scope"], a["decl"])
             a["matched"] = hits
             a["suggestions"] = near
-            if not hits and e["status"] in ("covered", "partial"):
+            if not hits and e["hand"] in ("covered", "partial"):
                 problems["apiMissing"].append({"entry": e["id"], "api": a["text"],
                                                "sameName": [f"{n['scope'] + ': ' if n['scope'] else ''}"
                                                             f"{n['declaration']} ({n['file']}:{n['line']})"
                                                             for n in near]})
 
     # --------------------------------------------------- per platform
+    # The derivation decides every entry; a hand status in the mapping
+    # overrides it, and a `status.<Platform>` overrides both.
+    derivation = Derivation(derived, interfaces, ext.get("shimTargets", []), owner)
     for e in entries:
         used = collections.Counter()
         for s in e["symbols"]:
@@ -299,19 +534,45 @@ def main():
             for h in a["matched"]:
                 api_plats.update(h["platforms"])
         e["systemPlatforms"] = [p for p in PLATFORMS if p in api_plats]
+        dplat, ddecls = derivation.entry(e, list(e["used"]))
+        e["derived"] = {p: dict(d, reason=derived_reason(d, p)) for p, d in dplat.items()}
+        e["derivedApis"] = [{"text": f"{d['scope'] + ': ' if d['scope'] else ''}{d['declaration']}",
+                             "scope": d["scope"], "decl": d["declaration"], "matched": [d], "derived": True}
+                            for _k, d in sorted(ddecls.items(), key=lambda kv: (kv[1]["file"], kv[1]["line"]))]
         e["platformStatus"] = {}
         for p in e["used"]:
             if p in e["overrides"]:
-                e["platformStatus"][p] = e["overrides"][p]
-            elif e["status"] in ("covered", "partial"):
+                e["platformStatus"][p] = dict(e["overrides"][p], by="override")
+            elif e["hand"] in ("covered", "partial"):
                 if p in api_plats:
-                    e["platformStatus"][p] = {"status": e["status"], "reason": ""}
+                    e["platformStatus"][p] = {"status": e["hand"], "reason": "", "by": "hand"}
                 elif not any(a["matched"] for a in e["apis"]):
-                    e["platformStatus"][p] = {"status": "missing", "reason": "the cited System API isn't on the tip"}
+                    e["platformStatus"][p] = {"status": "missing", "reason": "the cited System API isn't on the tip",
+                                              "by": "hand"}
                 else:
-                    e["platformStatus"][p] = {"status": "missing", "reason": f"System's API isn't built on {p}"}
+                    e["platformStatus"][p] = {"status": "missing", "reason": f"System's API isn't built on {p}",
+                                              "by": "hand"}
+            elif e["hand"] in ("missing", "ignore"):
+                e["platformStatus"][p] = {"status": e["hand"], "reason": "", "by": "hand"}
             else:
-                e["platformStatus"][p] = {"status": e["status"], "reason": ""}
+                d = e["derived"][p]
+                e["platformStatus"][p] = {"status": d["status"], "reason": d["reason"], "by": "derived"}
+        # The entry's status: the hand's, or the best the derivation found
+        # where the package uses it (a covered entry can be missing on the
+        # platforms System's API isn't built on, as with a hand status).
+        if e["hand"]:
+            e["status"] = e["hand"]
+        else:
+            got = {v["status"] for v in e["platformStatus"].values()}
+            e["status"] = next((s for s in ("covered", "partial", "missing") if s in got), "missing")
+        e["decidedBy"] = "hand" if e["hand"] else ("override" if e["overrides"] else "derived")
+        if not e["hand"]:
+            e["apis"] = e["derivedApis"]
+        # Where the hand and the derivation disagree, per platform.
+        e["disagree"] = {p: {"hand": e["platformStatus"][p]["status"], "derived": e["derived"][p]["status"],
+                             "reason": e["derived"][p]["reason"]}
+                         for p in e["used"] if e["hand"] and e["hand"] != "ignore"
+                         and e["platformStatus"][p]["status"] != e["derived"][p]["status"]}
         e["functionLike"] = [s for s in e["symbols"] if s in interfaces and is_function_like(interfaces[s])]
         e["sites"] = sum(len(interfaces[s]["sites"]) for s in e["symbols"] if s in interfaces)
         tg = collections.Counter()
@@ -319,7 +580,14 @@ def main():
             for t, n in interfaces.get(s, {}).get("targets", {}).items():
                 tg[t] += n
         e["targets"] = dict(sorted(tg.items()))
-        e["unreleased"] = any(h["availability"]["system"] == "199" for a in e["apis"] for h in a["matched"])
+        if e["hand"]:
+            e["unreleased"] = any(h["availability"]["system"] == "199" for a in e["apis"] for h in a["matched"])
+        else:
+            # Derived: some symbol that decides it is covered only by
+            # unreleased (System 199) declarations.
+            named = {v[1] for d in e["derived"].values() for v in d["evidence"].values()
+                     if v[0] in ("doc", "restricted")}
+            e["unreleased"] = any(derivation.names.get(n, {}).get("unreleased") for n in named)
 
     # ------------------------------------------------------ summaries
     def tally(function_only):
@@ -440,7 +708,8 @@ def main():
                                       if v["status"] in ("missing", "partial")],
                      "swiftLines": round(est["swift"]), "cLines": round(est["c"]),
                      "total": round(est["swift"] + est["c"]), "functions": sorted(set(est["functions"])),
-                     "shims": sorted(set(est["shims"])), "callSitesElsewhere": len(touched.get(e["id"], ()))})
+                     "shims": sorted(set(est["shims"])), "callSitesElsewhere": len(touched.get(e["id"], ())),
+                     "sites": e["sites"], "symbols": [s for s in e["symbols"] if s in interfaces]})
     gaps.sort(key=lambda g: (-g["total"], -g["callSitesElsewhere"], g["id"]))
 
     # ------------------------------ System API the package already uses
@@ -457,9 +726,30 @@ def main():
                         "examples": [f"{s['file']}:{s['line']}" for s in a["sites"][:2]],
                         "onTip": bool(found) if a["module"] == "SystemPackage" else None})
 
+    # ------------------------------------------------------ derivation
+    # Which entries the derivation decides and which the mapping's hand
+    # statuses do, and where the two disagree, over the entries the package
+    # uses.
+    in_use = [e for e in entries if e["used"]]
+    stats = collections.Counter(e["decidedBy"] for e in in_use)
+    stats.update("auto" for e in in_use if e.get("auto"))
+    agree = collections.Counter()
+    for e in in_use:
+        if e["hand"] and e["hand"] != "ignore":
+            agree["disagree" if e["disagree"] else "agree"] += 1
+    derivation_out = {
+        "entries": dict(stats), "handAgreement": dict(agree),
+        "disagreements": [{"entry": e["id"], "hand": e["hand"], "category": e["category"],
+                           "platforms": e["disagree"]} for e in in_use if e["disagree"]],
+        "system": {k: derived.get("stats", {}).get(k) for k in ("declarations", "documented", "sentences",
+                                                                  "typealiases", "implementationNames")},
+        "systemNames": len(derivation.names),
+    }
+
     out = {
         "meta": meta,
         "package": pkg,
+        "derivation": derivation_out,
         "config": {"wrapperFiles": wrapper_globs, "thinWrapperLines": THIN_WRAPPER_LINES,
                    "secondary": sorted(secondary),
                    "unrankedStdlib": sorted(e["id"] for e in entries if e["status"] == "missing" and e["swift"]
@@ -479,13 +769,16 @@ def main():
                                  if i["name"] in owner and owner[i["name"]]["wrap"] != "no"
                                  and owner[i["name"]]["status"] != "ignore"
                                  and owner[i["name"]]["category"] not in OUT_OF_SCOPE}),
-        "extraction": {k: ext[k] for k in ("libraryTargets", "shimTargets", "skippedTargets", "unsupportedPlatforms",
-                                           "unsupportedBecause", "excludedReferences", "crosscheck", "warnings",
-                                           "nestedPackages", "dependencyPackages", "systemDependency",
-                                           "dependencies", "model")},
+        "extraction": {k: ext.get(k) for k in ("libraryTargets", "shimTargets", "skippedTargets",
+                                               "unsupportedPlatforms", "unsupportedBecause", "excludedReferences",
+                                               "crosscheck", "warnings", "nestedPackages", "dependencyPackages",
+                                               "systemDependency", "dependencies", "model",
+                                               "lexicalUnresolvedDropped")} | {"mode": ext.get("extraction", "index")},
+        "darwin": ext.get("darwin"),
     }
     json.dump(out, open(args.out, "w"), indent=1)
-    failed = any(problems[k] for k in ("malformed", "unmapped", "duplicate", "apiMissing", "alreadySystemMissing"))
+    kinds = ("malformed", "duplicate", "apiMissing", "alreadySystemMissing") + (("unmapped",) if args.strict else ())
+    failed = any(problems[k] for k in kinds)
     return 2 if failed else 0
 
 
@@ -512,7 +805,15 @@ def find_used_symbol(api, demangled):
         want = base + labels
         exact = [c for c in cands if c["name"].rstrip("?!").replace("init?", "init") == want
                  or c["name"] == want]
+        # An enum case matched with its payload's labels, `.currentDirectory(_:)`
+        # for `case currentDirectory`.
+        if not exact and re.fullmatch(r"\((_:)+\)", labels):
+            exact = [c for c in cands if c["declaration"].startswith("case ")]
+        if not exact and re.fullmatch(r"\((_:)+\)", labels) and scope in api.public_types:
+            return [{"scope": scope, "name": base, "unscanned": "an enum case of a public enum"}]
         return exact or None
+    if not cands and scope in api.public_types and base[:1].islower():
+        return [{"scope": scope, "name": base, "unscanned": "an enum case of a public enum"}]
     return cands or None
 
 

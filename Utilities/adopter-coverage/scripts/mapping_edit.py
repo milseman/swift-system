@@ -12,9 +12,24 @@ rest of the file.
   ini.set_key("Dispatch", "wrap", "no")
   ini.add_entry(TEXT, before="[read]")       # or after="[close]"
   ini.save()
+
+As a command, `prune` drops the hand statuses a derivation makes
+redundant, from check.py's coverage.json for every package that uses the
+entries:
+
+  mapping_edit.py prune MAPPING.ini COVERAGE.json...
+
+A hand status goes when the derivation reaches the same status on every
+platform each package uses the entry on (its `system` citations go with
+it), and a hand `missing` goes when the derivation finds System's API for
+the entry: the hand status is stale. Hand statuses the derivation doesn't
+reproduce stay, as overrides, and are printed with the reason.
 """
 
+import collections
+import json
 import re
+import sys
 
 
 class Mapping:
@@ -79,6 +94,12 @@ class Mapping:
             sec = sec.rstrip("\n") + "\n" + text + "\n"
         self._replace(name, sec)
 
+    def remove_key(self, name, key):
+        """Remove a key, with its continuation lines, if the entry has it."""
+        sec = self.section(name)
+        pat = r"^" + re.escape(key) + r" =(?: .*)?\n(?:[ \t]+.*\n?)*"
+        self._replace(name, re.sub(pat, "", sec, count=1, flags=re.M))
+
     def add_system(self, name, decls):
         """Append System declarations to an entry's `system` key."""
         sec = self.section(name)
@@ -99,3 +120,42 @@ class Mapping:
 
     def save(self):
         open(self.path, "w", encoding="utf-8").write(re.sub(r"\n{3,}", "\n\n", self.text))
+
+
+def prune(mapping, coverages):
+    """(dropped, kept): entry ids with the reason for each."""
+    views = collections.defaultdict(list)
+    for path in coverages:
+        cov = json.load(open(path))
+        for e in cov["entries"]:
+            if e.get("used") and e.get("hand") and e["hand"] != "ignore":
+                views[e["id"]].append((cov["package"]["key"], e))
+    ini = Mapping(mapping)
+    dropped, kept = [], []
+    for eid, seen in sorted(views.items()):
+        hand = seen[0][1]["hand"]
+        # The hand status per platform is where its cited API is built;
+        # compare that with the derivation's.
+        diff = {(k, p): v for k, e in seen for p, v in e.get("disagree", {}).items()}
+        found = any(d["status"] in ("covered", "partial") for _k, e in seen for d in e["derived"].values())
+        if not diff or (hand == "missing" and found):
+            ini.remove_key(eid, "status")
+            ini.remove_key(eid, "system")
+            dropped.append((eid, hand, "agrees" if not diff else "stale: " + ", ".join(
+                sorted({f"{k} {p} {v['derived']}" for (k, p), v in diff.items()})[:6])))
+        else:
+            kept.append((eid, hand, "; ".join(sorted({f"{k} {p}: {v['hand']} vs derived {v['derived']} ({v['reason']})"
+                                                      for (k, p), v in diff.items()}))[:400]))
+    ini.save()
+    return dropped, kept
+
+
+if __name__ == "__main__":
+    if len(sys.argv) < 4 or sys.argv[1] != "prune":
+        sys.exit(__doc__)
+    dropped, kept = prune(sys.argv[2], sys.argv[3:])
+    for eid, hand, why in dropped:
+        print(f"dropped [{eid}] status = {hand}: {why}")
+    for eid, hand, why in kept:
+        print(f"kept    [{eid}] status = {hand}: {why}")
+    print(f"{len(dropped)} hand statuses dropped, {len(kept)} kept")

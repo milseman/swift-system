@@ -64,6 +64,10 @@ for relative in linux_files:
     text = text.replace('#else\n#error("Unsupported Platform")\n#endif',
                         "#else\nimport Darwin\n#endif", 1)
     text = "import LinuxModel\n" + text
+    if relative.endswith("Constants+Events.swift"):
+        # Constants+Threads.swift's, which SYSTEM_PACKAGE_DARWIN turns off.
+        text += "\n@_alwaysEmitIntoClient\ninternal var _CLOCK_REALTIME: CInt { 0 }\n" \
+                "\n@_alwaysEmitIntoClient\ninternal var _CLOCK_MONOTONIC: CInt { 1 }\n"
     target = os.path.join(work, relative)
     os.makedirs(os.path.dirname(target), exist_ok=True)
     open(target, "w").write(text)
