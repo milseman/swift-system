@@ -78,6 +78,7 @@ target_sources(SystemPackage PRIVATE
   FilePath/FilePathTempWindows.swift
   FilePath/FilePathWindows.swift)
 target_sources(SystemPackage PRIVATE
+  FileSystem/DiskQuota.swift
   FileSystem/FileFlags.swift
   FileSystem/FileMode.swift
   FileSystem/FilePathOperations.swift

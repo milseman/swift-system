@@ -117,6 +117,70 @@ final class StatFSMockTests: XCTestCase {
   }
   #endif
 
+  #if SYSTEM_PACKAGE_DARWIN
+  // quotactl's command is QCMD(command, type), which Swift doesn't import.
+  func testQuotaSyscalls() {
+    let path: FilePath = "/a/path"
+    func command(_ command: CInt, _ type: CInt) -> CInt {
+      (command << SUBCMDSHIFT) | (type & SUBCMDMASK)
+    }
+    let userStatus = command(Q_QUOTASTAT, USRQUOTA)
+    let groupStatus = command(Q_QUOTASTAT, GRPQUOTA)
+    let userQuota = command(Q_GETQUOTA, USRQUOTA)
+    let groupQuota = command(Q_GETQUOTA, GRPQUOTA)
+
+    let syscallTestCases: [MockTestCase] = [
+      MockTestCase(name: "quotactl", .interruptable, "/a/path", userStatus, 0, Wildcard()) {
+        retryOnInterrupt in
+        _ = try path.quotasEnabled(for: .user, retryOnInterrupt: retryOnInterrupt)
+      },
+
+      MockTestCase(name: "quotactl", .interruptable, "/a/path", groupStatus, 0, Wildcard()) {
+        retryOnInterrupt in
+        _ = try path.withPlatformString {
+          try FilePath.quotasEnabled($0, for: .group, retryOnInterrupt: retryOnInterrupt)
+        }
+      },
+
+      MockTestCase(name: "quotactl", .interruptable, "/a/path", userQuota, 501, Wildcard()) {
+        retryOnInterrupt in
+        _ = try path.diskQuota(for: UserID(rawValue: 501), retryOnInterrupt: retryOnInterrupt)
+      },
+
+      MockTestCase(name: "quotactl", .interruptable, "/a/path", userQuota, 501, Wildcard()) {
+        retryOnInterrupt in
+        _ = try path.withPlatformString {
+          try FilePath.diskQuota(
+            $0, for: UserID(rawValue: 501), retryOnInterrupt: retryOnInterrupt)
+        }
+      },
+
+      MockTestCase(name: "quotactl", .interruptable, "/a/path", groupQuota, 20, Wildcard()) {
+        retryOnInterrupt in
+        _ = try path.diskQuota(for: GroupID(rawValue: 20), retryOnInterrupt: retryOnInterrupt)
+      },
+
+      MockTestCase(name: "quotactl", .interruptable, "/a/path", groupQuota, 20, Wildcard()) {
+        retryOnInterrupt in
+        _ = try path.withPlatformString {
+          try FilePath.diskQuota(
+            $0, for: GroupID(rawValue: 20), retryOnInterrupt: retryOnInterrupt)
+        }
+      },
+
+      // quotactl takes the ID as an int, so one past Int32.max, such as
+      // nobody's, goes by its bit pattern.
+      MockTestCase(name: "quotactl", .interruptable, "/a/path", userQuota, CInt(-2), Wildcard()) {
+        retryOnInterrupt in
+        _ = try path.diskQuota(
+          for: UserID(rawValue: 4_294_967_294), retryOnInterrupt: retryOnInterrupt)
+      },
+    ]
+
+    syscallTestCases.forEach { $0.runAllTests() }
+  }
+  #endif
+
   #if os(Linux) || os(Android)
   // FileSystemType's calls, which report the f_type that statvfs lacks.
   func testFileSystemTypeSyscalls() {

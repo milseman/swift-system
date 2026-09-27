@@ -186,6 +186,52 @@ private struct StatFSTests {
   #endif
 
   #if SYSTEM_PACKAGE_DARWIN
+  // As Foundation's attributesOfFileSystem does: a file system without
+  // quotas, such as APFS, doesn't support asking, and one with them has the
+  // user's only if they're on.
+  @available(System 199, *)
+  @Test func quotasOfRoot() throws {
+    let root = try StatFS("/").mountPoint
+    let enabled: Bool
+    do {
+      enabled = try root.quotasEnabled(for: .user)
+    } catch {
+      #expect(error == .notSupported)
+      return
+    }
+    if enabled {
+      let quota = try root.diskQuota(for: UserID.effective)
+      #expect(quota.id == UserID.effective.rawValue)
+    }
+  }
+
+  @available(System 199, *)
+  @Test func diskQuotaRoundTrip() {
+    var quota = DiskQuota(rawValue: CInterop.DiskQuota())
+    quota.hardByteLimit = 1 << 40
+    quota.softByteLimit = 1 << 39
+    quota.bytesUsed = 12345
+    quota.hardInodeLimit = 1001
+    quota.softInodeLimit = 900
+    quota.inodesUsed = 42
+    quota.byteTimeLimit = 1_800_000_000
+    quota.inodeTimeLimit = 1_800_000_001
+    quota.id = 501
+    #expect(quota.rawValue.dqb_bhardlimit == 1 << 40)
+    #expect(quota.rawValue.dqb_bsoftlimit == 1 << 39)
+    #expect(quota.rawValue.dqb_curbytes == 12345)
+    #expect(quota.rawValue.dqb_ihardlimit == 1001)
+    #expect(quota.rawValue.dqb_isoftlimit == 900)
+    #expect(quota.rawValue.dqb_curinodes == 42)
+    #expect(quota.rawValue.dqb_btime == 1_800_000_000)
+    #expect(quota.rawValue.dqb_itime == 1_800_000_001)
+    #expect(quota.rawValue.dqb_id == 501)
+    #expect(DiskQuota.Kind.user.rawValue == USRQUOTA)
+    #expect(DiskQuota.Kind.group.rawValue == GRPQUOTA)
+  }
+  #endif
+
+  #if SYSTEM_PACKAGE_DARWIN
   @available(System 199, *)
   @Test func typeAndSubtypeRoundTrip() throws {
     // On Darwin, `type` and `subtype` are opaque kernel indices with no stable

@@ -9,8 +9,8 @@
 
 // The file system statistics calls behind StatFS: statfs, fstatfs and
 // getfsstat on Darwin and BSD, and statvfs and fstatvfs elsewhere, plus
-// statfs and fstatfs on Linux and Android for FileSystemType. The mocks
-// record the buffer as a pointer.
+// statfs and fstatfs on Linux and Android for FileSystemType, and quotactl
+// on Darwin for DiskQuota. The mocks record the buffer as a pointer.
 
 #if !os(Windows)
 
@@ -59,6 +59,19 @@ internal func system_getfsstat(
   // OpenBSD.
   return getfsstat(buffer, numericCast(byteCount), mode)
 }
+
+#if SYSTEM_PACKAGE_DARWIN
+// Records the buffer as a pointer.
+internal func system_quotactl(
+  _ path: UnsafePointer<CChar>, _ command: CInt, _ id: CInt,
+  _ buffer: UnsafeMutableRawPointer
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(path: path, command, id, buffer) }
+#endif
+  return quotactl(path, command, id, buffer.assumingMemoryBound(to: CChar.self))
+}
+#endif // SYSTEM_PACKAGE_DARWIN
 #else
 internal func system_statvfs(
   _ path: UnsafePointer<CChar>, _ buffer: UnsafeMutablePointer<statvfs>

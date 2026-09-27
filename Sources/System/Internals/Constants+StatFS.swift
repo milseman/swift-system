@@ -7,7 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-// The constants behind StatFS and MountFlags.
+// The constants behind StatFS, MountFlags, FileSystemType and DiskQuota.
 
 #if !os(Windows)
 
@@ -380,6 +380,28 @@ internal var _MNT_WAIT: CInt { MNT_WAIT }
 
 @_alwaysEmitIntoClient
 internal var _MNT_NOWAIT: CInt { MNT_NOWAIT }
+#endif
+
+// MARK: - quotactl
+
+#if SYSTEM_PACKAGE_DARWIN
+@_alwaysEmitIntoClient
+internal var _Q_QUOTASTAT: CInt { Q_QUOTASTAT }
+
+@_alwaysEmitIntoClient
+internal var _Q_GETQUOTA: CInt { Q_GETQUOTA }
+
+@_alwaysEmitIntoClient
+internal var _USRQUOTA: CInt { USRQUOTA }
+
+@_alwaysEmitIntoClient
+internal var _GRPQUOTA: CInt { GRPQUOTA }
+
+@_alwaysEmitIntoClient
+internal var _SUBCMDSHIFT: CInt { SUBCMDSHIFT }
+
+@_alwaysEmitIntoClient
+internal var _SUBCMDMASK: CInt { SUBCMDMASK }
 #endif
 
 // MARK: - File System Magic Numbers

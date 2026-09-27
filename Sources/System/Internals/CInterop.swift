@@ -166,4 +166,12 @@ extension CInterop {
   public typealias FileSystemID = CUnsignedLong
   #endif
 }
+
+#if SYSTEM_PACKAGE_DARWIN
+@available(System 199, *)
+extension CInterop {
+  /// The C `dqblk` structure of a disk quota, which `DiskQuota` wraps.
+  public typealias DiskQuota = dqblk
+}
+#endif
 #endif
