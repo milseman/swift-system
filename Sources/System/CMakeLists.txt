@@ -113,6 +113,11 @@ target_sources(SystemPackage PRIVATE
   Internals/Syscalls.swift
   Internals/WindowsSyscallAdapters.swift)
 target_sources(SystemPackage PRIVATE
+  Internals/Constants+SystemControl.swift
+  Internals/Syscalls+SystemControl.swift
+  SystemControl/SystemControl.swift
+  SystemControl/SystemControlNames.swift)
+target_sources(SystemPackage PRIVATE
   Terminal/BaudRate.swift
   Terminal/ControlCharacters.swift
   Terminal/TerminalAttributes.swift
