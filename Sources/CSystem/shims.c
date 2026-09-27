@@ -19,7 +19,39 @@
 #endif
 
 #ifdef __linux__
+
+// The `ST_*` mount-flag constants in <sys/statvfs.h> require _GNU_SOURCE.
+// Define it here, in a dedicated translation unit, not in CSystemLinux.h,
+// since defining it there changes libc types like `fd_set` for every file
+// that imports CSystem and conflicts with SwiftGlibc.
 #define _GNU_SOURCE
+#include <sys/statvfs.h>
+#include <stdint.h>
+
+uint64_t _system_get_ST_RDONLY(void) { return ST_RDONLY; }
+uint64_t _system_get_ST_NOSUID(void) { return ST_NOSUID; }
+uint64_t _system_get_ST_NODEV(void) { return ST_NODEV; }
+uint64_t _system_get_ST_NOEXEC(void) { return ST_NOEXEC; }
+uint64_t _system_get_ST_SYNCHRONOUS(void) { return ST_SYNCHRONOUS; }
+uint64_t _system_get_ST_MANDLOCK(void) { return ST_MANDLOCK; }
+uint64_t _system_get_ST_NOATIME(void) { return ST_NOATIME; }
+uint64_t _system_get_ST_NODIRATIME(void) { return ST_NODIRATIME; }
+uint64_t _system_get_ST_RELATIME(void) { return ST_RELATIME; }
+
+// ST_NOSYMFOLLOW was added to glibc's <sys/statvfs.h> in Linux 5.10. For
+// older versions, fall back to the fixed kernel UAPI bit (<linux/statfs.h>),
+// which is the same value a newer glibc header defines.
+#ifndef ST_NOSYMFOLLOW
+#define ST_NOSYMFOLLOW 0x2000
+#endif
+uint64_t _system_get_ST_NOSYMFOLLOW(void) { return ST_NOSYMFOLLOW; }
+
+#if !defined(__ANDROID__)
+uint64_t _system_get_ST_WRITE(void) { return ST_WRITE; }
+uint64_t _system_get_ST_APPEND(void) { return ST_APPEND; }
+uint64_t _system_get_ST_IMMUTABLE(void) { return ST_IMMUTABLE; }
+#endif
+
 #include <CSystemLinux.h>
 #include <sys/ioctl.h>
 
@@ -111,6 +143,31 @@ extern int csystem_renameat2(int olddirfd, const char *oldpath,
   errno = ENOSYS;
   return -1;
   #endif
+}
+#endif // __linux__
+
+#ifdef __linux__
+#include <sys/vfs.h>
+
+// f_type is a long on glibc, an unsigned long on Musl, and a uint64_t or
+// uint32_t on Bionic. The magic numbers it holds all fit in 32 bits.
+
+extern int csystem_statfs_type(const char *path, unsigned long *type) {
+  struct statfs buffer;
+  int result = statfs(path, &buffer);
+  if (result == 0) {
+    *type = (unsigned long)buffer.f_type;
+  }
+  return result;
+}
+
+extern int csystem_fstatfs_type(int fd, unsigned long *type) {
+  struct statfs buffer;
+  int result = fstatfs(fd, &buffer);
+  if (result == 0) {
+    *type = (unsigned long)buffer.f_type;
+  }
+  return result;
 }
 #endif // __linux__
 

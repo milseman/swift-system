@@ -1,7 +1,7 @@
 #[[
 This source file is part of the Swift System open source project
 
-Copyright (c) 2020 Apple Inc. and the Swift System project authors
+Copyright (c) 2020 - 2026 Apple Inc. and the Swift System project authors
 Licensed under Apache License v2.0 with Runtime Library Exception
 
 See https://swift.org/LICENSE.txt for license information
@@ -98,13 +98,17 @@ target_sources(SystemPackage PRIVATE
   FilePath/FilePathTempWindows.swift
   FilePath/FilePathWindows.swift)
 target_sources(SystemPackage PRIVATE
+  FileSystem/DiskQuota.swift
   FileSystem/FileFlags.swift
   FileSystem/FileMode.swift
   FileSystem/FilePathOperations.swift
+  FileSystem/FileSystemType+Linux.swift
   FileSystem/FileTimes.swift
   FileSystem/FileType.swift
   FileSystem/Identifiers.swift
-  FileSystem/Stat.swift)
+  FileSystem/MountFlags.swift
+  FileSystem/Stat.swift
+  FileSystem/StatFS.swift)
 if(CMAKE_SYSTEM_NAME STREQUAL Linux)
   target_sources(SystemPackage PRIVATE
     IORing/IOCompletion.swift
@@ -118,6 +122,7 @@ target_sources(SystemPackage PRIVATE
   Internals/Backcompat.swift
   Internals/CInterop.swift
   Internals/Constants+Events.swift
+  Internals/Constants+StatFS.swift
   Internals/Constants+Time.swift
   Internals/Constants.swift
   Internals/Exports.swift
@@ -126,6 +131,7 @@ target_sources(SystemPackage PRIVATE
   Internals/Syscalls+Directories.swift
   Internals/Syscalls+Environment.swift
   Internals/Syscalls+Events.swift
+  Internals/Syscalls+StatFS.swift
   Internals/Syscalls+SystemIdentity.swift
   Internals/Syscalls+Time.swift
   Internals/Syscalls+VectoredIO.swift

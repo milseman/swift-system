@@ -48,6 +48,8 @@ struct SystemSamples: ParsableCommand {
       // Directory samples
       Ls.self,
       RmR.self,
+      // File system statistics samples
+      DiskFree.self,
       // File and process samples
       PIDFile.self,
       AtomicWrite.self,
