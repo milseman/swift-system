@@ -79,6 +79,7 @@ struct SystemSamples: ParsableCommand {
       ConfStr.self,
       MkPath.self,
       LsProc.self,
+      GetAttrList.self,
     ])
 }
 
