@@ -78,3 +78,11 @@ extern int csystem_pthread_setaffinity_np(pthread_t thread, size_t size, const v
 extern int csystem_pthread_getaffinity_np(pthread_t thread, size_t size, void *mask);
 #endif // !__ANDROID__
 #endif // __linux__
+
+#ifdef __ANDROID__
+// preadv and pwritev, which Bionic declares only from API level 24; below
+// it, these fail with ENOSYS. `iov` points to `iovcnt` struct iovecs, untyped
+// so that this header needn't include <sys/uio.h> (see the ioctl shims).
+extern ssize_t csystem_preadv(int fd, const void *iov, int iovcnt, off_t offset);
+extern ssize_t csystem_pwritev(int fd, const void *iov, int iovcnt, off_t offset);
+#endif // __ANDROID__

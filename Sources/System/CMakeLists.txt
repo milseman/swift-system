@@ -104,6 +104,7 @@ target_sources(SystemPackage PRIVATE
   Internals/RawBuffer.swift
   Internals/Syscalls+Directories.swift
   Internals/Syscalls+Events.swift
+  Internals/Syscalls+VectoredIO.swift
   Internals/Syscalls.swift
   Internals/WindowsSyscallAdapters.swift)
 target_sources(SystemPackage PRIVATE
@@ -130,6 +131,8 @@ target_sources(SystemPackage PRIVATE
   Threads/PThreadNames.swift
   Threads/PThreadReadWriteLock.swift
   Threads/PThreadScheduling.swift)
+target_sources(SystemPackage PRIVATE
+  VectoredIO/VectoredIO.swift)
 target_link_libraries(SystemPackage PUBLIC
   CSystem)
 
