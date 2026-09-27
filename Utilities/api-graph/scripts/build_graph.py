@@ -58,6 +58,7 @@ C_NAME_RE = re.compile(r"[Tt]he corresponding C (?:[a-z]+ )?(function|functions|
                        r"macro|macros|call|calls|struct|structure|field|fields|value|values|option|options|"
                        r"command|commands|flag|flags|request|requests)[^`]*((?:`[^`]+`[^`.]*)+)")
 TOKEN_RE = re.compile(r"\b[A-Z][A-Za-z0-9_]*(?:\.[A-Z][A-Za-z0-9_]*)*")
+NOT_C = {"true", "false", "nil", "self", "super", "errno"}
 
 
 def load(path):
@@ -65,12 +66,16 @@ def load(path):
 
 
 def c_names(doc):
+    """C names from "The corresponding C ... is `x`" lines: lower-case
+    functions and upper-case constants, not the Swift parameters or literals
+    (`followTargetSymlink`, `true`) the same sentence can mention."""
     out = []
     for m in C_NAME_RE.finditer(doc or ""):
         for name in re.findall(r"`([^`]+)`", m.group(2)):
-            name = name.strip()
-            if re.match(r"^[A-Za-z_][\w]*(\(\))?$", name) and name not in out:
-                out.append(name.rstrip("()"))
+            name = name.strip().rstrip("()")
+            if (re.match(r"^[a-z_][a-z0-9_]*$", name) or re.match(r"^[A-Z_][A-Z0-9_]*$", name)) \
+                    and name not in NOT_C and name not in out:
+                out.append(name)
     return out
 
 
