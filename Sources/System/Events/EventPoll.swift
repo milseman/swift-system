@@ -276,7 +276,7 @@ extension EventPoll {
   public func wait(
     into events: inout OutputSpan<Event>,
     timeout: Duration? = nil,
-    signalMask: sigset_t,
+    signalMask: CInterop.SignalSet,
     retryOnInterrupt: Bool = true
   ) throws(Errno) -> Int {
     let milliseconds = _milliseconds(timeout: timeout)
@@ -296,7 +296,7 @@ extension EventPoll {
   internal func _wait(
     _ events: UnsafeMutableBufferPointer<Event>,
     milliseconds: CInt,
-    signalMask: UnsafePointer<sigset_t>?,
+    signalMask: UnsafePointer<CInterop.SignalSet>?,
     retryOnInterrupt: Bool
   ) -> Result<Int, Errno> {
     events.withMemoryRebound(to: CInterop.EPollEvent.self) { events in
