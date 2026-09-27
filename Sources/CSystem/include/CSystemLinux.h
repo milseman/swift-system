@@ -78,3 +78,45 @@ extern int csystem_pthread_setaffinity_np(pthread_t thread, size_t size, const v
 extern int csystem_pthread_getaffinity_np(pthread_t thread, size_t size, void *mask);
 #endif // !__ANDROID__
 #endif // __linux__
+
+#ifdef __linux__
+// Process descriptors, signal descriptors, and closing ranges of
+// descriptors, through raw system calls, since not every C library has
+// wrappers for them: glibc added pidfd_open in 2.36, and close_range in
+// 2.34, and Musl has neither. These return -1 and set errno to ENOSYS where
+// the kernel lacks them. `info` points to a siginfo_t, and `mask` to a
+// sigset_t.
+extern int csystem_pidfd_open(int pid, unsigned int flags);
+extern int csystem_pidfd_send_signal(int pidfd, int sig, void *info, unsigned int flags);
+extern int csystem_close_range(unsigned int first, unsigned int last, unsigned int flags);
+extern int csystem_signalfd(int fd, const void *mask, int flags);
+
+// The record that reading a signal descriptor returns, which is struct
+// signalfd_siginfo; shims.c checks the two agree. It's declared here rather
+// than through <sys/signalfd.h>, which glibc's and Bionic's Swift modules
+// don't include, for the reason above.
+struct csystem_signalfd_siginfo {
+  unsigned int ssi_signo;
+  int ssi_errno;
+  int ssi_code;
+  unsigned int ssi_pid;
+  unsigned int ssi_uid;
+  int ssi_fd;
+  unsigned int ssi_tid;
+  unsigned int ssi_band;
+  unsigned int ssi_overrun;
+  unsigned int ssi_trapno;
+  int ssi_status;
+  int ssi_int;
+  unsigned long long ssi_ptr;
+  unsigned long long ssi_utime;
+  unsigned long long ssi_stime;
+  unsigned long long ssi_addr;
+  unsigned short ssi_addr_lsb;
+  unsigned short __pad2;
+  int ssi_syscall;
+  unsigned long long ssi_call_addr;
+  unsigned int ssi_arch;
+  unsigned char __pad[28];
+};
+#endif // __linux__
