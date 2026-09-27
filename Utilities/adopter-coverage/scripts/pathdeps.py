@@ -17,7 +17,9 @@ Package.swift (never the checkout's):
 
 Usage: pathdeps.py rewrite PACKAGE.swift CHECKOUT REPO SYSTEM_COMMIT SYSTEM_EXPORTS
        prints the rewrites as JSON: [{"from", "to", "kind", "checkout", "key"}]; `key` is what
-       the build's cache key records: the System commit, or the path
+       the build's cache key records: the trees of System's Sources and manifest, or the path
+       pathdeps.py in-use REWRITES.json DUMP.json
+       the rewrites the evaluated manifest uses
 """
 
 import sys
@@ -58,6 +60,15 @@ def system_export(repo, commit, exports):
     return dest
 
 
+def build_tree(repo, commit):
+    """What a package that depends on System at commit builds against: the
+    trees of its Sources and manifest, so commits that change neither
+    (this tool's, say) share a build."""
+    trees = subprocess.run(["git", "-C", repo, "rev-parse", f"{commit}:Sources", f"{commit}:Package.swift"],
+                           capture_output=True, text=True, check=True).stdout.split()
+    return "-".join(t[:12] for t in trees)
+
+
 def rewrite(manifest, checkout, repo, commit, exports):
     text = open(manifest, encoding="utf-8").read()
     done = []
@@ -74,7 +85,7 @@ def rewrite(manifest, checkout, repo, commit, exports):
             new, kind = target, "local"
         done.append({"from": rel, "to": new, "kind": kind,
                      "checkout": target if kind == "swift-system" else None,
-                     "key": f"swift-system@{commit}" if kind == "swift-system" else f"path:{new}"})
+                     "key": f"swift-system@{build_tree(repo, commit)}" if kind == "swift-system" else f"path:{new}"})
         return m.group(1) + json.dumps(new)
 
     new_text = PATH_DEP.sub(sub, text)
@@ -83,11 +94,28 @@ def rewrite(manifest, checkout, repo, commit, exports):
     return done
 
 
+def in_use(rewrites, dump):
+    """The rewrites the evaluated manifest uses: its `fileSystem`
+    dependencies in `swift package dump-package`'s output. A path in a
+    branch the manifest doesn't take (NIO's SWIFTCI_USE_LOCAL_DEPS) isn't
+    one, and mustn't key the build."""
+    paths = set()
+    for d in json.load(open(dump)).get("dependencies", []):
+        for fs in d.get("fileSystem", []) or []:
+            p = fs.get("path")
+            if p:
+                paths.add(os.path.realpath(p))
+    return [r for r in rewrites if os.path.realpath(r["to"]) in paths]
+
+
 def main():
-    if len(sys.argv) != 7 or sys.argv[1] != "rewrite":
+    if len(sys.argv) == 7 and sys.argv[1] == "rewrite":
+        _, _, manifest, checkout, repo, commit, exports = sys.argv
+        print(json.dumps(rewrite(manifest, checkout, repo, commit, exports)))
+    elif len(sys.argv) == 4 and sys.argv[1] == "in-use":
+        print(json.dumps(in_use(json.load(open(sys.argv[2])), sys.argv[3])))
+    else:
         sys.exit(__doc__)
-    _, _, manifest, checkout, repo, commit, exports = sys.argv
-    print(json.dumps(rewrite(manifest, checkout, repo, commit, exports)))
 
 
 if __name__ == "__main__":

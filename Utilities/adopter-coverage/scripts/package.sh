@@ -53,6 +53,14 @@ export_package() {
     > "$N/pathdeps.json"
 }
 export_package
+# Only the path dependencies the evaluated manifest uses key the build.
+if [ -s "$N/pathdeps.json" ] && [ "$(cat "$N/pathdeps.json")" != "[]" ]; then
+  if "${benv[@]}" swift package "${SWIFTPM[@]}" --package-path "$N/src" --scratch-path "$N/build" \
+      ${PKG_BUILD_FLAGS[@]+"${PKG_BUILD_FLAGS[@]}"} dump-package > "$N/dump-early.json" 2> "$N/dump-early.log"; then
+    python3 "$S/pathdeps.py" in-use "$N/pathdeps.json" "$N/dump-early.json" > "$N/pathdeps-used.json"
+    mv "$N/pathdeps-used.json" "$N/pathdeps.json"
+  fi
+fi
 pathdeps="$(python3 -c 'import json,sys; print(" ".join(r["key"] for r in json.load(open(sys.argv[1]))))' "$N/pathdeps.json")"
 # The index reader is part of the key: a dump it wrote differently is stale.
 reader="$(shasum "$S/indexstore.py" | cut -c1-12)"
