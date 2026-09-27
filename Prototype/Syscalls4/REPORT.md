@@ -134,8 +134,9 @@ the `pty-run` sample, in a new "More system call samples" group in `main.swift`.
   waited for its child before reading hung for 15 minutes. The docs, the
   spawn test and the sample read first.
 - **On Darwin, a session leader that opens the terminal gets it as its
-  controlling terminal even with `O_NOCTTY`**; Linux honors `O_NOCTTY`.
-  The docs don't rely on either.
+  controlling terminal even with `O_NOCTTY`**; Linux honors `O_NOCTTY`
+  (both checked with a C probe, on macOS 26.3 and in swift:6.2-noble). The
+  docs and the spawn action don't pass it, so they rely on neither.
 - **swift-testing 6.2's exit tests capture 32 bytes of their own** (the same
   bytes each run, likely the exit test's ID) on both standard output and
   error from a child that ends with `_exit`, and none from one that calls
