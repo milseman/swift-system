@@ -442,7 +442,7 @@ def main():
     api = SystemAPI(json.load(open(args.system)))
     derived = json.load(open(args.derived)) if args.derived else {}
     meta = json.load(open(args.meta)) if args.meta else {}
-    known = {f[:-4] for f in os.listdir(os.path.dirname(os.path.abspath(args.package))) if f.endswith(".ini")}
+    known = package.all_names(package.root_of(args.package))
     config, entries, malformed = load_mapping(args.mapping, known)
     interfaces = {i["name"]: i for i in ext["interfaces"]}
     for e in entries:
