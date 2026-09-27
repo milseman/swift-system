@@ -106,6 +106,7 @@ target_sources(SystemPackage PRIVATE
   Internals/RawBuffer.swift
   Internals/Syscalls+Directories.swift
   Internals/Syscalls+Events.swift
+  Internals/Syscalls+StatFS.swift
   Internals/Syscalls.swift
   Internals/WindowsSyscallAdapters.swift)
 target_sources(SystemPackage PRIVATE
