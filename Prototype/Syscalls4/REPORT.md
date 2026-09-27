@@ -275,3 +275,80 @@ the `pty-run` sample, in a new "More system call samples" group in `main.swift`.
   38 suites pass.
 - Linux (swift:6.2-noble): XCTest 369 run, 2 skipped, 0 failures;
   swift-testing 287 tests in 39 suites pass.
+
+## 3. sendfile
+
+### Commits and API
+
+`0c49dde`.
+
+| API | C |
+|---|---|
+| `SocketDescriptor.sendFile(_:fromAbsoluteOffset:count:retryOnInterrupt:) throws(Errno) -> Int` (SystemSockets; Darwin, Linux, Android) | `sendfile`: Darwin's `(fd, s, offset, &len, nil, 0)`, Linux's `(s, fd, &offset, count)` |
+| `FileDescriptor.sendFile(_:fromAbsoluteOffset:count:retryOnInterrupt:) throws(Errno) -> Int` (SystemPackage; Linux, Android) | `sendfile` to any descriptor |
+
+### Design calls
+
+- **Partial progress is a result, never lost.** The method has `write`'s
+  semantics: it returns the count sent, which can be short, and throws
+  `.wouldBlock` (or `.interrupted`) only when nothing was sent. Darwin's
+  `sendfile` fails with `EAGAIN` or `EINTR` even after sending bytes, and
+  reports them in `*len` (a probe: 8092 bytes, then 0 on the next call);
+  a thrown error would lose them, so the method returns them. The Darwin and
+  Linux loops are then the same. Rejected: NIO's `IOResult` shape,
+  `(count, wouldBlock)`, which every caller would unpack when the next call
+  reports the full buffer anyway; and throwing with the count attached,
+  which `Errno` can't carry.
+- **An interruption after some bytes returns them**, rather than retrying
+  from the old offset, which would send them twice. One before any is
+  retried when `retryOnInterrupt` is set, as everywhere else.
+- **A count of 0 makes no call and returns 0**: Darwin's `sendfile` treats 0
+  as "the rest of the file", which Linux can't do. Rejected: exposing that
+  meaning (`count: Int?`). A negative count traps.
+- **`fromAbsoluteOffset:`**, as `read(fromAbsoluteOffset:into:)` labels
+  `pread`: neither platform moves the file's own offset. No form that uses
+  and advances the file's offset (Linux's `NULL` offset), which no adopter
+  uses.
+- **Two homes.** The socket form, in SystemSockets, is the one API over both
+  signatures. The descriptor form is Linux-only, in SystemPackage, for
+  NIOFS's file-to-file copy; on Darwin `sendfile` sends only to a stream
+  socket (to a pipe it's `ENOTSOCK`, to a datagram socket `EINVAL`).
+  Rejected: one `FileDescriptor` method that fails on Darwin for non-sockets.
+- **No headers or trailers** (Darwin's `sf_hdtr`), which no adopter passes;
+  **no FreeBSD form**, whose signature differs again and can't be built here.
+- The Darwin mock sets `*len` from the driver's byte counts, on a forced
+  error too, so the partial-progress path is mock-tested as well as tested
+  for real.
+
+### Findings
+
+- On Linux 6.18, a pipe as `sendfile`'s source fails with `ESPIPE`, where
+  the man page says `EINVAL`; the docs say only that it fails.
+- Darwin's `sendfile` works on `.local` stream socketpairs, so the tests
+  need no `bind`.
+
+### What it replaces in the adopters
+
+- NIO `Sources/NIOPosix/System.swift` `Posix.sendfile` (the Darwin and
+  Glibc/Musl/Android signatures, and `.wouldBlock(written)`), behind
+  `BSDSocketAPIPosix.swift` `sendfile(socket:fd:offset:len:)` and
+  `Socket.swift`'s `sendFile(fd:offset:count:)`; NIO's gap list names
+  `sendfile(2)` for `NIOPosix System`.
+- NIOFS `Sources/NIOFS/Internal/System Calls/Syscalls.swift`
+  `system_sendfile` and `Syscall.swift` `sendfile(to:from:offset:size:)`,
+  used by `FileSystem.swift`'s Linux copy, through the Linux
+  `FileDescriptor.sendFile`.
+
+### Platforms
+
+- Built and tested: macOS 26.3, Linux swift:6.2-noble.
+- Unverified: Musl and Android (the same Linux signature).
+
+### Tests
+
+- New: `SocketSendFileTests` (4), `SocketSendFileMockTests` (5, one
+  Darwin-only), and on Linux `SendFileTests` (2).
+- macOS: XCTest 430 run, 4 skipped, 0 failures; swift-testing 295 tests in
+  40 suites pass.
+- Linux (swift:6.2-noble): XCTest 369 run, 2 skipped, 0 failures;
+  swift-testing 297 tests in 42 suites pass.
