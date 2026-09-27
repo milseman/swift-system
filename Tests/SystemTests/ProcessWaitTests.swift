@@ -30,14 +30,22 @@ import Musl
 @testable import System
 #endif
 
+// The children's output goes to /dev/null: a child that a failing test
+// leaves running would otherwise hold the test runner's output open.
+@available(System 199, *)
+private let quiet: [SpawnFileAction] = [
+  .open("/dev/null", .writeOnly, as: .standardOutput),
+  .open("/dev/null", .writeOnly, as: .standardError),
+]
+
 @available(System 199, *)
 private func spawnSleep(_ seconds: Int = 10) throws -> ProcessID {
-  try ProcessID.spawn("/bin/sleep", arguments: ["sleep", "\(seconds)"])
+  try ProcessID.spawn("/bin/sleep", arguments: ["sleep", "\(seconds)"], fileActions: quiet)
 }
 
 @available(System 199, *)
 private func spawnExit(_ status: Int) throws -> ProcessID {
-  try ProcessID.spawn(shell, arguments: ["sh", "-c", "exit \(status)"])
+  try ProcessID.spawn(shell, arguments: ["sh", "-c", "exit \(status)"], fileActions: quiet)
 }
 
 @available(System 199, *)

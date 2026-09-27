@@ -80,7 +80,10 @@ final class SpawnTests: XCTestCase {
     ) {
       XCTAssertEqual($0 as? Errno, .noSuchFileOrDirectory)
     }
-    XCTAssertThrowsError(try ProcessID.tryWaitForAnyChild()) {
+    // Darwin briefly shows a child after a failed spawn, which a wait that
+    // doesn't block reports as running, and which no wait ever reports as
+    // ended; a blocking wait outlasts it.
+    XCTAssertThrowsError(try ProcessID.waitForAnyChild()) {
       XCTAssertEqual($0 as? Errno, .noChildProcess)
     }
   }
