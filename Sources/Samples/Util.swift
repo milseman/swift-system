@@ -13,11 +13,13 @@ import SystemSockets
 #if SYSTEM_PACKAGE_DARWIN
 import Darwin
 #elseif canImport(Glibc)
-import Glibc
+// glibc and Bionic declare stdin, stdout, and stderr as mutable globals,
+// which disableBuffering() uses.
+@preconcurrency import Glibc
 #elseif canImport(Musl)
 import Musl
 #elseif canImport(Android)
-import Android
+@preconcurrency import Android
 #else
 #error("Unsupported Platform")
 #endif
