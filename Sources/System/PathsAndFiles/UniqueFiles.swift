@@ -234,8 +234,8 @@ extension FilePath {
   /// or a directory with ``makeUniqueDirectory(retryOnInterrupt:)``,
   /// rather than at a name you choose.
   ///
-  /// The corresponding C function is `confstr`,
-  /// with `_CS_DARWIN_USER_TEMP_DIR`, on Darwin.
+  /// On Darwin, this reads ``SystemConfig/StringName/userTemporaryDirectory``,
+  /// through `confstr`.
   @_alwaysEmitIntoClient
   public static func temporaryDirectory() -> FilePath {
     _temporaryDirectory()
@@ -247,7 +247,11 @@ extension FilePath {
       return FilePath(SystemString(platformString: value))
     }
     #if SYSTEM_PACKAGE_DARWIN
-    if let directory = _darwinUserTemporaryDirectory() { return directory }
+    // The per-user directory is ASCII, so the string loses nothing.
+    if case .success(let directory?) = SystemConfig._string(.userTemporaryDirectory),
+       !directory.isEmpty {
+      return FilePath(directory)
+    }
     #endif
     #if os(Android)
     // Bionic's own temporary files go here; TMPDIR is rarely set.
@@ -258,29 +262,5 @@ extension FilePath {
   }
 }
 
-#if SYSTEM_PACKAGE_DARWIN
-// The darwin-more lane's SystemConfig.string(.userTemporaryDirectory) reads
-// the same value; this should use it once both lanes are merged.
-internal func _darwinUserTemporaryDirectory() -> FilePath? {
-  // confstr returns the size the value needs, with its terminator,
-  // or 0 if it fails, which it can when it can't create the directory.
-  var capacity = 1024
-  while true {
-    let result: FilePath?? = withUnsafeTemporaryAllocation(
-      of: CInterop.PlatformChar.self, capacity: capacity
-    ) { buffer in
-      let needed = system_confstr(
-        SYSTEM_CS_DARWIN_USER_TEMP_DIR, buffer.baseAddress!, buffer.count)
-      guard needed > 0 else { return .some(nil) }
-      guard needed <= buffer.count else {
-        capacity = needed
-        return nil
-      }
-      return FilePath(SystemString(platformString: buffer.baseAddress!))
-    }
-    if let result { return result }
-  }
-}
-#endif
 
 #endif // !os(Windows) && !os(WASI)

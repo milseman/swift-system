@@ -416,10 +416,10 @@ Design calls:
   `TMPDIR` (`issetugid`, or `getauxval(AT_SECURE)` through a shim on
   Linux), as Foundation's `getEnvSecure` does. It's a method, not a
   property, since `confstr` can create the directory. Rejected:
-  Foundation's order, which ignores the user's `TMPDIR` on Darwin. It
-  calls the existing `system_confstr`; the darwin-more lane's
-  `SystemConfig.string(.userTemporaryDirectory)` reads the same value, and
-  this should use it once both are merged.
+  Foundation's order, which ignores the user's `TMPDIR` on Darwin. On
+  Darwin it reads the darwin-more lane's
+  `SystemConfig.string(.userTemporaryDirectory)`, since the merge that
+  brought it in; before, it called `system_confstr` itself.
 - **`setCreationMask(_:)` is `umask`'s exact shape**: it sets the mask and
   returns the old one, with a discardable result. There's no getter,
   because C has none: reading the mask means setting it and setting it
