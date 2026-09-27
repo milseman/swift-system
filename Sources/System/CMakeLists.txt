@@ -61,6 +61,8 @@ target_sources(SystemPackage PRIVATE
 target_sources(SystemPackage PRIVATE
   Environment/ProcessEnvironment.swift)
 target_sources(SystemPackage PRIVATE
+  Errno/ErrnoAccess.swift)
+target_sources(SystemPackage PRIVATE
   Events/EventCounter.swift
   Events/EventPoll.swift
   Events/IntervalTimer.swift

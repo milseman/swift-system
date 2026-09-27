@@ -239,3 +239,72 @@ Adopters:
 Unverified off Darwin: the Linux, Android, FreeBSD and OpenBSD clock
 constants, and `clockid_t`'s being `CInt` there (which reusing
 `_CLOCK_BOOTTIME` assumes).
+
+## Public errno (a prototype; the decision stays open)
+
+`Errno.current` in `Sources/System/Errno.swift`, and
+`Sources/System/Errno/ErrnoAccess.swift`. Done out of order, on request:
+adopter lanes mark `SYSTEM-GAP: errno` for it.
+
+| API | C |
+|---|---|
+| `Errno.current { get set }` | `errno` |
+| `Errno.check(retryOnInterrupt:_:) throws(Errno) -> Value`, for a `FixedWidthInteger` result | a call that returns -1 (or `(size_t)-1`) and sets `errno` |
+| `Errno.check(retryOnInterrupt:_:) throws(Errno) -> Value`, for an `Optional` result | a call that returns `NULL` and sets `errno` |
+| `Errno.checkOptional(retryOnInterrupt:_:) throws(Errno) -> Value?` | a call like `readdir`, which returns `NULL` both for nothing and on failure: `errno` is cleared first |
+
+This is a default to try, not a decision. Whether System should vend
+`errno` at all is still open: the TODO it replaces said that safe access
+"needs a release barrier", and no such barrier exists.
+
+What the prototype does:
+
+- **`current` is public, with a getter and a setter.** Its documentation
+  says the value is reliable only when read immediately after the C call,
+  because Swift can run code between the call and the read: a release can
+  run a deinitializer that calls `free` or `close`. A test and the `errno`
+  sample show it happening (`aReleaseBeforeTheReadCanChangeErrno`). The
+  setter exists to clear `errno` before calls like `readdir`, `getpriority`
+  and `strtol`, whose result can't say whether they failed.
+- **The helpers read `errno` the moment the closure returns,** so callers
+  don't need the getter, in the shapes of System's internal `valueOrErrno`
+  and NIO's `syscall(blocking:)`, pointer `syscall`, and `syscallOptional`.
+  They retry `EINTR` unless told not to, as the rest of System does, and
+  throw `Errno`. The closure is non-throwing, to keep it to the C call. Its
+  documentation names what it can't prevent: a value whose last use is in
+  the call can be released inside the closure, after the call.
+- **Integer failure is all bits set** (`Value(truncatingIfNeeded: -1)`), so
+  a `size_t` result fails at `(size_t)-1`, as C's do, rather than trapping
+  on a negative literal.
+- **`current` is `@_alwaysEmitIntoClient`, over a new inlinable accessor,
+  and keeps its extension's `System 0.0.1` availability.** System's own
+  code of older availability uses it: with a `System 199` annotation, the
+  ABI-stable build rejects six uses (`Util.swift`'s `valueOrErrno`,
+  `SystemConfig.swift`, and four in `FilePathTempPosix.swift`), checked by
+  adding the annotation. With no symbol, the older availability is honest:
+  the code runs wherever the client does. The helpers are new, so they're
+  `System 199`.
+
+Alternatives, for the decision:
+
+1. No public getter or setter, only the helpers. Closes the late-read
+   hazard, except inside the closure, but leaves calls with other failure
+   values (`mmap`'s `MAP_FAILED`, `sysconf`'s -1 with `errno` unchanged)
+   without a way in, so their callers keep reading C's `errno`.
+2. A getter but no setter, with a `checkOptional`-style helper for every
+   clear-first case, including integer ones like `getpriority`.
+3. Helpers that return `Result<Value, Errno>`, as `valueOrErrno` does,
+   rather than throwing. It composes the way System's own layers do, but
+   Swift 6.2 makes typed `Result` closures awkward to write.
+4. A sentinel argument (`check(failingWith: MAP_FAILED)`), generic over
+   `Equatable`, instead of or beside the -1 and `nil` forms.
+5. Names: `check` and `checkOptional` follow what System's tests already
+   call such helpers. Alternatives: `valueOrThrow`, `withErrno`, or NIO's
+   `syscall`.
+
+Adopters: NIO reads `errno` in 54 lines (its `syscall` helpers, NIOFS's own
+`valueOrErrno`), Subprocess in 55 (Swift and its C shims), SwiftPM in 14,
+and Foundation's Swift sources in about 140, by grep.
+
+Unverified off Darwin: the accessor's Windows (`_get_errno`), WASI and
+Android branches, which copy `system_errno`'s in `Exports.swift`.

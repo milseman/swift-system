@@ -76,6 +76,7 @@ struct SystemSamples: ParsableCommand {
       Vectored.self,
       Env.self,
       Clocks.self,
+      ErrnoSample.self,
     ])
 }
 
