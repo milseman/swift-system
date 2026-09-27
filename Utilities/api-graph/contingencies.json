@@ -1,0 +1,123 @@
+{
+  "_comment": [
+    "The open design questions a carve-out can depend on. cluster.py tags a",
+    "declaration with a contingency when one of its rules matches, and a",
+    "cluster inherits the contingencies of the clusters it needs. The decision",
+    "numbers are the ones the api-graph lane was given; the decisions document",
+    "itself isn't in this repository, so each entry says in its own words what",
+    "the tool takes the question to be, and each rule is a concrete check.",
+    "A rule's weight scales the ranking penalty (1 = blocks outright); a rule with",
+    "inherit: false (a platform fact) doesn't pass to the clusters that need it.",
+    "Rule kinds: noncopyableType, hasDeinit, lifetime, declRegex, pathRegex,",
+    "referencesPath (any edge target, node or vocabulary), referencesNodePath",
+    "(new types only), module, platform, throwingClosure, changedThrows,",
+    "cName, implementationName."
+  ],
+  "contingencies": [
+    {
+      "id": "owned",
+      "title": "Owned types",
+      "decisions": "21-26, 54",
+      "question": "How owned (noncopyable) resource types look: OwnedFD itself, adopting and giving up a raw value (init(taking:), relinquish()), consuming close, and what a deinit does with a close error (item 54, deliberately unresolved).",
+      "deliberatelyOpen": "Item 54, the close policy: OwnedFD's deinit drops close errors today. That's the default the package ships, not a decision; trapping on EBADF was tried in a2401b7 and reverted in 40e2dc8.",
+      "writeups": ["Prototype/CloseErrors/README.md", "Prototype/BorrowedFD/README.md", "Prototype/Forwarding/README.md", "Prototype/Subtypes/README.md"],
+      "rules": [
+        {"kind": "noncopyableType", "weight": 1, "evidence": "{path} is noncopyable"},
+        {"kind": "hasDeinit", "weight": 1, "evidence": "{path} has a deinit, so it needs a close policy (item 54)"},
+        {"kind": "referencesPath", "pattern": "^OwnedFD(\\.Pipe)?$", "weight": 1, "evidence": "{path} uses OwnedFD"},
+        {"kind": "declRegex", "pattern": "\\b(consuming|borrowing)\\b", "weight": 1, "evidence": "{path} consumes or borrows an owner"}
+      ]
+    },
+    {
+      "id": "typed-throws",
+      "title": "Typed throws",
+      "decisions": "roadmap theme 2 (C4-C5)",
+      "question": "Plain wrappers throwing Errno are precedent on main (Stat, FileOperations, IORing), so they don't count. What's open is API that has to combine a caller's error with an Errno, as closeAfter does when both the body and close fail, and changes to an existing throws clause.",
+      "writeups": [],
+      "rules": [
+        {"kind": "throwingClosure", "weight": 1, "evidence": "{path} runs a throwing closure and throws itself, so the body's error and an Errno from cleanup have to be combined"},
+        {"kind": "changedThrows", "weight": 1, "evidence": "{path} changes the throws clause of existing API"},
+        {"kind": "declRegex", "pattern": "throws\\((?!Errno\\))", "weight": 1, "evidence": "{path} throws a generic or non-Errno typed error"}
+      ]
+    },
+    {
+      "id": "span",
+      "title": "Span and Lifetimes",
+      "decisions": "roadmap theme 3 (C6-C7)",
+      "question": "API that takes or returns span types, or depends on lifetime annotations (the experimental Lifetimes feature), whose shape and availability floors depend on the toolchain.",
+      "writeups": ["../Claude outputs/span-report.md"],
+      "rules": [
+        {"kind": "referencesPath", "pattern": "^(Swift\\.)?(Mutable|Output)?(Raw)?Span$|^UTF8Span$", "weight": 1, "evidence": "{path} takes or returns a span"},
+        {"kind": "lifetime", "weight": 1, "evidence": "{path} has a lifetime annotation or is ~Escapable"}
+      ]
+    },
+    {
+      "id": "sockets-fold",
+      "title": "The sockets fold",
+      "decisions": "74",
+      "question": "Whether SystemSockets stays a separate module or folds into SystemPackage. It decides the module a sockets pitch targets, and whether SystemSockets keeps its own copies of SystemPackage internals.",
+      "writeups": [],
+      "rules": [
+        {"kind": "module", "modules": ["SystemSockets"], "weight": 1, "evidence": "{path} is in SystemSockets"}
+      ]
+    },
+    {
+      "id": "win32",
+      "title": "The Win32 namespace and platform enums",
+      "decisions": "75",
+      "question": "Whether Windows keeps getting POSIX-shaped API through the UCRT (which Vision.md says has to die) or Windows-native API in a Win32 namespace (SYS-0010), and how multi-platform enums wrap each platform's owners. New API that compiles on Windows extends the UCRT layer; API for a concept that a Win32 draft also covers should share its name.",
+      "writeups": ["Prototype/PlatformEnum/README.md", "../win32-drafts/0010-win32-namespace-and-error.md"],
+      "rules": [
+        {"kind": "platform", "platform": "Windows", "weight": 1, "inherit": false, "evidence": "{path} compiles on Windows, through the UCRT's POSIX layer"},
+        {"kind": "pathRegex", "pattern": "^FileDescriptor\\.(FileLock|lock|unlock|tryLock|lockWholeFile|unlockWholeFile)", "weight": 0.4, "draft": "0014-win32-byte-range-locking.md", "evidence": "{path}: byte-range locking, which draft SYS-0014 covers for Win32"},
+        {"kind": "pathRegex", "pattern": "^FileDescriptor\\.path\\(", "weight": 0.4, "draft": "0016-win32-final-path-name.md", "evidence": "{path}: a descriptor's path, which draft SYS-0016 covers for Win32"},
+        {"kind": "pathRegex", "pattern": "(?i)^(FileSystemStatus|FileSystemInfo|VolumeInfo|StatFS|FileDescriptor\\.fileSystem|FilePath\\.fileSystem)", "weight": 0.4, "draft": "0015-win32-volume-information.md", "evidence": "{path}: file system information, which draft SYS-0015 covers for Win32"}
+      ]
+    },
+    {
+      "id": "pthread-deinit",
+      "title": "PThread's deinit",
+      "decisions": "80",
+      "question": "What destroying an unjoined PThread does: join (the package's default), detach, trap, or leak. Types nested in PThread need the PThread name to exist, but not this answer.",
+      "deliberatelyOpen": "Item 80: PThread's deinit joins, or detaches when it runs on the thread itself. That's a default to measure the others against, not a decision.",
+      "writeups": ["Prototype/ThreadDeinit/README.md", "Prototype/Threads/README.md"],
+      "rules": [
+        {"kind": "pathRegex", "pattern": "^PThread($|\\.[a-z_][^.]*$)", "weight": 1, "evidence": "{path} is PThread's own API"}
+      ]
+    },
+    {
+      "id": "public-errno",
+      "title": "Public errno",
+      "decisions": "46",
+      "question": "Whether System makes errno (Errno.current) public. SystemSockets can't see SystemPackage's internal accessor, so it keeps a copy of it and of the helpers built on it.",
+      "writeups": [],
+      "rules": [
+        {"kind": "implementationName", "pattern": "^(current|system_errno|valueOrErrno|nothingOrErrno)", "filePattern": "^Sources/SystemSockets/", "weight": 1, "evidence": "{path} reads errno through SystemSockets' own copy of Errno.current"},
+        {"kind": "declRegex", "pattern": "\\berrno\\b", "weight": 1, "evidence": "{path} exposes errno in its signature"}
+      ]
+    },
+    {
+      "id": "filepath-move",
+      "title": "The SE-0529 FilePath move",
+      "decisions": "SE-0529",
+      "question": "If FilePath moves out of System, API that extends it or nests types in it becomes an extension of a type System doesn't own, and may need another home or spelling.",
+      "writeups": [],
+      "rules": [
+        {"kind": "pathRegex", "pattern": "^FilePath\\.", "weight": 1, "evidence": "{path} extends FilePath"},
+        {"kind": "referencesNodePath", "pattern": "^FilePath\\.", "weight": 0.5, "evidence": "{path} uses a type nested in FilePath"}
+      ]
+    },
+    {
+      "id": "process-reaping",
+      "title": "Reaping an owned child process",
+      "decisions": "28",
+      "question": "What an owned child process does when it's destroyed unreaped. The processes lane's work; nothing on system-next matches yet at the time of writing.",
+      "deliberatelyOpen": "Item 28: whatever default the implementation picks is not a decision.",
+      "writeups": [],
+      "rules": [
+        {"kind": "cName", "pattern": "^(waitpid|waitid|wait4|wait3|pidfd_\\w+|posix_spawn\\w*|fork|vfork)$", "weight": 1, "evidence": "{path} wraps {cname}"},
+        {"kind": "pathRegex", "pattern": "^(ChildProcess|OwnedProcess|ProcessDescriptor|PIDFD|ProcessFD)\\b", "weight": 1, "evidence": "{path} is an owned process type"}
+      ]
+    }
+  ]
+}
