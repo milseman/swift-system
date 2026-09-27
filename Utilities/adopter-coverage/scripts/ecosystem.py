@@ -7,8 +7,8 @@ for the main branch scheme, and which of them import Darwin.
   ecosystem.py clone   ECOSYSTEM          shallow clones of the Swift packages
                                           among them, at the scheme's refs
   ecosystem.py survey  ECOSYSTEM OUT      each clone's manifest tools version and
-                                          a lexical count of its files that import
-                                          Darwin (outside tests and examples)
+                                          a lexical count of the files of its library
+                                          targets that import Darwin
   ecosystem.py packages SURVEY PACKAGES   a package file per Darwin-importing
                                           package, in PACKAGES/ecosystem
   ecosystem.py specs   SURVEY             check.sh's arguments for the ecosystem run
@@ -80,6 +80,43 @@ def clone(eco):
         print(f"{r['name']}: {'cloned' if p.returncode == 0 else 'FAILED: ' + p.stderr.strip()[:200]}")
 
 
+def library_dirs(d):
+    """The directories of the package's regular targets (its library code),
+    from `swift package dump-package` on an export in a temporary directory:
+    the clone is never written to. None if the manifest can't be read, even
+    with its tools version lowered to this toolchain's."""
+    import shutil
+    import tempfile
+    tmp = tempfile.mkdtemp(prefix="ecosystem-survey.")
+    try:
+        archive = subprocess.run(["git", "-C", d, "archive", "HEAD", "Package.swift"], capture_output=True).stdout
+        subprocess.run(["tar", "-x", "-C", tmp], input=archive)
+        for attempt in (0, 1):
+            p = subprocess.run(["swift", "package", "--disable-sandbox", "--package-path", tmp, "--scratch-path",
+                                os.path.join(tmp, ".build"), "dump-package"], capture_output=True, text=True)
+            if p.returncode == 0:
+                break
+            if attempt == 0 and "is using Swift tools version" in p.stderr:
+                have = re.search(r"Swift version (\d+\.\d+)", subprocess.run(
+                    ["swift", "--version"], capture_output=True, text=True).stdout)
+                path = os.path.join(tmp, "Package.swift")
+                text = open(path).read()
+                open(path, "w").write(re.sub(r"swift-tools-version\s*:\s*[\d.]+", "swift-tools-version:" +
+                                             (have.group(1) if have else "6.2"), text, count=1))
+                continue
+            return None
+        dump = json.loads(p.stdout)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    dirs = []
+    for t in dump.get("targets", []):
+        # Regular targets, less test support (SKTestSupport, _InternalTestSupport); XCTest is a library.
+        if t.get("type") != "regular" or re.search(r"(Test|Testing)(Support|Utilities|Utils|Helpers)$", t["name"]):
+            continue
+        dirs.append(os.path.normpath(t.get("path") or os.path.join("Sources", t["name"])))
+    return dirs
+
+
 def survey(eco, out):
     rows = []
     for r in scheme(eco):
@@ -90,6 +127,7 @@ def survey(eco, out):
             continue
         first = open(manifest, encoding="utf-8", errors="replace").readline()
         m = re.search(r"swift-tools-version\s*:\s*([\d.]+)", first)
+        libs = library_dirs(d)
         files, exported = [], []
         for dirpath, dirnames, fs in os.walk(d):
             rel_dir = os.path.relpath(dirpath, d)
@@ -102,8 +140,11 @@ def survey(eco, out):
             for f in fs:
                 if not f.endswith(".swift") or f == "Package.swift" or f.startswith("Package@"):
                     continue
-                text = open(os.path.join(dirpath, f), encoding="utf-8", errors="replace").read()
                 rel = os.path.normpath(os.path.join(rel_dir, f))
+                # Library code: in one of the manifest's regular targets.
+                if libs is not None and not any(rel.startswith(x + "/") for x in libs):
+                    continue
+                text = open(os.path.join(dirpath, f), encoding="utf-8", errors="replace").read()
                 if IMPORT_DARWIN.search(text):
                     files.append(rel)
                 if EXPORTED_DARWIN.search(text):
@@ -111,7 +152,8 @@ def survey(eco, out):
         commit = git("rev-parse", "HEAD", cwd=d).stdout.strip()
         rows.append(dict(r, package=True, commit=commit, tools=m.group(1) if m else None,
                          darwinFiles=len(files), darwinFileList=sorted(files), reexports=sorted(exported),
-                         audited=AUDITED.get(r["name"])))
+                         audited=AUDITED.get(r["name"]), libraryTargets=libs,
+                         scan="library targets" if libs is not None else "outside tests and examples"))
     json.dump(rows, open(out, "w"), indent=1)
     pk = [x for x in rows if x.get("package")]
     dz = [x for x in pk if x["darwinFiles"]]
