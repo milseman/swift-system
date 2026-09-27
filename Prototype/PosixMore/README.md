@@ -694,3 +694,40 @@ descriptor forms (22 lines, and its own `XATTR_MAXNAMELEN`); Foundation's
 
 Unverified off Darwin: every Linux branch (the `l` calls, the CSystem
 include, `ENODATA`), and user attributes on the CI's file systems.
+
+## 10. Random bytes
+
+`Sources/System/Entropy/Entropy.swift`,
+`Sources/System/Internals/Syscalls+Entropy.swift`, `<sys/random.h>` in
+`CSystemDarwin.h`, and an Android shim.
+
+| API | C |
+|---|---|
+| `Entropy.fill(_: UnsafeMutableRawBufferPointer) throws(Errno)` | `getentropy`, in calls of at most 256 bytes |
+| `Entropy.fill(_: inout MutableRawSpan) throws(Errno)` (macOS 15) | the same |
+| `Entropy.bytes(count:) throws(Errno) -> [UInt8]` | the same |
+
+Design calls:
+
+- **Any size, in 256-byte calls**, the most one `getentropy` call fills;
+  more is `EIO` on Darwin and Linux. The limit is the call's, not the
+  caller's concern.
+- **`getentropy`, not `getrandom` or `arc4random_buf`.** `getentropy` is
+  on Darwin, Linux, the BSDs and Android; `getrandom` isn't on Darwin, and
+  `arc4random_buf` can't report a failure. The standard library's
+  `SystemRandomNumberGenerator`, which the adopters use for random bytes,
+  reads the same kind of source but traps if it fails; this throws.
+  Rejected: a `RandomNumberGenerator` of System's own, which would
+  duplicate the standard library's.
+- **A namespace, `Entropy`**, after the call. Rejected: `SystemRandom`,
+  which reads as a relative of `SystemRandomNumberGenerator`.
+- **Darwin's module doesn't export `<sys/random.h>`**, so `CSystemDarwin.h`
+  includes it; Darwin's headers are modular, so nothing's members move.
+  Bionic has `getentropy` only from API level 28, below which the shim
+  fails with `ENOSYS`.
+
+Adopters: none call `getentropy`; NIO and Foundation use
+`SystemRandomNumberGenerator` (WebSocket keys and masks, UUIDs).
+
+Unverified off Darwin: glibc's declaration in `<unistd.h>` (from 2.25),
+Musl's and FreeBSD's, and the Android shim.

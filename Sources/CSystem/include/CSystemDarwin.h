@@ -18,7 +18,10 @@
 #endif
 
 #include <sys/ioctl.h>
+#include <sys/random.h>
 #include <termios.h>
+
+// <sys/random.h> is for getentropy, which the Darwin module doesn't export.
 
 // Terminal ioctl shims
 int _system_ioctl_TIOCGWINSZ(int fd, struct winsize *ws);

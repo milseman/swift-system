@@ -301,6 +301,17 @@ extern void csystem_freeifaddrs(void *list) {
   freeifaddrs((struct ifaddrs *)list);
   #endif
 }
+
+#include <sys/random.h>
+
+extern int csystem_getentropy(void *buffer, size_t length) {
+  #if __ANDROID_API__ >= 28
+  return getentropy(buffer, length);
+  #else
+  errno = ENOSYS;
+  return -1;
+  #endif
+}
 #endif // __ANDROID__
 
 #if !defined(_WIN32) && !defined(__wasi__)

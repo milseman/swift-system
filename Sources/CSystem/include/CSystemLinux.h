@@ -138,6 +138,10 @@ extern ssize_t csystem_pwritev(int fd, const void *iov, int iovcnt, off_t offset
 // untyped so that this header needn't include <ifaddrs.h>.
 extern int csystem_getifaddrs(void **list);
 extern void csystem_freeifaddrs(void *list);
+
+// getentropy, which Bionic declares only from API level 28; below it, this
+// fails with ENOSYS.
+extern int csystem_getentropy(void *buffer, size_t length);
 #endif // __ANDROID__
 
 #ifdef __linux__

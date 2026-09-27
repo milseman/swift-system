@@ -91,6 +91,7 @@ struct SystemSamples: ParsableCommand {
       MMap.self,
       IfConfig.self,
       XAttr.self,
+      UUIDGen.self,
       // Darwin samples
       CopyFile.self,
       Sysctl.self,
