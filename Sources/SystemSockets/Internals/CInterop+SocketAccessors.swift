@@ -617,3 +617,43 @@ extension CInterop.SockAddrVM {
   }
 }
 #endif // SYSTEM_PACKAGE_DARWIN
+
+// MARK: - linger
+
+@available(System 199, *)
+extension CInterop.Linger {
+  /// Creates the value of the linger-on-close option,
+  /// by default off.
+  ///
+  /// ``SocketDescriptor/setLinger(_:)`` sets the option from a duration;
+  /// this is for code that passes the C structure itself,
+  /// such as through ``SocketDescriptor/setOption(_:_:to:)``.
+  ///
+  /// The corresponding C fields are `l_onoff` and `l_linger`.
+  @_alwaysEmitIntoClient
+  public init(isEnabled: Bool = false, time: Int = 0) {
+    self = CInterop.Linger()
+    self.isEnabled = isEnabled
+    self.time = time
+  }
+
+  /// Whether closing the socket waits for unsent data to be sent.
+  ///
+  /// The corresponding C field is `l_onoff`.
+  @_alwaysEmitIntoClient
+  public var isEnabled: Bool {
+    get { l_onoff != 0 }
+    set { l_onoff = newValue ? 1 : 0 }
+  }
+
+  /// How long closing the socket waits: in seconds for `SO_LINGER`,
+  /// except on Darwin, whose `SO_LINGER` measures it in clock ticks,
+  /// hundredths of a second, and whose `SO_LINGER_SEC` in seconds.
+  ///
+  /// The corresponding C field is `l_linger`.
+  @_alwaysEmitIntoClient
+  public var time: Int {
+    get { Int(l_linger) }
+    set { l_linger = .init(newValue) }
+  }
+}

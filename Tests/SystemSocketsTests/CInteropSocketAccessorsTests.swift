@@ -138,6 +138,40 @@ private struct CInteropSocketAccessorsTests {
     #endif
   }
 
+  @available(System 199, *)
+  @Test func lingerAccessors() {
+    var value = CInterop.Linger(isEnabled: true, time: 5)
+    #expect(value.l_onoff == 1 && value.l_linger == 5)
+    value.isEnabled = false
+    value.time = 0
+    #expect(value.l_onoff == 0 && value.l_linger == 0)
+    value.l_onoff = 2
+    #expect(value.isEnabled)
+    #expect(sameBytes(CInterop.Linger(), linger()))
+  }
+
+  /// The C structure round-trips through the generic option calls, as it
+  /// does through a client's own setsockopt, and agrees with
+  /// SocketDescriptor's duration-based linger().
+  @available(System 199, *)
+  @available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *)
+  @Test func lingerThroughTheOptionCalls() throws {
+    let socket = try SocketDescriptor.open(.ipv4, .stream, protocol: .tcp)
+    defer { try? socket.close() }
+    #if SYSTEM_PACKAGE_DARWIN
+    let seconds = SocketDescriptor.SocketOption.lingerSeconds.rawValue
+    #else
+    let seconds = SocketDescriptor.SocketOption.linger.rawValue
+    #endif
+    try socket.setOption(.socket, seconds, to: CInterop.Linger(isEnabled: true, time: 3))
+    let value: CInterop.Linger = try socket.getOption(.socket, seconds)
+    #expect(value.isEnabled && value.time == 3)
+    #expect(try socket.linger() == .seconds(3))
+    try socket.setLinger(nil)
+    let off: CInterop.Linger = try socket.getOption(.socket, seconds)
+    #expect(!off.isEnabled)
+  }
+
   /// A path longer than the field is a precondition failure.
   @available(System 199, *)
   @Test func aPathThatDoesntFitTraps() async {

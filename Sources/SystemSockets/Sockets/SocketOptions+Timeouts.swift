@@ -179,14 +179,14 @@ extension SocketDescriptor {
 
   @usableFromInline
   internal func _linger() -> Result<Duration?, Errno> {
-    _value(OptionLevel.socket.rawValue, Self._lingerName, _CLinger()).map { value in
+    _value(OptionLevel.socket.rawValue, Self._lingerName, CInterop.Linger()).map { value in
       value.l_onoff == 0 ? nil : .seconds(Int64(value.l_linger))
     }
   }
 
   @usableFromInline
   internal func _setLinger(_ timeout: Duration?) -> Result<Void, Errno> {
-    var value = _CLinger()
+    var value = CInterop.Linger()
     if let timeout {
       value.l_onoff = 1
       if timeout > .zero {
@@ -217,7 +217,3 @@ extension SocketDescriptor {
     try _setFlag(OptionLevel.socket.rawValue, SocketOption.timestamp.rawValue, enabled).get()
   }
 }
-
-// `linger` names both the C type and, in these extensions, a method.
-@usableFromInline
-internal typealias _CLinger = linger
