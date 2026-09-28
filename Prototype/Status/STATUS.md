@@ -2,8 +2,8 @@
 
 Generated 2026-09-28 by `Utilities/adopter-coverage/status.sh`, from commits only; rerun it rather than editing this file. How each figure is made, and what it can't see, is in [How this is computed](#how-this-is-computed).
 
-- **System**: `coverage` @ `824a9291` (Merge branch 'system-next' into coverage), which contains `system-next` @ `e8762dd1` (Merge branch 'coverage' into system-next); 21 commit(s) of `coverage` aren't in `system-next`.
-- **API delta**: `main` @ `1b452c29` → `HEAD` @ `824a9291`.
+- **System**: `coverage` @ `a795ce43` (Add Memory.TypeDescriptor and typed allocation, wrapping Darwin's malloc_type_malloc, malloc_type_calloc, malloc_type_realloc, malloc_type_posix_memalign, malloc_type_valloc and their zone forms), which contains `system-next` @ `e8762dd1` (Merge branch 'coverage' into system-next); 23 commit(s) of `coverage` aren't in `system-next`.
+- **API delta**: `main` @ `1b452c29` → `HEAD` @ `a795ce43`.
 - **Adopters** (`../adopters`, branch `migrate-darwin`, against its merge base with `main`):
   - WasmKit @ `f5219fbf`, base `1e9c513d`
   - indexstore-db @ `cc966b89`, base `441ead77`
@@ -26,11 +26,11 @@ Copied verbatim from `Utilities/api-delta/regenerate.sh` (`BASE_REF=main`, `HEAD
 
 ## Summary
 
-- **2991 added, 0 removed, 0 changed** declarations in the macOS symbol graphs.
-  - SystemPackage: +2415 (448 → 2863 public symbols).
+- **3033 added, 0 removed, 0 changed** declarations in the macOS symbol graphs.
+  - SystemPackage: +2457 (448 → 2905 public symbols).
   - SystemSockets: +576 (0 → 576 public symbols). SystemSockets is a new module; it doesn't exist on `main`.
 - Availability of the additions:
-  - System 199: 2956
+  - System 199: 2998
   - System 199 + explicit OS floor: 26
   - System 0.0.1 + explicit OS floor: 8
   - System 0.0.1: 1
@@ -42,7 +42,7 @@ Copied verbatim from `Utilities/api-delta/regenerate.sh` (`BASE_REF=main`, `HEAD
 - 0 public declarations hidden from the graphs were removed.
 - No public declaration is conditional on `ENABLE_MOCKING` or `DEBUG`, so a release build has the same public API as the debug graphs.
 - Cross-check with `swift-api-digester`, which dumps every declaration, implicit ones included:
-  - SystemPackage: +2701 / -0 declarations, which is the graphs' +2415 plus 286 implicit ones; it has every graph addition; `-diagnose-sdk` reports no breaking changes.
+  - SystemPackage: +2751 / -0 declarations, which is the graphs' +2457 plus 294 implicit ones; it has every graph addition; `-diagnose-sdk` reports no breaking changes.
   - SystemSockets: +648 / -0 declarations, which is the graphs' +576 plus 71 implicit ones; explicit declarations it has that the graphs don't: `SocketAddress._withUnsafeMutablePointer(_:)`; it has every graph addition.
 - Nothing was removed or changed: no public declaration left the graphs or the source scan. The *changed* check compares declaration text (including default arguments), availability, conformances, generic and extension constraints, and access level, and pairs symbols by path when a signature change alters the USR.
 
@@ -85,7 +85,7 @@ Each row is a top-level type, and nested types count toward it: `FilePath.Resolu
 | SystemPackage | [`LocalFlags`](#systempackage-localflags) | 20 | 0 | 0 | S199 ×20 |
 | SystemPackage | [`Mach`](#systempackage-mach) | 53 | 0 | 0 | S199 ×53 |
 | SystemPackage | [`Math`](#systempackage-math) | 55 | 0 | 0 | S199 ×55 |
-| SystemPackage | [`Memory`](#systempackage-memory) | 49 | 0 | 0 | S199 ×49 |
+| SystemPackage | [`Memory`](#systempackage-memory) | 91 | 0 | 0 | S199 ×91 |
 | SystemPackage | [`MemoryMapping`](#systempackage-memorymapping) | 36 | 0 | 0 | S199 ×36 |
 | SystemPackage | [`MountFlags`](#systempackage-mountflags) | 29 | 0 | 0 | S199 ×29 |
 | SystemPackage | [`NamedSemaphore`](#systempackage-namedsemaphore) | 15 | 0 | 0 | S199 ×15 |
@@ -139,7 +139,7 @@ Each row is a top-level type, and nested types count toward it: `FilePath.Resolu
 | SystemSockets | [`sockaddr_storage (extends Darwin)`](#systemsockets-sockaddr-storage-extends-darwin) | 3 | 0 | 0 | S199 ×3 |
 | SystemSockets | [`sockaddr_un (extends Darwin)`](#systemsockets-sockaddr-un-extends-darwin) | 5 | 0 | 0 | S199 ×5 |
 | SystemSockets | [`sockaddr_vm (extends Darwin)`](#systemsockets-sockaddr-vm-extends-darwin) | 5 | 0 | 0 | S199 ×5 |
-| **Total** | | **2991** | **0** | **0** | |
+| **Total** | | **3033** | **0** | **0** | |
 
 # 2. Adoption
 
@@ -371,7 +371,7 @@ Verbatim, not rerun: each package's own test totals (at the start, and the lates
 
 # 3. Gaps
 
-Every `SYSTEM-GAP:` marker in the packages' sources at the commits above: 51 markers in 34 files, of which 0 are outside the packages' targets. Each marker's text is read for the C interfaces it names (see [How this is computed](#how-this-is-computed)); a marker that names none is counted under its phrase, with the Darwin names imported under it deciding its status. Status is against System at `824a9291`:
+Every `SYSTEM-GAP:` marker in the packages' sources at the commits above: 51 markers in 34 files, of which 0 are outside the packages' targets. Each marker's text is read for the C interfaces it names (see [How this is computed](#how-this-is-computed)); a marker that names none is counted under its phrase, with the Darwin names imported under it deciding its status. Status is against System at `a795ce43`:
 
 - **missing**: System documents none of it (or only some: *k of n*).
 - **covered**: a System declaration's doc comment names it as the corresponding C interface, a CInterop alias names it, or, for `X members`, System gives `CInterop` alias of `X` Swift-named accessors. The marker is stale, or the package hasn't adopted the API yet. *Not yet in `system-next`* means only this branch has it.
@@ -379,7 +379,7 @@ Every `SYSTEM-GAP:` marker in the packages' sources at the commits above: 51 mar
 
 A family marked *(provisional)* is a C-library layer above the OS (math, stdio, locales, string.h and ctype.h) that System wraps provisionally, in `Sources/System/Provisional/`, since it may move to the standard library; it counts like everything else.
 
-Interfaces: 8 missing, 67 covered, 1 unread, 76 in all.
+Interfaces: 3 missing, 72 covered, 1 unread, 76 in all.
 
 | # | Interface | Status | Files | Packages | Family |
 |---:|---|---|---:|---|---|
@@ -433,11 +433,11 @@ Interfaces: 8 missing, 67 covered, 1 unread, 76 in all.
 | 48 | `locale_t` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | xlocale |
 | 49 | `localtime` | covered (as `localtime_r`) | 1 | swift-log | calendar time |
 | 50 | `log` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | libm |
-| 51 | `malloc_type_calloc` | missing | 1 | swift-foundation | libmalloc |
-| 52 | `malloc_type_descriptor_v0_t` | missing | 1 | swift-foundation | libmalloc |
-| 53 | `malloc_type_descriptor_v0_t members` | missing | 1 | swift-foundation | C struct members (MemberImportVisibility) |
-| 54 | `malloc_type_malloc` | missing | 1 | swift-foundation | libmalloc |
-| 55 | `malloc_type_realloc` | missing | 1 | swift-foundation | libmalloc |
+| 51 | `malloc_type_calloc` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | libmalloc |
+| 52 | `malloc_type_descriptor_v0_t` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | libmalloc |
+| 53 | `malloc_type_descriptor_v0_t members` | covered (by Memory.TypeDescriptor; not yet in `system-next`) | 1 | swift-foundation | C struct members (MemberImportVisibility) |
+| 54 | `malloc_type_malloc` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | libmalloc |
+| 55 | `malloc_type_realloc` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | libmalloc |
 | 56 | `mkstemps` | covered (as `mkostemps`; not yet in `system-next`) | 1 | swift-tools-support-core | mkstemps |
 | 57 | `mktemp` | missing | 1 | swift-foundation | temporary files |
 | 58 | `O_DSYNC` | covered (doc comment; not yet in `system-next`) | 1 | WasmKit | O_DSYNC |
@@ -467,10 +467,8 @@ The missing interfaces above, grouped, largest first: the order to fill them in.
 | # | Family | Files | Packages | Interfaces |
 |---:|---|---:|---|---|
 | 1 | posix_spawn | 2 | swift-subprocess | posix_spawn's raw attributes and file actions |
-| 2 | C struct members (MemberImportVisibility) | 1 | swift-foundation | `malloc_type_descriptor_v0_t members` |
-| 3 | libmalloc | 1 | swift-foundation | `malloc_type_calloc`, `malloc_type_descriptor_v0_t`, `malloc_type_malloc`, `malloc_type_realloc` |
-| 4 | readpassphrase | 1 | swift-package-manager | `readpassphrase` |
-| 5 | temporary files | 1 | swift-foundation | `mktemp` |
+| 2 | readpassphrase | 1 | swift-package-manager | `readpassphrase` |
+| 3 | temporary files | 1 | swift-foundation | `mktemp` |
 
 ## Markers that name no C interface
 
@@ -530,11 +528,11 @@ The missing interfaces above, grouped, largest first: the order to fill them in.
 - `locale_t` (covered): swift-foundation: `Sources/FoundationEssentials/Platform.swift:22`
 - `localtime` (covered): swift-log: `Sources/Logging/Handlers/StreamLogHandler.swift:23`
 - `log` (covered): swift-foundation: `Tests/FoundationInternationalizationTests/Formatting/DiscreteFormatStyleTestUtilities.swift:23`
-- `malloc_type_calloc` (missing): swift-foundation: `Sources/FoundationEssentials/Data/Representations/DataStorage.swift:16`
-- `malloc_type_descriptor_v0_t` (missing): swift-foundation: `Sources/FoundationEssentials/Data/Representations/DataStorage.swift:17`
-- `malloc_type_descriptor_v0_t members` (missing): swift-foundation: `Sources/FoundationEssentials/Data/Representations/DataStorage.swift:17`
-- `malloc_type_malloc` (missing): swift-foundation: `Sources/FoundationEssentials/Data/Representations/DataStorage.swift:16`
-- `malloc_type_realloc` (missing): swift-foundation: `Sources/FoundationEssentials/Data/Representations/DataStorage.swift:16`
+- `malloc_type_calloc` (covered): swift-foundation: `Sources/FoundationEssentials/Data/Representations/DataStorage.swift:16`
+- `malloc_type_descriptor_v0_t` (covered): swift-foundation: `Sources/FoundationEssentials/Data/Representations/DataStorage.swift:17`
+- `malloc_type_descriptor_v0_t members` (covered): swift-foundation: `Sources/FoundationEssentials/Data/Representations/DataStorage.swift:17`
+- `malloc_type_malloc` (covered): swift-foundation: `Sources/FoundationEssentials/Data/Representations/DataStorage.swift:16`
+- `malloc_type_realloc` (covered): swift-foundation: `Sources/FoundationEssentials/Data/Representations/DataStorage.swift:16`
 - `mkstemps` (covered): swift-tools-support-core: `Sources/TSCBasic/TemporaryFile.swift:15`
 - `mktemp` (missing): swift-foundation: `Sources/FoundationEssentials/Data/Data+Writing.swift:26`
 - `O_DSYNC` (covered): WasmKit: `Sources/WASI/Platform/PAL/PALFileDescriptor.swift:7`
@@ -606,16 +604,15 @@ api-delta's last run, and a few seconds when they haven't.
   everywhere, since `import struct Darwin.msghdr` is there for msghdr's fields, not for the name CInterop
   already has.
 - **Covered** means System's library modules (`Sources/System`, `Sources/SystemSockets`, not the samples) name
-  the interface in a doc comment's *The corresponding C … is* sentence, or a public typealias targets it, or,
-  for `X members`, an `extension CInterop.<alias of X>` exists. A few interfaces count as covered by the
-  replacement System wraps instead (`EQUIVALENTS` in `scripts/status.py`: usleep and sleep by nanosleep,
-  localtime and gmtime by their `_r` forms, mkstemp and mkstemps by mkostemp(s), time and gettimeofday by
-  clock_gettime), and the table says
-  so. A family that System answers with a design of its own, rather than a wrapper, counts as covered once a
-  witness in System's sources shows the answer has what the markers ask for (`ANSWERED`: fts is DirectoryWalk,
-  with its two-visit order). This sees what System documents, not whether the API fits the adopter's use: a
-  partial wrapper counts as covered, and an API whose doc comments don't name the C interface counts as
-  missing.
+  the interface in a doc comment's *The corresponding C … is* sentence, or a public typealias targets it, or, for
+  `X members`, an `extension CInterop.<alias of X>` exists. A few interfaces count as covered by the replacement
+  System wraps instead (`EQUIVALENTS` in `scripts/status.py`: usleep and sleep by nanosleep, localtime and gmtime
+  by their `_r` forms, mkstemp and mkstemps by mkostemp(s), time and gettimeofday by clock_gettime), and the table
+  says so. A family that System answers with a design of its own, rather than a wrapper, counts as covered once a
+  witness in System's sources shows the answer has what the markers ask for (`ANSWERED`: fts is DirectoryWalk, with
+  its two-visit order, and `malloc_type_descriptor_v0_t`'s members are `Memory.TypeDescriptor`'s properties). This
+  sees what System documents, not whether the API fits the adopter's use: a partial wrapper counts as covered, and
+  an API whose doc comments don't name the C interface counts as missing.
 - **Provisional families** (libm, C stdio, locale and xlocale, string.h and ctype.h, numeric conversion) are a
   fixed list in `scripts/status.py`, matched by name or by the name's SDK module in adopter-coverage's stored
   vocabulary when there is one. They're C-library layers above the OS that System wraps provisionally, in

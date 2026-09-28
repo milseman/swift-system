@@ -395,3 +395,27 @@ Tests: TimeZoneFilesTests. XCTest 519, swift-testing 461 in 72 suites, all passi
 - `DynamicLibrary.LoaderError.message`'s doc names dlerror (TSC).
 
 Tests: SmallGapsTest. XCTest 525, swift-testing 461, all passing.
+
+## 20. Typed allocation: `a795ce4`
+
+First, local system-next moved to `e8762dd`, Michael's merge of coverage up to `be36a44`; merging it back
+(`824a929`) changed nothing. The RawSpawn doc link that DocC found ambiguous between spawn's FilePath and
+C-string overloads now names `-(FilePath,_,_,_,_)` (`53286c2`); the same link in the processes lane's
+`Spawn.swift` and `ChildProcess.swift` is left to that lane.
+
+Foundation's Data allocates with libmalloc's typed calls, describing its buffers as generic data.
+
+- `Memory.TypeDescriptor`: the `malloc_type_id_t`, with Swift-named properties for the version 0 descriptor's
+  fields, read and set through the C union: `layout` (an option set for `layout_semantics`), `kind`,
+  `callSiteFlags`, `typeHash` (C's `hash`) and a read-only `version`.
+- `Memory` and `Memory.Zone`: `allocate(byteCount:type:)`, `allocateZeroed(byteCount:type:)` and
+  `(count:stride:type:)`, `allocate(byteCount:alignment:type:)`, `allocatePageAligned(byteCount:type:)` and
+  `reallocate(_:byteCount:type:)`, with the untyped methods' rules. macOS 14 and its peers, 64-bit only.
+- Rejected: a CInterop alias of the union with accessors (its own `hash`, `summary` and `type_id` would sit beside
+  them, and the allocations would take a C union); wrapping `malloc_type_free`, which C compilers never call for
+  `free` and `Memory.free` covers.
+- status.py: `ANSWERED` counts the union's members as answered by `Memory.TypeDescriptor`, and now applies to
+  `X members` too, which returned before reaching it.
+
+Status: 72 of 76 interfaces covered; missing are posix_spawn's 18th name, `mktemp` and `readpassphrase`.
+Tests: TypedAllocationTest. XCTest 532 (4 skipped), swift-testing 461 in 72 suites, all passing.
