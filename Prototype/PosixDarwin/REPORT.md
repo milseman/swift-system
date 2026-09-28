@@ -146,7 +146,7 @@ Tests: `BrokenDownTimeTests` (swift-testing, UTC only),
 `BrokenDownTimeMockTests`. Totals after it: 453 XCTests (4 skipped) and 384
 swift-testing tests in 58 suites, all passing but the flaky kqueue timer.
 
-## 2. Search paths
+## 2. Search paths: `8f4fd92`
 
 `Sources/System/SearchPaths/SearchPaths.swift`,
 `Sources/System/Internals/Syscalls+SearchPaths.swift` and
@@ -209,7 +209,7 @@ domains, every directory against sysdir called directly) and
 `SearchPathsMockTests`. Totals after it: 454 XCTests (4 skipped) and 389
 swift-testing tests in 59 suites, all passing.
 
-## 3. Mach virtual memory
+## 3. Mach virtual memory: `1d07a9f`
 
 `Sources/System/MachVirtualMemory/` (`MachKernelError.swift`,
 `MachVirtualMemory.swift`), `Internals/Syscalls+MachVirtualMemory.swift` and
@@ -280,7 +280,7 @@ read-only destinations, every error's code and description) and
 `MachVirtualMemoryMockTests`. Totals after it: 456 XCTests (4 skipped) and
 396 swift-testing tests in 60 suites, all passing.
 
-## 4. Credentials
+## 4. Credentials: `6b4a8f0`
 
 `Sources/System/ProcessCredentials/ProcessCredentials.swift` and
 `Internals/Syscalls+ProcessCredentials.swift`; the `groups` sample.
@@ -344,7 +344,7 @@ user, a thread without credentials) and `ProcessCredentialsMockTests` (the
 growing list, `ESRCH` as `nil`). Totals after it: 459 XCTests (4 skipped)
 and 401 swift-testing tests in 61 suites, all passing.
 
-## 5. Timers and priority
+## 5. Timers and priority: `17a4d57`
 
 `Sources/System/TimersAndPriority/` (`ProcessTimer.swift`,
 `ProcessPriority.swift`), `Internals/Syscalls+TimersAndPriority.swift` and
@@ -403,3 +403,50 @@ each timer set, read and stopped, rounding, a one-shot expiry with
 priority, and `nice` in an exit test, since a process can't lower its own
 nice value again), and `TimersAndPriorityMockTests`. Totals after it: 466
 XCTests (4 skipped) and 405 swift-testing tests in 62 suites, all passing.
+
+## Merge of system-next: `478dc4d`
+
+Brought in the malloc lane (`Memory`, `Memory.Zone`, `MemoryAllocator`,
+`MemoryBytes`, its CSystem shims, tests and the `malloc` sample) and an
+api-graph fix. The one conflict was `Sources/System/CMakeLists.txt`, where
+both sides added a block after MachTime's; both are kept, in sorted order
+(`MachVirtualMemory`, then `Memory`). `main.swift` merged cleanly. The CMake
+list matches SwiftPM's sources. The duplicate check over both lanes' new
+files finds only members of different types, the complementary Linux and
+Darwin branches of the `ITIMER_` and `PRIO_` constants, and malloc's
+`csystem_malloc_usable_size`, defined once for glibc and once for FreeBSD.
+`Mach.VirtualMemory` and malloc's `valloc` and `pvalloc` don't overlap.
+
+Tests after it: 471 XCTests (4 skipped) and 433 swift-testing tests in 65
+suites, all passing.
+
+## Where the lane stopped
+
+The lane closed after the merge, on request. Done: clusters 1 to 5
+(broken-down time, search paths, Mach virtual memory, credentials, timers
+and priority), each with tests, a sample and a section above.
+
+Not started: 6, memory locking (`mlock`, `munlock`, `mlockall`,
+`munlockall`); 7, shared memory and named semaphores; 8, `os_unfair_lock`
+and `arc4random`; 9, `sync`, `fsync` on a path, `chroot`, `truncate` on a
+path; 10, other adopter gaps.
+
+Open, for you to decide:
+- **Deinits that drop errors, item 54.** Nothing in this lane owns a
+  resource; an owned `Mach.VirtualMemory` region was left for later, and
+  clusters 6 and 7 would have added owners.
+- **`Mach.KernelError`** could replace `MachPort.swift`'s preconditions and
+  `PortRightError`.
+- **`strftime`'s `%z`, `%Z` and `%s`** are filled in from the value's own
+  fields; if System should pass the format through instead, that's one
+  function to delete.
+- **Local times before 1900 throw on Darwin**, where `mktime` fails for
+  them; UTC ones are computed.
+
+Unverified off Darwin, in general: every Linux, Musl, Android and BSD
+branch, notably `tm_gmtoff` and `tm_zone` (and Musl's spelling of them),
+the `getgrouplist` signature and glibc's count on -1, and the spelled-out
+Linux `ITIMER_` and `PRIO_` values.
+
+The flaky `KernelQueueTests.testOneShotTimer` failed twice in full runs
+early on and passed in every run since; it isn't this lane's.
