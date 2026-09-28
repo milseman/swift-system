@@ -2,8 +2,8 @@
 
 Generated 2026-09-28 by `Utilities/adopter-coverage/status.sh`, from commits only; rerun it rather than editing this file. How each figure is made, and what it can't see, is in [How this is computed](#how-this-is-computed).
 
-- **System**: `coverage` @ `ae3049a5` (status.py: let ANSWERED speak for a marker that names no C interface, and answer Subprocess's raw posix_spawn path with ProcessID.spawn's C-values and credentials forms), which contains `system-next` @ `e8762dd1` (Merge branch 'coverage' into system-next); 28 commit(s) of `coverage` aren't in `system-next`.
-- **API delta**: `main` @ `1b452c29` → `HEAD` @ `042d0cf4` (api-delta's last run; nothing it reads has changed since).
+- **System**: `coverage` @ `02390d52` (TimeZoneFiles: emit the TZDIR and TZDEFAULT constants into clients, as Constants.swift's are), which contains `system-next` @ `e8762dd1` (Merge branch 'coverage' into system-next); 30 commit(s) of `coverage` aren't in `system-next`.
+- **API delta**: `main` @ `1b452c29` → `HEAD` @ `02390d52`.
 - **Adopters** (`../adopters`, branch `migrate-darwin`, against its merge base with `main`):
   - WasmKit @ `f5219fbf`, base `1e9c513d`
   - indexstore-db @ `cc966b89`, base `441ead77`
@@ -372,7 +372,7 @@ Verbatim, not rerun: each package's own test totals (at the start, and the lates
 
 # 3. Gaps
 
-Every `SYSTEM-GAP:` marker in the packages' sources at the commits above: 51 markers in 34 files, of which 0 are outside the packages' targets. Each marker's text is read for the C interfaces it names (see [How this is computed](#how-this-is-computed)); a marker that names none is counted under its phrase, with the Darwin names imported under it deciding its status. Status is against System at `ae3049a5`:
+Every `SYSTEM-GAP:` marker in the packages' sources at the commits above: 51 markers in 34 files, of which 0 are outside the packages' targets. Each marker's text is read for the C interfaces it names (see [How this is computed](#how-this-is-computed)); a marker that names none is counted under its phrase, with the Darwin names imported under it deciding its status. Status is against System at `02390d52`:
 
 - **missing**: System documents none of it (or only some: *k of n*).
 - **covered**: a System declaration's doc comment names it as the corresponding C interface, a CInterop alias names it, or, for `X members`, System gives `CInterop` alias of `X` Swift-named accessors. The marker is stale, or the package hasn't adopted the API yet. *Not yet in `system-next`* means only this branch has it.

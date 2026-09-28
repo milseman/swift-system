@@ -464,3 +464,16 @@ posix_spawn can't do, and which Subprocess does in a C shim of its own by forkin
 
 Status: all 76 interfaces covered. Tests: SpawnCredentialsTest. XCTest 550 (4 skipped), swift-testing 461, all
 passing.
+
+## 23. Explicit availability: `02390d5`
+
+A clean run of the explicit-availability check (`-require-explicit-availability=warn`, CLAUDE.md's command) flagged
+section 18's `_TZDIR` and `_TZDEFAULT`, which as `@usableFromInline` were ABI without an `@available`; they're now
+`@_alwaysEmitIntoClient`, as Constants.swift's constants are. The check now warns only in Syscalls.swift's termios
+wrappers and in posix-darwin's `system_exit` and `system__exit` (Syscalls+ProcessExit.swift), left to their
+owners. None of this branch's other additions draw a warning, and the ABI-stable build fails only in its known
+places (FileTimes.swift, FilePathOperations.swift, Syscalls.swift's UserID and GroupID wrappers).
+
+Where the branch stands: every interface that the adopters' 51 markers name is covered (76 of 76), 12 DocC
+diagnostics remain (none in this branch's files; the processes lane's ambiguous spawn links are two of them), and
+local system-next is still `e8762dd`.
