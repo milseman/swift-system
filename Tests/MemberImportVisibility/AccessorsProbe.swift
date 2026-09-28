@@ -80,6 +80,10 @@ func _accessorProbe() {
   event.filterFlags = []
   event.filterData += 1
   event.userData = nil
+
+  // POSIXErrorCode, through Errno
+  let code = CInterop.POSIXErrorCode(.notPermitted)
+  _ = code?.errno
   #endif
   _ = (time, interval, vector, status)
 }

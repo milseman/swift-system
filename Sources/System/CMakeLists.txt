@@ -207,6 +207,7 @@ target_sources(SystemPackage PRIVATE
 target_sources(SystemPackage PRIVATE
   Internals/Constants+Provisional.swift
   Internals/Syscalls+Provisional.swift
+  Provisional/Provisional+POSIXErrorCode.swift
   Provisional/Provisional+Stdio.swift)
 target_sources(SystemPackage PRIVATE
   Internals/Syscalls+ProcessCredentials.swift
