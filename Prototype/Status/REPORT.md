@@ -348,3 +348,21 @@ set the global locale (setlocale, LC_ALL). `Sources/System/Provisional/Provision
 Tests: ProvisionalLocaleTest. XCTest 515, swift-testing 460. One full run failed the malloc lane's
 `reallocateFreeingOnFailureFreesTheBlock` (a zone's block count, under parallel tests); it passed alone three
 times and in the rerun. It isn't this lane's.
+
+## 17. posix_spawn's raw attributes and file actions: `32ec619`
+
+swift-subprocess keeps raw posix_spawn to hand `posix_spawnattr_t`/`posix_spawn_file_actions_t` to its public
+`preSpawnProcessConfigurator`, and to pass them to its own `_subprocess_spawn` (which forks first, for other
+credentials). `Sources/System/RawSpawn/RawSpawn.swift`:
+
+- `CInterop.SpawnAttributes`/`SpawnFileActions`: what posix_spawn takes a pointer to (`posix_spawnattr_t?` on
+  Darwin and the BSDs, where it's a pointer, the structure elsewhere), so an `inout` of it matches Subprocess's
+  public signature on Darwin.
+- `SpawnAttributes.withCAttributes(_:)` and `SpawnFileAction.withCFileActions(_:_:)` build the C values from
+  System's types and let a closure change and pass them; `ProcessID.spawn(...cFileActions:cAttributes:)` (and
+  `searchingPathFor:`) spawns with them. The internal builders now pass mutable pointers.
+- Rejected: a spawn that calls a configurator mid-way (serves only the first need); public setters for the
+  SETSIGMASK/SETSIGDEF/SETPGROUP flags that System's properties imply, which the closure can set.
+
+Status: 17 of the marker's 18 names are now documented; the 18th, `posix_spawnattr_getflags` (a test's), isn't
+wrapped, and the closure can call it. Tests: RawSpawnTests. XCTest 519, swift-testing 460, all passing.

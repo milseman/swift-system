@@ -2,8 +2,8 @@
 
 Generated 2026-09-28 by `Utilities/adopter-coverage/status.sh`, from commits only; rerun it rather than editing this file. How each figure is made, and what it can't see, is in [How this is computed](#how-this-is-computed).
 
-- **System**: `coverage` @ `63f97d83` (Add CLocale, provisionally, for the C library's locales: newlocale, freelocale, setlocale, strtod_l, strtof_l and strncasecmp_l), which doesn't contain `system-next` @ `e8762dd1` (Merge branch 'coverage' into system-next); 12 commit(s) of `coverage` aren't in `system-next`.
-- **API delta**: `main` @ `1b452c29` → `HEAD` @ `63f97d83`.
+- **System**: `coverage` @ `32ec619e` (Add CInterop.SpawnAttributes and SpawnFileActions, SpawnAttributes.withCAttributes(_:), SpawnFileAction.withCFileActions(_:_:), and ProcessID.spawn with cFileActions: and cAttributes:), which doesn't contain `system-next` @ `e8762dd1` (Merge branch 'coverage' into system-next); 14 commit(s) of `coverage` aren't in `system-next`.
+- **API delta**: `main` @ `1b452c29` → `HEAD` @ `32ec619e`.
 - **Adopters** (`../adopters`, branch `migrate-darwin`, against its merge base with `main`):
   - WasmKit @ `f5219fbf`, base `1e9c513d`
   - indexstore-db @ `cc966b89`, base `441ead77`
@@ -26,23 +26,23 @@ Copied verbatim from `Utilities/api-delta/regenerate.sh` (`BASE_REF=main`, `HEAD
 
 ## Summary
 
-- **2974 added, 0 removed, 0 changed** declarations in the macOS symbol graphs.
-  - SystemPackage: +2398 (448 → 2846 public symbols).
+- **2980 added, 0 removed, 0 changed** declarations in the macOS symbol graphs.
+  - SystemPackage: +2404 (448 → 2852 public symbols).
   - SystemSockets: +576 (0 → 576 public symbols). SystemSockets is a new module; it doesn't exist on `main`.
 - Availability of the additions:
-  - System 199: 2939
+  - System 199: 2945
   - System 199 + explicit OS floor: 26
   - System 0.0.1 + explicit OS floor: 8
   - System 0.0.1: 1
 - The source scan finds these new public declarations, which the macOS graphs can't show:
-  - 408 compiled only on other platforms;
+  - 410 compiled only on other platforms;
   - 233 new `@available(*, unavailable, renamed:)` stubs;
   - 1 new underscored public declaration(s).
   - 27 added, removed or changed graph symbols the scan didn't find (enum case: 26, no source location: 1). Enum cases have no `public` keyword, and synthesized members have no location; any others are scanner misses. Their platforms show as `?`.
 - 0 public declarations hidden from the graphs were removed.
 - No public declaration is conditional on `ENABLE_MOCKING` or `DEBUG`, so a release build has the same public API as the debug graphs.
 - Cross-check with `swift-api-digester`, which dumps every declaration, implicit ones included:
-  - SystemPackage: +2684 / -0 declarations, which is the graphs' +2398 plus 286 implicit ones; it has every graph addition; `-diagnose-sdk` reports no breaking changes.
+  - SystemPackage: +2690 / -0 declarations, which is the graphs' +2404 plus 286 implicit ones; it has every graph addition; `-diagnose-sdk` reports no breaking changes.
   - SystemSockets: +648 / -0 declarations, which is the graphs' +576 plus 71 implicit ones; explicit declarations it has that the graphs don't: `SocketAddress._withUnsafeMutablePointer(_:)`; it has every graph addition.
 - Nothing was removed or changed: no public declaration left the graphs or the source scan. The *changed* check compares declaration text (including default arguments), availability, conformances, generic and extension constraints, and access level, and pairs symbols by path when a signature change alters the USR.
 
@@ -54,7 +54,7 @@ Each row is a top-level type, and nested types count toward it: `FilePath.Resolu
 |---|---|---:|---:|---:|---|
 | SystemPackage | [`BaudRate`](#systempackage-baudrate) | 26 | 0 | 0 | S199 ×26 |
 | SystemPackage | [`BrokenDownTime`](#systempackage-brokendowntime) | 29 | 0 | 0 | S199 ×29 |
-| SystemPackage | [`CInterop`](#systempackage-cinterop) | 40 | 0 | 0 | S199 ×40 |
+| SystemPackage | [`CInterop`](#systempackage-cinterop) | 42 | 0 | 0 | S199 ×42 |
 | SystemPackage | [`CLocale`](#systempackage-clocale) | 32 | 0 | 0 | S199 ×32 |
 | SystemPackage | [`ChildProcess`](#systempackage-childprocess) | 9 | 0 | 0 | S199 ×9 |
 | SystemPackage | [`ClockID`](#systempackage-clockid) | 13 | 0 | 0 | S199 ×13 |
@@ -95,7 +95,7 @@ Each row is a top-level type, and nested types count toward it: `FilePath.Resolu
 | SystemPackage | [`POSIXErrorCode (extends _DarwinFoundation1)`](#systempackage-posixerrorcode-extends-darwinfoundation1) | 2 | 0 | 0 | S199 ×2 |
 | SystemPackage | [`PThread`](#systempackage-pthread) | 123 | 0 | 0 | S199 ×123 |
 | SystemPackage | [`ProcessEnvironment`](#systempackage-processenvironment) | 7 | 0 | 0 | S199 ×7 |
-| SystemPackage | [`ProcessID`](#systempackage-processid) | 209 | 0 | 0 | S199 ×209 |
+| SystemPackage | [`ProcessID`](#systempackage-processid) | 211 | 0 | 0 | S199 ×211 |
 | SystemPackage | [`ProcessPriority`](#systempackage-processpriority) | 8 | 0 | 0 | S199 ×8 |
 | SystemPackage | [`ProcessStateChange`](#systempackage-processstatechange) | 7 | 0 | 0 | S199 ×7 |
 | SystemPackage | [`ProcessTimer`](#systempackage-processtimer) | 18 | 0 | 0 | S199 ×18 |
@@ -103,8 +103,8 @@ Each row is a top-level type, and nested types count toward it: `FilePath.Resolu
 | SystemPackage | [`SearchPaths`](#systempackage-searchpaths) | 42 | 0 | 0 | S199 ×41, S199+OS ×1 |
 | SystemPackage | [`Signal`](#systempackage-signal) | 73 | 0 | 0 | S199 ×73 |
 | SystemPackage | [`SignalSet`](#systempackage-signalset) | 22 | 0 | 0 | S199 ×22 |
-| SystemPackage | [`SpawnAttributes`](#systempackage-spawnattributes) | 17 | 0 | 0 | S199 ×17 |
-| SystemPackage | [`SpawnFileAction`](#systempackage-spawnfileaction) | 7 | 0 | 0 | S199 ×7 |
+| SystemPackage | [`SpawnAttributes`](#systempackage-spawnattributes) | 18 | 0 | 0 | S199 ×18 |
+| SystemPackage | [`SpawnFileAction`](#systempackage-spawnfileaction) | 8 | 0 | 0 | S199 ×8 |
 | SystemPackage | [`StatFS`](#systempackage-statfs) | 27 | 0 | 0 | S199 ×27 |
 | SystemPackage | [`SystemConfig`](#systempackage-systemconfig) | 71 | 0 | 0 | S199 ×71 |
 | SystemPackage | [`SystemControl`](#systempackage-systemcontrol) | 72 | 0 | 0 | S199 ×72 |
@@ -139,7 +139,7 @@ Each row is a top-level type, and nested types count toward it: `FilePath.Resolu
 | SystemSockets | [`sockaddr_storage (extends Darwin)`](#systemsockets-sockaddr-storage-extends-darwin) | 3 | 0 | 0 | S199 ×3 |
 | SystemSockets | [`sockaddr_un (extends Darwin)`](#systemsockets-sockaddr-un-extends-darwin) | 5 | 0 | 0 | S199 ×5 |
 | SystemSockets | [`sockaddr_vm (extends Darwin)`](#systemsockets-sockaddr-vm-extends-darwin) | 5 | 0 | 0 | S199 ×5 |
-| **Total** | | **2974** | **0** | **0** | |
+| **Total** | | **2980** | **0** | **0** | |
 
 # 2. Adoption
 
@@ -371,7 +371,7 @@ Verbatim, not rerun: each package's own test totals (at the start, and the lates
 
 # 3. Gaps
 
-Every `SYSTEM-GAP:` marker in the packages' sources at the commits above: 51 markers in 34 files, of which 0 are outside the packages' targets. Each marker's text is read for the C interfaces it names (see [How this is computed](#how-this-is-computed)); a marker that names none is counted under its phrase, with the Darwin names imported under it deciding its status. Status is against System at `63f97d83`:
+Every `SYSTEM-GAP:` marker in the packages' sources at the commits above: 51 markers in 34 files, of which 0 are outside the packages' targets. Each marker's text is read for the C interfaces it names (see [How this is computed](#how-this-is-computed)); a marker that names none is counted under its phrase, with the Darwin names imported under it deciding its status. Status is against System at `32ec619e`:
 
 - **missing**: System documents none of it (or only some: *k of n*).
 - **covered**: a System declaration's doc comment names it as the corresponding C interface, a CInterop alias names it, or, for `X members`, System gives `CInterop` alias of `X` Swift-named accessors. The marker is stale, or the package hasn't adopted the API yet. *Not yet in `system-next`* means only this branch has it.
@@ -390,7 +390,7 @@ Interfaces: 16 missing, 59 covered, 1 unread, 76 in all.
 | 5 | `fts_path` | covered (by DirectoryWalk; not yet in `system-next`) | 2 | swift-foundation | fts |
 | 6 | `FTSENT` | covered (by DirectoryWalk; not yet in `system-next`) | 2 | swift-foundation | fts |
 | 7 | `memcmp` | covered (doc comment) | 2 | swift-syntax | string.h |
-| 8 | posix_spawn's raw attributes and file actions | missing (12 of 18 names covered) | 2 | swift-subprocess | posix_spawn |
+| 8 | posix_spawn's raw attributes and file actions | missing (17 of 18 names covered) | 2 | swift-subprocess | posix_spawn |
 | 9 | `pow` | covered (doc comment; not yet in `system-next`) | 2 | swift-foundation | libm |
 | 10 | `TZDIR` | missing | 2 | swift-foundation | tzfile.h |
 | 11 | `UTIME_NOW` | covered (doc comment) | 2 | swift-nio | file times |
