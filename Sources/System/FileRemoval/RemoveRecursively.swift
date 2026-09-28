@@ -177,9 +177,9 @@ extension FilePath {
   /// The corresponding C function is `removefile`,
   /// with `REMOVEFILE_RECURSIVE` and a `removefile_state_t`
   /// whose confirm, status, and error callbacks report to `progress`.
-  /// The corresponding C functions for the state are
-  /// `removefile_state_alloc`, `removefile_state_set`,
-  /// `removefile_state_get`, and `removefile_state_free`.
+  /// The corresponding C functions are `removefile_state_alloc`,
+  /// `removefile_state_set`, `removefile_state_get`,
+  /// and `removefile_state_free`, for the state.
   /// - Note: Only available on Darwin.
   @_alwaysEmitIntoClient
   public func removeRecursively(
@@ -209,9 +209,9 @@ extension FilePath {
   /// The corresponding C function is `removefile`,
   /// with `REMOVEFILE_RECURSIVE` and a `removefile_state_t`
   /// whose confirm, status, and error callbacks report to `progress`.
-  /// The corresponding C functions for the state are
-  /// `removefile_state_alloc`, `removefile_state_set`,
-  /// `removefile_state_get`, and `removefile_state_free`.
+  /// The corresponding C functions are `removefile_state_alloc`,
+  /// `removefile_state_set`, `removefile_state_get`,
+  /// and `removefile_state_free`, for the state.
   /// - Note: Only available on Darwin.
   @_alwaysEmitIntoClient
   public static func removeRecursively(
