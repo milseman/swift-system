@@ -225,3 +225,25 @@ Tests: ProvisionalPOSIXErrorCodeTests, and the MemberImportVisibility probe. XCT
 suites. One full run failed AttributeListTests' `testVolumeAttributes`, which compares a volume's free space from
 getattrlist with statfs's a moment later; it fails alone too, two runs in three, while other sessions write to
 the disk. It isn't this lane's.
+
+## 10. Shared memory and named semaphores: `be36a44`
+
+The posix-darwin lane's unstarted cluster 7.
+
+- `FileDescriptor.openSharedMemory(named:_:options:permissions:)` and `removeSharedMemory(named:)` (shm_open,
+  shm_unlink) reuse FileDescriptor's AccessMode and OpenOptions and, like `open`, trap for `.create` without
+  permissions. shm_open is variadic, so CSystem's `csystem_shm_open` passes the mode. Rejected: a SharedMemory
+  owner type; the result is a descriptor, which mapping and `resize(to:)` already take.
+- `NamedSemaphore`, a handle over `sem_t *` (`CInterop.Semaphore`), with its own OpenOptions (create,
+  exclusiveCreate), `open(named:options:permissions:value:)`, `close()`, `remove(named:)`,
+  `wait(retryOnInterrupt:)`, `tryWait()` (false for EAGAIN), `post()` and `maxValue`. Rejected: `signal()`,
+  DispatchSemaphore's word, which reads as System's `Signal`; an owner closing in its deinit (item 54);
+  `sem_init`/`sem_getvalue`, which Darwin lacks (ENOSYS).
+- Not on Android (no shm_open or sem_open in bionic); Linux code unbuilt.
+
+Found on macOS 26.3: shm names over 31 bytes fail ENAMETOOLONG; O_TRUNC fails EINVAL; a second ftruncate fails
+EINVAL; read/write fail ENXIO; the descriptor is close-on-exec; mappings outlive the name. Reopening a
+semaphore's name gives another handle on the same count; sem_post at SEM_VALUE_MAX (32,767) doesn't fail; a
+larger initial value fails EINVAL.
+
+Tests: SharedMemoryTest. XCTest 506 (4 skipped), swift-testing 443, all passing.
