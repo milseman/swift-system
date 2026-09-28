@@ -239,6 +239,9 @@ target_sources(SystemPackage PRIVATE
 target_sources(SystemPackage PRIVATE
   RandomGenerator/RandomGenerator.swift)
 target_sources(SystemPackage PRIVATE
+  Internals/Syscalls+RootAndSync.swift
+  RootAndSync/RootAndSync.swift)
+target_sources(SystemPackage PRIVATE
   Internals/Constants+SearchPaths.swift
   Internals/Syscalls+SearchPaths.swift
   SearchPaths/SearchPaths.swift)
