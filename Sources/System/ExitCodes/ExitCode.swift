@@ -13,8 +13,8 @@
 extension ProcessID {
   /// The status a process exits with.
   ///
-  /// A process passes its exit code to ``ProcessID/exit(_:)-(ExitCode)``
-  /// or ``ProcessID/exitImmediately(_:)-(ExitCode)``,
+  /// A process passes its exit code to ``ProcessID/exit(_:)-(ProcessID.ExitCode)``
+  /// or ``ProcessID/exitImmediately(_:)-(ProcessID.ExitCode)``,
   /// and the process that waits for it reads it from
   /// ``ExitStatus/exited(_:)``, as the low 8 bits of the code.
   /// By convention, ``success`` is 0 and every other code is a failure.
@@ -289,7 +289,7 @@ extension ProcessID {
   /// - Parameter code: The process's exit code.
   ///
   /// This method is ``exitImmediately(_:)-(CInt)`` with a code's raw value;
-  /// see that method for when it's safe where ``exit(_:)-(ExitCode)`` isn't.
+  /// see that method for when it's safe where ``exit(_:)-(ProcessID.ExitCode)`` isn't.
   ///
   /// The corresponding C function is `_exit`.
   @_alwaysEmitIntoClient

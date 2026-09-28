@@ -2,15 +2,16 @@
 
 Generated 2026-09-28 by `Utilities/adopter-coverage/status.sh`, from commits only; rerun it rather than editing this file. How each figure is made, and what it can't see, is in [How this is computed](#how-this-is-computed).
 
-- **System**: `coverage` @ `040169cb` (Add SystemConfig.maxFileNameBytes, maxPathBytes and maxSymbolicLinks for NAME_MAX, PATH_MAX and MAXSYMLINKS, and AccessMode.search and .execute for O_SEARCH and O_EXEC), which contains `system-next` @ `ebc1231f` (Merge branch 'posix-darwin' into system-next); 4 commit(s) of `coverage` aren't in `system-next`.
-- **API delta**: `main` @ `1b452c29` → `HEAD` @ `040169cb`.
+- **System**: `coverage` @ `7416b212` (Add ProcessID.ExitCode, with EXIT_SUCCESS, EXIT_FAILURE and the <sysexits.h> codes, and exit(_:) and exitImmediately(_:) overloads that take one), which contains `system-next` @ `ebc1231f` (Merge branch 'posix-darwin' into system-next); 6 commit(s) of `coverage` aren't in `system-next`.
+- **API delta**: `main` @ `1b452c29` → `HEAD` @ `7416b212`.
 - **Adopters** (`../adopters`, branch `migrate-darwin`, against its merge base with `main`):
   - swift-argument-parser @ `0fbda276`, base `1021ac8c`
   - swift-async-algorithms @ `bd5f6f44`, base `789dcf1f`
   - swift-certificates @ `0df6bd14`, base `ff86b924`
-  - swift-foundation @ `826601a4`, base `6669273a`
+  - swift-driver @ `15cf6766`, base `15cf6766` (no commits beyond the merge base yet)
+  - swift-foundation @ `9e719127`, base `6669273a`
   - swift-log @ `4d6d77fe`, base `9c9acde6`
-  - swift-nio @ `aaf5a67e`, base `feaf4ac5`
+  - swift-nio @ `aaf5a67e`, base `feaf4ac5` (uncommitted changes in the checkout aren't counted)
   - swift-package-manager @ `24a8a7b0`, base `24a8a7b0` (no commits beyond the merge base yet) (uncommitted changes in the checkout aren't counted)
   - swift-subprocess @ `1dc7dbb8`, base `8f099c6e`
   - swift-syntax @ `961f0b72`, base `e9289aa4`
@@ -22,23 +23,23 @@ Copied verbatim from `Utilities/api-delta/regenerate.sh` (`BASE_REF=main`, `HEAD
 
 ## Summary
 
-- **2741 added, 0 removed, 0 changed** declarations in the macOS symbol graphs.
-  - SystemPackage: +2165 (448 → 2613 public symbols).
+- **2765 added, 0 removed, 0 changed** declarations in the macOS symbol graphs.
+  - SystemPackage: +2189 (448 → 2637 public symbols).
   - SystemSockets: +576 (0 → 576 public symbols). SystemSockets is a new module; it doesn't exist on `main`.
 - Availability of the additions:
-  - System 199: 2706
+  - System 199: 2730
   - System 199 + explicit OS floor: 26
   - System 0.0.1 + explicit OS floor: 8
   - System 0.0.1: 1
 - The source scan finds these new public declarations, which the macOS graphs can't show:
   - 400 compiled only on other platforms;
-  - 215 new `@available(*, unavailable, renamed:)` stubs;
+  - 233 new `@available(*, unavailable, renamed:)` stubs;
   - 1 new underscored public declaration(s).
   - 26 added, removed or changed graph symbols the scan didn't find (enum case: 25, no source location: 1). Enum cases have no `public` keyword, and synthesized members have no location; any others are scanner misses. Their platforms show as `?`.
 - 0 public declarations hidden from the graphs were removed.
 - No public declaration is conditional on `ENABLE_MOCKING` or `DEBUG`, so a release build has the same public API as the debug graphs.
 - Cross-check with `swift-api-digester`, which dumps every declaration, implicit ones included:
-  - SystemPackage: +2428 / -0 declarations, which is the graphs' +2165 plus 263 implicit ones; it has every graph addition; `-diagnose-sdk` reports no breaking changes.
+  - SystemPackage: +2453 / -0 declarations, which is the graphs' +2189 plus 264 implicit ones; it has every graph addition; `-diagnose-sdk` reports no breaking changes.
   - SystemSockets: +648 / -0 declarations, which is the graphs' +576 plus 71 implicit ones; explicit declarations it has that the graphs don't: `SocketAddress._withUnsafeMutablePointer(_:)`; it has every graph addition.
 - Nothing was removed or changed: no public declaration left the graphs or the source scan. The *changed* check compares declaration text (including default arguments), availability, conformances, generic and extension constraints, and access level, and pairs symbols by path when a signature change alters the USR.
 
@@ -86,7 +87,7 @@ Each row is a top-level type, and nested types count toward it: `FilePath.Resolu
 | SystemPackage | [`OwnedFD`](#systempackage-ownedfd) | 30 | 0 | 0 | S199 ×30 |
 | SystemPackage | [`PThread`](#systempackage-pthread) | 123 | 0 | 0 | S199 ×123 |
 | SystemPackage | [`ProcessEnvironment`](#systempackage-processenvironment) | 7 | 0 | 0 | S199 ×7 |
-| SystemPackage | [`ProcessID`](#systempackage-processid) | 185 | 0 | 0 | S199 ×185 |
+| SystemPackage | [`ProcessID`](#systempackage-processid) | 209 | 0 | 0 | S199 ×209 |
 | SystemPackage | [`ProcessPriority`](#systempackage-processpriority) | 8 | 0 | 0 | S199 ×8 |
 | SystemPackage | [`ProcessStateChange`](#systempackage-processstatechange) | 7 | 0 | 0 | S199 ×7 |
 | SystemPackage | [`ProcessTimer`](#systempackage-processtimer) | 18 | 0 | 0 | S199 ×18 |
@@ -129,7 +130,7 @@ Each row is a top-level type, and nested types count toward it: `FilePath.Resolu
 | SystemSockets | [`sockaddr_storage (extends Darwin)`](#systemsockets-sockaddr-storage-extends-darwin) | 3 | 0 | 0 | S199 ×3 |
 | SystemSockets | [`sockaddr_un (extends Darwin)`](#systemsockets-sockaddr-un-extends-darwin) | 5 | 0 | 0 | S199 ×5 |
 | SystemSockets | [`sockaddr_vm (extends Darwin)`](#systemsockets-sockaddr-vm-extends-darwin) | 5 | 0 | 0 | S199 ×5 |
-| **Total** | | **2741** | **0** | **0** | |
+| **Total** | | **2765** | **0** | **0** | |
 
 # 2. Adoption
 
@@ -140,6 +141,7 @@ Swift files of each package's own targets (from its manifest; not nested package
 | swift-argument-parser | 166 | 1 → 0 | 0 | 0 → 1 | 0 | 1 → 0 | 0 (0) → 1 (1) |
 | swift-async-algorithms | 146 | 2 → 0 | 0 | 0 | 0 | 1 → 0 | 0 (0) |
 | swift-certificates | 133 | 2 → 0 | 0 | 0 → 1 | 0 | 3 → 0 | 0 (0) → 1 (1) |
+| swift-driver | 195 | 11 | 1 | 0 | 0 | — | 0 (0) |
 | swift-foundation | 431 | 33 → 0 | 1 → 0 | 0 → 14 | 3 | 7 → 1 | 0 (0) → 22 (15) |
 | swift-log | 30 | 5 → 0 | 0 | 0 → 2 | 0 | 1 → 0 | 0 (0) → 3 (2) |
 | swift-nio | 479 | 41 → 0 | 3 → 1 | 0 → 38 | 0 | — | 0 (0) → 45 (39) |
@@ -147,11 +149,11 @@ Swift files of each package's own targets (from its manifest; not nested package
 | swift-subprocess | 36 | 17 → 0 | 0 | 0 → 2 | 0 | — | 0 (0) → 3 (2) |
 | swift-syntax | 586 | 2 → 0 | 0 | 0 → 2 | 0 | 3 → 0 | 0 (0) → 3 (2) |
 | swift-tools-support-core | 124 | 0 | 1 → 0 | 0 → 5 | 0 | 14 → 5 | 0 (0) → 13 (5) |
-| **All** | 3014 | 106 → 3 | 7 → 3 | 0 → 65 | 3 | | 0 (0) → 91 (67) |
+| **All** | 3209 | 117 → 14 | 8 → 4 | 0 → 65 | 3 | | 0 (0) → 91 (67) |
 
 2 more marker(s) are in files outside the targets (they're in the gaps below): swift-nio: `Benchmarks/`, swift-nio: `IntegrationTests/`.
 
-Files whose imports aren't narrow yet: swift-nio: `Tests/NIOFSTests/FileInfoTests.swift` (submodule), swift-package-manager: `Sources/Commands/Utilities/TestingSupport.swift` (whole module), swift-package-manager: `Sources/CoreCommands/SwiftCommandState.swift` (whole module), swift-package-manager: `Tests/BasicsTests/SandboxTests.swift` (whole module), swift-package-manager: `Sources/Basics/Environment/Environment.swift` (submodule), swift-package-manager: `Sources/swiftpm-testing-helper/Entrypoint.swift` (submodule).
+Files whose imports aren't narrow yet: swift-driver: `Sources/SwiftDriver/SwiftScan/Loader.swift` (whole module), swift-driver: `Sources/SwiftDriver/Utilities/DateAdditions.swift` (whole module), swift-driver: `Sources/SwiftDriver/Utilities/System.swift` (whole module), swift-driver: `Sources/SwiftDriver/Utilities/VirtualPath.swift` (whole module), swift-driver: `Sources/swift-build-sdk-interfaces/main.swift` (whole module), swift-driver: `Sources/swift-driver/main.swift` (whole module), swift-driver: `Tests/SwiftDriverTests/Helpers/DriverTestHelpers.swift` (whole module), swift-driver: `Tests/SwiftDriverTests/MiscDriverTests.swift` (whole module), swift-driver: `Tests/SwiftDriverTests/SpecialModeTests.swift` (whole module), swift-driver: `Tests/SwiftDriverTests/TargetTests.swift` (whole module), swift-driver: `Tests/SwiftDriverTests/ToolchainTests.swift` (whole module), swift-driver: `Sources/SwiftDriver/Driver/ToolExecutionDelegate.swift` (submodule), swift-nio: `Tests/NIOFSTests/FileInfoTests.swift` (submodule), swift-package-manager: `Sources/Commands/Utilities/TestingSupport.swift` (whole module), swift-package-manager: `Sources/CoreCommands/SwiftCommandState.swift` (whole module), swift-package-manager: `Tests/BasicsTests/SandboxTests.swift` (whole module), swift-package-manager: `Sources/Basics/Environment/Environment.swift` (submodule), swift-package-manager: `Sources/swiftpm-testing-helper/Entrypoint.swift` (submodule).
 
 ## Copied from the packages' reports
 
@@ -207,6 +209,10 @@ Verbatim, not rerun: each package's own test totals (at the start, and the lates
   | | At start | Now |
   | Darwin names reached through Foundation's or XCTest's re-export | 3: `X509/Verifier/ServerIdentityPolicy.swift` (`in_addr`, `in6_addr`, `inet_pton`, `AF_INET*`, `memcmp`); `X509Tests/IPAddressTests.swift` (`in_addr`, `in6_addr`, `inet_pton`, `AF_INET*`); `X509Tests/TimeTests.swift` (`gmtime_r`, `tm`, `time_t`) | 0 |
   ```
+
+**swift-driver**
+
+- No MIGRATION.md or REPORT.md with test totals at this commit.
 
 **swift-foundation**
 
@@ -309,14 +315,14 @@ Verbatim, not rerun: each package's own test totals (at the start, and the lates
 
 # 3. Gaps
 
-Every `SYSTEM-GAP:` marker in the packages' sources at the commits above: 93 markers in 69 files, of which 2 are outside the packages' targets. Each marker's text is read for the C interfaces it names (see [How this is computed](#how-this-is-computed)); a marker that names none is counted under its phrase, with the Darwin names imported under it deciding its status. Status is against System at `040169cb`:
+Every `SYSTEM-GAP:` marker in the packages' sources at the commits above: 93 markers in 69 files, of which 2 are outside the packages' targets. Each marker's text is read for the C interfaces it names (see [How this is computed](#how-this-is-computed)); a marker that names none is counted under its phrase, with the Darwin names imported under it deciding its status. Status is against System at `7416b212`:
 
 - **missing**: System documents none of it (or only some: *k of n*).
 - **covered**: a System declaration's doc comment names it as the corresponding C interface, a CInterop alias names it, or, for `X members`, System gives `CInterop` alias of `X` Swift-named accessors. The marker is stale, or the package hasn't adopted the API yet. *Not yet in `system-next`* means only this branch has it.
 - **not System's**: a C-library layer above the OS, or another module's type ([below](#not-systems)).
 - **unread**: the marker names no C interface and nothing is imported under it; read the marker.
 
-Interfaces: 57 missing, 55 covered, 23 not System's, 1 unread, 136 in all.
+Interfaces: 56 missing, 56 covered, 23 not System's, 1 unread, 136 in all.
 
 | # | Interface | Status | Files | Packages | Family |
 |---:|---|---|---:|---|---|
@@ -369,7 +375,7 @@ Interfaces: 57 missing, 55 covered, 23 not System's, 1 unread, 136 in all.
 | 47 | `DT_SOCK` | covered (doc comment) | 1 | swift-nio | directory entry types |
 | 48 | `DT_WHT` | covered (doc comment) | 1 | swift-nio | directory entry types |
 | 49 | `errno` | covered (doc comment) | 1 | swift-nio | errno |
-| 50 | `EX_USAGE` | missing | 1 | swift-argument-parser | sysexits |
+| 50 | `EX_USAGE` | covered (doc comment; not yet in `system-next`) | 1 | swift-argument-parser | sysexits |
 | 51 | `exit` | covered (doc comment) | 1 | swift-nio | exit |
 | 52 | `fdopen` | not System's (C stdio) | 1 | swift-log | C stdio |
 | 53 | `fflush` | not System's (C stdio) | 1 | swift-log | C stdio |
@@ -474,8 +480,7 @@ The missing interfaces above, grouped, largest first: the order to fill them in.
 | 9 | libmalloc | 1 | swift-foundation | `malloc_type_calloc`, `malloc_type_descriptor_v0_t`, `malloc_type_malloc`, `malloc_type_realloc` |
 | 10 | mkstemps | 1 | swift-tools-support-core | `mkstemps` |
 | 11 | removefile | 1 | swift-foundation | `removefile`, `removefile_flags_t`, `REMOVEFILE_PROCEED`, `REMOVEFILE_RECURSIVE`, `REMOVEFILE_SKIP`, `removefile_state_alloc`, `REMOVEFILE_STATE_CONFIRM_CALLBACK`, `REMOVEFILE_STATE_CONFIRM_CONTEXT`, `REMOVEFILE_STATE_ERRNO`, `REMOVEFILE_STATE_ERROR_CALLBACK`, `REMOVEFILE_STATE_ERROR_CONTEXT`, `removefile_state_free`, `removefile_state_get`, `removefile_state_set`, `removefile_state_t`, `REMOVEFILE_STOP` |
-| 12 | sysexits | 1 | swift-argument-parser | `EX_USAGE` |
-| 13 | temporary files | 1 | swift-foundation | `mktemp` |
+| 12 | temporary files | 1 | swift-foundation | `mktemp` |
 
 ## Not System's
 
@@ -545,7 +550,7 @@ Recorded, not to be implemented. A name is counted here when System doesn't alre
 - `DT_SOCK` (covered): swift-nio: `Tests/NIOFSTests/FileTypeTests.swift:21`
 - `DT_WHT` (covered): swift-nio: `Tests/NIOFSTests/FileTypeTests.swift:21`
 - `errno` (covered): swift-nio: `Tests/NIOPosixTests/SystemCallWrapperHelpers.swift:23`
-- `EX_USAGE` (missing): swift-argument-parser: `Sources/ArgumentParser/Utilities/Platform.swift:25`
+- `EX_USAGE` (covered): swift-argument-parser: `Sources/ArgumentParser/Utilities/Platform.swift:25`
 - `exit` (covered): swift-nio: `Tests/NIOPosixTests/EventLoopCrashTests.swift:23`
 - `fdopen` (not System's): swift-log: `Tests/LoggingTests/StreamLogHandlerTest.swift:22`
 - `fflush` (not System's): swift-log: `Tests/LoggingTests/StreamLogHandlerTest.swift:22`
