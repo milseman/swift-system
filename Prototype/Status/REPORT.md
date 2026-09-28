@@ -366,3 +366,17 @@ credentials). `Sources/System/RawSpawn/RawSpawn.swift`:
 
 Status: 17 of the marker's 18 names are now documented; the 18th, `posix_spawnattr_getflags` (a test's), isn't
 wrapped, and the closure can call it. Tests: RawSpawnTests. XCTest 519, swift-testing 460, all passing.
+
+## 18. tzfile.h's paths: `68c6bec`
+
+Foundation reads TZDIR and TZDEFAULT through `_FoundationCShims`, since no Darwin module declares `<tzfile.h>`.
+CSystem's Darwin header now includes it; `FilePath.timeZoneDirectory` (TZDIR, `/var/db/timezone/zoneinfo`) and
+`FilePath.defaultTimeZoneFile` (TZDEFAULT, `/etc/localtime`), Darwin only. Rejected: counting them as the C
+library's (they're paths the system keeps).
+
+Also fixed: SocketOpenOptionsTests' `acceptSetsExactlyTheOptions` (syscalls-4's) accepted on a nonblocking
+listener right after `connect()` and failed with EAGAIN when the connection hadn't queued yet, in four recent
+full runs at a load average near 65; it now retries EAGAIN for up to two seconds (with a catch-all: pattern
+catches of `Errno.wouldBlock` in loops have crashed the compiler).
+
+Tests: TimeZoneFilesTests. XCTest 519, swift-testing 461 in 72 suites, all passing.

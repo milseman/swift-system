@@ -2,8 +2,8 @@
 
 Generated 2026-09-28 by `Utilities/adopter-coverage/status.sh`, from commits only; rerun it rather than editing this file. How each figure is made, and what it can't see, is in [How this is computed](#how-this-is-computed).
 
-- **System**: `coverage` @ `32ec619e` (Add CInterop.SpawnAttributes and SpawnFileActions, SpawnAttributes.withCAttributes(_:), SpawnFileAction.withCFileActions(_:_:), and ProcessID.spawn with cFileActions: and cAttributes:), which doesn't contain `system-next` @ `e8762dd1` (Merge branch 'coverage' into system-next); 14 commit(s) of `coverage` aren't in `system-next`.
-- **API delta**: `main` @ `1b452c29` → `HEAD` @ `32ec619e`.
+- **System**: `coverage` @ `68c6bec6` (Add FilePath.timeZoneDirectory and defaultTimeZoneFile for <tzfile.h>'s TZDIR and TZDEFAULT; make acceptSetsExactlyTheOptions wait for its connections), which doesn't contain `system-next` @ `e8762dd1` (Merge branch 'coverage' into system-next); 16 commit(s) of `coverage` aren't in `system-next`.
+- **API delta**: `main` @ `1b452c29` → `HEAD` @ `68c6bec6`.
 - **Adopters** (`../adopters`, branch `migrate-darwin`, against its merge base with `main`):
   - WasmKit @ `f5219fbf`, base `1e9c513d`
   - indexstore-db @ `cc966b89`, base `441ead77`
@@ -26,11 +26,11 @@ Copied verbatim from `Utilities/api-delta/regenerate.sh` (`BASE_REF=main`, `HEAD
 
 ## Summary
 
-- **2980 added, 0 removed, 0 changed** declarations in the macOS symbol graphs.
-  - SystemPackage: +2404 (448 → 2852 public symbols).
+- **2982 added, 0 removed, 0 changed** declarations in the macOS symbol graphs.
+  - SystemPackage: +2406 (448 → 2854 public symbols).
   - SystemSockets: +576 (0 → 576 public symbols). SystemSockets is a new module; it doesn't exist on `main`.
 - Availability of the additions:
-  - System 199: 2945
+  - System 199: 2947
   - System 199 + explicit OS floor: 26
   - System 0.0.1 + explicit OS floor: 8
   - System 0.0.1: 1
@@ -42,7 +42,7 @@ Copied verbatim from `Utilities/api-delta/regenerate.sh` (`BASE_REF=main`, `HEAD
 - 0 public declarations hidden from the graphs were removed.
 - No public declaration is conditional on `ENABLE_MOCKING` or `DEBUG`, so a release build has the same public API as the debug graphs.
 - Cross-check with `swift-api-digester`, which dumps every declaration, implicit ones included:
-  - SystemPackage: +2690 / -0 declarations, which is the graphs' +2404 plus 286 implicit ones; it has every graph addition; `-diagnose-sdk` reports no breaking changes.
+  - SystemPackage: +2692 / -0 declarations, which is the graphs' +2406 plus 286 implicit ones; it has every graph addition; `-diagnose-sdk` reports no breaking changes.
   - SystemSockets: +648 / -0 declarations, which is the graphs' +576 plus 71 implicit ones; explicit declarations it has that the graphs don't: `SocketAddress._withUnsafeMutablePointer(_:)`; it has every graph addition.
 - Nothing was removed or changed: no public declaration left the graphs or the source scan. The *changed* check compares declaration text (including default arguments), availability, conformances, generic and extension constraints, and access level, and pairs symbols by path when a signature change alters the USR.
 
@@ -70,7 +70,7 @@ Each row is a top-level type, and nested types count toward it: `FilePath.Resolu
 | SystemPackage | [`ExitStatus`](#systempackage-exitstatus) | 6 | 0 | 0 | S199 ×6 |
 | SystemPackage | [`ExtendedAttributeOptions`](#systempackage-extendedattributeoptions) | 5 | 0 | 0 | S199 ×5 |
 | SystemPackage | [`FileDescriptor`](#systempackage-filedescriptor) | 242 | 0 | 0 | S199 ×229, S0.0.1+OS ×8, S199+OS ×5 |
-| SystemPackage | [`FilePath`](#systempackage-filepath) | 437 | 0 | 0 | S199 ×423, S199+OS ×14 |
+| SystemPackage | [`FilePath`](#systempackage-filepath) | 439 | 0 | 0 | S199 ×425, S199+OS ×14 |
 | SystemPackage | [`FilePermissions`](#systempackage-filepermissions) | 1 | 0 | 0 | S199 ×1 |
 | SystemPackage | [`FileStream`](#systempackage-filestream) | 32 | 0 | 0 | S199 ×32 |
 | SystemPackage | [`FileSystemID`](#systempackage-filesystemid) | 8 | 0 | 0 | S199 ×8 |
@@ -139,7 +139,7 @@ Each row is a top-level type, and nested types count toward it: `FilePath.Resolu
 | SystemSockets | [`sockaddr_storage (extends Darwin)`](#systemsockets-sockaddr-storage-extends-darwin) | 3 | 0 | 0 | S199 ×3 |
 | SystemSockets | [`sockaddr_un (extends Darwin)`](#systemsockets-sockaddr-un-extends-darwin) | 5 | 0 | 0 | S199 ×5 |
 | SystemSockets | [`sockaddr_vm (extends Darwin)`](#systemsockets-sockaddr-vm-extends-darwin) | 5 | 0 | 0 | S199 ×5 |
-| **Total** | | **2980** | **0** | **0** | |
+| **Total** | | **2982** | **0** | **0** | |
 
 # 2. Adoption
 
@@ -371,7 +371,7 @@ Verbatim, not rerun: each package's own test totals (at the start, and the lates
 
 # 3. Gaps
 
-Every `SYSTEM-GAP:` marker in the packages' sources at the commits above: 51 markers in 34 files, of which 0 are outside the packages' targets. Each marker's text is read for the C interfaces it names (see [How this is computed](#how-this-is-computed)); a marker that names none is counted under its phrase, with the Darwin names imported under it deciding its status. Status is against System at `32ec619e`:
+Every `SYSTEM-GAP:` marker in the packages' sources at the commits above: 51 markers in 34 files, of which 0 are outside the packages' targets. Each marker's text is read for the C interfaces it names (see [How this is computed](#how-this-is-computed)); a marker that names none is counted under its phrase, with the Darwin names imported under it deciding its status. Status is against System at `68c6bec6`:
 
 - **missing**: System documents none of it (or only some: *k of n*).
 - **covered**: a System declaration's doc comment names it as the corresponding C interface, a CInterop alias names it, or, for `X members`, System gives `CInterop` alias of `X` Swift-named accessors. The marker is stale, or the package hasn't adopted the API yet. *Not yet in `system-next`* means only this branch has it.
@@ -379,7 +379,7 @@ Every `SYSTEM-GAP:` marker in the packages' sources at the commits above: 51 mar
 
 A family marked *(provisional)* is a C-library layer above the OS (math, stdio, locales, string.h and ctype.h) that System wraps provisionally, in `Sources/System/Provisional/`, since it may move to the standard library; it counts like everything else.
 
-Interfaces: 16 missing, 59 covered, 1 unread, 76 in all.
+Interfaces: 14 missing, 61 covered, 1 unread, 76 in all.
 
 | # | Interface | Status | Files | Packages | Family |
 |---:|---|---|---:|---|---|
@@ -392,7 +392,7 @@ Interfaces: 16 missing, 59 covered, 1 unread, 76 in all.
 | 7 | `memcmp` | covered (doc comment) | 2 | swift-syntax | string.h |
 | 8 | posix_spawn's raw attributes and file actions | missing (17 of 18 names covered) | 2 | swift-subprocess | posix_spawn |
 | 9 | `pow` | covered (doc comment; not yet in `system-next`) | 2 | swift-foundation | libm |
-| 10 | `TZDIR` | missing | 2 | swift-foundation | tzfile.h |
+| 10 | `TZDIR` | covered (doc comment; not yet in `system-next`) | 2 | swift-foundation | tzfile.h |
 | 11 | `UTIME_NOW` | covered (doc comment) | 2 | swift-nio | file times |
 | 12 | `UTIME_OMIT` | covered (doc comment; not yet in `system-next`) | 2 | swift-nio | file times |
 | 13 | `XATTR_MAXNAMELEN` | covered (doc comment; not yet in `system-next`) | 2 | swift-nio | extended attributes |
@@ -458,7 +458,7 @@ Interfaces: 16 missing, 59 covered, 1 unread, 76 in all.
 | 73 | `time` | covered (as `clock_gettime`) | 1 | swift-log | calendar time |
 | 74 | `time_t` | missing | 1 | swift-certificates | calendar time |
 | 75 | `tm` | covered (doc comment) | 1 | swift-certificates | calendar time |
-| 76 | `TZDEFAULT` | missing | 1 | swift-foundation | tzfile.h |
+| 76 | `TZDEFAULT` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | tzfile.h |
 
 ## Missing, by family
 
@@ -467,17 +467,16 @@ The missing interfaces above, grouped, largest first: the order to fill them in.
 | # | Family | Files | Packages | Interfaces |
 |---:|---|---:|---|---|
 | 1 | posix_spawn | 2 | swift-subprocess | posix_spawn's raw attributes and file actions |
-| 2 | tzfile.h | 2 | swift-foundation | `TZDIR`, `TZDEFAULT` |
-| 3 | C struct members (MemberImportVisibility) | 1 | swift-foundation | `malloc_type_descriptor_v0_t members` |
-| 4 | calendar time | 1 | swift-certificates | `time_t` |
-| 5 | dynamic loader | 1 | swift-tools-support-core | `dlerror` |
-| 6 | gettimeofday before macOS 13 | 1 | swift-driver | gettimeofday before macOS 13 |
-| 7 | libmalloc | 1 | swift-foundation | `malloc_type_calloc`, `malloc_type_descriptor_v0_t`, `malloc_type_malloc`, `malloc_type_realloc` |
-| 8 | mkstemps | 1 | swift-tools-support-core | `mkstemps` |
-| 9 | O_DSYNC | 1 | WasmKit | `O_DSYNC` |
-| 10 | readpassphrase | 1 | swift-package-manager | `readpassphrase` |
-| 11 | string.h and ctype.h (provisional) | 1 | swift-driver | `strsignal` |
-| 12 | temporary files | 1 | swift-foundation | `mktemp` |
+| 2 | C struct members (MemberImportVisibility) | 1 | swift-foundation | `malloc_type_descriptor_v0_t members` |
+| 3 | calendar time | 1 | swift-certificates | `time_t` |
+| 4 | dynamic loader | 1 | swift-tools-support-core | `dlerror` |
+| 5 | gettimeofday before macOS 13 | 1 | swift-driver | gettimeofday before macOS 13 |
+| 6 | libmalloc | 1 | swift-foundation | `malloc_type_calloc`, `malloc_type_descriptor_v0_t`, `malloc_type_malloc`, `malloc_type_realloc` |
+| 7 | mkstemps | 1 | swift-tools-support-core | `mkstemps` |
+| 8 | O_DSYNC | 1 | WasmKit | `O_DSYNC` |
+| 9 | readpassphrase | 1 | swift-package-manager | `readpassphrase` |
+| 10 | string.h and ctype.h (provisional) | 1 | swift-driver | `strsignal` |
+| 11 | temporary files | 1 | swift-foundation | `mktemp` |
 
 ## Markers that name no C interface
 
@@ -496,7 +495,7 @@ The missing interfaces above, grouped, largest first: the order to fill them in.
 - `memcmp` (covered): swift-syntax: `Sources/SwiftCompilerPluginMessageHandling/JSON/JSONDecoding.swift:16`; swift-syntax: `Sources/SwiftSyntax/SyntaxText.swift:15`; swift-syntax: `Sources/SwiftSyntax/SyntaxText.swift:27`
 - posix_spawn's raw attributes and file actions (missing): swift-subprocess: `Sources/Subprocess/Platforms/Subprocess+Darwin.swift:14`; swift-subprocess: `Tests/SubprocessTests/DarwinTests.swift:15`
 - `pow` (covered): swift-foundation: `Sources/FoundationEssentials/Calendar/Calendar_Astronomy.swift:17`; swift-foundation: `Tests/FoundationInternationalizationTests/Formatting/DiscreteFormatStyleTestUtilities.swift:23`
-- `TZDIR` (missing): swift-foundation: `Sources/FoundationEssentials/TimeZone/TimeZone.swift:405`; swift-foundation: `Sources/FoundationEssentials/TimeZone/TimeZone_Cache.swift:34`
+- `TZDIR` (covered): swift-foundation: `Sources/FoundationEssentials/TimeZone/TimeZone.swift:405`; swift-foundation: `Sources/FoundationEssentials/TimeZone/TimeZone_Cache.swift:34`
 - `UTIME_NOW` (covered): swift-nio: `Sources/NIOFS/FileInfo.swift:18`; swift-nio: `Sources/_NIOFileSystem/FileInfo.swift:18`
 - `UTIME_OMIT` (covered): swift-nio: `Sources/NIOFS/FileInfo.swift:18`; swift-nio: `Sources/_NIOFileSystem/FileInfo.swift:18`
 - `XATTR_MAXNAMELEN` (covered): swift-nio: `Sources/NIOFS/FileSystemError+Syscall.swift:18`; swift-nio: `Sources/_NIOFileSystem/FileSystemError+Syscall.swift:18`
@@ -562,7 +561,7 @@ The missing interfaces above, grouped, largest first: the order to fill them in.
 - `time` (covered): swift-log: `Sources/Logging/Handlers/StreamLogHandler.swift:23`
 - `time_t` (missing): swift-certificates: `Tests/X509Tests/TimeTests.swift:19`
 - `tm` (covered): swift-certificates: `Tests/X509Tests/TimeTests.swift:19`
-- `TZDEFAULT` (missing): swift-foundation: `Sources/FoundationEssentials/TimeZone/TimeZone_Cache.swift:34`
+- `TZDEFAULT` (covered): swift-foundation: `Sources/FoundationEssentials/TimeZone/TimeZone_Cache.swift:34`
 
 </details>
 
