@@ -25,6 +25,7 @@ import Darwin
 extension FilePath {
   /// Options for removing a file hierarchy.
   ///
+  /// The corresponding C type is `removefile_flags_t`.
   /// - Note: Only available on Darwin.
   @frozen
   public struct RemoveOptions: OptionSet, Sendable, Hashable, Codable {
@@ -174,8 +175,11 @@ extension FilePath {
   /// or ``Errno/canceled`` if it stopped at another stage.
   ///
   /// The corresponding C function is `removefile`,
-  /// with `REMOVEFILE_RECURSIVE`
-  /// and the confirm, status, and error callbacks.
+  /// with `REMOVEFILE_RECURSIVE` and a `removefile_state_t`
+  /// whose confirm, status, and error callbacks report to `progress`.
+  /// The corresponding C functions for the state are
+  /// `removefile_state_alloc`, `removefile_state_set`,
+  /// `removefile_state_get`, and `removefile_state_free`.
   /// - Note: Only available on Darwin.
   @_alwaysEmitIntoClient
   public func removeRecursively(
@@ -203,8 +207,11 @@ extension FilePath {
   /// See ``removeRecursively(options:progress:)``.
   ///
   /// The corresponding C function is `removefile`,
-  /// with `REMOVEFILE_RECURSIVE`
-  /// and the confirm, status, and error callbacks.
+  /// with `REMOVEFILE_RECURSIVE` and a `removefile_state_t`
+  /// whose confirm, status, and error callbacks report to `progress`.
+  /// The corresponding C functions for the state are
+  /// `removefile_state_alloc`, `removefile_state_set`,
+  /// `removefile_state_get`, and `removefile_state_free`.
   /// - Note: Only available on Darwin.
   @_alwaysEmitIntoClient
   public static func removeRecursively(
@@ -294,8 +301,8 @@ extension FilePath {
   /// See ``removeRecursively(options:progress:)``.
   ///
   /// The corresponding C function is `removefileat`,
-  /// with `REMOVEFILE_RECURSIVE`
-  /// and the confirm, status, and error callbacks.
+  /// with `REMOVEFILE_RECURSIVE` and a `removefile_state_t`
+  /// whose confirm, status, and error callbacks report to `progress`.
   /// - Note: Only available on Darwin.
   @_alwaysEmitIntoClient
   public func removeRecursively(
@@ -326,8 +333,8 @@ extension FilePath {
   /// See ``removeRecursively(options:progress:)``.
   ///
   /// The corresponding C function is `removefileat`,
-  /// with `REMOVEFILE_RECURSIVE`
-  /// and the confirm, status, and error callbacks.
+  /// with `REMOVEFILE_RECURSIVE` and a `removefile_state_t`
+  /// whose confirm, status, and error callbacks report to `progress`.
   /// - Note: Only available on Darwin.
   @_alwaysEmitIntoClient
   public static func removeRecursively(

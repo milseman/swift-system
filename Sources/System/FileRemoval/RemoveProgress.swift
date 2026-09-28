@@ -25,7 +25,9 @@ extension FilePath {
   /// See ``FilePath/removeRecursively(options:progress:)``.
   ///
   /// The corresponding C type is `removefile_callback_t`,
-  /// which gets the path as an argument.
+  /// which gets the path as an argument,
+  /// and whose context is the state's `REMOVEFILE_STATE_CONFIRM_CONTEXT`,
+  /// `REMOVEFILE_STATE_STATUS_CONTEXT`, or `REMOVEFILE_STATE_ERROR_CONTEXT`.
   /// - Note: Only available on Darwin.
   @frozen
   public struct RemoveProgress: Hashable, Sendable {
