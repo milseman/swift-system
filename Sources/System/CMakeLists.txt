@@ -231,7 +231,9 @@ target_sources(SystemPackage PRIVATE
 target_sources(SystemPackage PRIVATE
   Internals/Constants+Provisional.swift
   Internals/Syscalls+Provisional.swift
+  Internals/Syscalls+ProvisionalLocale.swift
   Internals/Syscalls+ProvisionalMath.swift
+  Provisional/Provisional+Locale.swift
   Provisional/Provisional+Math.swift
   Provisional/Provisional+POSIXErrorCode.swift
   Provisional/Provisional+Stdio.swift)
