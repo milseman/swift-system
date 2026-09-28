@@ -92,6 +92,8 @@ struct SystemSamples: ParsableCommand {
       IfConfig.self,
       XAttr.self,
       UUIDGen.self,
+      // More system call samples
+      PtyRun.self,
       // Darwin samples
       CopyFile.self,
       Sysctl.self,

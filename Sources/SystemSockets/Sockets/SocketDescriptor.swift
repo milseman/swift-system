@@ -170,6 +170,7 @@ extension SocketDescriptor {
       #if SYSTEM_PACKAGE_DARWIN
       case .system: return "system"
       case .networkDevice: return "networkDevice"
+      case .vsock: return "vsock"
       #endif
       default: return "Domain(\(rawValue))"
       }
