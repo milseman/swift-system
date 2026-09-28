@@ -419,3 +419,24 @@ Foundation's Data allocates with libmalloc's typed calls, describing its buffers
 
 Status: 72 of 76 interfaces covered; missing are posix_spawn's 18th name, `mktemp` and `readpassphrase`.
 Tests: TypedAllocationTest. XCTest 532 (4 skipped), swift-testing 461 in 72 suites, all passing.
+
+## 21. The last three names: `34aa3c3`
+
+- `TerminalDescriptor.readPassphrase(prompt:into:options:)` (readpassphrase, SwiftPM's registry login) reads into
+  the caller's buffer, so it can be cleared with `Memory.secureZero`; `readPassphrase(prompt:maxByteCount:options:)`
+  returns a String and clears its own buffer. `PassphraseOptions` for the RPP_* flags. No `retryOnInterrupt`:
+  readpassphrase restores the terminal and runs the handler of a SIGINT or the like, and if that returns, EINTR
+  means the user asked to stop; retrying, the convention's default, would prompt again.
+- `FilePath.makeUniqueFile(options:permissions:retryOnInterrupt:)` and `(relativeTo:...)`, for Foundation's
+  temporary file with a chosen mode relative to a directory: mktemp makes the name, open or openat creates the
+  file with O_EXCL, and a taken name is tried again (up to 100 times), as mkstemp does inside; the permissions
+  pass through the creation mask, which mkostemp's 0600 and a later fchmod don't. Relative to a directory, mktemp
+  makes only the last component, since it checks names against the working directory. mktemp goes through a
+  CSystem shim, since the SDK deprecates it. Darwin only: glibc's and OpenBSD's linkers warn at every link of a
+  program that calls mktemp. Rejected: `makeUniqueName()` for mktemp alone; looping forever, as Foundation does.
+- `SpawnAttributes.Flags(of:)` and `store(in:)` (posix_spawnattr_getflags, setflags) read and replace C
+  attributes' flags, as Subprocess's configurator test does to add POSIX_SPAWN_SETSID.
+
+Status: 75 of 76 interfaces covered, none missing; the one left is *unread*: Subprocess's "raw posix_spawn path"
+marker, whose other half is spawning with other credentials (section 22). Tests: ReadPassphraseTest,
+UniqueFilesWithPermissionsTest, RawSpawnTests. XCTest 544 (4 skipped), swift-testing 461, all passing.
