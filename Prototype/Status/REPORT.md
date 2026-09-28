@@ -98,7 +98,7 @@ opens its chains relative to a directory descriptor.
 
 Tests: CompileTimeLimitsTest, SearchAccessModeTest. XCTest 478 (4 skipped), swift-testing 437, all passing.
 
-## 4. Exit codes: `7416b21`, `d0f2ac3`
+## 4. Exit codes: `7416b21`, `d630505`
 
 swift-argument-parser imports Darwin for `EX_USAGE`, the code its validation failures exit with.
 
@@ -113,7 +113,7 @@ swift-argument-parser imports Darwin for `EX_USAGE`, the code its validation fai
   (public), and which System's own samples use, so every file importing both would be ambiguous; and constants
   without a type, which `exit(_:)` couldn't take.
 - The overloads make DocC's `exit(_:)` links ambiguous, so ProcessExit.swift's now say ``exit(_:)-(CInt)``;
-  DocC 6.2 wants the nested type qualified (``exit(_:)-(ProcessID.ExitCode)``), which `d0f2ac3` fixed after
+  DocC 6.2 wants the nested type qualified (``exit(_:)-(ProcessID.ExitCode)``), which `d630505` fixed after
   api-delta's DocC diagnostics showed it.
 - The sysexits codes are off on WASI, whose libc may lack `<sysexits.h>`.
 
