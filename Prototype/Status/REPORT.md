@@ -329,3 +329,22 @@ file importing both would be ambiguous); generics over BinaryFloatingPoint, whic
 
 Tests: ProvisionalMathTests. XCTest 510, swift-testing 460 in 71 suites (one full run hit the known accept
 flake; the rerun passed).
+
+## 16. C locales, provisionally: `63f97d8`
+
+Foundation parses and compares in the POSIX locale (strtod_l, strtof_l, strncasecmp_l, locale_t), and its tests
+set the global locale (setlocale, LC_ALL). `Sources/System/Provisional/Provisional+Locale.swift`, Darwin only:
+
+- `CInterop.Locale` (locale_t) and `CLocale`, a handle over `locale_t?`: `.posix` (LC_C_LOCALE) and `.global`
+  (LC_GLOBAL_LOCALE); `named(_:categories:base:)` (newlocale) and `free()`; `Category` and `Categories` (the
+  LC_*_MASKs, with `.all` for LC_ALL_MASK, which Swift can't import); `globalName(for:)` and `setGlobal(_:for:)`
+  (setlocale); `parseDouble`, `parseFloat` (value and bytes taken) and `compareIgnoringCase(_:_:maxByteCount:)`.
+  Rejected: the name `Locale` (Foundation's); a Swift `String` API, which Foundation's C-string callers don't
+  want.
+- Found: in the macOS 26 SDK these calls sit in explicit submodules of `_DarwinFoundation2`/`_DarwinFoundation3`
+  that `import Darwin` leaves out, so CSystem's Darwin header includes `<locale.h>` and the `<xlocale.h>`
+  headers.
+
+Tests: ProvisionalLocaleTest. XCTest 515, swift-testing 460. One full run failed the malloc lane's
+`reallocateFreeingOnFailureFreesTheBlock` (a zone's block count, under parallel tests); it passed alone three
+times and in the rerun. It isn't this lane's.

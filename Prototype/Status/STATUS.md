@@ -2,8 +2,8 @@
 
 Generated 2026-09-28 by `Utilities/adopter-coverage/status.sh`, from commits only; rerun it rather than editing this file. How each figure is made, and what it can't see, is in [How this is computed](#how-this-is-computed).
 
-- **System**: `coverage` @ `9166bd57` (Add Math, provisionally, with the C math library's elementary functions for Double and Float), which doesn't contain `system-next` @ `e8762dd1` (Merge branch 'coverage' into system-next); 10 commit(s) of `coverage` aren't in `system-next`.
-- **API delta**: `main` @ `1b452c29` → `HEAD` @ `9166bd57`.
+- **System**: `coverage` @ `63f97d83` (Add CLocale, provisionally, for the C library's locales: newlocale, freelocale, setlocale, strtod_l, strtof_l and strncasecmp_l), which doesn't contain `system-next` @ `e8762dd1` (Merge branch 'coverage' into system-next); 12 commit(s) of `coverage` aren't in `system-next`.
+- **API delta**: `main` @ `1b452c29` → `HEAD` @ `63f97d83`.
 - **Adopters** (`../adopters`, branch `migrate-darwin`, against its merge base with `main`):
   - WasmKit @ `f5219fbf`, base `1e9c513d`
   - indexstore-db @ `cc966b89`, base `441ead77`
@@ -26,11 +26,11 @@ Copied verbatim from `Utilities/api-delta/regenerate.sh` (`BASE_REF=main`, `HEAD
 
 ## Summary
 
-- **2941 added, 0 removed, 0 changed** declarations in the macOS symbol graphs.
-  - SystemPackage: +2365 (448 → 2813 public symbols).
+- **2974 added, 0 removed, 0 changed** declarations in the macOS symbol graphs.
+  - SystemPackage: +2398 (448 → 2846 public symbols).
   - SystemSockets: +576 (0 → 576 public symbols). SystemSockets is a new module; it doesn't exist on `main`.
 - Availability of the additions:
-  - System 199: 2906
+  - System 199: 2939
   - System 199 + explicit OS floor: 26
   - System 0.0.1 + explicit OS floor: 8
   - System 0.0.1: 1
@@ -42,7 +42,7 @@ Copied verbatim from `Utilities/api-delta/regenerate.sh` (`BASE_REF=main`, `HEAD
 - 0 public declarations hidden from the graphs were removed.
 - No public declaration is conditional on `ENABLE_MOCKING` or `DEBUG`, so a release build has the same public API as the debug graphs.
 - Cross-check with `swift-api-digester`, which dumps every declaration, implicit ones included:
-  - SystemPackage: +2646 / -0 declarations, which is the graphs' +2365 plus 281 implicit ones; it has every graph addition; `-diagnose-sdk` reports no breaking changes.
+  - SystemPackage: +2684 / -0 declarations, which is the graphs' +2398 plus 286 implicit ones; it has every graph addition; `-diagnose-sdk` reports no breaking changes.
   - SystemSockets: +648 / -0 declarations, which is the graphs' +576 plus 71 implicit ones; explicit declarations it has that the graphs don't: `SocketAddress._withUnsafeMutablePointer(_:)`; it has every graph addition.
 - Nothing was removed or changed: no public declaration left the graphs or the source scan. The *changed* check compares declaration text (including default arguments), availability, conformances, generic and extension constraints, and access level, and pairs symbols by path when a signature change alters the USR.
 
@@ -54,7 +54,8 @@ Each row is a top-level type, and nested types count toward it: `FilePath.Resolu
 |---|---|---:|---:|---:|---|
 | SystemPackage | [`BaudRate`](#systempackage-baudrate) | 26 | 0 | 0 | S199 ×26 |
 | SystemPackage | [`BrokenDownTime`](#systempackage-brokendowntime) | 29 | 0 | 0 | S199 ×29 |
-| SystemPackage | [`CInterop`](#systempackage-cinterop) | 39 | 0 | 0 | S199 ×39 |
+| SystemPackage | [`CInterop`](#systempackage-cinterop) | 40 | 0 | 0 | S199 ×40 |
+| SystemPackage | [`CLocale`](#systempackage-clocale) | 32 | 0 | 0 | S199 ×32 |
 | SystemPackage | [`ChildProcess`](#systempackage-childprocess) | 9 | 0 | 0 | S199 ×9 |
 | SystemPackage | [`ClockID`](#systempackage-clockid) | 13 | 0 | 0 | S199 ×13 |
 | SystemPackage | [`ControlCharacter`](#systempackage-controlcharacter) | 21 | 0 | 0 | S199 ×21 |
@@ -138,7 +139,7 @@ Each row is a top-level type, and nested types count toward it: `FilePath.Resolu
 | SystemSockets | [`sockaddr_storage (extends Darwin)`](#systemsockets-sockaddr-storage-extends-darwin) | 3 | 0 | 0 | S199 ×3 |
 | SystemSockets | [`sockaddr_un (extends Darwin)`](#systemsockets-sockaddr-un-extends-darwin) | 5 | 0 | 0 | S199 ×5 |
 | SystemSockets | [`sockaddr_vm (extends Darwin)`](#systemsockets-sockaddr-vm-extends-darwin) | 5 | 0 | 0 | S199 ×5 |
-| **Total** | | **2941** | **0** | **0** | |
+| **Total** | | **2974** | **0** | **0** | |
 
 # 2. Adoption
 
@@ -370,7 +371,7 @@ Verbatim, not rerun: each package's own test totals (at the start, and the lates
 
 # 3. Gaps
 
-Every `SYSTEM-GAP:` marker in the packages' sources at the commits above: 51 markers in 34 files, of which 0 are outside the packages' targets. Each marker's text is read for the C interfaces it names (see [How this is computed](#how-this-is-computed)); a marker that names none is counted under its phrase, with the Darwin names imported under it deciding its status. Status is against System at `9166bd57`:
+Every `SYSTEM-GAP:` marker in the packages' sources at the commits above: 51 markers in 34 files, of which 0 are outside the packages' targets. Each marker's text is read for the C interfaces it names (see [How this is computed](#how-this-is-computed)); a marker that names none is counted under its phrase, with the Darwin names imported under it deciding its status. Status is against System at `63f97d83`:
 
 - **missing**: System documents none of it (or only some: *k of n*).
 - **covered**: a System declaration's doc comment names it as the corresponding C interface, a CInterop alias names it, or, for `X members`, System gives `CInterop` alias of `X` Swift-named accessors. The marker is stale, or the package hasn't adopted the API yet. *Not yet in `system-next`* means only this branch has it.
@@ -378,7 +379,7 @@ Every `SYSTEM-GAP:` marker in the packages' sources at the commits above: 51 mar
 
 A family marked *(provisional)* is a C-library layer above the OS (math, stdio, locales, string.h and ctype.h) that System wraps provisionally, in `Sources/System/Provisional/`, since it may move to the standard library; it counts like everything else.
 
-Interfaces: 22 missing, 53 covered, 1 unread, 76 in all.
+Interfaces: 16 missing, 59 covered, 1 unread, 76 in all.
 
 | # | Interface | Status | Files | Packages | Family |
 |---:|---|---|---:|---|---|
@@ -428,8 +429,8 @@ Interfaces: 22 missing, 53 covered, 1 unread, 76 in all.
 | 44 | `fwrite` | covered (doc comment) | 1 | swift-log | C stdio streams |
 | 45 | gettimeofday before macOS 13 | missing (1 of 2 names covered) | 1 | swift-driver | gettimeofday before macOS 13 |
 | 46 | `gmtime_r` | covered (doc comment) | 1 | swift-certificates | calendar time |
-| 47 | `LC_ALL` | missing | 1 | swift-foundation | locale (provisional) |
-| 48 | `locale_t` | missing | 1 | swift-foundation | locale (provisional) |
+| 47 | `LC_ALL` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | LC_ALL |
+| 48 | `locale_t` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | xlocale |
 | 49 | `localtime` | covered (as `localtime_r`) | 1 | swift-log | calendar time |
 | 50 | `log` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | libm |
 | 51 | `malloc_type_calloc` | missing | 1 | swift-foundation | libmalloc |
@@ -445,15 +446,15 @@ Interfaces: 22 missing, 53 covered, 1 unread, 76 in all.
 | 61 | raw posix_spawn path | unread | 1 | swift-subprocess | raw posix_spawn path |
 | 62 | readlinkat into a caller's buffer (System's readSymbolicLink returns a FilePath, which dro | covered (doc comment) | 1 | WasmKit | readlinkat into a caller's buffer (System's readSymbolicLink returns a FilePath, which dro |
 | 63 | `readpassphrase` | missing | 1 | swift-package-manager | readpassphrase |
-| 64 | `setlocale` | missing | 1 | swift-foundation | locale (provisional) |
+| 64 | `setlocale` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | setlocale |
 | 65 | `setvbuf` | covered (doc comment) | 1 | swift-log | C stdio streams |
 | 66 | `sin` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | libm |
 | 67 | `stdout` | covered (doc comment) | 1 | swift-log | C stdio streams |
 | 68 | `strftime` | covered (doc comment) | 1 | swift-log | calendar time |
-| 69 | `strncasecmp_l` | missing | 1 | swift-foundation | locale (provisional) |
+| 69 | `strncasecmp_l` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | xlocale |
 | 70 | `strsignal` | missing | 1 | swift-driver | string.h and ctype.h (provisional) |
-| 71 | `strtod_l` | missing | 1 | swift-foundation | locale (provisional) |
-| 72 | `strtof_l` | missing | 1 | swift-foundation | locale (provisional) |
+| 71 | `strtod_l` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | xlocale |
+| 72 | `strtof_l` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | xlocale |
 | 73 | `time` | covered (as `clock_gettime`) | 1 | swift-log | calendar time |
 | 74 | `time_t` | missing | 1 | swift-certificates | calendar time |
 | 75 | `tm` | covered (doc comment) | 1 | swift-certificates | calendar time |
@@ -465,19 +466,18 @@ The missing interfaces above, grouped, largest first: the order to fill them in.
 
 | # | Family | Files | Packages | Interfaces |
 |---:|---|---:|---|---|
-| 1 | locale (provisional) | 2 | swift-foundation | `LC_ALL`, `locale_t`, `setlocale`, `strncasecmp_l`, `strtod_l`, `strtof_l` |
-| 2 | posix_spawn | 2 | swift-subprocess | posix_spawn's raw attributes and file actions |
-| 3 | tzfile.h | 2 | swift-foundation | `TZDIR`, `TZDEFAULT` |
-| 4 | C struct members (MemberImportVisibility) | 1 | swift-foundation | `malloc_type_descriptor_v0_t members` |
-| 5 | calendar time | 1 | swift-certificates | `time_t` |
-| 6 | dynamic loader | 1 | swift-tools-support-core | `dlerror` |
-| 7 | gettimeofday before macOS 13 | 1 | swift-driver | gettimeofday before macOS 13 |
-| 8 | libmalloc | 1 | swift-foundation | `malloc_type_calloc`, `malloc_type_descriptor_v0_t`, `malloc_type_malloc`, `malloc_type_realloc` |
-| 9 | mkstemps | 1 | swift-tools-support-core | `mkstemps` |
-| 10 | O_DSYNC | 1 | WasmKit | `O_DSYNC` |
-| 11 | readpassphrase | 1 | swift-package-manager | `readpassphrase` |
-| 12 | string.h and ctype.h (provisional) | 1 | swift-driver | `strsignal` |
-| 13 | temporary files | 1 | swift-foundation | `mktemp` |
+| 1 | posix_spawn | 2 | swift-subprocess | posix_spawn's raw attributes and file actions |
+| 2 | tzfile.h | 2 | swift-foundation | `TZDIR`, `TZDEFAULT` |
+| 3 | C struct members (MemberImportVisibility) | 1 | swift-foundation | `malloc_type_descriptor_v0_t members` |
+| 4 | calendar time | 1 | swift-certificates | `time_t` |
+| 5 | dynamic loader | 1 | swift-tools-support-core | `dlerror` |
+| 6 | gettimeofday before macOS 13 | 1 | swift-driver | gettimeofday before macOS 13 |
+| 7 | libmalloc | 1 | swift-foundation | `malloc_type_calloc`, `malloc_type_descriptor_v0_t`, `malloc_type_malloc`, `malloc_type_realloc` |
+| 8 | mkstemps | 1 | swift-tools-support-core | `mkstemps` |
+| 9 | O_DSYNC | 1 | WasmKit | `O_DSYNC` |
+| 10 | readpassphrase | 1 | swift-package-manager | `readpassphrase` |
+| 11 | string.h and ctype.h (provisional) | 1 | swift-driver | `strsignal` |
+| 12 | temporary files | 1 | swift-foundation | `mktemp` |
 
 ## Markers that name no C interface
 
@@ -533,8 +533,8 @@ The missing interfaces above, grouped, largest first: the order to fill them in.
 - `fwrite` (covered): swift-log: `Tests/LoggingTests/StreamLogHandlerTest.swift:22`
 - gettimeofday before macOS 13 (missing): swift-driver: `Sources/SwiftDriver/Utilities/DateAdditions.swift:20`; swift-driver: `Sources/SwiftDriver/Utilities/DateAdditions.swift:21`
 - `gmtime_r` (covered): swift-certificates: `Tests/X509Tests/TimeTests.swift:19`
-- `LC_ALL` (missing): swift-foundation: `Tests/FoundationEssentialsTests/JSONEncoderTests.swift:17`
-- `locale_t` (missing): swift-foundation: `Sources/FoundationEssentials/Platform.swift:22`
+- `LC_ALL` (covered): swift-foundation: `Tests/FoundationEssentialsTests/JSONEncoderTests.swift:17`
+- `locale_t` (covered): swift-foundation: `Sources/FoundationEssentials/Platform.swift:22`
 - `localtime` (covered): swift-log: `Sources/Logging/Handlers/StreamLogHandler.swift:23`
 - `log` (covered): swift-foundation: `Tests/FoundationInternationalizationTests/Formatting/DiscreteFormatStyleTestUtilities.swift:23`
 - `malloc_type_calloc` (missing): swift-foundation: `Sources/FoundationEssentials/Data/Representations/DataStorage.swift:16`
@@ -550,15 +550,15 @@ The missing interfaces above, grouped, largest first: the order to fill them in.
 - raw posix_spawn path (unread): swift-subprocess: `Sources/Subprocess/Platforms/Subprocess+Darwin.swift:306`
 - readlinkat into a caller's buffer (System's readSymbolicLink returns a FilePath, which dro (covered): WasmKit: `Sources/WASI/Platform/PAL/PALFileDescriptor.swift:10`
 - `readpassphrase` (missing): swift-package-manager: `Sources/PackageRegistryCommand/PackageRegistryCommand+Auth.swift:27`
-- `setlocale` (missing): swift-foundation: `Tests/FoundationEssentialsTests/JSONEncoderTests.swift:17`
+- `setlocale` (covered): swift-foundation: `Tests/FoundationEssentialsTests/JSONEncoderTests.swift:17`
 - `setvbuf` (covered): swift-log: `Tests/LoggingTests/StreamLogHandlerTest.swift:22`
 - `sin` (covered): swift-foundation: `Sources/FoundationEssentials/Calendar/Calendar_Astronomy.swift:17`
 - `stdout` (covered): swift-log: `Sources/Logging/Handlers/StreamLogHandler.swift:17`
 - `strftime` (covered): swift-log: `Sources/Logging/Handlers/StreamLogHandler.swift:23`
-- `strncasecmp_l` (missing): swift-foundation: `Sources/FoundationEssentials/Platform.swift:22`
+- `strncasecmp_l` (covered): swift-foundation: `Sources/FoundationEssentials/Platform.swift:22`
 - `strsignal` (missing): swift-driver: `Sources/SwiftDriver/Driver/ToolExecutionDelegate.swift:17`
-- `strtod_l` (missing): swift-foundation: `Sources/FoundationEssentials/Platform.swift:22`
-- `strtof_l` (missing): swift-foundation: `Sources/FoundationEssentials/Platform.swift:22`
+- `strtod_l` (covered): swift-foundation: `Sources/FoundationEssentials/Platform.swift:22`
+- `strtof_l` (covered): swift-foundation: `Sources/FoundationEssentials/Platform.swift:22`
 - `time` (covered): swift-log: `Sources/Logging/Handlers/StreamLogHandler.swift:23`
 - `time_t` (missing): swift-certificates: `Tests/X509Tests/TimeTests.swift:19`
 - `tm` (covered): swift-certificates: `Tests/X509Tests/TimeTests.swift:19`
