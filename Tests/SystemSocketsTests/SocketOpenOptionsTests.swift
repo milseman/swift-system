@@ -83,16 +83,34 @@ private struct SocketOpenOptionsTests {
       return client
     }
 
+    // A connection can reach the listener's queue a moment after connect()
+    // returns, and the listener doesn't wait for it, so accept retries a
+    // while. (A catch-all, since catching Errno.wouldBlock by pattern in a
+    // loop has crashed the compiler.)
+    func accepting<T>(_ accept: () throws -> T) throws -> T {
+      for _ in 0..<2000 {
+        do {
+          return try accept()
+        } catch {
+          guard (error as? Errno) == .wouldBlock else { throw error }
+          usleep(1000)
+        }
+      }
+      return try accept()
+    }
+
     let first = try connect()
     defer { try? first.close() }
-    let blocking = try listener.accept(options: [])
+    let blocking = try accepting { try listener.accept(options: []) }
     defer { try? blocking.close() }
     #expect(try flags(of: blocking) == (false, false))
 
     let second = try connect()
     defer { try? second.close() }
     var client = SocketAddress()
-    let nonBlocking = try listener.accept(client: &client, options: [.closeOnExec, .nonBlocking])
+    let nonBlocking = try accepting {
+      try listener.accept(client: &client, options: [.closeOnExec, .nonBlocking])
+    }
     defer { try? nonBlocking.close() }
     #expect(try flags(of: nonBlocking) == (true, true))
     #expect(client.ipv4?.addressString == "127.0.0.1")

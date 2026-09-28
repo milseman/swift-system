@@ -299,6 +299,8 @@ target_sources(SystemPackage PRIVATE
   Time/ClockID.swift
   Time/Sleep.swift)
 target_sources(SystemPackage PRIVATE
+  TimeZoneFiles/TimeZoneFiles.swift)
+target_sources(SystemPackage PRIVATE
   Internals/Constants+TimersAndPriority.swift
   Internals/Syscalls+TimersAndPriority.swift
   TimersAndPriority/ProcessPriority.swift
