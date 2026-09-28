@@ -118,6 +118,16 @@ EQUIVALENTS = {
 }
 
 
+# Families that System answers with a design of its own rather than a wrapper
+# of the C interface, so that matching names can't see them: (the names, the
+# System API that answers them, a witness in System's sources that the answer
+# has what the adopters' markers ask for, where the decision is recorded).
+ANSWERED = [
+    (r"^(fts_\w+|FTS\w*)$", "DirectoryWalk", "case preorderAndPostorder",
+     "Prototype/Directories/README.md"),
+]
+
+
 class SystemNames:
     """What System's library modules name at a commit: the C names in their
     doc comments' "corresponding C" sentences, their public typealiases'
@@ -152,6 +162,13 @@ class SystemNames:
                 self.aliases[m.group(1)].add(m.group(2))
         self.alias_targets = {t for ts in self.aliases.values() for t in ts}
 
+        self.answered = []
+        for pattern, api, witness, _ in ANSWERED:
+            found = subprocess.run(["git", "-C", repo, "grep", "-q", "-F", "-e", witness, commit, "--",
+                                    *SYSTEM_SOURCES]).returncode == 0
+            if found:
+                self.answered.append((pattern, api))
+
         self.accessor_structs = set()
         out = git(repo, "grep", "-h", "-I", "-E", "-e", r"^[[:space:]]*extension[[:space:]]+CInterop\.", commit, "--",
                   *SYSTEM_SOURCES, ok=(0, 1))
@@ -179,6 +196,9 @@ class SystemNames:
         for other in EQUIVALENTS.get(name, ()):
             if other in self.names:
                 return True, f"as `{other}`"
+        for pattern, api in self.answered:
+            if re.search(pattern, name):
+                return True, f"by {api}"
         return False, ""
 
 
@@ -1283,9 +1303,11 @@ api-delta's last run, and a few seconds when they haven't.
   for `X members`, an `extension CInterop.<alias of X>` exists. A few interfaces count as covered by the
   replacement System wraps instead (`EQUIVALENTS` in `scripts/status.py`: usleep and sleep by nanosleep,
   localtime and gmtime by their `_r` forms, mkstemp by mkostemp, time by clock_gettime), and the table says
-  so. This sees what System documents, not whether the API fits the adopter's use: a partial wrapper counts
-  as covered, and an API whose doc comments don't name the C interface (a `nil` that means `UTIME_OMIT`)
-  counts as missing.
+  so. A family that System answers with a design of its own, rather than a wrapper, counts as covered once a
+  witness in System's sources shows the answer has what the markers ask for (`ANSWERED`: fts is DirectoryWalk,
+  with its two-visit order). This sees what System documents, not whether the API fits the adopter's use: a
+  partial wrapper counts as covered, and an API whose doc comments don't name the C interface counts as
+  missing.
 - **Provisional families** (libm, C stdio, locale and xlocale, string.h and ctype.h, numeric conversion) are a
   fixed list in `scripts/status.py`, matched by name or by the name's SDK module in adopter-coverage's stored
   vocabulary when there is one. They're C-library layers above the OS that System wraps provisionally, in
