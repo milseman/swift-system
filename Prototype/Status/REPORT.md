@@ -121,3 +121,31 @@ Tests: ExitCodeTests (values against the C constants, descriptions, exit tests o
 (4 skipped), swift-testing 441 in 66 suites. One full run failed PThreadTests' `setCurrentQualityOfService`,
 whose background-QoS thread didn't run within 10 s with the machine's load average near 65; it passed alone
 three times and in the full rerun. It isn't this lane's.
+
+## 5. removefile: `a545dcc`, `b514cb4`, `819d780`
+
+Foundation's `FileManager.removeItem` calls removefile with confirm and error callbacks for its delegate, and
+reaches `<removefile.h>` through `_FoundationCShims`, since the Darwin module doesn't declare it. CSystem's
+Darwin header now includes it, as it does `<sys/random.h>`.
+
+- `FilePath.removeRecursively(options:)`, with static C-string and `relativeTo:` (removefileat) forms. It
+  always passes `REMOVEFILE_RECURSIVE`, and is named for it: without it removefile leaves every directory in
+  place, even an empty one, and returns success. Rejected: `remove(options:)` next to `remove()` (remove(3)),
+  which would make `[]` a silent no-op on directories.
+- `RemoveOptions`: `keepDirectory` (KEEP_PARENT), `crossMountPoints`, `allowLongPaths` (documented as changing
+  the process's working directory for the call). Rejected: the `SECURE_*` overwrite passes (they can't reach old
+  blocks on APFS or an SSD) and the undocumented CLEAR_PURGEABLE, SYSTEM_DISCARDED and RECURSIVE_SLIM.
+- `removeRecursively(options:progress:)` takes a non-escaping handler, as FileCopy's progress does:
+  `RemoveProgress` (stage `.start`/`.finish`/`.error` from the confirm/status/error callbacks, the path, the
+  error) → `.proceed`/`.skip`/`.stop`. removefile *succeeds* when a callback stops it anywhere but at an error,
+  so a stop throws `Errno.canceled`, or the error it stopped at. Rejected: FileCopy's rule that a stop always
+  throws `.canceled`, which would make Foundation's delegate path capture the error itself, as it does today.
+- No `retryOnInterrupt`: calling it again removes what's left.
+- `b514cb4` and `819d780` name `removefile_flags_t`, `removefile_state_t`, its four calls and its context keys in
+  the doc comments, in the standard *corresponding C* phrasing, which status.sh and adopter-coverage read.
+
+Found on macOS 26.3: callbacks get absolute real paths (`/private/var` for `/var`, relative paths from the
+root); confirm runs before each file and status after, depth first; skipping a file makes its directory fail
+with ENOTEMPTY; a link is removed, not its target; an invalid callback result acts as a skip.
+
+Tests: RemoveRecursivelyTest. XCTest 489 (4 skipped), swift-testing 441 in 66 suites, all passing.
