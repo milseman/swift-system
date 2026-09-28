@@ -503,9 +503,22 @@ internal var _O_WRONLY: CInt { O_WRONLY }
 @_alwaysEmitIntoClient
 internal var _O_RDWR: CInt { O_RDWR }
 
+#if SYSTEM_PACKAGE_DARWIN
+@_alwaysEmitIntoClient
+internal var _O_SEARCH: CInt { O_SEARCH }
+
+@_alwaysEmitIntoClient
+internal var _O_EXEC: CInt { O_EXEC }
+#endif
+
 #if !os(Windows)
 #if canImport(Musl)
 internal var _O_ACCMODE: CInt { 0x03|O_SEARCH }
+#elseif SYSTEM_PACKAGE_DARWIN
+// O_EXEC, and O_SEARCH (O_EXEC with O_DIRECTORY), are access modes outside
+// O_ACCMODE's bits; F_GETFL returns O_EXEC for both.
+@_alwaysEmitIntoClient
+internal var _O_ACCMODE: CInt { O_ACCMODE | O_EXEC }
 #else
 // TODO: API?
 @_alwaysEmitIntoClient

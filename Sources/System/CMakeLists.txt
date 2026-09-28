@@ -167,6 +167,9 @@ target_sources(SystemPackage PRIVATE
   LibProc/ProcessList.swift
   LibProc/ProcessPaths.swift)
 target_sources(SystemPackage PRIVATE
+  Internals/Constants+Limits.swift
+  Limits/CompileTimeLimits.swift)
+target_sources(SystemPackage PRIVATE
   Internals/Syscalls+MachTime.swift
   MachTime/MachTime.swift)
 target_sources(SystemPackage PRIVATE

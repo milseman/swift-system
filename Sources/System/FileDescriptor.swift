@@ -715,6 +715,49 @@ extension FileDescriptor {
 }
 #endif // os(Linux) || os(Android) || os(FreeBSD) || os(WASI)
 
+#if SYSTEM_PACKAGE_DARWIN
+@available(System 199, *)
+extension FileDescriptor.AccessMode {
+  /// Opens a directory for searching only.
+  ///
+  /// The descriptor can be the directory that calls with a `relativeTo`
+  /// parameter resolve relative paths against,
+  /// and the directory of `fchdir` and `fstat`,
+  /// but it can't be read, so it can't list the directory.
+  /// Opening it checks for search permission, not read permission;
+  /// opening a file that isn't a directory fails with ``Errno/notDirectory``.
+  ///
+  /// ``FileDescriptor/accessMode()`` reports a descriptor opened this way
+  /// as ``execute``: the system keeps one mode for both.
+  ///
+  /// The corresponding C constant is `O_SEARCH`.
+  ///
+  /// - Note: Only available on Darwin.
+  @_alwaysEmitIntoClient
+  public static var search: Self { Self(rawValue: _O_SEARCH) }
+
+  @_alwaysEmitIntoClient
+  @available(*, unavailable, renamed: "search")
+  public static var O_SEARCH: Self { search }
+
+  /// Opens a file for executing only.
+  ///
+  /// The descriptor can't be read or written.
+  /// Opening it checks for execute permission,
+  /// failing with ``Errno/permissionDenied`` without it.
+  ///
+  /// The corresponding C constant is `O_EXEC`.
+  ///
+  /// - Note: Only available on Darwin.
+  @_alwaysEmitIntoClient
+  public static var execute: Self { Self(rawValue: _O_EXEC) }
+
+  @_alwaysEmitIntoClient
+  @available(*, unavailable, renamed: "execute")
+  public static var O_EXEC: Self { execute }
+}
+#endif // SYSTEM_PACKAGE_DARWIN
+
 @available(System 0.0.1, *)
 extension FileDescriptor.AccessMode
   : CustomStringConvertible, CustomDebugStringConvertible
@@ -726,7 +769,14 @@ extension FileDescriptor.AccessMode
     case .readOnly: return "readOnly"
     case .writeOnly: return "writeOnly"
     case .readWrite: return "readWrite"
-    default: return "\(Self.self)(rawValue: \(self.rawValue))"
+    default:
+      #if SYSTEM_PACKAGE_DARWIN
+      if #available(System 199, *) {
+        if self == .search { return "search" }
+        if self == .execute { return "execute" }
+      }
+      #endif
+      return "\(Self.self)(rawValue: \(self.rawValue))"
     }
   }
 
