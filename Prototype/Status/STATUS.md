@@ -2,8 +2,8 @@
 
 Generated 2026-09-28 by `Utilities/adopter-coverage/status.sh`, from commits only; rerun it rather than editing this file. How each figure is made, and what it can't see, is in [How this is computed](#how-this-is-computed).
 
-- **System**: `coverage` @ `34aa3c3a` (Add TerminalDescriptor.readPassphrase wrapping readpassphrase, FilePath.makeUniqueFile with permissions: (mktemp, then open or openat with O_EXCL), and SpawnAttributes.Flags(of:) and store(in:) for posix_spawnattr_getflags and setflags), which contains `system-next` @ `e8762dd1` (Merge branch 'coverage' into system-next); 25 commit(s) of `coverage` aren't in `system-next`.
-- **API delta**: `main` @ `1b452c29` → `HEAD` @ `34aa3c3a`.
+- **System**: `coverage` @ `ae3049a5` (status.py: let ANSWERED speak for a marker that names no C interface, and answer Subprocess's raw posix_spawn path with ProcessID.spawn's C-values and credentials forms), which contains `system-next` @ `e8762dd1` (Merge branch 'coverage' into system-next); 28 commit(s) of `coverage` aren't in `system-next`.
+- **API delta**: `main` @ `1b452c29` → `HEAD` @ `042d0cf4` (api-delta's last run; nothing it reads has changed since).
 - **Adopters** (`../adopters`, branch `migrate-darwin`, against its merge base with `main`):
   - WasmKit @ `f5219fbf`, base `1e9c513d`
   - indexstore-db @ `cc966b89`, base `441ead77`
@@ -26,11 +26,11 @@ Copied verbatim from `Utilities/api-delta/regenerate.sh` (`BASE_REF=main`, `HEAD
 
 ## Summary
 
-- **3048 added, 0 removed, 0 changed** declarations in the macOS symbol graphs.
-  - SystemPackage: +2472 (448 → 2920 public symbols).
+- **3057 added, 0 removed, 0 changed** declarations in the macOS symbol graphs.
+  - SystemPackage: +2481 (448 → 2929 public symbols).
   - SystemSockets: +576 (0 → 576 public symbols). SystemSockets is a new module; it doesn't exist on `main`.
 - Availability of the additions:
-  - System 199: 3013
+  - System 199: 3022
   - System 199 + explicit OS floor: 26
   - System 0.0.1 + explicit OS floor: 8
   - System 0.0.1: 1
@@ -42,7 +42,7 @@ Copied verbatim from `Utilities/api-delta/regenerate.sh` (`BASE_REF=main`, `HEAD
 - 0 public declarations hidden from the graphs were removed.
 - No public declaration is conditional on `ENABLE_MOCKING` or `DEBUG`, so a release build has the same public API as the debug graphs.
 - Cross-check with `swift-api-digester`, which dumps every declaration, implicit ones included:
-  - SystemPackage: +2769 / -0 declarations, which is the graphs' +2472 plus 297 implicit ones; it has every graph addition; `-diagnose-sdk` reports no breaking changes.
+  - SystemPackage: +2781 / -0 declarations, which is the graphs' +2481 plus 300 implicit ones; it has every graph addition; `-diagnose-sdk` reports no breaking changes.
   - SystemSockets: +648 / -0 declarations, which is the graphs' +576 plus 71 implicit ones; explicit declarations it has that the graphs don't: `SocketAddress._withUnsafeMutablePointer(_:)`; it has every graph addition.
 - Nothing was removed or changed: no public declaration left the graphs or the source scan. The *changed* check compares declaration text (including default arguments), availability, conformances, generic and extension constraints, and access level, and pairs symbols by path when a signature change alters the USR.
 
@@ -95,7 +95,7 @@ Each row is a top-level type, and nested types count toward it: `FilePath.Resolu
 | SystemPackage | [`POSIXErrorCode (extends _DarwinFoundation1)`](#systempackage-posixerrorcode-extends-darwinfoundation1) | 2 | 0 | 0 | S199 ×2 |
 | SystemPackage | [`PThread`](#systempackage-pthread) | 123 | 0 | 0 | S199 ×123 |
 | SystemPackage | [`ProcessEnvironment`](#systempackage-processenvironment) | 7 | 0 | 0 | S199 ×7 |
-| SystemPackage | [`ProcessID`](#systempackage-processid) | 211 | 0 | 0 | S199 ×211 |
+| SystemPackage | [`ProcessID`](#systempackage-processid) | 215 | 0 | 0 | S199 ×215 |
 | SystemPackage | [`ProcessPriority`](#systempackage-processpriority) | 8 | 0 | 0 | S199 ×8 |
 | SystemPackage | [`ProcessStateChange`](#systempackage-processstatechange) | 7 | 0 | 0 | S199 ×7 |
 | SystemPackage | [`ProcessTimer`](#systempackage-processtimer) | 18 | 0 | 0 | S199 ×18 |
@@ -104,6 +104,7 @@ Each row is a top-level type, and nested types count toward it: `FilePath.Resolu
 | SystemPackage | [`Signal`](#systempackage-signal) | 74 | 0 | 0 | S199 ×74 |
 | SystemPackage | [`SignalSet`](#systempackage-signalset) | 22 | 0 | 0 | S199 ×22 |
 | SystemPackage | [`SpawnAttributes`](#systempackage-spawnattributes) | 20 | 0 | 0 | S199 ×20 |
+| SystemPackage | [`SpawnCredentials`](#systempackage-spawncredentials) | 5 | 0 | 0 | S199 ×5 |
 | SystemPackage | [`SpawnFileAction`](#systempackage-spawnfileaction) | 8 | 0 | 0 | S199 ×8 |
 | SystemPackage | [`StatFS`](#systempackage-statfs) | 27 | 0 | 0 | S199 ×27 |
 | SystemPackage | [`SystemConfig`](#systempackage-systemconfig) | 71 | 0 | 0 | S199 ×71 |
@@ -139,7 +140,7 @@ Each row is a top-level type, and nested types count toward it: `FilePath.Resolu
 | SystemSockets | [`sockaddr_storage (extends Darwin)`](#systemsockets-sockaddr-storage-extends-darwin) | 3 | 0 | 0 | S199 ×3 |
 | SystemSockets | [`sockaddr_un (extends Darwin)`](#systemsockets-sockaddr-un-extends-darwin) | 5 | 0 | 0 | S199 ×5 |
 | SystemSockets | [`sockaddr_vm (extends Darwin)`](#systemsockets-sockaddr-vm-extends-darwin) | 5 | 0 | 0 | S199 ×5 |
-| **Total** | | **3048** | **0** | **0** | |
+| **Total** | | **3057** | **0** | **0** | |
 
 # 2. Adoption
 
@@ -371,15 +372,15 @@ Verbatim, not rerun: each package's own test totals (at the start, and the lates
 
 # 3. Gaps
 
-Every `SYSTEM-GAP:` marker in the packages' sources at the commits above: 51 markers in 34 files, of which 0 are outside the packages' targets. Each marker's text is read for the C interfaces it names (see [How this is computed](#how-this-is-computed)); a marker that names none is counted under its phrase, with the Darwin names imported under it deciding its status. Status is against System at `34aa3c3a`:
+Every `SYSTEM-GAP:` marker in the packages' sources at the commits above: 51 markers in 34 files, of which 0 are outside the packages' targets. Each marker's text is read for the C interfaces it names (see [How this is computed](#how-this-is-computed)); a marker that names none is counted under its phrase, with the Darwin names imported under it deciding its status. Status is against System at `ae3049a5`:
 
 - **missing**: System documents none of it (or only some: *k of n*).
 - **covered**: a System declaration's doc comment names it as the corresponding C interface, a CInterop alias names it, or, for `X members`, System gives `CInterop` alias of `X` Swift-named accessors. The marker is stale, or the package hasn't adopted the API yet. *Not yet in `system-next`* means only this branch has it.
-- **unread**: the marker names no C interface and nothing is imported under it; read the marker.
+- **unread**: the marker names no C interface, nothing is imported under it, and no `ANSWERED` entry speaks for it; read the marker.
 
 A family marked *(provisional)* is a C-library layer above the OS (math, stdio, locales, string.h and ctype.h) that System wraps provisionally, in `Sources/System/Provisional/`, since it may move to the standard library; it counts like everything else.
 
-Interfaces: 75 covered, 1 unread, 76 in all.
+Interfaces: 76 covered, 76 in all.
 
 | # | Interface | Status | Files | Packages | Family |
 |---:|---|---|---:|---|---|
@@ -443,7 +444,7 @@ Interfaces: 75 covered, 1 unread, 76 in all.
 | 58 | `O_DSYNC` | covered (doc comment; not yet in `system-next`) | 1 | WasmKit | O_DSYNC |
 | 59 | `O_SYNC` | covered (doc comment) | 1 | WasmKit | fcntl.h |
 | 60 | `POSIXErrorCode` | covered (doc comment) | 1 | swift-foundation | POSIXErrorCode |
-| 61 | raw posix_spawn path | unread | 1 | swift-subprocess | raw posix_spawn path |
+| 61 | raw posix_spawn path | covered (by ProcessID.spawn's C-values and credentials forms; not yet in `system-next`) | 1 | swift-subprocess | raw posix_spawn path |
 | 62 | readlinkat into a caller's buffer (System's readSymbolicLink returns a FilePath, which dro | covered (doc comment) | 1 | WasmKit | readlinkat into a caller's buffer (System's readSymbolicLink returns a FilePath, which dro |
 | 63 | `readpassphrase` | covered (doc comment; not yet in `system-next`) | 1 | swift-package-manager | readpassphrase |
 | 64 | `setlocale` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | setlocale |
@@ -535,7 +536,7 @@ The missing interfaces above, grouped, largest first: the order to fill them in.
 - `O_DSYNC` (covered): WasmKit: `Sources/WASI/Platform/PAL/PALFileDescriptor.swift:7`
 - `O_SYNC` (covered): WasmKit: `Sources/WASI/Platform/PAL/PALFileDescriptor.swift:7`
 - `POSIXErrorCode` (covered): swift-foundation: `Sources/FoundationEssentials/Error/ErrorCodes+POSIX.swift:20`; swift-foundation: `Sources/FoundationEssentials/Error/ErrorCodes+POSIX.swift:21`
-- raw posix_spawn path (unread): swift-subprocess: `Sources/Subprocess/Platforms/Subprocess+Darwin.swift:306`
+- raw posix_spawn path (covered): swift-subprocess: `Sources/Subprocess/Platforms/Subprocess+Darwin.swift:306`
 - readlinkat into a caller's buffer (System's readSymbolicLink returns a FilePath, which dro (covered): WasmKit: `Sources/WASI/Platform/PAL/PALFileDescriptor.swift:10`
 - `readpassphrase` (covered): swift-package-manager: `Sources/PackageRegistryCommand/PackageRegistryCommand+Auth.swift:27`
 - `setlocale` (covered): swift-foundation: `Tests/FoundationEssentialsTests/JSONEncoderTests.swift:17`
@@ -596,7 +597,7 @@ api-delta's last run, and a few seconds when they haven't.
   A wildcard (`IP_*`, `DT_*`) becomes the names imported under the marker that match it. A marker whose head
   names nothing (`posix_spawn's raw attributes and file actions`) is counted under its phrase, and the scoped
   Darwin imports right under it (the file's own list of what the gap costs) decide its status; with none, it
-  is *unread*. Rejected: recognizing names by an SDK vocabulary alone, since the explanations are English
+  is *unread*, unless an `ANSWERED` entry matches its phrase. Rejected: recognizing names by an SDK vocabulary alone, since the explanations are English
   and `time`, `free`, `sleep` and `remove` are C functions; and taking the imports as the interfaces
   everywhere, since `import struct Darwin.msghdr` is there for msghdr's fields, not for the name CInterop
   already has.
@@ -607,9 +608,10 @@ api-delta's last run, and a few seconds when they haven't.
   by their `_r` forms, mkstemp and mkstemps by mkostemp(s), time and gettimeofday by clock_gettime), and the table
   says so. A family that System answers with a design of its own, rather than a wrapper, counts as covered once a
   witness in System's sources shows the answer has what the markers ask for (`ANSWERED`: fts is DirectoryWalk, with
-  its two-visit order, and `malloc_type_descriptor_v0_t`'s members are `Memory.TypeDescriptor`'s properties). This
-  sees what System documents, not whether the API fits the adopter's use: a partial wrapper counts as covered, and
-  an API whose doc comments don't name the C interface counts as missing.
+  its two-visit order, `malloc_type_descriptor_v0_t`'s members are `Memory.TypeDescriptor`'s properties, and
+  Subprocess's raw posix_spawn path, a marker that names no C interface, is `ProcessID.spawn`'s C-values and
+  credentials forms). This sees what System documents, not whether the API fits the adopter's use: a partial
+  wrapper counts as covered, and an API whose doc comments don't name the C interface counts as missing.
 - **Provisional families** (libm, C stdio, locale and xlocale, string.h and ctype.h, numeric conversion) are a
   fixed list in `scripts/status.py`, matched by name or by the name's SDK module in adopter-coverage's stored
   vocabulary when there is one. They're C-library layers above the OS that System wraps provisionally, in

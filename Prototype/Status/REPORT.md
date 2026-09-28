@@ -440,3 +440,27 @@ Tests: TypedAllocationTest. XCTest 532 (4 skipped), swift-testing 461 in 72 suit
 Status: 75 of 76 interfaces covered, none missing; the one left is *unread*: Subprocess's "raw posix_spawn path"
 marker, whose other half is spawning with other credentials (section 22). Tests: ReadPassphraseTest,
 UniqueFilesWithPermissionsTest, RawSpawnTests. XCTest 544 (4 skipped), swift-testing 461, all passing.
+
+## 22. Spawning with other credentials: `042d0cf`
+
+The other half of Subprocess's raw posix_spawn path marker: running a child as another user or group, which
+posix_spawn can't do, and which Subprocess does in a C shim of its own by forking first.
+
+- `SpawnCredentials` (user, group, supplementaryGroups, each `nil` for the caller's) and `ProcessID.spawn(...,
+  credentials:)`, with System's file actions and attributes or with C values (`cFileActions:`, `cAttributes:`,
+  `fileActionDescriptors:`), and `searchingPathFor:` forms. Darwin only, the one platform with
+  POSIX_SPAWN_SETEXEC.
+- A CSystem shim forks, so that the child runs only async-signal-safe C: signals are blocked across the fork and
+  the child resets its handlers; setgroups, setgid, setuid, in that order; close-on-exec is cleared on the
+  descriptors the file actions use, since with SETEXEC Darwin closes close-on-exec descriptors before applying
+  the actions (checked with a C probe: the dup2 fails with EBADF until the flag is cleared); SETEXEC goes on the
+  child's copy of the attributes, so the caller's keep their flags; a failure comes back through a close-on-exec
+  pipe and the child is reaped.
+- Rejected: a credentials property on SpawnAttributes (the C attributes can't hold it, and it would hide the
+  fork); separate `user:`/`group:` parameters, whose defaults would make calls ambiguous with spawn; forking in
+  Swift, which can't promise the child calls only async-signal-safe functions.
+- status.py (`ae3049a`): an `ANSWERED` entry can now speak for a phrase marker that names no C interface; the
+  raw posix_spawn path is answered by these forms and section 17's.
+
+Status: all 76 interfaces covered. Tests: SpawnCredentialsTest. XCTest 550 (4 skipped), swift-testing 461, all
+passing.
