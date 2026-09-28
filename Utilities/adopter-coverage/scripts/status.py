@@ -182,50 +182,45 @@ class SystemNames:
         return False, ""
 
 
-# ---------------------------------------------------------------- what isn't System's
+# ---------------------------------------------------------------- provisional families
 
-# Families that aren't System's to wrap: C-library layers above the OS, or
-# another module's Swift types. A name falls in one by its SDK module (from
-# adopter-coverage's stored vocabulary, when there is one) or by these
-# lists, and only when System doesn't wrap it already: remove(3) and
-# rename(2) are declared in stdio.h, and are System's.
-NOT_SYSTEMS = [
-    ("libm", "Math functions are the C library's, and the standard library's or swift-numerics' to offer; "
-             "they aren't operating-system interfaces.",
+# C-library layers above the OS that System wraps provisionally, in
+# Sources/System/Provisional/, since they may move to the standard library:
+# math, stdio, locales, and string.h and ctype.h. They count as missing until
+# System covers them, as everything else does; the family only groups them,
+# and names the file they go in. A name falls in one by these lists or by its
+# SDK module (from adopter-coverage's stored vocabulary, when there is one).
+# remove(3) and rename(2) are declared in stdio.h, but they're file-system
+# calls, and System's.
+PROVISIONAL = [
+    ("libm", "Provisional+Math.swift",
      ("._math", "._tgmath", "._complex", "._fenv"),
      """sin cos tan asin acos atan atan2 sinh cosh tanh asinh acosh atanh exp exp2 expm1 log log2 log10 log1p
         pow sqrt cbrt hypot floor ceil round trunc rint nearbyint fmod remainder fabs fmin fmax fma ldexp frexp
         modf copysign nan erf erfc lgamma tgamma"""),
-    ("C stdio", "Buffered `FILE` streams are the C library's layer over the descriptors System wraps; "
-                "print shares stdout's buffer, so a Swift replacement belongs with print.",
+    ("C stdio", "Provisional+Stdio.swift",
      ("._stdio",),
      """FILE stdin stdout stderr fopen fdopen freopen fclose fflush fwrite fread fputs fputc fgets fgetc
         fprintf fscanf fseek fseeko ftell ftello rewind fileno flockfile funlockfile ftrylockfile setbuf setvbuf
         setlinebuf printf puts putchar getchar perror sprintf snprintf vfprintf vprintf getline getdelim popen
         pclose tmpfile ferror feof clearerr"""),
-    ("locale", "The C library's locale machinery (locale.h, xlocale.h); locales are Foundation's.",
+    ("locale", "Provisional+Locale.swift",
      ("._locale", ".xlocale", "locale.locale_t"),
      """locale_t setlocale newlocale uselocale freelocale duplocale localeconv querylocale LC_ALL LC_COLLATE
         LC_CTYPE LC_MONETARY LC_NUMERIC LC_TIME LC_MESSAGES LC_GLOBAL_LOCALE strtod_l strtof_l strtold_l
         strtol_l strtoll_l strtoul_l strtoull_l strncasecmp_l strcasecmp_l strcoll_l strxfrm_l strftime_l
         isspace_l isdigit_l toupper_l tolower_l"""),
-    ("string.h and ctype.h", "The C library's string and character utilities, and the memory calls the "
-                             "standard library has: copyMemory and initializeMemory are memcpy, memmove and memset. "
-                             "(System's Memory has memcmp and memchr, which it doesn't.)",
+    ("string.h and ctype.h", "Provisional+StringH.swift",
      ("._string", "._strings", "._ctype", "._wctype"),
      """memcpy memmove memset bcopy bzero strlen strnlen strcmp strncmp strcasecmp
         strncasecmp strcpy strncpy strlcpy strlcat strcat strncat strchr strrchr strstr strdup strndup strtok
         strtok_r strspn strcspn strpbrk isspace isalpha isdigit isalnum isupper islower isxdigit isprint
         ispunct iscntrl isgraph toupper tolower"""),
-    ("C numeric conversion", "Parsing and formatting numbers is the standard library's.",
+    ("C numeric conversion", "Provisional+Stdlib.swift",
      (),
      "strtod strtof strtold strtol strtoll strtoul strtoull atoi atol atoll atof"),
-    ("the Darwin overlay's Swift types", "POSIXErrorCode is the Darwin overlay's Swift enum, in Foundation's "
-                                         "public API and ABI; System's Errno can't stand in for it there.",
-     (),
-     "POSIXErrorCode"),
 ]
-NOT_SYSTEMS_BY_NAME = {n: fam for fam, _, _, names in NOT_SYSTEMS for n in names.split()}
+PROVISIONAL_BY_NAME = {n: fam for fam, _, _, names in PROVISIONAL for n in names.split()}
 
 
 def load_vocab(path):
@@ -241,18 +236,18 @@ def load_vocab(path):
     return where
 
 
-def not_systems(name, vocab):
-    """The not-System's family a C name belongs to, or None."""
-    if name in NOT_SYSTEMS_BY_NAME:
-        return NOT_SYSTEMS_BY_NAME[name]
+def provisional_family(name, vocab):
+    """The provisional family a C name belongs to, or None."""
+    if name in PROVISIONAL_BY_NAME:
+        return PROVISIONAL_BY_NAME[name]
     modules = vocab.get(name, set())
     if not modules:
         return None
     families = set()
     for m in modules:
-        fam = next((f for f, _, suffixes, _ in NOT_SYSTEMS if any(m.endswith(s) or s in m for s in suffixes)), None)
+        fam = next((f for f, _, suffixes, _ in PROVISIONAL if any(m.endswith(s) or s in m for s in suffixes)), None)
         if fam is None:
-            return None   # declared somewhere System's too
+            return None   # declared somewhere else too
         families.add(fam)
     return sorted(families)[0] if families else None
 
@@ -292,10 +287,10 @@ FAMILIES = [
 ]
 
 
-def family_of(name, phrase, vocab, foreign=True):
-    fam = not_systems(name, vocab) if foreign else None
+def family_of(name, phrase, vocab, provisional=True):
+    fam = provisional_family(name, vocab) if provisional else None
     if fam:
-        return fam
+        return fam + " (provisional)"
     for fam, pattern in FAMILIES:
         if re.search(pattern, name):
             return fam
@@ -1131,15 +1126,10 @@ def main():
         if not names:
             return "unread", ""
         covered = [n for n in names if sys_head.covers(n)[0]]
-        foreign = [n for n in names if n not in covered and not_systems(n, vocab)]
         if len(covered) == len(names):
             late = [n for n in names if not sys_next.covers(n)[0]]
             how = sys_head.covers(names[0])[1] if len(names) == 1 else f"all {len(names)} names"
             return "covered", how + (f"; not yet in `{a.system_next}`" if late else "")
-        if covered and len(covered) + len(foreign) == len(names):
-            return "covered", f"{len(covered)} of {len(names)} names; the rest aren't System's"
-        if foreign and len(foreign) + len(covered) == len(names):
-            return "not System's", not_systems(foreign[0], vocab)
         if covered:
             return "missing", f"{len(covered)} of {len(names)} names covered"
         return "missing", ""
@@ -1148,7 +1138,14 @@ def main():
     for iface, g in gaps.items():
         st, how = status(iface, g)
         pkgs = {n for n, _ in g["files"]}
-        fam = family_of(iface, g["phrase"], vocab, foreign=st != "covered") if iface != g["phrase"] else g["phrase"]
+        # A covered interface keeps its own family: memcmp is System's Memory's,
+        # not a provisional string.h wrapper. A phrase takes its names' family,
+        # when they share one.
+        if iface != g["phrase"]:
+            fam = family_of(iface, g["phrase"], vocab, provisional=st != "covered")
+        else:
+            shared = {family_of(n, None, vocab, provisional=st != "covered") for n in g["names"]}
+            fam = shared.pop() if len(shared) == 1 and not (shared & set(g["names"])) else g["phrase"]
         rows.append((len(g["files"]), len(pkgs), iface, fam, st, how, sorted(pkgs), g))
     rows.sort(key=lambda r: (-r[0], -r[1], r[2].lower()))
 
@@ -1167,11 +1164,14 @@ def main():
       "alias names it, or, for `X members`, System gives `CInterop` alias of `X` Swift-named accessors. The "
       "marker is stale, or the package hasn't adopted the API yet." +
       (f" *Not yet in `{a.system_next}`* means only this branch has it." if sys_next is not sys_head else ""))
-    w("- **not System's**: a C-library layer above the OS, or another module's type ([below](#not-systems)).")
     w("- **unread**: the marker names no C interface and nothing is imported under it; read the marker.")
     w("")
     counts = collections.Counter(r[4] for r in rows)
-    w("Interfaces: " + ", ".join(f"{counts[k]} {k}" for k in ("missing", "covered", "not System's", "unread")
+    w("A family marked *(provisional)* is a C-library layer above the OS (math, stdio, locales, string.h and "
+      "ctype.h) that System wraps provisionally, in `Sources/System/Provisional/`, since it may move to the "
+      "standard library; it counts like everything else.")
+    w("")
+    w("Interfaces: " + ", ".join(f"{counts[k]} {k}" for k in ("missing", "covered", "unread")
                                  if counts[k]) + f", {len(rows)} in all.")
     w("")
     w("| # | Interface | Status | Files | Packages | Family |")
@@ -1200,20 +1200,6 @@ def main():
     for k, (fam, e) in enumerate(ranked, 1):
         names = ", ".join(shown(i) for i in e["ifaces"])
         w(f"| {k} | {cell(fam)} | {len(e['files'])} | {', '.join(sorted(e['pkgs']))} | {names} |")
-    w("")
-
-    w("## Not System's")
-    w("")
-    w("Recorded, not to be implemented. A name is counted here when System doesn't already wrap it; the families:")
-    w("")
-    for fam, reason, _, _ in NOT_SYSTEMS:
-        hits = [r for r in rows if r[4] == "not System's" and r[5] == fam]
-        files = {f for r in hits for f in r[7]["files"]}
-        if hits:
-            w(f"- **{fam}** ({len(hits)} {'interface' if len(hits) == 1 else 'interfaces'}, {len(files)} "
-              f"{'file' if len(files) == 1 else 'files'}): {reason} " + ", ".join(shown(r[2]) for r in hits) + ".")
-        else:
-            w(f"- **{fam}**: {reason} (No marker names one now.)")
     w("")
 
     if unread:
@@ -1300,12 +1286,13 @@ api-delta's last run, and a few seconds when they haven't.
   so. This sees what System documents, not whether the API fits the adopter's use: a partial wrapper counts
   as covered, and an API whose doc comments don't name the C interface (a `nil` that means `UTIME_OMIT`)
   counts as missing.
-- **Not System's** is a fixed list of families in `scripts/status.py` (libm, C stdio, locale and xlocale,
-  string.h and ctype.h, numeric conversion, the Darwin overlay's POSIXErrorCode), matched by name or by the
-  name's SDK module in adopter-coverage's stored vocabulary when there is one. It applies only to what System
-  doesn't wrap already.
-- **Families** group the ranked interfaces for the work list: a fixed map of name patterns to System's
-  clusters, else the marker's phrase, else the name itself.
+- **Provisional families** (libm, C stdio, locale and xlocale, string.h and ctype.h, numeric conversion) are a
+  fixed list in `scripts/status.py`, matched by name or by the name's SDK module in adopter-coverage's stored
+  vocabulary when there is one. They're C-library layers above the OS that System wraps provisionally, in
+  `Sources/System/Provisional/`, and they count as missing until covered, like everything else; the family
+  only groups them in the work list.
+- **Families** group the ranked interfaces for the work list: the provisional families, then a fixed map of
+  name patterns to System's clusters, else the marker's phrase, else the name itself.
 """
 
 

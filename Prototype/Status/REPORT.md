@@ -149,3 +149,40 @@ root); confirm runs before each file and status after, depth first; skipping a f
 with ENOTEMPTY; a link is removed, not its target; an invalid callback result acts as a skip.
 
 Tests: RemoveRecursivelyTest. XCTest 489 (4 skipped), swift-testing 441 in 66 suites, all passing.
+
+## 6. Memory locking: `e9198ce`
+
+The posix-darwin lane's unstarted cluster 6.
+
+- `Memory.lockPages(_:)` and `unlockPages(_:)` (mlock, munlock) take any `UnsafeRawBufferPointer`, in the malloc
+  lane's `Memory` namespace; `MemoryMapping.lockPages(range:)` and `unlockPages(range:)` take offsets, like its
+  `setProtection(_:range:)`. Named for pages: the system locks every page a buffer touches, and a bare `lock`
+  reads as a mutex's.
+- `Memory.lockAllPages(_:)` with `PageLockOptions` (`.current`, `.future`, Linux's `.onFault`) and
+  `unlockAllPages()` exist everywhere but Darwin, where mlockall and munlockall always fail with ENOSYS.
+  Rejected: declaring them on Darwin too, as an API that can only throw. That code is unbuilt (Linux paused).
+- No `retryOnInterrupt`: the calls don't report EINTR.
+
+Found on macOS 26.3: RLIMIT_MEMLOCK is unlimited; ranges round out to pages; locking faults every page in (4 GiB
+took 0.7 s) and unlocking leaves them resident; unmapped memory fails with ENOMEM; PROT_NONE pages lock.
+
+Tests: MemoryLockingTest. XCTest 494 (4 skipped), swift-testing 441. One full run failed SocketOpenOptionsTests'
+`acceptSetsExactlyTheOptions` with EAGAIN (a nonblocking accept racing the connection it expects, at a load
+average near 66); it passed alone three times and in the full rerun. It isn't this lane's.
+
+## 7. The not-System's families are in scope
+
+Michael's call (2026-09-28): what status.sh marked *not System's* (libm, C stdio, locale, string.h and ctype.h,
+the Darwin overlay's POSIXErrorCode) is in scope. System wraps those families provisionally, in
+`Sources/System/Provisional/` files named for them, each with a note that it may move to the standard library;
+POSIXErrorCode gets a CInterop typealias. status.sh now counts them as missing until covered, like everything
+else: the *not System's* status and section are gone, the families are marked *(provisional)* in the work
+list, and the reasons they were set apart move to the provisional files' notes. A covered name keeps its own
+family (memcmp is System's `Memory`), and a phrase interface takes its names' family, so TSC's "C stdio FILE
+streams" joins C stdio.
+
+The work list then, by files affected: C stdio (5 files: swift-log, swift-nio, swift-tools-support-core),
+POSIXErrorCode (3), then two files each for XATTR_MAXNAMELEN, UTIME_OMIT, fts, libm, locale, posix_spawn's raw
+attributes and tzfile.h, and one-file gaps. The order from here: C stdio, POSIXErrorCode, the remaining early
+items (shared memory and named semaphores, os_unfair_lock and arc4random, sync and chroot), then the two-file
+families.
