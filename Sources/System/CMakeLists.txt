@@ -66,6 +66,8 @@ target_sources(SystemPackage PRIVATE
   Directories/DirectoryStream.swift
   Directories/DirectoryWalk.swift)
 target_sources(SystemPackage PRIVATE
+  DirectoryEntryTypes/FileType+DirectoryEntry.swift)
+target_sources(SystemPackage PRIVATE
   DynamicLoading/DynamicLibrary.swift)
 target_sources(SystemPackage PRIVATE
   Entropy/Entropy.swift)
