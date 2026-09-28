@@ -74,3 +74,26 @@ Darwin imports until System names them and makes them usable without the C libra
 Tests: accessors against the C fields, the duration conversions, a `CInterop.Linger` through
 `setOption`/`getOption` on a TCP socket agreeing with `linger()`, and both in the MemberImportVisibility
 probe. XCTest 471 (4 skipped), swift-testing 437 in 65 suites, all passing.
+
+## 3. Compile-time limits and O_SEARCH: `040169c`
+
+Foundation's gaps with the most files (5): NAME_MAX, PATH_MAX and MAXSYMLINKS as compile-time constants, for
+buffers sized before there's a path to ask `pathconf` about; and O_SEARCH for directory descriptors.
+
+- `SystemConfig.maxFileNameBytes`, `maxPathBytes`, and on Darwin `maxSymbolicLinks`, as `Int`s. They reuse the
+  names of the `pathconf` names in `SystemConfig.PathName`, so `value(.maxFileNameBytes, for: dir)` is the
+  directory's limit and `SystemConfig.maxFileNameBytes` the headers'. Rejected: `FilePath` members (a path
+  can be longer; calls fail with ENAMETOOLONG) and a new namespace. `maxSymbolicLinks` is Darwin-only:
+  glibc's MAXSYMLINKS (20) isn't the Linux kernel's limit (40).
+- `FileDescriptor.AccessMode.search` and `.execute`, Darwin-only, with the renamed `O_SEARCH`/`O_EXEC` stubs.
+  Darwin's O_EXEC is outside O_ACCMODE's bits and F_GETFL reports it for both modes, so Darwin's internal
+  access-mode mask now includes it: `accessMode()` returns `.execute` for either (it said `.readOnly`), and
+  `statusFlags()` drops the stray bit. Rejected: leaving the mask alone, which misreports every such
+  descriptor; a separate `.search` from `accessMode()`, which F_GETFL can't tell apart.
+
+Found on macOS 26.3: O_SEARCH opens only directories (ENOTDIR); its descriptor reads fail (EBADF) but
+`openat`, `fchdir` and `fstat` work; O_EXEC needs execute permission (EACCES); a path resolves through 32
+links and fails on the 33rd, counting links in the path itself (the temporary directory's `/var`), so the test
+opens its chains relative to a directory descriptor.
+
+Tests: CompileTimeLimitsTest, SearchAccessModeTest. XCTest 478 (4 skipped), swift-testing 437, all passing.
