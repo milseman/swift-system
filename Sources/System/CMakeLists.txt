@@ -112,6 +112,11 @@ target_sources(SystemPackage PRIVATE
   FilePath/FilePathTempWindows.swift
   FilePath/FilePathWindows.swift)
 target_sources(SystemPackage PRIVATE
+  FileRemoval/RemoveProgress.swift
+  FileRemoval/RemoveRecursively.swift
+  Internals/Constants+FileRemoval.swift
+  Internals/Syscalls+FileRemoval.swift)
+target_sources(SystemPackage PRIVATE
   FileSystem/DiskQuota.swift
   FileSystem/FileFlags.swift
   FileSystem/FileMode.swift
