@@ -65,9 +65,15 @@ for relative in linux_files:
                         "#else\nimport Darwin\n#endif", 1)
     text = "import LinuxModel\n" + text
     if relative.endswith("Constants+Events.swift"):
-        # Constants+Threads.swift's, which SYSTEM_PACKAGE_DARWIN turns off.
-        text += "\n@_alwaysEmitIntoClient\ninternal var _CLOCK_REALTIME: CInt { 0 }\n" \
-                "\n@_alwaysEmitIntoClient\ninternal var _CLOCK_MONOTONIC: CInt { 1 }\n"
+        # Linux's clocks, as CInts. Under SYSTEM_PACKAGE_DARWIN,
+        # Constants+Threads.swift's are off, and Constants+Time.swift's
+        # _CLOCK_REALTIME and _CLOCK_MONOTONIC are Darwin's clockid_t, which
+        # ClockID needs, so IntervalTimer's copy uses these instead.
+        text += "\n@_alwaysEmitIntoClient\ninternal var _LINUX_CLOCK_REALTIME: CInt { 0 }\n" \
+                "\n@_alwaysEmitIntoClient\ninternal var _LINUX_CLOCK_MONOTONIC: CInt { 1 }\n"
+    if relative.endswith("IntervalTimer.swift"):
+        for name in ["_CLOCK_REALTIME", "_CLOCK_MONOTONIC"]:
+            text = text.replace("rawValue: %s)" % name, "rawValue: _LINUX%s)" % name)
     target = os.path.join(work, relative)
     os.makedirs(os.path.dirname(target), exist_ok=True)
     open(target, "w").write(text)

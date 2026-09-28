@@ -1,6 +1,5 @@
 #include <unistd.h>
 #include <sys/syscall.h>
-#include <signal.h>
 
 #define __SWIFT_IORING_SQE_FALLBACK_STRUCT { \
     __u8    opcode; \
@@ -238,10 +237,16 @@ static inline int io_uring_enter2(int fd, unsigned int to_submit, unsigned int m
 			flags, args, sz);
 }
 
+// The size of the kernel's signal set: _NSIG / 8, which shims.c checks.
+// This header doesn't include <signal.h>, whose sigaction and siginfo_t
+// Swift would then attribute to CSystem; see CSystemLinux.h.
+#define CSYSTEM_KERNEL_SIGSET_SIZE 8
+
+// `sig` points to a sigset_t, untyped for the same reason.
 static inline int io_uring_enter(int fd, unsigned int to_submit, unsigned int min_complete,
-		   unsigned int flags, sigset_t *sig)
+		   unsigned int flags, void *sig)
 {
-	return io_uring_enter2(fd, to_submit, min_complete, flags, sig, _NSIG / 8);
+	return io_uring_enter2(fd, to_submit, min_complete, flags, sig, CSYSTEM_KERNEL_SIGSET_SIZE);
 }
 
 #endif

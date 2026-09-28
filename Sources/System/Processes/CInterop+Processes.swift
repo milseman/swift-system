@@ -23,8 +23,18 @@ import Android
 
 @available(System 199, *)
 extension CInterop {
+  #if canImport(Glibc)
+  // Named through Glibc's module: CSystem's headers declare sigset_t too,
+  // and Swift attributes a C type to the module whose copy it loads first.
+  // Unqualified, the name in a SystemPackage file that imports CSystem can
+  // load CSystem's, and then a client can't see the type's initializer
+  // without importing CSystem (Tests/MemberImportVisibility/SignalSetProbe).
+  /// The C `sigset_t` type, a set of signals.
+  public typealias SignalSet = Glibc.sigset_t
+  #else
   /// The C `sigset_t` type, a set of signals.
   public typealias SignalSet = sigset_t
+  #endif
 
   /// The C `struct sigaction` type, which describes a signal's action.
   public typealias SignalAction = sigaction

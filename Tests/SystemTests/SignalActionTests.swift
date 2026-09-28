@@ -102,7 +102,9 @@ final class SignalActionTests: XCTestCase {
     XCTAssertEqual(handledSignal, SIGUSR1)
     XCTAssertEqual(handledSender, getpid())
     #if os(Linux) || os(Android)
-    XCTAssertTrue([SI_USER, SI_TKILL].contains(handledCode), "si_code \(handledCode)")
+    // glibc declares SI_USER and SI_TKILL in an enum, which imports as Int.
+    XCTAssertTrue(
+      [CInt(SI_USER), CInt(SI_TKILL)].contains(handledCode), "si_code \(handledCode)")
     #else
     // Darwin reports 0, rather than SI_USER, for a signal that pthread_kill
     // sent, which raise does (macOS 26.3).
