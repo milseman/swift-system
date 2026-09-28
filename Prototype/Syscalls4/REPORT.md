@@ -778,3 +778,65 @@ the review of clusters 1 to 6.
 - New: `SocketAddressHostTextTests` (4).
 - macOS: XCTest 442 run, 4 skipped, 0 failures; swift-testing 359 tests in
   53 suites pass.
+
+## 8. VM sockets (vsock), on Darwin
+
+### Commits and API
+
+`5d57b0d`, in SystemSockets (`Sockets/SocketAddress+VMSocket.swift`,
+`Internals/SocketSyscalls+VMSockets.swift`, and a `description` case in
+`SocketDescriptor.swift`).
+
+| API | C |
+|---|---|
+| `SocketDescriptor.Domain.vsock` | `PF_VSOCK` |
+| `VMSocketAddress` (`contextID`, `port`), `CInterop.SockAddrVM` | `struct sockaddr_vm` (`svm_cid`, `svm_port`) |
+| `VMSocketAddress.ContextID` `.any`, `.hypervisor`, `.local`, `.host`; `Port.any` | `VMADDR_CID_ANY`, `_HYPERVISOR`, `_RESERVED`, `_HOST`; `VMADDR_PORT_ANY` |
+| `SocketAddress(vsock:)`, `SocketAddress.vsock` | |
+| `SocketDescriptor.localContextID() throws(Errno)` | `ioctl(IOCTL_VM_SOCKETS_GET_LOCAL_CID)` |
+
+### Design calls
+
+- **`VMSocketAddress`, not `VsockAddress`**: NIO declares a public
+  top-level `VsockAddress` (NIOPosix), which a System type of that name
+  would make ambiguous in every NIO file that imports both. "VM sockets"
+  is the concept's name in vsock(7). The `SocketAddress` label is
+  `vsock:`, after the domain, as `ipv4:` is after `.ipv4`.
+- **Nested `ContextID` and `Port` types** with NIO's constants and its
+  `-1` descriptions for `.any`, since NIO's callers already use them.
+  `.local` is 1, which Darwin calls `VMADDR_CID_RESERVED` and Linux
+  `VMADDR_CID_LOCAL`.
+- **The ioctl's request is spelled out**, `_IOR('s', 209, uint32_t)`,
+  0x400473d1, which Swift can't import as a macro and NIO exports from C;
+  a C probe printed the value, and the mock test checks it.
+- **Darwin only.** Linux's `sockaddr_vm` has another layout (no `svm_len`,
+  a `svm_zero` pad), in `<linux/vm_sockets.h>`, which glibc's module
+  doesn't include, and Linux reads the local context ID from `/dev/vsock`.
+  With the Linux runs paused, that half waits.
+
+### Findings
+
+- On a Mac that isn't a virtual machine, `socket(AF_VSOCK, SOCK_STREAM, 0)`
+  fails with `ENODEV`, and a datagram socket with `EPROTONOSUPPORT`; the
+  transport is a guest's.
+
+### What it replaces in the adopters
+
+- NIO `Sources/NIOPosix/VsockAddress.swift`: `sockaddr_vm`, `AF_VSOCK`,
+  `PF_VSOCK`, and the local context ID ioctl with
+  `CNIODarwin_IOCTL_VM_SOCKETS_GET_LOCAL_CID`, clearing, on Darwin,
+  `// SYSTEM-GAP: vsock: sockaddr_vm, AF_VSOCK, PF_VSOCK` and the
+  `ioctl(2)` of NIOPosix `System.swift`. NIO's public `VsockAddress` would
+  convert to and from `VMSocketAddress`.
+
+### Platforms
+
+- Built and tested: macOS 26.3, as a host (no guest was available, so a
+  real connection and the real ioctl weren't exercised).
+- Not added: Linux and Android.
+
+### Tests
+
+- New: `SocketVMSocketTests` (4).
+- macOS: XCTest 442 run, 4 skipped, 0 failures; swift-testing 363 tests in
+  54 suites pass.
