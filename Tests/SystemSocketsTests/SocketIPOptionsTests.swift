@@ -164,6 +164,13 @@ private struct SocketIPOptionsTests {
       // Zero isn't C's "no timeout"; nil is.
       try socket.setReceiveTimeout(.zero)
       #expect(try socket.receiveTimeout() != nil)
+      // Nor is a negative duration an invalid time (EDOM), sub-second or not.
+      for negative: Duration in [.milliseconds(-500), .seconds(-2), .nanoseconds(-1)] {
+        try socket.setReceiveTimeout(negative)
+        #expect(try socket.receiveTimeout() != nil, "\(negative)")
+        try socket.setSendTimeout(negative)
+        #expect(try socket.sendTimeout() != nil, "\(negative)")
+      }
       try socket.setReceiveTimeout(nil)
       #expect(try socket.receiveTimeout() == nil)
     }
@@ -197,6 +204,8 @@ private struct SocketIPOptionsTests {
       try socket.setLinger(.milliseconds(1500))
       #expect(try socket.linger() == .seconds(2))
       try socket.setLinger(.zero)
+      #expect(try socket.linger() == .zero)
+      try socket.setLinger(.milliseconds(-500))
       #expect(try socket.linger() == .zero)
       try socket.setLinger(nil)
       #expect(try socket.linger() == nil)

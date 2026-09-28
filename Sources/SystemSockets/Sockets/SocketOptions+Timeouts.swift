@@ -123,13 +123,14 @@ extension SocketDescriptor {
   internal func _setTimeout(_ name: CInt, _ timeout: Duration?) -> Result<Void, Errno> {
     var value = timeval()
     if let timeout {
-      // C's zero is no timeout; the shortest timeout is a microsecond.
-      let (seconds, attoseconds) = timeout.components
-      var microseconds = attoseconds / 1_000_000_000_000
-      if attoseconds % 1_000_000_000_000 > 0 { microseconds += 1 }
-      if seconds < 0 || (seconds == 0 && microseconds == 0) {
+      if timeout <= .zero {
+        // C's zero is no timeout; the shortest timeout is a microsecond.
         value.tv_usec = 1
       } else {
+        // A positive duration's components are both nonnegative.
+        let (seconds, attoseconds) = timeout.components
+        var microseconds = attoseconds / 1_000_000_000_000
+        if attoseconds % 1_000_000_000_000 > 0 { microseconds += 1 }
         value.tv_sec = .init(seconds + microseconds / 1_000_000)
         value.tv_usec = .init(microseconds % 1_000_000)
       }
@@ -187,10 +188,12 @@ extension SocketDescriptor {
   internal func _setLinger(_ timeout: Duration?) -> Result<Void, Errno> {
     var value = _CLinger()
     if let timeout {
-      let (seconds, attoseconds) = timeout.components
-      let rounded = seconds < 0 ? 0 : seconds + (attoseconds > 0 ? 1 : 0)
       value.l_onoff = 1
-      value.l_linger = CInt(clamping: rounded)
+      if timeout > .zero {
+        // A positive duration's components are both nonnegative.
+        let (seconds, attoseconds) = timeout.components
+        value.l_linger = CInt(clamping: seconds + (attoseconds > 0 ? 1 : 0))
+      }
     }
     return _setValue(OptionLevel.socket.rawValue, Self._lingerName, value)
   }
