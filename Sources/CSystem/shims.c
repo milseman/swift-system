@@ -316,6 +316,14 @@ extern int csystem_getentropy(void *buffer, size_t length) {
 }
 #endif // __ANDROID__
 
+#if !defined(_WIN32) && !defined(__wasi__) && !defined(__ANDROID__)
+#include <sys/mman.h>
+
+extern int csystem_shm_open(const char *name, int oflag, unsigned int mode) {
+  return shm_open(name, oflag, (mode_t)mode);
+}
+#endif
+
 #if !defined(_WIN32) && !defined(__wasi__)
 #if defined(__APPLE__)
 #include <crt_externs.h>
