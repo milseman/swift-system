@@ -682,3 +682,99 @@ the review of clusters 1 to 6.
 - At `a6161fb`: macOS XCTest 430 run, 4 skipped, 0 failures,
   swift-testing 325 tests in 46 suites pass; Linux XCTest 369 run, 2
   skipped, 0 failures, swift-testing 327 tests in 48 suites pass.
+
+## Merging system-next, and the review of clusters 1 to 6
+
+- `e1c37c6` merges system-next `9f5b261` (posix-more's clusters 5 to 10,
+  linux-build's fixes). Both conflicts were both sides adding entries, in
+  `Sources/Samples/main.swift` and `Sources/System/CMakeLists.txt`. On
+  macOS, XCTest 442 run (4 skipped), swift-testing 353 tests pass.
+- The Linux runs were then paused, on request, before the merged tree was
+  built there. Not done, as asked: building darwin-more, statfs and
+  posix-more's clusters 5 to 10 on Linux; review fixes 3c (FreeBSD and
+  OpenBSD `accept4` gating) and 3d (Musl's `TCP_*` macros and
+  `struct tcp_info`); and queue clusters 9, 10 and 11.
+- Review fixes made:
+  - `9058be1`: `TCPInfo.rawValue` copies at most the bytes the kernel
+    filled, the buffer's 256, and the C struct's size into a zeroed
+    `tcp_info`, instead of loading a whole `tcp_info` from the buffer,
+    which glibc's newest 280-byte declaration would read past. Linux-only;
+    not built since.
+  - `e7848a6`: a negative sub-second timeout (`.milliseconds(-500)`) had
+    components `(0, -5e17)`, passed the old `seconds < 0` test, and became
+    a negative `tv_usec`, which both kernels reject with `EDOM`. Timeouts
+    and linger now test `timeout <= .zero`. The tests add negative
+    durations.
+  - `954d884`: the buffer forms of `sendMessages` and `receiveMessages`
+    (cluster 6 above), so a batch needs no `msghdr` members;
+    `3efdbde` makes their loopback test wait for its datagrams, which
+    under a full test run's load arrived after the send returned.
+  - `19bc15c`: the cluster 6 section above, which was missing.
+- Swift 6.3 (swift:6.3-noble, before the pause): SystemSocketsTests
+  builds; the SystemTests target crashes the 6.3.3 compiler
+  (`StackNesting::fixNesting`, the pattern-catch crashes the linux-build
+  lane recorded) in other lanes' tests: `ProcessResourceLimitTests.swift:120`
+  (`catch Errno.notPermitted`), and, with that one set aside, a second
+  `MandatoryAllocBoxToStack` crash in another SystemTests file of the same
+  batch; building `system-samples` crashed too. None is in this lane's
+  files, which have no pattern catches. With linux-build closed, no lane
+  owns them.
+
+## 7. Host address text in caller memory
+
+### Commits and API
+
+`0d7b43d`, in SystemSockets (`Sockets/SocketAddress+HostText.swift`).
+
+| API | C |
+|---|---|
+| `IPv4Address.Host.init?(cString:)`, `IPv6Address.Host.init?(cString:)` | `inet_pton` |
+| `description(into: UnsafeMutableBufferPointer<CChar>) throws(Errno) -> Int` on both | `inet_ntop` |
+| `IPv4Address.Host.descriptionCapacity` (16), `IPv6Address.Host.descriptionCapacity` (46) | `INET_ADDRSTRLEN`, `INET6_ADDRSTRLEN` |
+
+### Design calls
+
+- **Cluster 4's host types are the conversions without a round trip
+  through `SocketAddress`**: `Host(string)?.rawValue` is the `in_addr` or
+  `in6_addr` that `inet_pton` fills, `Host(bytes:)` reads one from the
+  caller's memory (a `sockaddr`'s address field, for example), and
+  `description` is `inet_ntop`. This cluster adds the forms that allocate
+  nothing: parsing from a C string, and formatting into a buffer the
+  caller manages, with the buffer sizes.
+- **`description(into:)` returns the length**, not counting the
+  terminating null, and throws `.noSpace` (`ENOSPC`) for a buffer that's
+  too small, or empty, as `inet_ntop` reports it.
+- **IPv6's `init?(cString:)` rejects a scope**, as `init(_:)` does (the
+  Darwin `inet_pton` behavior in cluster 4's findings).
+- Rejected: `parse(_:into: UnsafeMutablePointer<in_addr>)` statics, which
+  `Host(string)?.rawValue` already is; a family-generic form over raw
+  pointers, which would take the address's size on trust.
+
+### Findings
+
+- `inet_ntop`'s longest IPv6 text is 39 characters, eight groups of four
+  digits; `INET6_ADDRSTRLEN`'s 46 leaves room for RFC 4291's mixed form
+  (`ffff:ffff:ffff:ffff:ffff:ffff:255.255.255.255`), which `inet_ntop`
+  writes only for IPv4-mapped and -compatible addresses.
+
+### What it replaces in the adopters
+
+- NIO `Sources/NIOCore/SocketAddresses.swift`: `descriptionForAddress`
+  and its `inet_ntop` buffers, clearing `// SYSTEM-GAP: INET_ADDRSTRLEN,
+  INET6_ADDRSTRLEN (buffer sizes for NIO's inet_ntop)`, and the
+  `inet_pton` into `in_addr` and `in6_addr` in `init(ipAddress:port:)`;
+  `Sources/NIOCore/BSDSocketAPI.swift`'s `inet_pton` and `inet_ntop`
+  wrappers (`// SYSTEM-GAP: … inet_ntop, inet_pton`); and
+  `Tests/NIOCoreTests/SocketAddressTest.swift`.
+
+### Platforms
+
+- Built and tested: macOS 26.3. Not built on Linux (paused); it uses only
+  `inet_pton`, `inet_ntop` and the two constants, which glibc, Musl and
+  Bionic declare.
+
+### Tests
+
+- New: `SocketAddressHostTextTests` (4).
+- macOS: XCTest 442 run, 4 skipped, 0 failures; swift-testing 359 tests in
+  53 suites pass.
