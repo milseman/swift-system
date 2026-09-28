@@ -199,3 +199,51 @@ struct csystem_signalfd_siginfo {
   unsigned char __pad[28];
 };
 #endif // __linux__
+
+#if defined(__linux__) && defined(__GLIBC__)
+// glibc's allocator extensions, which it declares in <malloc.h>, which its
+// Swift module doesn't include. <malloc.h> includes <stdio.h>, and so FILE,
+// which this header mustn't declare (see the top of this file), so these
+// are shims, and shims.c includes it. `stream` points to a FILE.
+extern size_t csystem_malloc_usable_size(const void *pointer);
+extern void *csystem_pvalloc(size_t size);
+extern int csystem_malloc_trim(size_t pad);
+extern int csystem_mallopt(int parameter, int value);
+extern int csystem_malloc_info(int options, void *stream);
+extern void csystem_malloc_stats(void);
+
+// The fields of glibc's struct mallinfo2, in its order, which
+// csystem_get_mallinfo2 fills. Before glibc 2.33, which added mallinfo2,
+// they're mallinfo's, whose int fields count modulo 4 GB.
+struct csystem_mallinfo2 {
+  size_t arena;
+  size_t ordblks;
+  size_t smblks;
+  size_t hblks;
+  size_t hblkhd;
+  size_t usmblks;
+  size_t fsmblks;
+  size_t uordblks;
+  size_t fordblks;
+  size_t keepcost;
+};
+extern void csystem_get_mallinfo2(struct csystem_mallinfo2 *info);
+
+// mallopt's parameters, which have these values in every glibc; shims.c
+// checks them against <malloc.h>.
+#define CSYSTEM_M_MXFAST 1
+#define CSYSTEM_M_TRIM_THRESHOLD (-1)
+#define CSYSTEM_M_TOP_PAD (-2)
+#define CSYSTEM_M_MMAP_THRESHOLD (-3)
+#define CSYSTEM_M_MMAP_MAX (-4)
+#define CSYSTEM_M_CHECK_ACTION (-5)
+#define CSYSTEM_M_PERTURB (-6)
+#define CSYSTEM_M_ARENA_TEST (-7)
+#define CSYSTEM_M_ARENA_MAX (-8)
+#endif // defined(__linux__) && defined(__GLIBC__)
+
+#ifdef __ANDROID__
+// Zeroes memory with stores the compiler can't remove, as explicit_bzero
+// does elsewhere; Bionic has no explicit_bzero.
+extern void csystem_explicit_bzero(void *start, size_t count);
+#endif // __ANDROID__

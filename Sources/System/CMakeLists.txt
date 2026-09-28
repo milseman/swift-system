@@ -164,6 +164,13 @@ target_sources(SystemPackage PRIVATE
   Internals/Syscalls+MachTime.swift
   MachTime/MachTime.swift)
 target_sources(SystemPackage PRIVATE
+  Internals/Constants+Memory.swift
+  Internals/Syscalls+Memory.swift
+  Memory/Memory.swift
+  Memory/MemoryAllocator.swift
+  Memory/MemoryBytes.swift
+  Memory/MemoryZone.swift)
+target_sources(SystemPackage PRIVATE
   MemoryMapping/MemoryMapping.swift)
 target_sources(SystemPackage PRIVATE
   NetworkInterfaces/NetworkInterface.swift)
