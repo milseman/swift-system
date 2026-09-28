@@ -126,6 +126,10 @@ EQUIVALENTS = {
 ANSWERED = [
     (r"^(fts_\w+|FTS\w*)$", "DirectoryWalk", "case preorderAndPostorder",
      "Prototype/Directories/README.md"),
+    # The C union's fields are the identifier's bits; TypeDescriptor is the
+    # identifier, with Swift-named properties for the fields.
+    (r"^malloc_type_descriptor_v0_t members$", "Memory.TypeDescriptor", "public var callSiteFlags",
+     "Sources/System/TypedAllocation/TypeDescriptor.swift"),
 ]
 
 
@@ -184,6 +188,9 @@ class SystemNames:
 
     def covers(self, name):
         """(covered, how) for a gap interface's name."""
+        for pattern, api in self.answered:
+            if re.search(pattern, name):
+                return True, f"by {api}"
         if name.endswith(" members"):
             struct = name[:-len(" members")]
             return struct in self.accessor_structs, "Swift-named accessors" if struct in self.accessor_structs else ""
@@ -197,9 +204,6 @@ class SystemNames:
         for other in EQUIVALENTS.get(name, ()):
             if other in self.names:
                 return True, f"as `{other}`"
-        for pattern, api in self.answered:
-            if re.search(pattern, name):
-                return True, f"by {api}"
         return False, ""
 
 
@@ -1300,16 +1304,15 @@ api-delta's last run, and a few seconds when they haven't.
   everywhere, since `import struct Darwin.msghdr` is there for msghdr's fields, not for the name CInterop
   already has.
 - **Covered** means System's library modules (`Sources/System`, `Sources/SystemSockets`, not the samples) name
-  the interface in a doc comment's *The corresponding C … is* sentence, or a public typealias targets it, or,
-  for `X members`, an `extension CInterop.<alias of X>` exists. A few interfaces count as covered by the
-  replacement System wraps instead (`EQUIVALENTS` in `scripts/status.py`: usleep and sleep by nanosleep,
-  localtime and gmtime by their `_r` forms, mkstemp and mkstemps by mkostemp(s), time and gettimeofday by
-  clock_gettime), and the table says
-  so. A family that System answers with a design of its own, rather than a wrapper, counts as covered once a
-  witness in System's sources shows the answer has what the markers ask for (`ANSWERED`: fts is DirectoryWalk,
-  with its two-visit order). This sees what System documents, not whether the API fits the adopter's use: a
-  partial wrapper counts as covered, and an API whose doc comments don't name the C interface counts as
-  missing.
+  the interface in a doc comment's *The corresponding C … is* sentence, or a public typealias targets it, or, for
+  `X members`, an `extension CInterop.<alias of X>` exists. A few interfaces count as covered by the replacement
+  System wraps instead (`EQUIVALENTS` in `scripts/status.py`: usleep and sleep by nanosleep, localtime and gmtime
+  by their `_r` forms, mkstemp and mkstemps by mkostemp(s), time and gettimeofday by clock_gettime), and the table
+  says so. A family that System answers with a design of its own, rather than a wrapper, counts as covered once a
+  witness in System's sources shows the answer has what the markers ask for (`ANSWERED`: fts is DirectoryWalk, with
+  its two-visit order, and `malloc_type_descriptor_v0_t`'s members are `Memory.TypeDescriptor`'s properties). This
+  sees what System documents, not whether the API fits the adopter's use: a partial wrapper counts as covered, and
+  an API whose doc comments don't name the C interface counts as missing.
 - **Provisional families** (libm, C stdio, locale and xlocale, string.h and ctype.h, numeric conversion) are a
   fixed list in `scripts/status.py`, matched by name or by the name's SDK module in adopter-coverage's stored
   vocabulary when there is one. They're C-library layers above the OS that System wraps provisionally, in

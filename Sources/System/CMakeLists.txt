@@ -315,6 +315,11 @@ target_sources(SystemPackage PRIVATE
   TimersAndPriority/ProcessPriority.swift
   TimersAndPriority/ProcessTimer.swift)
 target_sources(SystemPackage PRIVATE
+  Internals/Constants+TypedAllocation.swift
+  Internals/Syscalls+TypedAllocation.swift
+  TypedAllocation/TypeDescriptor.swift
+  TypedAllocation/TypedAllocation.swift)
+target_sources(SystemPackage PRIVATE
   Internals/Syscalls+UnfairLockAndRandom.swift
   UnfairLock/UnfairLock.swift)
 target_sources(SystemPackage PRIVATE
