@@ -107,6 +107,7 @@ struct SystemSamples: ParsableCommand {
       SysDir.self,
       VMCopy.self,
       Groups.self,
+      Nice.self,
     ])
 }
 

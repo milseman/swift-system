@@ -343,3 +343,63 @@ user's and root's groups against `getgrouplist` called directly, an unknown
 user, a thread without credentials) and `ProcessCredentialsMockTests` (the
 growing list, `ESRCH` as `nil`). Totals after it: 459 XCTests (4 skipped)
 and 401 swift-testing tests in 61 suites, all passing.
+
+## 5. Timers and priority
+
+`Sources/System/TimersAndPriority/` (`ProcessTimer.swift`,
+`ProcessPriority.swift`), `Internals/Syscalls+TimersAndPriority.swift` and
+`Constants+TimersAndPriority.swift`; the `nice` sample.
+
+| API | C |
+|---|---|
+| `ProcessTimer`: `.real`, `.virtual`, `.profiling` | `ITIMER_REAL`, `ITIMER_VIRTUAL`, `ITIMER_PROF` |
+| `ProcessTimer.Schedule`: `nextExpiration`, `interval` (`Duration`, macOS 13), `.disarmed`; `CInterop.ITimerVal` | `struct itimerval` |
+| `ProcessTimer.schedule() throws(Errno)` | `getitimer` |
+| `ProcessTimer.setSchedule(_:) throws(Errno) -> Schedule` | `setitimer` |
+| `ProcessTimer.setAlarm(seconds:) -> Int` | `alarm` |
+| `ProcessPriority.Target`: `.process`, `.processGroup`, `.user` | `PRIO_PROCESS`, `PRIO_PGRP`, `PRIO_USER` |
+| `ProcessPriority.current(for:) throws(Errno) -> Int` | `getpriority` |
+| `ProcessPriority.setCurrent(_:for:) throws(Errno)` | `setpriority` |
+| `ProcessPriority.adjust(by:) throws(Errno) -> Int` | `nice` |
+
+Design calls:
+
+- **`ProcessTimer`, since `IntervalTimer` is taken**: the events lane's
+  `IntervalTimer` is Linux's timerfd. These three timers belong to the
+  process and deliver signals, which the documentation names
+  (`Signal.alarm`, `.virtualAlarm`, `.profilingAlarm`).
+- **`Schedule` has `IntervalTimer.Schedule`'s shape**: a `RawRepresentable`
+  over `itimerval` with `nextExpiration` and `interval` as `Duration`s and
+  `.disarmed`, and `setSchedule` returns the old schedule, as its
+  `setSchedule` does. As there, a negative time is zero, and a positive one
+  rounds up, here to a microsecond, so that a time shorter than the unit
+  doesn't stop the timer. Rejected: a struct of two `Duration`s, which
+  would put the macOS 13 floor on the type itself.
+- **`alarm` is `ProcessTimer.setAlarm(seconds:)`**, beside the real timer it
+  shares. It can't fail, so it doesn't throw; a negative count traps.
+- **Priorities mirror C's which and who** as `ProcessPriority.Target`, since
+  process groups are `ProcessID`s here and a method on `ProcessID` couldn't
+  tell a process from a group. The shape is `ResourceLimit`'s:
+  `current(for:)` and `setCurrent(_:for:)`. Values are `Int` nice values.
+  Rejected: methods on `ProcessID` and `UserID`, and a wrapper type for the
+  value.
+- **`nice` is `adjust(by:)`**, returning the new value.
+- **-1 is a nice value**, so `getpriority` and `nice` clear `errno` first and
+  fail only if it's set afterward.
+- Not added: Darwin's `PRIO_DARWIN_THREAD` and `PRIO_DARWIN_PROCESS`
+  background bands, Linux's `RLIMIT_NICE`, and POSIX `timer_create`
+  (not on Darwin).
+
+Findings, probed on macOS 26.3: `nice` returns the new value and stops at
+19, where `setpriority` stops at 20; raising a priority without privilege
+fails with `EPERM` from `nice` and `EACCES` from `setpriority`; the timers
+keep whole microseconds; and `alarm` rounds the time left up (2.4 s is 3).
+
+Adopters: none call these; the queue asked for them.
+
+Tests: `ProcessTimerTests` (XCTest, since the timers are process-wide:
+each timer set, read and stopped, rounding, a one-shot expiry with
+`SIGALRM` ignored, `alarm`), `ProcessPriorityTests` (a spawned child's
+priority, and `nice` in an exit test, since a process can't lower its own
+nice value again), and `TimersAndPriorityMockTests`. Totals after it: 466
+XCTests (4 skipped) and 405 swift-testing tests in 62 suites, all passing.

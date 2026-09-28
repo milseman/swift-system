@@ -256,6 +256,11 @@ target_sources(SystemPackage PRIVATE
   Time/ClockID.swift
   Time/Sleep.swift)
 target_sources(SystemPackage PRIVATE
+  Internals/Constants+TimersAndPriority.swift
+  Internals/Syscalls+TimersAndPriority.swift
+  TimersAndPriority/ProcessPriority.swift
+  TimersAndPriority/ProcessTimer.swift)
+target_sources(SystemPackage PRIVATE
   VectoredIO/VectoredIO.swift)
 target_link_libraries(SystemPackage PUBLIC
   CSystem)
