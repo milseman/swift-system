@@ -55,3 +55,22 @@ mkstemps, nfds_t, O_SEARCH, removefile, timeval, EX_USAGE, mktemp, AF_VSOCK).
 Limits: name matching can't see an API whose doc comments don't name the C interface (System's `nil` file
 time is UTIME_OMIT, undocumented), and counts a partial wrapper as covered (`linger` is named by
 `SocketDescriptor.linger()`, but NIO's public API needs the C type).
+
+## 2. CInterop.TimeVal and CInterop.Linger: `0e1defa`
+
+NIO's SocketOptionProvider takes and returns C `timeval` and `linger` values in its public API, so it keeps
+Darwin imports until System names them and makes them usable without the C library.
+
+- `CInterop.TimeVal` (SystemPackage, next to TimeSpec) copies TimeSpec's shape: `init(seconds:microseconds:)`
+  with zero defaults (the zero value too), `seconds`, `microseconds`, and from macOS 13 `init(duration:)` and
+  `duration`, normalized and rounded down to a microsecond. Rejected: rounding up, as the socket timeouts and
+  ProcessTimer do internally so that a positive time never becomes C's "none"; the general conversion
+  matches TimeSpec's, and its doc points out the zero case.
+- `CInterop.Linger` (SystemSockets) has `init(isEnabled:time:)`, `isEnabled` and `time`. Rejected names:
+  `seconds` (Darwin's `SO_LINGER` counts clock ticks; only `SO_LINGER_SEC` is seconds) and `timeout` (reads
+  as a Duration, and as a failure). SocketDescriptor's `linger()` now uses the alias; the internal `_CLinger`
+  it replaced is gone.
+
+Tests: accessors against the C fields, the duration conversions, a `CInterop.Linger` through
+`setOption`/`getOption` on a TCP socket agreeing with `linger()`, and both in the MemberImportVisibility
+probe. XCTest 471 (4 skipped), swift-testing 437 in 65 suites, all passing.
