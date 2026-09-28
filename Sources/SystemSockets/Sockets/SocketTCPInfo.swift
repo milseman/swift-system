@@ -529,8 +529,19 @@ extension SocketDescriptor {
     }
 
     /// The fields that the C library declares.
+    ///
+    /// Only the bytes the kernel filled in are copied, and no more than this
+    /// buffer holds, since a C library can declare a longer structure than
+    /// either: glibc's newest is 280 bytes. The rest are zero.
     public var rawValue: CInterop.TCPInfo {
-      withUnsafeBytes(of: _bytes) { $0.loadUnaligned(as: CInterop.TCPInfo.self) }
+      var info = CInterop.TCPInfo()
+      withUnsafeMutableBytes(of: &info) { destination in
+        withUnsafeBytes(of: _bytes) { source in
+          let count = min(_count, source.count, destination.count)
+          destination.copyMemory(from: UnsafeRawBufferPointer(rebasing: source.prefix(count)))
+        }
+      }
+      return info
     }
 
     /// A newer field, at its offset in the kernel's structure,
