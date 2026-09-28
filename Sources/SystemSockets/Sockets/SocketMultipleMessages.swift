@@ -195,4 +195,208 @@ extension SocketDescriptor {
   #endif
 }
 
+// MARK: - Batches of Buffers
+
+@available(System 199, *)
+extension SocketDescriptor {
+  /// A message that ``receiveMessages(into:flags:retryOnInterrupt:)``
+  /// received.
+  @frozen
+  public struct ReceivedMessage: Sendable {
+    /// The number of bytes received into the message's buffer.
+    public var byteCount: Int
+
+    /// The address the message came from,
+    /// which is empty for a connected stream socket's messages.
+    public var sender: SocketAddress
+
+    /// Flags that describe the message,
+    /// such as ``MessageFlags/dataTruncated`` if a datagram didn't fit
+    /// in its buffer.
+    public var flags: MessageFlags
+
+    /// Creates a received message's description.
+    @_alwaysEmitIntoClient
+    public init(byteCount: Int, sender: SocketAddress, flags: MessageFlags) {
+      self.byteCount = byteCount
+      self.sender = sender
+      self.flags = flags
+    }
+  }
+
+  /// Sends several messages with one call, each from a buffer of its own.
+  ///
+  ///     let sent = try socket.sendMessages([header, body], to: destination)
+  ///
+  /// - Parameters:
+  ///   - messages: The messages' bytes, in order, one buffer a message.
+  ///   - address: The destination of every message,
+  ///     for a socket that isn't connected,
+  ///     or `nil`, the default, for a connected socket.
+  ///   - flags: Message flags for every message.
+  ///   - retryOnInterrupt: Whether to retry the call
+  ///     if it throws ``Errno/interrupted`` before sending anything.
+  ///     The default is `true`.
+  /// - Returns: The number of messages sent, from the first,
+  ///   as for the form that takes `CInterop.MMsgHdr`s.
+  ///
+  /// This method builds the message headers itself,
+  /// so it needs nothing from the C library.
+  /// To send ancillary messages too, or to reuse headers,
+  /// use the form that takes `CInterop.MMsgHdr`s.
+  ///
+  /// The corresponding C function is `sendmmsg`.
+  /// Darwin has no `sendmmsg`, so there this method calls `sendmsg`
+  /// for each message in turn.
+  @_alwaysEmitIntoClient
+  public func sendMessages(
+    _ messages: some Collection<UnsafeRawBufferPointer>,
+    to address: SocketAddress? = nil,
+    flags: MessageFlags = .none,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) -> Int {
+    try _sendBuffers(
+      Array(messages.lazy.map { ($0, address) }),
+      flags: flags, retryOnInterrupt: retryOnInterrupt
+    ).get()
+  }
+
+  /// Sends several messages with one call, each from a buffer of its own
+  /// and to an address of its own.
+  ///
+  ///     let sent = try socket.sendMessages([(reply, client), (other, peer)])
+  ///
+  /// - Parameters:
+  ///   - messages: The messages, in order: each one's bytes and destination.
+  ///   - flags: Message flags for every message.
+  ///   - retryOnInterrupt: Whether to retry the call
+  ///     if it throws ``Errno/interrupted`` before sending anything.
+  ///     The default is `true`.
+  /// - Returns: The number of messages sent, from the first.
+  ///
+  /// The corresponding C function is `sendmmsg`.
+  /// Darwin has no `sendmmsg`, so there this method calls `sendmsg`
+  /// for each message in turn.
+  @_alwaysEmitIntoClient
+  public func sendMessages(
+    _ messages: some Collection<(UnsafeRawBufferPointer, SocketAddress)>,
+    flags: MessageFlags = .none,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) -> Int {
+    try _sendBuffers(
+      Array(messages.lazy.map { ($0.0, Optional($0.1)) }),
+      flags: flags, retryOnInterrupt: retryOnInterrupt
+    ).get()
+  }
+
+  /// Receives several messages with one call, each into a buffer of its own.
+  ///
+  ///     let received = try socket.receiveMessages(into: buffers)
+  ///     for (message, buffer) in zip(received, buffers) {
+  ///       handle(buffer.prefix(message.byteCount), from: message.sender)
+  ///     }
+  ///
+  /// - Parameters:
+  ///   - buffers: The buffers to receive the messages into, in order,
+  ///     one a message.
+  ///   - flags: Message flags for every message.
+  ///   - retryOnInterrupt: Whether to retry the call
+  ///     if it throws ``Errno/interrupted`` before receiving anything.
+  ///     The default is `true`.
+  /// - Returns: The messages received, in the order of the buffers
+  ///   they were received into: as many as were waiting,
+  ///   on a nonblocking socket,
+  ///   as for the form that takes `CInterop.MMsgHdr`s.
+  ///
+  /// This method builds the message headers itself,
+  /// so it needs nothing from the C library.
+  /// To receive ancillary messages too, or to reuse headers,
+  /// use the form that takes `CInterop.MMsgHdr`s.
+  ///
+  /// The corresponding C function is `recvmmsg`.
+  /// Darwin has no `recvmmsg`, so there this method calls `recvmsg`
+  /// for each message in turn.
+  @_alwaysEmitIntoClient
+  public func receiveMessages(
+    into buffers: some Collection<UnsafeMutableRawBufferPointer>,
+    flags: MessageFlags = .none,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) -> [ReceivedMessage] {
+    try _receiveBuffers(Array(buffers), flags: flags, retryOnInterrupt: retryOnInterrupt).get()
+  }
+
+  @usableFromInline
+  internal func _sendBuffers(
+    _ messages: [(UnsafeRawBufferPointer, SocketAddress?)],
+    flags: MessageFlags,
+    retryOnInterrupt: Bool
+  ) -> Result<Int, Errno> {
+    let count = messages.count
+    guard count > 0 else { return .success(0) }
+    return withUnsafeTemporaryAllocation(of: CInterop.IOVec.self, capacity: count) { vectors in
+      withUnsafeTemporaryAllocation(of: SocketAddress.self, capacity: count) { addresses in
+        withUnsafeTemporaryAllocation(of: CInterop.MMsgHdr.self, capacity: count) { headers in
+          for (i, (bytes, address)) in messages.enumerated() {
+            vectors.initializeElement(at: i, to: CInterop.IOVec(
+              iov_base: UnsafeMutableRawPointer(mutating: bytes.baseAddress),
+              iov_len: bytes.count))
+            addresses.initializeElement(at: i, to: address ?? SocketAddress())
+            var header = CInterop.MsgHdr()
+            header.msg_iov = vectors.baseAddress! + i
+            header.msg_iovlen = 1
+            if let address {
+              header.msg_name = UnsafeMutableRawPointer(
+                (addresses.baseAddress! + i).pointer(to: \._storage)!)
+              header.msg_namelen = address._length
+            }
+            headers.initializeElement(at: i, to: CInterop.MMsgHdr(msg_hdr: header))
+          }
+          // The elements are all trivial, so they needn't be deinitialized.
+          return _sendMessages(headers, flags: flags, retryOnInterrupt: retryOnInterrupt)
+        }
+      }
+    }
+  }
+
+  @usableFromInline
+  internal func _receiveBuffers(
+    _ buffers: [UnsafeMutableRawBufferPointer],
+    flags: MessageFlags,
+    retryOnInterrupt: Bool
+  ) -> Result<[ReceivedMessage], Errno> {
+    let count = buffers.count
+    guard count > 0 else { return .success([]) }
+    let capacity = CInterop.SockLen(MemoryLayout<sockaddr_storage>.size)
+    return withUnsafeTemporaryAllocation(of: CInterop.IOVec.self, capacity: count) { vectors in
+      withUnsafeTemporaryAllocation(of: SocketAddress.self, capacity: count) { addresses in
+        withUnsafeTemporaryAllocation(of: CInterop.MMsgHdr.self, capacity: count) { headers in
+          for (i, buffer) in buffers.enumerated() {
+            vectors.initializeElement(at: i, to: CInterop.IOVec(
+              iov_base: buffer.baseAddress, iov_len: buffer.count))
+            addresses.initializeElement(at: i, to: SocketAddress())
+            var header = CInterop.MsgHdr()
+            header.msg_iov = vectors.baseAddress! + i
+            header.msg_iovlen = 1
+            header.msg_name = UnsafeMutableRawPointer(
+              (addresses.baseAddress! + i).pointer(to: \._storage)!)
+            header.msg_namelen = capacity
+            headers.initializeElement(at: i, to: CInterop.MMsgHdr(msg_hdr: header))
+          }
+          return _receiveMessages(headers, flags: flags, retryOnInterrupt: retryOnInterrupt)
+            .map { received in
+              (0 ..< received).map { i in
+                var sender = addresses[i]
+                sender._length = min(headers[i].msg_hdr.msg_namelen, capacity)
+                return ReceivedMessage(
+                  byteCount: Int(headers[i].msg_len),
+                  sender: sender,
+                  flags: MessageFlags(rawValue: headers[i].msg_hdr.msg_flags))
+              }
+            }
+        }
+      }
+    }
+  }
+}
+
 #endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)

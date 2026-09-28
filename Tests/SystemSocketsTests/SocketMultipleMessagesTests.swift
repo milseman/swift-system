@@ -135,6 +135,74 @@ private struct SocketMultipleMessagesTests {
     #expect(try socket.receiveMessages(empty) == 0)
   }
 
+  /// The buffer forms build the headers themselves.
+  @available(System 199, *)
+  @Test func sendsAndReceivesBuffers() throws {
+    let (first, second) = try SocketDescriptor.pair(.local, .datagram, options: [.closeOnExec, .nonBlocking])
+    defer {
+      try? first.close()
+      try? second.close()
+    }
+    let outgoing = Messages(count: 3, size: 50, filled: true)
+    let sent = try first.sendMessages((0..<3).map {
+      UnsafeRawBufferPointer(rebasing: outgoing.storage[$0 * 50 ..< ($0 + 1) * 50])
+    })
+    #expect(sent == 3)
+
+    // Four buffers, the last too small for the datagram it gets.
+    let storage = UnsafeMutableRawBufferPointer.allocate(byteCount: 400, alignment: 1)
+    defer { storage.deallocate() }
+    let buffers = [
+      UnsafeMutableRawBufferPointer(rebasing: storage[0 ..< 100]),
+      UnsafeMutableRawBufferPointer(rebasing: storage[100 ..< 200]),
+      UnsafeMutableRawBufferPointer(rebasing: storage[200 ..< 210]),
+      UnsafeMutableRawBufferPointer(rebasing: storage[300 ..< 400]),
+    ]
+    let received = try second.receiveMessages(into: buffers)
+    #expect(received.map(\.byteCount) == [50, 50, 10])
+    #expect(received.map { $0.flags.contains(.dataTruncated) } == [false, false, true])
+    #expect(Array(buffers[1].prefix(50)) == outgoing.bytes(of: 1))
+    #expect(Array(buffers[2]) == Array(outgoing.bytes(of: 2).prefix(10)))
+    #expect(try first.sendMessages([UnsafeRawBufferPointer]()) == 0)
+  }
+
+  @available(System 199, *)
+  @Test(.requiresSocketBinding) func sendsToAndReceivesFromAddresses() throws {
+    func bound() throws -> (SocketDescriptor, SocketAddress) {
+      let socket = try SocketDescriptor.open(.ipv4, .datagram, options: [.closeOnExec, .nonBlocking])
+      try socket.bind(to: SocketAddress(ipv4: IPv4Address(host: .loopback, port: 0)))
+      var address = SocketAddress()
+      try socket.getLocalAddress(into: &address)
+      return (socket, address)
+    }
+    let (sender, senderAddress) = try bound()
+    defer { try? sender.close() }
+    let (first, firstAddress) = try bound()
+    defer { try? first.close() }
+    let (second, secondAddress) = try bound()
+    defer { try? second.close() }
+
+    let bytes: [UInt8] = [1, 2, 3, 4, 5, 6]
+    try bytes.withUnsafeBytes { bytes in
+      let sent = try sender.sendMessages([
+        (UnsafeRawBufferPointer(rebasing: bytes[0 ..< 2]), firstAddress),
+        (UnsafeRawBufferPointer(rebasing: bytes[2 ..< 4]), secondAddress),
+        (UnsafeRawBufferPointer(rebasing: bytes[4 ..< 6]), firstAddress),
+      ])
+      #expect(sent == 3)
+    }
+    let storage = UnsafeMutableRawBufferPointer.allocate(byteCount: 64, alignment: 1)
+    defer { storage.deallocate() }
+    let buffers = (0 ..< 4).map { UnsafeMutableRawBufferPointer(rebasing: storage[$0 * 16 ..< ($0 + 1) * 16]) }
+    let atFirst = try first.receiveMessages(into: buffers)
+    #expect(atFirst.map(\.byteCount) == [2, 2])
+    #expect(atFirst.map(\.sender) == [senderAddress, senderAddress])
+    #expect(Array(buffers[1].prefix(2)) == [5, 6])
+    let atSecond = try second.receiveMessages(into: buffers)
+    #expect(atSecond.map(\.byteCount) == [2])
+    #expect(Array(buffers[0].prefix(2)) == [3, 4])
+  }
+
   #if ENABLE_MOCKING
   @available(System 199, *)
   @Test func mockedCalls() throws {
