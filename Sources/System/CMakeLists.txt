@@ -63,6 +63,9 @@ target_sources(SystemPackage PRIVATE
   Internals/Constants+AttributeLists.swift
   Internals/Syscalls+AttributeLists.swift)
 target_sources(SystemPackage PRIVATE
+  BrokenDownTime/BrokenDownTime.swift
+  Internals/Syscalls+BrokenDownTime.swift)
+target_sources(SystemPackage PRIVATE
   Directories/DirectoryStream.swift
   Directories/DirectoryWalk.swift)
 target_sources(SystemPackage PRIVATE
