@@ -17,4 +17,8 @@
 #define COMPATIBILITY_O_CLOFORK 0
 #endif
 
+// malloc_usable_size, which FreeBSD declares in <malloc_np.h>, which its
+// Swift module doesn't include; see shims.c.
+extern size_t csystem_malloc_usable_size(const void *pointer);
+
 #endif // defined(__FreeBSD__)

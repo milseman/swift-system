@@ -558,3 +558,84 @@ extern int csystem_recvmmsg(int fd, void *msgvec, unsigned int vlen, int flags, 
   return recvmmsg(fd, (struct mmsghdr *)msgvec, vlen, flags, (struct timespec *)timeout);
 }
 #endif // __linux__
+
+// MARK: - The allocator
+
+#if defined(__linux__) && defined(__GLIBC__)
+#include <malloc.h>
+
+_Static_assert(CSYSTEM_M_MXFAST == M_MXFAST, "M_MXFAST");
+_Static_assert(CSYSTEM_M_TRIM_THRESHOLD == M_TRIM_THRESHOLD, "M_TRIM_THRESHOLD");
+_Static_assert(CSYSTEM_M_TOP_PAD == M_TOP_PAD, "M_TOP_PAD");
+_Static_assert(CSYSTEM_M_MMAP_THRESHOLD == M_MMAP_THRESHOLD, "M_MMAP_THRESHOLD");
+_Static_assert(CSYSTEM_M_MMAP_MAX == M_MMAP_MAX, "M_MMAP_MAX");
+_Static_assert(CSYSTEM_M_CHECK_ACTION == M_CHECK_ACTION, "M_CHECK_ACTION");
+_Static_assert(CSYSTEM_M_PERTURB == M_PERTURB, "M_PERTURB");
+_Static_assert(CSYSTEM_M_ARENA_TEST == M_ARENA_TEST, "M_ARENA_TEST");
+_Static_assert(CSYSTEM_M_ARENA_MAX == M_ARENA_MAX, "M_ARENA_MAX");
+
+extern size_t csystem_malloc_usable_size(const void *pointer) {
+  return malloc_usable_size((void *)pointer);
+}
+
+extern void *csystem_pvalloc(size_t size) {
+  return pvalloc(size);
+}
+
+extern int csystem_malloc_trim(size_t pad) {
+  return malloc_trim(pad);
+}
+
+extern int csystem_mallopt(int parameter, int value) {
+  return mallopt(parameter, value);
+}
+
+extern int csystem_malloc_info(int options, void *stream) {
+  return malloc_info(options, (FILE *)stream);
+}
+
+extern void csystem_malloc_stats(void) {
+  malloc_stats();
+}
+
+extern void csystem_get_mallinfo2(struct csystem_mallinfo2 *info) {
+  #if __GLIBC_PREREQ(2, 33)
+  struct mallinfo2 m = mallinfo2();
+  #define CSYSTEM_MALLINFO_FIELD(f) ((size_t)m.f)
+  #else
+  // mallinfo's int fields count modulo 2^32.
+  struct mallinfo m = mallinfo();
+  #define CSYSTEM_MALLINFO_FIELD(f) ((size_t)(unsigned int)m.f)
+  #endif
+  info->arena = CSYSTEM_MALLINFO_FIELD(arena);
+  info->ordblks = CSYSTEM_MALLINFO_FIELD(ordblks);
+  info->smblks = CSYSTEM_MALLINFO_FIELD(smblks);
+  info->hblks = CSYSTEM_MALLINFO_FIELD(hblks);
+  info->hblkhd = CSYSTEM_MALLINFO_FIELD(hblkhd);
+  info->usmblks = CSYSTEM_MALLINFO_FIELD(usmblks);
+  info->fsmblks = CSYSTEM_MALLINFO_FIELD(fsmblks);
+  info->uordblks = CSYSTEM_MALLINFO_FIELD(uordblks);
+  info->fordblks = CSYSTEM_MALLINFO_FIELD(fordblks);
+  info->keepcost = CSYSTEM_MALLINFO_FIELD(keepcost);
+  #undef CSYSTEM_MALLINFO_FIELD
+}
+#endif // defined(__linux__) && defined(__GLIBC__)
+
+#if defined(__FreeBSD__)
+#include <malloc_np.h>
+
+extern size_t csystem_malloc_usable_size(const void *pointer) {
+  return malloc_usable_size(pointer);
+}
+#endif // defined(__FreeBSD__)
+
+#ifdef __ANDROID__
+#include <string.h>
+
+extern void csystem_explicit_bzero(void *start, size_t count) {
+  memset(start, 0, count);
+  // The compiler must assume that the empty assembly reads the memory, so
+  // it can't remove the memset as a store that nothing reads.
+  __asm__ __volatile__("" : : "r"(start) : "memory");
+}
+#endif // __ANDROID__
