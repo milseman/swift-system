@@ -267,3 +267,17 @@ Found on macOS 26.3: misusing an unfair lock ends the process with SIGKILL, not 
 returns false.
 
 Tests: UnfairLockTests, RandomGeneratorTests. XCTest 506, swift-testing 452 in 69 suites, all passing.
+
+## 12. chroot and sync: `87f36ab`
+
+The posix-darwin lane's unstarted cluster 9; truncating a path was already `FilePath.resize(to:)`.
+
+- `FilePath.setRootDirectory(_:retryOnInterrupt:)` (chroot), for a FilePath and a C string, after
+  `setCurrentWorkingDirectory` (chdir), retrying on EINTR as path calls do. Its doc: the root is inherited,
+  needs privileges (EPERM), and leaves the working directory alone.
+- `FileDescriptor.synchronizeAllFileSystems()` (sync), the system-wide `synchronize()`, noting that it can
+  return before the writes finish, as Darwin's does; it can't fail. Rejected: a namespace for one call; syncfs,
+  Linux-only, until Linux resumes.
+
+That ends the early list: posix-darwin's clusters 6 to 9 are done. Tests: RootAndSyncTest. XCTest 509,
+swift-testing 452, all passing.
