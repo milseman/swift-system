@@ -365,3 +365,369 @@ program rather than calling it.
 Unverified off Darwin: the Android branches, `getlogin_r`'s `int` length
 on older FreeBSD (it's passed with `numericCast`), and glibc's `getlogin`
 errors without a controlling terminal.
+
+## 5. Paths and files
+
+`Sources/System/PathsAndFiles/` (`FilePath+Resolution.swift`,
+`UniqueFiles.swift`, `ProcessDefaults.swift`),
+`Sources/System/Internals/Syscalls+PathsAndFiles.swift`, and two CSystem
+shims for Linux.
+
+| API | C |
+|---|---|
+| `FilePath.canonicalized() throws(Errno) -> FilePath`, and a C-string form | `realpath` |
+| `FilePath.remove(retryOnInterrupt:)`, and a C-string form | `remove` |
+| `FilePath.makeUniqueFile(options:retryOnInterrupt:) -> (path:, descriptor:)`, and a C-string form that rewrites the template | `mkostemp` |
+| `FilePath.makeUniqueDirectory(retryOnInterrupt:) -> FilePath`, and a C-string form | `mkdtemp` |
+| `FilePath.temporaryDirectory() -> FilePath` | `TMPDIR`, then Darwin's `confstr(_CS_DARWIN_USER_TEMP_DIR)`, then `/data/local/tmp` or `/tmp` |
+| `FilePermissions.setCreationMask(_:) -> FilePermissions` | `umask` |
+| `FileDescriptor.currentWorkingDirectory` | `AT_FDCWD` |
+
+Design calls:
+
+- **`canonicalized()`** for `realpath`, after the "canonical, absolute"
+  form it returns, and beside `lexicallyNormalized()`, whose doc it
+  contrasts with. Rejected: `realPath()` (the C name), and
+  `resolvingSymbolicLinks()`, which undersells making the path absolute and
+  removing `..`.
+- **`remove()`** is C's name. It's a file system call beside `unlink()` and
+  `removeDirectory()`, and it throws, which keeps it apart from
+  `removeLastComponent()`, which edits the path. Rejected: `removeItem()`,
+  which is recursive in Foundation.
+- **Templates must end in six X's, on every platform.** POSIX requires it,
+  and glibc enforces it; Darwin's `mkstemp` accepted `report-XX`, and its
+  `mkdtemp` made a directory named exactly `scratch` from a template
+  without X's: a name anyone can guess. Found by the tests. Rejected:
+  passing Darwin's leniency through.
+- **`makeUniqueFile` is `mkostemp`**, so `options: .closeOnExec` makes the
+  descriptor without a window in which a child could inherit it. The
+  default is no options, as for `open`. glibc declares `mkostemp` only with
+  `_GNU_SOURCE`, and Bionic only from API level 23, so Linux goes through a
+  CSystem shim, which on older Android calls `mkstemp` for no options and
+  fails with `ENOSYS` for others. It returns the new path and the
+  descriptor, as `pipe()` returns its two. Rejected: returning an
+  `OwnedFD`, which `open` doesn't either; and a `permissions:` parameter,
+  which `mkstemp` doesn't have (the file is 0600 less the mask).
+- **A retried call starts from the original template**: a failed call can
+  leave the X's replaced, so `_retryingTemplate` saves and restores it.
+- **`temporaryDirectory()` reads `TMPDIR` first,** as POSIX and NIO do,
+  then Darwin's per-user directory, then `/data/local/tmp` on Android, as
+  NIO and Foundation do, then `/tmp`. A set-user-ID program ignores
+  `TMPDIR` (`issetugid`, or `getauxval(AT_SECURE)` through a shim on
+  Linux), as Foundation's `getEnvSecure` does. It's a method, not a
+  property, since `confstr` can create the directory. Rejected:
+  Foundation's order, which ignores the user's `TMPDIR` on Darwin. On
+  Darwin it reads the darwin-more lane's
+  `SystemConfig.string(.userTemporaryDirectory)`, since the merge that
+  brought it in; before, it called `system_confstr` itself.
+- **`setCreationMask(_:)` is `umask`'s exact shape**: it sets the mask and
+  returns the old one, with a discardable result. There's no getter,
+  because C has none: reading the mask means setting it and setting it
+  back, which another thread can see, and the documentation says so.
+  Foundation needs the value (to `fchmod` after `mkstemp`, its comment
+  says), which this leaves racy. `FileOperations.swift` already has an
+  internal `creationMask` property and `withCreationMask(_:body:)`, which
+  this lane didn't edit; making those public, or reading Linux's
+  `/proc/self/status`, is the choice left. Not on Windows, where System's
+  `umask` is its own emulation.
+- **`FileDescriptor.currentWorkingDirectory`** reads well where it's used,
+  `relativeTo: .currentWorkingDirectory`. Its documentation says it isn't
+  an open descriptor, and other calls on it throw `EBADF`. No `renamed:`
+  stub for `AT_FDCWD`, as the standard streams have none for
+  `STDIN_FILENO`.
+- Not added: `mkstemps` and `mkostemps` (a template with a suffix),
+  `mkdtempat` and a `realpath` relative to a directory, which don't exist
+  everywhere.
+
+Adopters:
+- NIO: `remove` in NIOFS and `NonBlockingFileIO` (3 lines); `AT_FDCWD` for
+  NIOFS's Linux paths (2); NIOFS's `temporaryDirectory`, which reads
+  `TMPDIR` and `confstr(_CS_DARWIN_USER_TEMP_DIR)` (3).
+- Foundation, by grep: `mkstemp` and `umask` in `Data+Writing`, `AT_FDCWD`,
+  and `NSTemporaryDirectory`'s `confstr` and `TMPDIR`.
+- SwiftPM: `mkdtemp` (1), and the per-user temporary directory for its
+  sandbox profile.
+
+Unverified off Darwin: the `mkostemp` and `getauxval` shims, glibc's
+`EINVAL` for bad templates (now caught first anyway), and Linux's `remove`
+error for a directory that isn't empty (the test accepts any `Errno`).
+
+## 6. Dynamic loading
+
+`Sources/System/DynamicLoading/DynamicLibrary.swift`,
+`Sources/System/Internals/Syscalls+DynamicLoading.swift` and
+`Constants+DynamicLoading.swift`.
+
+| API | C |
+|---|---|
+| `DynamicLibrary: ~Copyable`, `init(_:options:) throws(LoaderError)` (`FilePath` and C string) | `dlopen` |
+| `DynamicLibrary.mainProgram(options:)` | `dlopen(NULL, …)` |
+| `address(of:) -> UnsafeMutableRawPointer?` (`String` and C string) | `dlsym` |
+| `close() throws(LoaderError)`, `deinit`, `relinquish()`, `init(taking:)`, `handle` | `dlclose` |
+| `DynamicLibrary.LoaderError` (`message`) | `dlerror` |
+| `DynamicLibrary.OpenOptions`: `.lazy`, `.now`, `.global`, `.local`, `.noLoad`, `.noDelete` (not OpenBSD), `.first` (Darwin) | `RTLD_*` |
+
+Design calls:
+
+- **An owned handle, on `OwnedFD`'s pattern**: `init(taking:)`, a consuming
+  `close()` that reports an error, a `deinit` that drops one, `relinquish()`,
+  and a `handle` property for calls it doesn't wrap. Whether a deinit should
+  drop close errors is `OwnedFD`'s open question (`Prototype/CloseErrors`);
+  this follows its current default without deciding it. It's
+  `@unchecked Sendable`, since the dl* calls are thread-safe and the handle
+  is a raw pointer.
+- **Errors are `LoaderError`s with `dlerror`'s message, not `Errno`**: the
+  dynamic linker doesn't report through `errno`. SwiftPM's `PackagePlugin`
+  keeps the same message in its own `LibraryOpenError`. For the same reason
+  the wrappers have no mock hooks, which set `errno`.
+- **A missing symbol is `nil`, not an error**, as NIO, SwiftPM and
+  Foundation treat it. `address(of:)` clears `dlerror` first, so a caller can
+  still tell a symbol whose value is null from a missing one.
+- **The default options are `[.now, .local]` everywhere.** Darwin makes a
+  library global when neither `.local` nor `.global` is given, and Linux
+  local, so the default names one; and `.now` fails at load rather than
+  crashing at a lazy call later. Rejected: `.lazy` (C's usual choice).
+- **`mainProgram()` is `dlopen(NULL)`**, which NIO and SwiftPM use to find
+  symbols in the running process. Rejected: `RTLD_DEFAULT` (a pseudo-handle
+  glibc declares only with `_GNU_SOURCE`, and whose value differs by
+  platform).
+- **Addresses are raw pointers**, and the documentation says a function's
+  must be cast with `unsafeBitCast(_:to:)`, which nothing checks. Rejected:
+  a generic `address<T>(of:as:)` that casts, which hides the unchecked
+  cast.
+- Not added: `dladdr` (glibc declares it only with `_GNU_SOURCE`), `dlinfo`,
+  `dlvsym`, and `RTLD_NEXT`. Glibc's module links `libdl`, which glibc
+  before 2.34, on Ubuntu 20.04, still needs.
+
+Adopters:
+- NIO: `dlopen(nil, RTLD_NOW)` and `dlsym` to find
+  `swift_task_enqueueGlobal_hook` (`PosixSingletons+ConcurrencyTakeOver`).
+- SwiftPM: `PackagePlugin`'s `LibraryHandle` (`dlopen(nil, RTLD_NOW | RTLD_LOCAL)`,
+  `dlsym`, `dlerror`), and the testing helper's `dlopen` of a test bundle,
+  `dlsym(image, "main")` and `dlclose`.
+- Foundation: `AttributeScope`'s `dlopen(path, RTLD_NOLOAD | RTLD_FIRST)`,
+  `dlsym` and `dlclose`.
+
+Unverified off Darwin: the `RTLD_NOLOAD` and `RTLD_NODELETE` values on
+FreeBSD and Bionic, OpenBSD's lack of them, and Android's linking of
+`libdl`.
+
+## 7. Memory mapping
+
+`Sources/System/MemoryMapping/MemoryMapping.swift`,
+`Sources/System/Internals/Syscalls+MemoryMapping.swift` and
+`Constants+MemoryMapping.swift`.
+
+| API | C |
+|---|---|
+| `MemoryMapping: ~Copyable`, `init(byteCount:protection:options:)` | `mmap` with `MAP_ANON` |
+| `init(file:offset:byteCount:protection:options:)` | `mmap` |
+| `bytes: RawSpan`, `mutableBytes: MutableRawSpan` (macOS 15, as the Span I/O) | |
+| `setProtection(_:range:)` | `mprotect` |
+| `synchronize(asynchronously:invalidatingCaches:range:)` | `msync` |
+| `advise(_:range:)` with `Advice`: `.normal`, `.random`, `.sequential`, `.willNeed`, `.doNotNeed`, `.free` | `madvise` |
+| `residentPages() -> [Bool]` (not OpenBSD) | `mincore` |
+| `unmap() throws(Errno)`, `deinit`, `relinquish()`, `init(unsafeTaking:byteCount:)`, `unsafeBuffer` | `munmap` |
+| `Protection` (`.read`, `.write`, `.execute`), `Options` (`.shared`, `.private`; `.noReserve`, `.populate` on Linux) | `PROT_*`, `MAP_*` |
+
+Design calls:
+
+- **The owner is the span audit's shape**: spans through a borrow and a
+  mutation, which are sound because the address never moves, and
+  `OwnedFD`'s pattern for the rest: a consuming `unmap()` that reports, a
+  `deinit` that drops, and `relinquish()`. The adopting initializer is
+  `init(unsafeTaking:byteCount:)`, where `OwnedFD`'s is `init(taking:)`:
+  unmapping memory that something else uses is undefined behavior, which
+  closing the wrong descriptor isn't.
+- **Hazards are documented, not typed away**: another process changing a
+  shared mapping under a span, `SIGBUS` past the end of a truncated file,
+  and a crash for writing through `mutableBytes` to memory that doesn't
+  allow it. Rejected: separate read-only and writable mapping types, which
+  would double the API for a check that `mprotect` can undo anyway.
+- **No `MAP_FIXED`**, which silently replaces whatever was mapped at the
+  address; code that needs it is placing memory by hand, and can use C.
+  The address is always the system's choice.
+- **Defaults**: an anonymous mapping is `[.read, .write]` and `.private`; a
+  file's is `.read` and `.shared`. Foundation maps files `MAP_PRIVATE`,
+  which for a read-only mapping differs only in whether others' writes are
+  guaranteed to show.
+- **`msync`'s flags are two `Bool`s**, since it needs exactly one of
+  `MS_SYNC` and `MS_ASYNC`, which an option set can't express.
+- **`residentPages()` returns `[Bool]`**, one per page, reading only the low
+  bit (Darwin uses the others). Rejected: filling a caller's
+  `MutableSpan<UInt8>` (the audit's suggestion), which would expose the
+  per-platform `char` and `unsigned char` vectors and Darwin's extra bits.
+- **Platform differences stay visible**: `.doNotNeed` discards a private
+  mapping's pages at once on Linux and is a hint elsewhere, which its
+  documentation says; Linux rejects advice that starts inside a page and
+  Darwin rounds it down, which a test found.
+- **Swift 6.2 limit, found by the sample**: a `let` owner can't be consumed
+  (by `unmap()`) anywhere after a span has borrowed it, even once the span
+  is gone; a `var` owner can, with a spurious "never mutated" warning. The
+  `mmap` sample reads its span in a helper that takes the mapping
+  `borrowing`, which works. Worth reporting upstream.
+- Not added: `mlock`/`munlock`, `mremap` (Linux), `MAP_JIT` (Darwin), and
+  huge pages.
+
+Adopters: Foundation's `Data(contentsOf:options: .alwaysMapped)`
+(`Data+Reading.swift`), which compares with `MAP_FAILED` on most platforms
+and with `-1` on Android, and unmaps in `Data`'s deallocator. The `extents`
+sample calls `mmap` and `mincore` from C, and could use this (the demos
+lane's file). NIO and Subprocess don't map memory.
+
+Unverified off Darwin: Bionic's non-optional `mmap` result, Linux's
+`unsigned char` `mincore` vector, and the Linux-only options.
+
+## 8. Network interfaces
+
+`Sources/System/NetworkInterfaces/NetworkInterface.swift`,
+`Sources/System/Internals/Syscalls+NetworkInterfaces.swift` and
+`Constants+NetworkInterfaces.swift`, and Android shims for `getifaddrs`.
+
+| API | C |
+|---|---|
+| `NetworkInterface` (a namespace) | |
+| `NetworkInterface.Addresses: ~Copyable`, `init() throws(Errno)`, `count`, `forEach(_:)` | `getifaddrs`, `freeifaddrs` |
+| `Addresses.Entry: ~Escapable`: `name`, `flags`, `addressFamily`, `unsafeNode` | `ifa_name`, `ifa_flags`, `sa_family`, `struct ifaddrs` |
+| `Entry.address`, `.netmask`, `.broadcastAddress`, `.destinationAddress`: `RawSpan?` (macOS 15) | `ifa_addr`, `ifa_netmask`, `ifa_broadaddr`/`ifa_dstaddr` |
+| `NetworkInterface.Flags`: `.up`, `.broadcast`, `.debug`, `.loopback`, `.pointToPoint`, `.running`, `.noARP`, `.promiscuous`, `.allMulticast`, `.multicast` | `IFF_*` |
+| `NetworkInterface.Index`, `init?(name:) throws(Errno)`, `name() throws(Errno) -> String?` | `if_nametoindex`, `if_indextoname` |
+
+Design calls:
+
+- **An owned list with entries that can't outlive it.** `Entry` is
+  `~Escapable`, with a lifetime borrowed from the list, and the address
+  spans copy that lifetime; `Prototype/PosixMore/Verify/P1_entry_escape.swift`
+  checks that keeping either fails to compile. Iteration is `forEach`,
+  since a `~Escapable` value can't be an `Array` element or a `Sequence`'s.
+  Rejected: copying every entry into a value (addresses as byte arrays) and
+  returning `[Entry]`, which is simpler but isn't an owned list and copies
+  what NIO converts right away; and entries that hold a raw pointer, which
+  a caller could keep past `freeifaddrs`.
+- **Addresses are the sockaddr's bytes, as spans.** SystemPackage can't name
+  SystemSockets' `SocketAddress`, which the fold-in will fix; until then,
+  `span.withUnsafeBytes { SocketAddress($0) }` converts, as the `ifconfig`
+  sample does. The length is `sa_len` on Darwin and the BSDs, and the
+  family's `sockaddr` size on Linux, which has no length field (20 bytes
+  for `AF_PACKET`'s `sockaddr_ll`, whose header Glibc's module lacks).
+  Darwin's netmasks can be shorter than their family's `sockaddr`, and the
+  documentation says so.
+- **Broadcast and destination addresses** share a C field; each property
+  answers only when the flags say that's what the field holds, as NIO
+  reads them. Linux and Android spell the field `ifa_ifu.ifu_dstaddr`.
+- **A missing interface is `nil`, and other failures throw**: glibc's
+  `if_nametoindex` opens a socket, so it can fail with `EMFILE`, which a
+  plain `nil` would report as "no such interface". Darwin reports a missing
+  one with `ENXIO` and Linux with `ENODEV`; both are `nil`.
+- **One top-level name**, `NetworkInterface`, holds `Addresses`, `Flags` and
+  `Index`. NIO's own types are `NIONetworkDevice` and `NIONetworkInterface`,
+  so nothing collides.
+- **Swift 6.2**: `Optional.map` requires an `Escapable` value, so an
+  optional span is unwrapped with `if let`.
+- Not added: `if_nameindex` and `if_freenameindex`, which list names and
+  indexes; per-interface statistics (`ifa_data`, `AF_LINK`), which
+  `unsafeNode` reaches.
+
+Adopters: NIO's `System.enumerateDevices` and `NIONetworkDevice`
+(`NIOCore/Interfaces.swift`), which walk the `ifaddrs` list and call
+`if_nametoindex` for each device (48 lines). No other adopter uses these.
+
+Unverified off Darwin: the Android shims; glibc's anonymous-enum `IFF_*`
+constants, which Swift imports as `Int` and this converts; and the Linux
+address lengths.
+
+## 9. Extended attributes
+
+`Sources/System/ExtendedAttributes/ExtendedAttributes.swift`,
+`Sources/System/Internals/Syscalls+ExtendedAttributes.swift` and
+`Constants+ExtendedAttributes.swift`, and `<sys/xattr.h>` in
+`CSystemLinux.h`.
+
+| API | Darwin | Linux |
+|---|---|---|
+| `FilePath.extendedAttributeNames(followTargetSymlink:retryOnInterrupt:)` | `listxattr`, with `XATTR_NOFOLLOW` | `listxattr`, `llistxattr` |
+| `FilePath.extendedAttribute(_:followTargetSymlink:retryOnInterrupt:) -> [UInt8]?` | `getxattr` | `getxattr`, `lgetxattr` |
+| `FilePath.setExtendedAttribute(_:to:options:followTargetSymlink:retryOnInterrupt:)` | `setxattr` | `setxattr`, `lsetxattr` |
+| `FilePath.removeExtendedAttribute(_:followTargetSymlink:retryOnInterrupt:)` | `removexattr` | `removexattr`, `lremovexattr` |
+| The same four on `FileDescriptor`, and as `FilePath` statics over C strings | `f…xattr` | `f…xattr` |
+| `ExtendedAttributeOptions`: `.create`, `.replace` | `XATTR_CREATE`, `XATTR_REPLACE` | the same |
+| `Errno.attributeNotFound` on Linux and Android | (`ENOATTR`, as before) | `ENODATA` |
+
+Design calls:
+
+- **One set of signatures over two.** Darwin's calls take a `position`,
+  used only for resource forks, which is always 0 here, and options that
+  include `XATTR_NOFOLLOW`; Linux has an `l` form of each path call instead.
+  `followTargetSymlink:` picks between them, named as `stat`'s parameter is.
+  Rejected: exposing `position` and Darwin's other options
+  (`XATTR_SHOWCOMPRESSION`, `XATTR_NOSECURITY`), which Linux has no
+  equivalent for; and FreeBSD's `extattr_*` calls, whose namespaces are an
+  argument rather than a prefix, and which would need a different shape.
+- **A missing attribute reads as `nil`**, where Darwin says `ENOATTR` and
+  Linux `ENODATA`. For the calls that still throw it, `remove` and `set`
+  with `.replace`, **`Errno.attributeNotFound` is now portable**: on Linux
+  and Android it's `ENODATA`, which Linux's attribute library also names
+  `ENOATTR`. The existing Darwin and FreeBSD declaration is unchanged; the
+  Linux one is in this lane's file. Rejected: throwing each platform's own
+  error, which makes every caller check two names.
+- **Values are `[UInt8]` read in two calls**: the size, then the value, and
+  again if the value grew in between (`ERANGE`). Setting takes any
+  `Sequence<UInt8>`, as `writeAll` does, so `Array`, `Data` and
+  `String.UTF8View` all work. Names are `[String]`, repaired if they aren't
+  UTF-8. Rejected: span-based reads into a caller's buffer, which save a
+  copy that attribute sizes rarely justify; a later overload can add them.
+- **Glibc's module doesn't include `<sys/xattr.h>`**, so `CSystemLinux.h`
+  includes it; it declares no types, so no C members move to CSystem.
+  Musl's and Bionic's modules include it anyway. The Linux values of
+  `XATTR_CREATE` and `XATTR_REPLACE` are the kernel's 1 and 2, since glibc
+  declares them in an enum.
+- **Tests skip a file system without extended attributes** (`ENOTSUP`),
+  such as tmpfs before Linux 6.6, rather than fail.
+- Not added: Linux 6.13's `getxattrat` family, and a view of the names as a
+  span.
+
+Adopters: NIO's NIOFS `FileHandle.attributeNames`, `valueForAttribute`,
+`updateValueForAttribute` and `removeValueForAttribute`, over the
+descriptor forms (22 lines, and its own `XATTR_MAXNAMELEN`); Foundation's
+`FileManager` extended attributes, by grep (`getxattr`, `setxattr`,
+`listxattr`, and their `f` forms).
+
+Unverified off Darwin: every Linux branch (the `l` calls, the CSystem
+include, `ENODATA`), and user attributes on the CI's file systems.
+
+## 10. Random bytes
+
+`Sources/System/Entropy/Entropy.swift`,
+`Sources/System/Internals/Syscalls+Entropy.swift`, `<sys/random.h>` in
+`CSystemDarwin.h`, and an Android shim.
+
+| API | C |
+|---|---|
+| `Entropy.fill(_: UnsafeMutableRawBufferPointer) throws(Errno)` | `getentropy`, in calls of at most 256 bytes |
+| `Entropy.fill(_: inout MutableRawSpan) throws(Errno)` (macOS 15) | the same |
+| `Entropy.bytes(count:) throws(Errno) -> [UInt8]` | the same |
+
+Design calls:
+
+- **Any size, in 256-byte calls**, the most one `getentropy` call fills;
+  more is `EIO` on Darwin and Linux. The limit is the call's, not the
+  caller's concern.
+- **`getentropy`, not `getrandom` or `arc4random_buf`.** `getentropy` is
+  on Darwin, Linux, the BSDs and Android; `getrandom` isn't on Darwin, and
+  `arc4random_buf` can't report a failure. The standard library's
+  `SystemRandomNumberGenerator`, which the adopters use for random bytes,
+  reads the same kind of source but traps if it fails; this throws.
+  Rejected: a `RandomNumberGenerator` of System's own, which would
+  duplicate the standard library's.
+- **A namespace, `Entropy`**, after the call. Rejected: `SystemRandom`,
+  which reads as a relative of `SystemRandomNumberGenerator`.
+- **Darwin's module doesn't export `<sys/random.h>`**, so `CSystemDarwin.h`
+  includes it; Darwin's headers are modular, so nothing's members move.
+  Bionic has `getentropy` only from API level 28, below which the shim
+  fails with `ENOSYS`.
+
+Adopters: none call `getentropy`; NIO and Foundation use
+`SystemRandomNumberGenerator` (WebSocket keys and masks, UUIDs).
+
+Unverified off Darwin: glibc's declaration in `<unistd.h>` (from 2.25),
+Musl's and FreeBSD's, and the Android shim.

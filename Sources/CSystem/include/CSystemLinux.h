@@ -132,9 +132,33 @@ extern int csystem_pthread_getaffinity_np(pthread_t thread, size_t size, void *m
 // so that this header needn't include <sys/uio.h> (see the ioctl shims).
 extern ssize_t csystem_preadv(int fd, const void *iov, int iovcnt, off_t offset);
 extern ssize_t csystem_pwritev(int fd, const void *iov, int iovcnt, off_t offset);
+
+// getifaddrs and freeifaddrs, which Bionic declares only from API level 24;
+// below it, getifaddrs fails with ENOSYS. `list` points to a struct ifaddrs *,
+// untyped so that this header needn't include <ifaddrs.h>.
+extern int csystem_getifaddrs(void **list);
+extern void csystem_freeifaddrs(void *list);
+
+// getentropy, which Bionic declares only from API level 28; below it, this
+// fails with ENOSYS.
+extern int csystem_getentropy(void *buffer, size_t length);
 #endif // __ANDROID__
 
 #ifdef __linux__
+// The extended attribute calls, which glibc's Swift module doesn't include.
+// The header declares no types, so nothing's members move to CSystem.
+#include <sys/xattr.h>
+
+// mkostemp, which glibc declares only with _GNU_SOURCE, and Bionic only from
+// API level 23; below it, this calls mkstemp when there are no flags, and
+// fails with ENOSYS when there are.
+extern int csystem_mkostemp(char *path_template, int flags);
+
+// Whether the process runs with privileges it didn't start with, as a
+// set-user-ID program does: getauxval(AT_SECURE). No C library's Swift module
+// includes <sys/auxv.h>.
+extern int csystem_is_secure_execution(void);
+
 // Process descriptors, signal descriptors, and closing ranges of
 // descriptors, through raw system calls, since not every C library has
 // wrappers for them: glibc added pidfd_open in 2.36, and close_range in
