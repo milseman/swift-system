@@ -183,6 +183,9 @@ target_sources(SystemPackage PRIVATE
   PathsAndFiles/ProcessDefaults.swift
   PathsAndFiles/UniqueFiles.swift)
 target_sources(SystemPackage PRIVATE
+  Internals/Syscalls+ProcessCredentials.swift
+  ProcessCredentials/ProcessCredentials.swift)
+target_sources(SystemPackage PRIVATE
   Internals/Syscalls+ProcessExit.swift
   ProcessExit/ProcessExit.swift)
 target_sources(SystemPackage PRIVATE

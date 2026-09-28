@@ -279,3 +279,67 @@ Tests: `MachVirtualMemoryTests` (zeroed pages, the empty allocation,
 read-only destinations, every error's code and description) and
 `MachVirtualMemoryMockTests`. Totals after it: 456 XCTests (4 skipped) and
 396 swift-testing tests in 60 suites, all passing.
+
+## 4. Credentials
+
+`Sources/System/ProcessCredentials/ProcessCredentials.swift` and
+`Internals/Syscalls+ProcessCredentials.swift`; the `groups` sample.
+
+| API | C |
+|---|---|
+| `ProcessID.isSetUserOrGroupID: Bool` | `issetugid`; `getauxval(AT_SECURE)` on Linux and Android |
+| `ProcessEnvironment.secureValue(of:) -> String?` | glibc's `secure_getenv`; `issetugid` and `getenv` |
+| `GroupID.supplementary(forUser:including:) throws(Errno) -> [GroupID]` | `getgrouplist` |
+| `PThread.credentials() throws(Errno) -> (user: UserID, group: GroupID)?` (Darwin) | `pthread_getugid_np` |
+| (already there) `UserEntry(name:)`, `GroupEntry(name:)` | `getpwnam_r`, `getgrnam_r` |
+
+Design calls:
+
+- **`isSetUserOrGroupID` is a static on `ProcessID`**, where the other
+  statics (`current`, `parent`, `exit`) are about the calling process, and it
+  reuses posix-more's internal `system_isSecureExecution()`, which cluster 5
+  of that lane wrote for `TMPDIR`. The name is `issetugid`'s spelled out.
+  Its documentation says when it becomes true, which differs: Darwin and the
+  BSDs also count a process that has changed its IDs since, and Linux's
+  secure-execution mode is fixed when the program starts. Rejected: the
+  BSDs' "tainted" and Linux's "secure execution", which each name one
+  platform's rule; and a place on `ProcessEnvironment`, since the flag also
+  governs more than the environment.
+- **`secureValue(of:)` is `secure_getenv`'s rule everywhere**: `nil` in a
+  set-ID process, else `value(of:)`. glibc's `secure_getenv` checks the same
+  `AT_SECURE`, so one implementation serves every platform and glibc needs
+  no `_GNU_SOURCE` shim. It's in this lane's file, as an extension of
+  posix-more's `ProcessEnvironment`.
+- **`getgrouplist` is `GroupID.supplementary(forUser:including:)`**, the
+  query beside `UserID.setSupplementary(forUser:including:)` (`initgroups`,
+  which sets these groups) and `GroupID.supplementary()` (`getgroups`).
+  Darwin's takes `int` groups, and returns -1 without the needed count when
+  they don't fit (glibc says how many), so the list grows by four times from
+  64, as `supplementary()` does, to 2^17 groups, then throws `.outOfRange`.
+  Found by probing: a user the database doesn't know gets
+  `[group, (gid_t)-1]` on Darwin, and this leaves out the -1, which isn't a
+  group (`chown` and `setregid` take it as "unchanged"). Rejected: returning
+  what Darwin returns.
+- **`pthread_getugid_np` is `PThread.credentials()`, and `nil` when the
+  thread acts as its process** (the call fails with `ESRCH` then, probed),
+  so Foundation's fallback reads
+  `try PThread.credentials() ?? (UserID.effective, GroupID.effective)`.
+  Darwin only. Its setter, `pthread_setugid_np`, is deprecated ("error-prone
+  and discouraged"), and isn't wrapped.
+- **By-name lookups already exist**: `UserEntry(name:)` and
+  `GroupEntry(name:)` wrap `getpwnam_r` and `getgrnam_r`.
+- Not added: `getresuid`/`getresgid` (not on Darwin), `getpwent` enumeration,
+  and a Windows elevation check, which Foundation's `getEnvSecure` also has.
+
+Adopters: Foundation's `Platform.getEnvSecure` (`secure_getenv`, or
+`issetugid` and `getenv`) and `_lookupUGIDs` (`pthread_getugid_np`, falling
+back to the effective IDs). No adopter calls `getgrouplist`.
+
+Unverified off Darwin: `getgrouplist`'s `gid_t` signature on glibc, Musl,
+Bionic, FreeBSD and OpenBSD, and glibc's count on -1.
+
+Tests: `ProcessCredentialsTests` (the runner isn't set-ID, the current
+user's and root's groups against `getgrouplist` called directly, an unknown
+user, a thread without credentials) and `ProcessCredentialsMockTests` (the
+growing list, `ESRCH` as `nil`). Totals after it: 459 XCTests (4 skipped)
+and 401 swift-testing tests in 61 suites, all passing.

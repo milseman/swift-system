@@ -106,6 +106,7 @@ struct SystemSamples: ParsableCommand {
       DateSample.self,
       SysDir.self,
       VMCopy.self,
+      Groups.self,
     ])
 }
 
