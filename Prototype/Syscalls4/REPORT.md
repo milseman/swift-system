@@ -840,3 +840,188 @@ the review of clusters 1 to 6.
 - New: `SocketVMSocketTests` (4).
 - macOS: XCTest 442 run, 4 skipped, 0 failures; swift-testing 363 tests in
   54 suites pass.
+
+## File types from directory entries
+
+### Commits and API
+
+`7bd235a`, in SystemPackage (`Sources/System/DirectoryEntryTypes/FileType+DirectoryEntry.swift`).
+
+| API | C |
+|---|---|
+| `FileType.init?(directoryEntryType: UInt8)` | `d_type`: `DT_REG`, `DT_DIR`, `DT_LNK`, `DT_FIFO`, `DT_SOCK`, `DT_CHR`, `DT_BLK`, Darwin and FreeBSD `DT_WHT` |
+| `FileType.directoryEntryType: UInt8` | `IFTODT` |
+
+### Design calls
+
+- **The initializer is the directories lane's internal mapping**,
+  `FileType(_directoryEntryType:)`, made public under a new name, and it
+  returns `nil` for `DT_UNKNOWN`, which a file system reports when it
+  can't give the type without reading the inode, and for unknown values.
+  Rejected: exposing `DTTOIF`'s shift (`FileType(rawValue: mode_t(d_type)
+  << 12)`, which NIO uses), which makes `DT_UNKNOWN` a file type of 0.
+- **The inverse is a property**, for code that produces `d_type`s, as
+  NIO's `listDirectory` does; a type with none is `DT_UNKNOWN`.
+- Not on WASI, as the directories code isn't: its `DT_*` need CSystem's
+  `_getConst_` accessors.
+
+### What it replaces in the adopters
+
+- NIO `Sources/NIOFS/FileType.swift` (`init(direntType:)` over `DTTOIF`,
+  and `IFTODT` in `listDirectory`) and `Tests/NIOFSTests/FileTypeTests.swift`,
+  clearing `// SYSTEM-GAP: DT_*` (the test checks NIO's mapping against
+  them).
+
+### Tests
+
+- New: `DirectoryEntryTypeTests` (2: every `DT_*` both ways and against
+  `DTTOIF`; `readdir`'s types for a file, a directory, a symbolic link and
+  a FIFO against `lstat`'s).
+- macOS: XCTest 442 run, 4 skipped, 0 failures; swift-testing 365 tests in
+  55 suites pass.
+
+## Accessors for the C structures System vends
+
+### Commits and API
+
+`338401f`: `Sources/System/Internals/CInterop+Accessors.swift`,
+`Sources/SystemSockets/Internals/CInterop+SocketAccessors.swift`, the probe
+`Tests/MemberImportVisibility/AccessorsProbe.swift`, and a `Package.swift`
+change giving the probe target a dependency on SystemSockets.
+
+| Type (C) | Initializer (all parameters default to zero) | Properties |
+|---|---|---|
+| `CInterop.TimeSpec`, new (`timespec`) | `init(seconds:nanoseconds:)`, `init(duration:)` (macOS 13) | `seconds`, `nanoseconds`, `duration` (macOS 13) |
+| `CInterop.IOVec` (`iovec`) | `init(base:length:)`, `init(_: UnsafeMutableRawBufferPointer)` | `base`, `length` |
+| `CInterop.KEvent` (`kevent`; Darwin, FreeBSD, OpenBSD) | `init(identifier:eventFilter:eventFlags:filterFlags:filterData:userData:)` | the same six, typed with `KernelEvent`'s `Filter`, `Flags`, `FilterFlags` |
+| `CInterop.Stat` (`stat`) | `init(deviceID:inode:mode:linkCount:userID:groupID:specialDeviceID:size:preferredIOBlockSize:blocksAllocated:)` | those, `accessTime`, `modificationTime`, `statusChangeTime`, and where they exist `creationTime`, `flags`, `generationNumber` |
+| `CInterop.MsgHdr` (`msghdr`) | `init(name:nameLength:vectors:vectorCount:control:controlLength:flags:)` | the same seven; `flags` is `MessageFlags` |
+| `CInterop.CMsgHdr` (`cmsghdr`) | `init(length:level:type:)` | the same, as `OptionLevel` and `Option` |
+| `CInterop.SockAddr` (`sockaddr`) | `init(family:)` | `family`; Darwin and the BSDs `length` |
+| `CInterop.SockAddrIn` (`sockaddr_in`) | `init(family:port:address:)` | `family`, `port` (host order), `address`; `length` |
+| `CInterop.SockAddrIn6` (`sockaddr_in6`) | `init(family:port:flowInfo:address:scopeID:)` | the same; `length` |
+| `CInterop.SockAddrUn` (`sockaddr_un`) | `init(family:path:)` | `family`, `path` (a `FilePath`), `pathCapacity`; `length` |
+| `CInterop.SockAddrStorage` (`sockaddr_storage`) | `init(family:)` | `family`; `length` |
+| `CInterop.SockAddrVM` (`sockaddr_vm`, Darwin) | `init(family:port:contextID:)` | the same, `length` |
+| `CInterop.InAddr` (`in_addr`) | `init(integerValue:)` | `integerValue` (first byte most significant) |
+| `CInterop.In6Addr` (`in6_addr`) | `init(bytes:)` | `bytes` (a 16-tuple) |
+
+### Design calls
+
+- **The C types stay in the API**, with accessors declared in System
+  (Michael's call). Under MemberImportVisibility, a C structure's fields
+  and its initializers belong to the C library's module, which a client
+  that imports only System can't reach; extension members belong to
+  System. Rejected, for now: Swift wrapper types in place of the C types.
+- **Swift names, never the C fields'**, so a file that imports both
+  System and the C library sees two distinct sets of names and no
+  ambiguity. `kevent`'s C fields are plain words (`filter`, `flags`,
+  `data`), so its accessors are `eventFilter`, `eventFlags`, `filterData`;
+  `stat`'s times are `accessTime` and so on, not Linux's `st_atim`.
+- **The zero initializer is the memberwise one, with every default
+  zero.** Without the C library, `CInterop.IOVec()` resolves to it; with
+  the C library imported, `iovec()` still picks C's own zero initializer,
+  which is the same value. A probe checked both before the code was
+  written, and the tests, which import the C library, compile against
+  both. So the defaults are all zero, the family included (0, not
+  `AF_INET`): a default that differed would make `X()` mean different
+  values with and without the import. Rejected: a separate `init()`,
+  which redeclares C's.
+- **`timespec`'s `Duration` conversions have a label**, `init(duration:)`
+  and `duration`, beside the Darwin and Glibc overlays' unlabeled
+  `timespec(_: Duration)` and `Duration(_: timespec)`. They also
+  normalize a negative duration to nonnegative nanoseconds
+  (`-0.5 s` is `(-1, 500_000_000)`), which the overlay's doesn't.
+- **Types follow the fields' meanings**: lengths and counts whose C types
+  differ by platform (`msg_iovlen` is a `size_t` on glibc and an `int`
+  elsewhere) are `Int`; families are `Domain`, flags `MessageFlags`, and a
+  control message's level and type System's option types. A port is in
+  host byte order, as `IPv4Address.port` is, and `sin6_flowinfo` as the
+  field holds it, as `IPv6Address.flowLabel` reports it. `in6_addr`'s
+  union, which each C library names differently, is read as bytes.
+- **`stat`'s and `kevent`'s accessors delegate to `Stat` and
+  `KernelEvent`**, whose platform-specific field names are already
+  handled.
+- **Covered already, and left alone**: `PollFD` (`PollEntry`), `WinSize`
+  (`WindowSize`), `Termios` (`TerminalAttributes`), the TCP information
+  structures (cluster 5), `AddrInfo` (resolution). **Waiting for Linux**:
+  `epoll_event` and `itimerspec`.
+- **The probe checks Darwin too.** The other MemberImportVisibility probes
+  compile only on Linux, since what they check (CSystem taking a C type's
+  members) happens only there; this one checks that a client with no C
+  import can use every accessor, which applies everywhere. It uses
+  `canImport(Darwin)`, since the probe target doesn't get
+  `SYSTEM_PACKAGE_DARWIN`, and it failed as it should with a C field added
+  (`property 'iov_len' is not available due to missing import of defining
+  module 'Darwin'`).
+
+### What it replaces in the adopters
+
+NIO's "members of System-vended C structs under MemberImportVisibility"
+markers, by type:
+- `iovec`: `Sources/NIOPosix/PendingWritesManager.swift` (its memberwise
+  initializer), `Socket.swift`, `PendingDatagramWritesManager.swift`,
+  `DatagramVectorReadManager.swift`; `Tests/NIOPosixTests/ChannelTests.swift`,
+  `SyscallAbstractionLayer.swift`, `PendingDatagramWritesManagerTests.swift`.
+- `msghdr`, `cmsghdr`: `Sources/NIOPosix/BSDSocketAPIPosix.swift`
+  (`msg_control`, `msg_controllen`, `cmsg_len`), `Socket.swift`,
+  `ControlMessage.swift`, `PendingDatagramWritesManager.swift`,
+  `DatagramVectorReadManager.swift`; `Tests/NIOPosixTests/ControlMessageTests.swift`.
+- The `sockaddr` family, `in_addr`, `in6_addr`: `Sources/NIOCore/SocketAddresses.swift`,
+  `Interfaces.swift`; `Sources/NIOPosix/BaseSocket.swift` (`sa_family`,
+  `ss_family`, the zero `sockaddr_storage`), `SocketChannel.swift`,
+  `ControlMessage.swift`, `VsockAddress.swift` (`ss_family`);
+  `Sources/NIOMulticastChat/main.swift`; and the tests `MulticastTest`,
+  `HappyEyeballsTest`, `ChannelPipelineTest`, `SocketAddressTest`,
+  `SocketOptionProviderTest` (`s_addr`).
+- `timespec`: `Sources/NIOFS/FileInfo.swift`,
+  `Sources/NIOFS/Internal/SystemFileHandle.swift`, and `_NIOFileSystem`'s
+  copies.
+- `stat`: `Tests/NIOFSTests/FileInfoTests.swift`, which builds and
+  mutates `CInterop.Stat` field by field.
+- NIO's `Sources/NIOPosix/System.swift` aliases (`timespec`,
+  `sockaddr_storage`) can name `CInterop.TimeSpec` and
+  `CInterop.SockAddrStorage`.
+
+Code that keeps C field names (`addr.sin_port = …`) still needs its
+scoped C imports; the accessors let it drop them by switching names.
+
+### Platforms
+
+- Built and tested: macOS 26.3.
+- Not built on Linux (paused). The accessors use only field names that
+  glibc, Musl and Bionic share (`tv_sec`, `iov_base`, `msg_iovlen`,
+  `sin_port`, …), `.init(_:)` for the fields whose types differ, and
+  `Stat` and `KernelEvent` for the rest; the Linux branches of the tests,
+  and the probe's first Linux build, are unverified.
+
+### Tests
+
+- New: `CInteropAccessorsTests` (5) and `CInteropSocketAccessorsTests`
+  (3, one an exit test of the path's precondition), which check each
+  accessor against the C field it names and each initializer against C's
+  (by fields where padding makes the bytes differ, since Swift doesn't
+  keep padding when it copies a value); the probe.
+- macOS: XCTest 442 run, 4 skipped, 0 failures; swift-testing 373 tests in
+  57 suites pass.
+
+## Where the lane stopped (2026-09-28)
+
+- Done: clusters 1 to 8 (8 on Darwin only), the review fixes 3a, 3b, 3e
+  and 3f, the `d_type` conversion, and the accessors.
+- Skipped, as asked when the Linux runs were paused: building the merged
+  tree (darwin-more, statfs, posix-more's clusters 5 to 10) on Linux; the
+  review fixes 3c (FreeBSD and OpenBSD `accept4`) and 3d (Musl); and
+  clusters 9 (Linux files), 10 (Linux process and memory) and 11
+  (inotify).
+- Built and tested on Linux (swift:6.2-noble) through `a6161fb`
+  (cluster 6). Not since: `9058be1` (Linux-only `TCPInfo.rawValue`),
+  `e7848a6`, `954d884`, `0d7b43d`, `7bd235a`, `338401f`, and vsock's
+  Linux half, which isn't written.
+- Swift 6.3: this lane's files have no pattern catches, and
+  SystemSocketsTests built; SystemTests and the samples crash the 6.3.3
+  compiler in other lanes' code (see the review section).
+- Not checked here: the ABI-stable build and the explicit-availability
+  check (`-require-explicit-availability`) over the new API, and the
+  coverage tool's run over it. Every new public declaration carries
+  `@available(System 199, *)` and a "The corresponding C …" sentence.
