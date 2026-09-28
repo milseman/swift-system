@@ -380,3 +380,18 @@ full runs at a load average near 65; it now retries EAGAIN for up to two seconds
 catches of `Errno.wouldBlock` in loops have crashed the compiler).
 
 Tests: TimeZoneFilesTests. XCTest 519, swift-testing 461 in 72 suites, all passing.
+
+## 19. One-file gaps: `d0031c5`
+
+- `FilePath.makeUniqueFile(suffixLength:...)` (mkostemps, Darwin and the BSDs) for TSC's mkstemps, and on Darwin
+  `makeUniqueFile(relativeTo:suffixLength:...)` (mkostempsat_np) for Foundation's temporary file relative to a
+  directory; the mode stays 0600 and the doc points to `setPermissions`. Rejected: a `permissions:` parameter,
+  which mkostempsat_np doesn't take (it would be a second call anyway).
+- `OpenOptions`/`StatusFlags` `.sync` and `.dataSync` (O_SYNC, O_DSYNC) on Darwin, for WasmKit.
+- `ClockID.currentTimeSpec()`: clock_gettime's timespec, without `currentTime()`'s macOS-13 `Duration`, for
+  swift-driver's pre-13 time of day (status.py counts gettimeofday as clock_gettime's).
+- `CInterop.Time` (time_t, swift-certificates' tests); `Signal.message` (strsignal, swift-driver), which I put
+  on Signal rather than in Provisional+StringH though string.h declares it, since it's about signals.
+- `DynamicLibrary.LoaderError.message`'s doc names dlerror (TSC).
+
+Tests: SmallGapsTest. XCTest 525, swift-testing 461, all passing.
