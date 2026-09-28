@@ -60,6 +60,14 @@ Exit status:
 - `2`: a check found problems, listed at the top of the package's report.
 - `1`: the tool itself failed, for at least one package. The other packages' reports are still written.
 
+## The status report
+
+`status.sh` is the cheap summary, meant to be rerun after every merge: it regenerates `Prototype/Status/STATUS.md` from commits alone. It has three parts. The API part is api-delta's Summary and *By area* table, main against HEAD, copied verbatim; api-delta runs again only when `Sources/`, `Package.swift` or api-delta itself changed since its last run. The adoption part has a row for each package in `../adopters` on its `migrate-darwin` branch, next to its merge base with `main`: files that import Darwin whole, by submodule or only through scoped imports, files whose Darwin imports only FOUNDATION_FRAMEWORK builds compile, and SYSTEM-GAP markers, all counted over the package's own targets. It also copies each package's test totals and re-export counts from its MIGRATION.md or REPORT.md, labeled as copied. The gaps part lists every `SYSTEM-GAP:` marker by interface, ranked by files and packages, and marks each interface missing or covered in System now; C-library families that System wraps provisionally (math, stdio, locales, string.h) are grouped and marked as such. It needs no builds, only git, `swift package dump-package` (cached per manifest), and api-delta; a run takes about 10 seconds when api-delta's last run is current, and about a minute more when it isn't. The report's last section describes the method and its limits. `STATUS_*` variables, listed in the script's header, point it elsewhere.
+
+```sh
+Utilities/adopter-coverage/status.sh                         # rewrites Prototype/Status/STATUS.md
+```
+
 ## What it produces
 
 Everything goes to the results store; see its `README.md` (a copy of `results-README.md` here). A run's directory, `runs/<run>/`, holds `run.json` (the System commit, the tool, each package's commit, extraction and result) and the combined `COVERAGE.md` and `coverage.json`; `.build/adopter-coverage` gets a copy. Each package's result, `results/<package>/<commit>/<System commit>/<tool>/`, holds:
@@ -122,6 +130,8 @@ As in api-delta: SwiftPM runs each manifest under `sandbox-exec`, and inside ano
 | `check.sh` | Runs everything: scans System and derives its coverage, runs `scripts/package.sh` for each package, stores the results and writes the combined report. |
 | `results.sh` | The results store: list, delta, verify, rerun, migration. |
 | `ecosystem.sh` | The toolchain's packages: clone, survey, run, report. |
+| `status.sh` | Rewrites `Prototype/Status/STATUS.md`: api-delta's summary, the adopters' Darwin imports and SYSTEM-GAP markers, and the gaps by interface. |
+| `scripts/status.py` | What `status.sh` reports, and how: the marker parser, the not-System's families, the method. |
 | `scripts/package.sh` | One package: export, build, index, extraction, check and report. |
 | `scripts/common.sh` | Shell helpers the scripts share. |
 | `scripts/package.py` | Reads a package's file. |

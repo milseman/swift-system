@@ -69,6 +69,37 @@ private struct CInteropAccessorsTests {
     #expect(timespec(Duration.seconds(2)).tv_sec == 2)
   }
 
+  @available(System 199, *)
+  @Test func timeValAccessors() {
+    var time = CInterop.TimeVal(seconds: 3, microseconds: 4)
+    #expect(time.tv_sec == 3 && time.tv_usec == 4)
+    time.seconds = 5
+    time.microseconds = 6
+    #expect(time.tv_sec == 5 && time.tv_usec == 6)
+    // timeval has padding after tv_usec on 64-bit Darwin, so compare fields.
+    let zero = CInterop.TimeVal()
+    #expect(zero.tv_sec == 0 && zero.tv_usec == 0)
+  }
+
+  @available(System 199, *)
+  @available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *)
+  @Test func timeValDurations() {
+    let time = CInterop.TimeVal(duration: .milliseconds(1500))
+    #expect(time.seconds == 1 && time.microseconds == 500_000)
+    #expect(time.duration == .milliseconds(1500))
+    // Normalized: the microseconds are never negative.
+    let negative = CInterop.TimeVal(duration: .milliseconds(-500))
+    #expect(negative.seconds == -1 && negative.microseconds == 500_000)
+    #expect(negative.duration == .milliseconds(-500))
+    // Rounded down to a microsecond, for negative durations too.
+    #expect(CInterop.TimeVal(duration: .nanoseconds(999)).microseconds == 0)
+    let justBelow = CInterop.TimeVal(duration: .nanoseconds(-1))
+    #expect(justBelow.seconds == -1 && justBelow.microseconds == 999_999)
+    var changed = time
+    changed.duration += .microseconds(500_001)
+    #expect(changed.seconds == 2 && changed.microseconds == 1)
+  }
+
   #if !os(WASI)
   @available(System 199, *)
   @Test func ioVecAccessors() {

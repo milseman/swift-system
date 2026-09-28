@@ -106,6 +106,74 @@ extension CInterop.TimeSpec {
   }
 }
 
+// MARK: - timeval
+
+@available(System 199, *)
+extension CInterop {
+  /// A time, in seconds and microseconds.
+  ///
+  /// The corresponding C type is `struct timeval`.
+  public typealias TimeVal = timeval
+}
+
+@available(System 199, *)
+extension CInterop.TimeVal {
+  /// Creates a time from whole seconds and microseconds,
+  /// by default zero.
+  ///
+  /// The corresponding C fields are `tv_sec` and `tv_usec`.
+  @_alwaysEmitIntoClient
+  public init(seconds: Int = 0, microseconds: Int = 0) {
+    self.init(tv_sec: .init(seconds), tv_usec: .init(microseconds))
+  }
+
+  /// The whole seconds.
+  ///
+  /// The corresponding C field is `tv_sec`.
+  @_alwaysEmitIntoClient
+  public var seconds: Int {
+    get { Int(tv_sec) }
+    set { tv_sec = .init(newValue) }
+  }
+
+  /// The microseconds past the whole seconds, from 0 through 999,999
+  /// in a normalized time.
+  ///
+  /// The corresponding C field is `tv_usec`.
+  @_alwaysEmitIntoClient
+  public var microseconds: Int {
+    get { Int(tv_usec) }
+    set { tv_usec = .init(newValue) }
+  }
+}
+
+@available(System 199, *)
+@available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *)
+extension CInterop.TimeVal {
+  /// Creates a normalized time from a duration, rounded down to a
+  /// microsecond, so that its microseconds are from 0 through 999,999
+  /// even for a negative duration.
+  ///
+  /// A time that a call reads as "none" when it's zero,
+  /// such as a socket timeout, needs a duration of at least a microsecond.
+  @_alwaysEmitIntoClient
+  public init(duration: Duration) {
+    var (seconds, attoseconds) = duration.components
+    if attoseconds < 0 {
+      seconds -= 1
+      attoseconds += 1_000_000_000_000_000_000
+    }
+    self.init(seconds: Int(seconds), microseconds: Int(attoseconds / 1_000_000_000_000))
+  }
+
+  /// The time as a duration.
+  @_alwaysEmitIntoClient
+  public var duration: Duration {
+    get { .seconds(seconds) + .microseconds(microseconds) }
+    set { self = CInterop.TimeVal(duration: newValue) }
+  }
+}
+
 // MARK: - iovec
 
 #if !os(WASI)

@@ -13,6 +13,11 @@ extern int csystem_posix_pipe2(int fildes[2], int flag);
 
 extern int csystem_posix_dup3(int fildes, int fildes2, int flag);
 
+#if !defined(_WIN32) && !defined(__wasi__) && !defined(__ANDROID__)
+// shm_open, which is variadic, so Swift can't import it.
+extern int csystem_shm_open(const char *name, int oflag, unsigned int mode);
+#endif
+
 #if !defined(_WIN32) && !defined(__wasi__)
 // The process's environ array. Darwin's is _NSGetEnviron's, since a library
 // can't link to environ there, and not every other C library declares

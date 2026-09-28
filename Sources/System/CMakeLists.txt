@@ -90,6 +90,9 @@ target_sources(SystemPackage PRIVATE
   Executable/CurrentExecutable.swift
   Internals/Syscalls+Executable.swift)
 target_sources(SystemPackage PRIVATE
+  ExitCodes/ExitCode.swift
+  Internals/Constants+ExitCodes.swift)
+target_sources(SystemPackage PRIVATE
   ExtendedAttributes/ExtendedAttributes.swift)
 target_sources(SystemPackage PRIVATE
   FileCopying/FileClone.swift
@@ -108,6 +111,11 @@ target_sources(SystemPackage PRIVATE
   FilePath/FilePathTempPosix.swift
   FilePath/FilePathTempWindows.swift
   FilePath/FilePathWindows.swift)
+target_sources(SystemPackage PRIVATE
+  FileRemoval/RemoveProgress.swift
+  FileRemoval/RemoveRecursively.swift
+  Internals/Constants+FileRemoval.swift
+  Internals/Syscalls+FileRemoval.swift)
 target_sources(SystemPackage PRIVATE
   FileSystem/DiskQuota.swift
   FileSystem/FileFlags.swift
@@ -167,6 +175,9 @@ target_sources(SystemPackage PRIVATE
   LibProc/ProcessList.swift
   LibProc/ProcessPaths.swift)
 target_sources(SystemPackage PRIVATE
+  Internals/Constants+Limits.swift
+  Limits/CompileTimeLimits.swift)
+target_sources(SystemPackage PRIVATE
   Internals/Syscalls+MachTime.swift
   MachTime/MachTime.swift)
 target_sources(SystemPackage PRIVATE
@@ -184,11 +195,20 @@ target_sources(SystemPackage PRIVATE
 target_sources(SystemPackage PRIVATE
   MemoryMapping/MemoryMapping.swift)
 target_sources(SystemPackage PRIVATE
+  Internals/Constants+MemoryLocking.swift
+  Internals/Syscalls+MemoryLocking.swift
+  MemoryLocking/MemoryLocking.swift)
+target_sources(SystemPackage PRIVATE
   NetworkInterfaces/NetworkInterface.swift)
 target_sources(SystemPackage PRIVATE
   PathsAndFiles/FilePath+Resolution.swift
   PathsAndFiles/ProcessDefaults.swift
   PathsAndFiles/UniqueFiles.swift)
+target_sources(SystemPackage PRIVATE
+  Internals/Constants+Provisional.swift
+  Internals/Syscalls+Provisional.swift
+  Provisional/Provisional+POSIXErrorCode.swift
+  Provisional/Provisional+Stdio.swift)
 target_sources(SystemPackage PRIVATE
   Internals/Syscalls+ProcessCredentials.swift
   ProcessCredentials/ProcessCredentials.swift)
@@ -223,6 +243,11 @@ target_sources(SystemPackage PRIVATE
 target_sources(SystemPackage PRIVATE
   Internals/Syscalls+SendFile.swift
   SendFile/SendFile.swift)
+target_sources(SystemPackage PRIVATE
+  Internals/Constants+SharedMemory.swift
+  Internals/Syscalls+SharedMemory.swift
+  SharedMemory/NamedSemaphore.swift
+  SharedMemory/SharedMemory.swift)
 target_sources(SystemPackage PRIVATE
   Internals/Constants+SystemControl.swift
   Internals/Syscalls+SystemControl.swift

@@ -34,6 +34,16 @@ func _accessorProbe() {
     time.duration += .seconds(1)
   }
 
+  // timeval
+  var interval = CInterop.TimeVal()
+  interval = CInterop.TimeVal(seconds: 1, microseconds: 2)
+  interval.seconds += interval.microseconds
+  interval.microseconds = 0
+  if #available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *) {
+    interval = CInterop.TimeVal(duration: .milliseconds(1500))
+    interval.duration += .seconds(1)
+  }
+
   // iovec
   var vector = CInterop.IOVec()
   vector = CInterop.IOVec(base: nil, length: 0)
@@ -70,8 +80,12 @@ func _accessorProbe() {
   event.filterFlags = []
   event.filterData += 1
   event.userData = nil
+
+  // POSIXErrorCode, through Errno
+  let code = CInterop.POSIXErrorCode(.notPermitted)
+  _ = code?.errno
   #endif
-  _ = (time, vector, status)
+  _ = (time, interval, vector, status)
 }
 
 #if canImport(SystemSockets)
@@ -129,6 +143,12 @@ func _socketAccessorProbe() {
   var host4 = CInterop.InAddr()
   host4.integerValue = 1
 
+  // linger
+  var lingering = CInterop.Linger()
+  lingering = CInterop.Linger(isEnabled: true, time: 5)
+  lingering.isEnabled = false
+  lingering.time += 1
+
   #if canImport(Darwin)
   address.length = 16
   ipv4.length = 16
@@ -144,7 +164,7 @@ func _socketAccessorProbe() {
   vm.contextID = 3
   _ = vm
   #endif
-  _ = (header, control, address, ipv4, ipv6, host6, local, storage, host4)
+  _ = (header, control, address, ipv4, ipv6, host6, local, storage, host4, lingering)
 }
 #endif // canImport(SystemSockets)
 

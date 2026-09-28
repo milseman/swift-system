@@ -102,4 +102,9 @@ extension CInterop {
   ///
   /// The corresponding C type is `addrinfo`.
   public typealias AddrInfo = addrinfo
+
+  /// The value of the linger-on-close socket option.
+  ///
+  /// The corresponding C type is `struct linger`.
+  public typealias Linger = linger
 }
