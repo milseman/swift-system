@@ -63,6 +63,9 @@ target_sources(SystemPackage PRIVATE
   Internals/Constants+AttributeLists.swift
   Internals/Syscalls+AttributeLists.swift)
 target_sources(SystemPackage PRIVATE
+  BrokenDownTime/BrokenDownTime.swift
+  Internals/Syscalls+BrokenDownTime.swift)
+target_sources(SystemPackage PRIVATE
   Directories/DirectoryStream.swift
   Directories/DirectoryWalk.swift)
 target_sources(SystemPackage PRIVATE
@@ -167,6 +170,11 @@ target_sources(SystemPackage PRIVATE
   Internals/Syscalls+MachTime.swift
   MachTime/MachTime.swift)
 target_sources(SystemPackage PRIVATE
+  Internals/Constants+MachVirtualMemory.swift
+  Internals/Syscalls+MachVirtualMemory.swift
+  MachVirtualMemory/MachKernelError.swift
+  MachVirtualMemory/MachVirtualMemory.swift)
+target_sources(SystemPackage PRIVATE
   Internals/Constants+Memory.swift
   Internals/Syscalls+Memory.swift
   Memory/Memory.swift
@@ -181,6 +189,9 @@ target_sources(SystemPackage PRIVATE
   PathsAndFiles/FilePath+Resolution.swift
   PathsAndFiles/ProcessDefaults.swift
   PathsAndFiles/UniqueFiles.swift)
+target_sources(SystemPackage PRIVATE
+  Internals/Syscalls+ProcessCredentials.swift
+  ProcessCredentials/ProcessCredentials.swift)
 target_sources(SystemPackage PRIVATE
   Internals/Syscalls+ProcessExit.swift
   ProcessExit/ProcessExit.swift)
@@ -205,6 +216,10 @@ target_sources(SystemPackage PRIVATE
 target_sources(SystemPackage PRIVATE
   Internals/Syscalls+Pseudoterminals.swift
   Pseudoterminals/Pseudoterminal.swift)
+target_sources(SystemPackage PRIVATE
+  Internals/Constants+SearchPaths.swift
+  Internals/Syscalls+SearchPaths.swift
+  SearchPaths/SearchPaths.swift)
 target_sources(SystemPackage PRIVATE
   Internals/Syscalls+SendFile.swift
   SendFile/SendFile.swift)
@@ -247,6 +262,11 @@ target_sources(SystemPackage PRIVATE
 target_sources(SystemPackage PRIVATE
   Time/ClockID.swift
   Time/Sleep.swift)
+target_sources(SystemPackage PRIVATE
+  Internals/Constants+TimersAndPriority.swift
+  Internals/Syscalls+TimersAndPriority.swift
+  TimersAndPriority/ProcessPriority.swift
+  TimersAndPriority/ProcessTimer.swift)
 target_sources(SystemPackage PRIVATE
   VectoredIO/VectoredIO.swift)
 target_link_libraries(SystemPackage PUBLIC

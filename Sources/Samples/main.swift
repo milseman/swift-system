@@ -104,6 +104,12 @@ struct SystemSamples: ParsableCommand {
       MkPath.self,
       LsProc.self,
       GetAttrList.self,
+      // More POSIX and Darwin samples
+      DateSample.self,
+      SysDir.self,
+      VMCopy.self,
+      Groups.self,
+      Nice.self,
     ])
 }
 
