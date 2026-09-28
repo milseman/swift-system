@@ -194,10 +194,12 @@ extern int csystem_ptsname_r(int fd, char *buffer, size_t length) {
 #endif // __linux__
 
 #ifdef __linux__
+#include <signal.h>
 #include <sys/stat.h>
 
 _Static_assert(CSYSTEM_UTIME_NOW == UTIME_NOW, "CSYSTEM_UTIME_NOW");
 _Static_assert(CSYSTEM_UTIME_OMIT == UTIME_OMIT, "CSYSTEM_UTIME_OMIT");
+_Static_assert(CSYSTEM_KERNEL_SIGSET_SIZE == _NSIG / 8, "CSYSTEM_KERNEL_SIGSET_SIZE");
 #endif // __linux__
 
 #ifdef __linux__
@@ -284,6 +286,34 @@ extern ssize_t csystem_pwritev(int fd, const void *iov, int iovcnt, off_t offset
   return -1;
   #endif
 }
+
+#include <ifaddrs.h>
+
+extern int csystem_getifaddrs(void **list) {
+  #if __ANDROID_API__ >= 24
+  return getifaddrs((struct ifaddrs **)list);
+  #else
+  errno = ENOSYS;
+  return -1;
+  #endif
+}
+
+extern void csystem_freeifaddrs(void *list) {
+  #if __ANDROID_API__ >= 24
+  freeifaddrs((struct ifaddrs *)list);
+  #endif
+}
+
+#include <sys/random.h>
+
+extern int csystem_getentropy(void *buffer, size_t length) {
+  #if __ANDROID_API__ >= 28
+  return getentropy(buffer, length);
+  #else
+  errno = ENOSYS;
+  return -1;
+  #endif
+}
 #endif // __ANDROID__
 
 #if !defined(_WIN32) && !defined(__wasi__)
@@ -300,6 +330,25 @@ extern char **csystem_environ(void) {
   #endif
 }
 #endif // !defined(_WIN32) && !defined(__wasi__)
+
+#ifdef __linux__
+#include <stdlib.h>
+#include <sys/auxv.h>
+
+extern int csystem_mkostemp(char *path_template, int flags) {
+  #if defined(__ANDROID__) && __ANDROID_API__ < 23
+  if (flags == 0) return mkstemp(path_template);
+  errno = ENOSYS;
+  return -1;
+  #else
+  return mkostemp(path_template, flags);
+  #endif
+}
+
+extern int csystem_is_secure_execution(void) {
+  return getauxval(AT_SECURE) != 0;
+}
+#endif // __linux__
 
 // MARK: - Processes and signals
 

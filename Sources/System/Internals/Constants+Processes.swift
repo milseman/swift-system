@@ -140,10 +140,10 @@ internal var _SIGPWR: CInt { SIGPWR }
 // One more than the highest signal number: the numbers that a signal set
 // can hold are 1 through _NSIG - 1. It's NSIG on Darwin (32) and OpenBSD
 // (33), 65 on Linux, whose sigset_t has room for 1024 but whose kernel has
-// 64 signals, and _SIG_MAXSIG + 1 (129) on FreeBSD.
+// 64 signals, and _SIG_MAXSIG + 1 (129) on FreeBSD. Linux's C libraries
+// declare _NSIG themselves, and a second declaration here would make it
+// ambiguous where both are visible, as in a test's @testable import.
 #if os(Linux) || os(Android)
-@_alwaysEmitIntoClient
-internal var _NSIG: CInt { 65 }
 #elseif os(FreeBSD)
 @_alwaysEmitIntoClient
 internal var _NSIG: CInt { CInt(_SIG_MAXSIG) + 1 }

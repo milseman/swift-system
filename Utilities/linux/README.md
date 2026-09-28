@@ -39,11 +39,11 @@ The package directory is mounted at `/code`, and each run starts a new container
 
 ## What it has checked
 
-As of 2026-09-27, at the tip of the `linux-build` branch, every target builds and every test passes on each of these:
+Every target builds and every test passes on each of these, as of 2026-09-27. The first row is system-next with the processes and posix-more lanes merged; the others are from before those merges (commit `25d3ea2`), and haven't been run since.
 
 | Image | Arch | Swift | glibc | XCTest | swift-testing |
 |---|---|---|---|---|---|
-| `swift:6.2-noble` | arm64 | 6.2.4 | 2.39 | 274, 2 skipped | 208, 1 skipped |
+| `swift:6.2-noble` | arm64 | 6.2.4 | 2.39 | 356, 2 skipped | 247, 1 skipped |
 | `swift:6.2-jammy` | arm64 | 6.2.4 | 2.35 | 274, 2 skipped | 208, 1 skipped |
 | `swift:6.3-noble` | arm64 | 6.3.3 | 2.39 | 274, 2 skipped | 208, 1 skipped |
 | `swift:6.2-noble` | amd64 | 6.2.4 | 2.39 | 274, 17 skipped | 208, 1 skipped |
@@ -59,7 +59,9 @@ What broke the first Linux build, for code written on a Mac:
 
 - **glibc's enums.** `SOCK_STREAM` and the other socket types are members of `enum __socket_type`, which Swift imports as a struct: use `CInt(SOCK_STREAM.rawValue)` under `#if os(Linux) && canImport(Glibc)`. `IPPROTO_*`, `MSG_*`, and `SHUT_*` are in anonymous enums, which import as `Int`: `CInt(IPPROTO_TCP)` works everywhere. `IPPROTO_IPV4` is `IPPROTO_IPIP` on Linux.
 - **Macros Swift can't import.** glibc defines `UTIME_NOW` as `((1l << 30) - 1l)`, which the importer drops; `CSystemLinux.h` defines `CSYSTEM_UTIME_NOW`, checked against the real one in `shims.c`. Constants that glibc declares only with `_GNU_SOURCE` get `CSYSTEM_` definitions there too.
-- **Which module owns a C type.** Under MemberImportVisibility, a C type that both glibc's Swift module and a CSystem header declare belongs to whichever module's copy Swift loads first, and then its members can be hidden from clients, which don't import CSystem (#320). A CSystem function that takes such a type, as `timerfd_settime` took `itimerspec` and `timespec`, makes CSystem's copy the one SystemPackage's module refers to. So `CSystemLinux.h` includes as few of glibc's module's headers as it can, and its shims take such types as `void *`, with the real header in `shims.c`. `Tests/MemberImportVisibility` reads the members as a client would; add a probe there for each C type a new API vends. `sigset_t` is still attributed to CSystem: SystemPackage names it in files that import CSystem, and it's fixed only by naming it through its module (`Glibc.sigset_t`).
-- **Duplicate names.** Code under `#if os(Linux)` compiles only here, so two lanes' definitions of one internal name, such as `_CLOCK_REALTIME`, collide only here. Grep `Sources/` before adding one.
+- **Which module owns a C type.** Under MemberImportVisibility, a C type that both glibc's Swift module and a CSystem header declare belongs to whichever module's copy Swift loads first, and then its members can be hidden from clients, which don't import CSystem (#320). A CSystem function that takes such a type, as `timerfd_settime` took `itimerspec` and `timespec`, makes CSystem's copy the one SystemPackage's module refers to. So `CSystemLinux.h` and `io_uring.h` include as few of glibc's module's headers as they can (not `<signal.h>`, `<pthread.h>`, `<sched.h>`, `<sys/socket.h>`, `<sys/stat.h>`, or `<sys/timerfd.h>`), and their shims take such types as `void *`, with the real header in `shims.c`. `Tests/MemberImportVisibility` reads the members as a client would; add a probe there for each C type a new API vends, in a file of its own if nothing else there should load the type first. `sigset_t` comes through `<sys/types.h>` and `<sys/epoll.h>`, which CSystem needs, so it's named through its module instead: `CInterop.SignalSet` is `Glibc.sigset_t`, and public API should take that rather than `sigset_t`.
+- **Duplicate names.** Code under `#if os(Linux)` compiles only here, so two lanes' definitions of one internal name, such as `_CLOCK_REALTIME`, collide only here. So does an internal name that the C library also declares, such as glibc's `_NSIG`, for tests that `@testable import` SystemPackage. Grep `Sources/` before adding one.
+- **Anonymous enums in other headers.** `PRIO_PROCESS` is a member of glibc's `enum __priority_which`, but `getpriority` takes an `int`, and `SI_USER` and `SI_TKILL` import as `Int`.
+- **dash.** Ubuntu's `/bin/sh` is dash, which takes only single-digit descriptors in `>&n`; write to `/dev/fd/n` instead.
 - **Mutable C globals.** glibc declares `stdin`, `stdout`, and `stderr` as mutable globals, which Swift 6 rejects; `@preconcurrency import Glibc` accepts them.
 - **Behaviors that differ.** `sysconf(_SC_JOB_CONTROL)` is 1, not 200112. `pathconf` gives a directory the terminal limits (`_PC_MAX_CANON` is 255) rather than failing. A mutex's priority ceiling must be in `SCHED_FIFO`'s range, 1 through 99; `SCHED_OTHER`'s is 0 through 0.

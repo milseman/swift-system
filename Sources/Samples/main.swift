@@ -86,6 +86,12 @@ struct SystemSamples: ParsableCommand {
       Clocks.self,
       ErrnoSample.self,
       Uname.self,
+      MkTemp.self,
+      DLSym.self,
+      MMap.self,
+      IfConfig.self,
+      XAttr.self,
+      UUIDGen.self,
       // More system call samples
       PtyRun.self,
       // Darwin samples

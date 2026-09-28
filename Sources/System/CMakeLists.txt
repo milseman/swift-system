@@ -66,6 +66,10 @@ target_sources(SystemPackage PRIVATE
   Directories/DirectoryStream.swift
   Directories/DirectoryWalk.swift)
 target_sources(SystemPackage PRIVATE
+  DynamicLoading/DynamicLibrary.swift)
+target_sources(SystemPackage PRIVATE
+  Entropy/Entropy.swift)
+target_sources(SystemPackage PRIVATE
   Environment/ProcessEnvironment.swift)
 target_sources(SystemPackage PRIVATE
   Errno/ErrnoAccess.swift)
@@ -80,6 +84,8 @@ target_sources(SystemPackage PRIVATE
 target_sources(SystemPackage PRIVATE
   Executable/CurrentExecutable.swift
   Internals/Syscalls+Executable.swift)
+target_sources(SystemPackage PRIVATE
+  ExtendedAttributes/ExtendedAttributes.swift)
 target_sources(SystemPackage PRIVATE
   FileCopying/FileClone.swift
   FileCopying/FileCopy.swift
@@ -121,7 +127,11 @@ endif()
 target_sources(SystemPackage PRIVATE
   Internals/Backcompat.swift
   Internals/CInterop.swift
+  Internals/Constants+DynamicLoading.swift
   Internals/Constants+Events.swift
+  Internals/Constants+ExtendedAttributes.swift
+  Internals/Constants+MemoryMapping.swift
+  Internals/Constants+NetworkInterfaces.swift
   Internals/Constants+StatFS.swift
   Internals/Constants+Time.swift
   Internals/Constants.swift
@@ -129,8 +139,14 @@ target_sources(SystemPackage PRIVATE
   Internals/Mocking.swift
   Internals/RawBuffer.swift
   Internals/Syscalls+Directories.swift
+  Internals/Syscalls+DynamicLoading.swift
+  Internals/Syscalls+Entropy.swift
   Internals/Syscalls+Environment.swift
   Internals/Syscalls+Events.swift
+  Internals/Syscalls+ExtendedAttributes.swift
+  Internals/Syscalls+MemoryMapping.swift
+  Internals/Syscalls+NetworkInterfaces.swift
+  Internals/Syscalls+PathsAndFiles.swift
   Internals/Syscalls+StatFS.swift
   Internals/Syscalls+SystemIdentity.swift
   Internals/Syscalls+Time.swift
@@ -147,6 +163,14 @@ target_sources(SystemPackage PRIVATE
 target_sources(SystemPackage PRIVATE
   Internals/Syscalls+MachTime.swift
   MachTime/MachTime.swift)
+target_sources(SystemPackage PRIVATE
+  MemoryMapping/MemoryMapping.swift)
+target_sources(SystemPackage PRIVATE
+  NetworkInterfaces/NetworkInterface.swift)
+target_sources(SystemPackage PRIVATE
+  PathsAndFiles/FilePath+Resolution.swift
+  PathsAndFiles/ProcessDefaults.swift
+  PathsAndFiles/UniqueFiles.swift)
 target_sources(SystemPackage PRIVATE
   Internals/Syscalls+ProcessExit.swift
   ProcessExit/ProcessExit.swift)
