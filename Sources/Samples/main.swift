@@ -94,6 +94,8 @@ struct SystemSamples: ParsableCommand {
       UUIDGen.self,
       // Memory allocation samples
       Malloc.self,
+      // More system call samples
+      PtyRun.self,
       // Darwin samples
       CopyFile.self,
       Sysctl.self,

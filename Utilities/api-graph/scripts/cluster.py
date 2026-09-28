@@ -743,7 +743,7 @@ def main():
                                   "namespaceOnly": set(v["kinds"]) <= {"nests"}} for k, v in sorted(pre.items())}
 
     # ------------------------------------------------------------ 5b. inheritance
-    def all_prereqs(key, seen=None):
+    def all_prereqs(key, seen=None, stack=frozenset()):
         """Every unit `key` needs, transitively, and whether only through nesting."""
         seen = {} if seen is None else seen
         for k, info in units[key]["prerequisites"].items():
@@ -753,7 +753,7 @@ def main():
                 continue
             seen[k] = ns_only
             sub = {}
-            all_prereqs(k, sub)
+            if k not in stack: all_prereqs(k, sub, stack | {key})
             for kk, v in sub.items():
                 if kk == key:
                     continue

@@ -200,6 +200,20 @@ struct csystem_signalfd_siginfo {
 };
 #endif // __linux__
 
+#ifdef __linux__
+// accept4, which glibc and Musl declare only with _GNU_SOURCE; see shims.c.
+// `addr` points to a struct sockaddr and `addrlen` to a socklen_t, untyped so
+// that this header needn't include <sys/socket.h> (see the ioctl shims).
+extern int csystem_accept4(int fd, void *addr, void *addrlen, int flags);
+
+// sendmmsg and recvmmsg, which glibc and Musl declare only with _GNU_SOURCE,
+// as they do struct mmsghdr. `msgvec` points to `vlen` struct mmsghdrs,
+// which SystemSockets' CInterop.MMsgHdr mirrors, and `timeout` to a struct
+// timespec, untyped for the same reason as accept4's arguments.
+extern int csystem_sendmmsg(int fd, void *msgvec, unsigned int vlen, int flags);
+extern int csystem_recvmmsg(int fd, void *msgvec, unsigned int vlen, int flags, void *timeout);
+#endif // __linux__
+
 #if defined(__linux__) && defined(__GLIBC__)
 // glibc's allocator extensions, which it declares in <malloc.h>, which its
 // Swift module doesn't include. <malloc.h> includes <stdio.h>, and so FILE,

@@ -66,6 +66,8 @@ target_sources(SystemPackage PRIVATE
   Directories/DirectoryStream.swift
   Directories/DirectoryWalk.swift)
 target_sources(SystemPackage PRIVATE
+  DirectoryEntryTypes/FileType+DirectoryEntry.swift)
+target_sources(SystemPackage PRIVATE
   DynamicLoading/DynamicLibrary.swift)
 target_sources(SystemPackage PRIVATE
   Entropy/Entropy.swift)
@@ -126,6 +128,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL Linux)
 endif()
 target_sources(SystemPackage PRIVATE
   Internals/Backcompat.swift
+  Internals/CInterop+Accessors.swift
   Internals/CInterop.swift
   Internals/Constants+DynamicLoading.swift
   Internals/Constants+Events.swift
@@ -179,6 +182,9 @@ target_sources(SystemPackage PRIVATE
   PathsAndFiles/ProcessDefaults.swift
   PathsAndFiles/UniqueFiles.swift)
 target_sources(SystemPackage PRIVATE
+  Internals/Syscalls+ProcessExit.swift
+  ProcessExit/ProcessExit.swift)
+target_sources(SystemPackage PRIVATE
   Internals/Constants+Processes.swift
   Internals/Syscalls+Processes.swift
   Processes/ChildProcess.swift
@@ -196,6 +202,12 @@ target_sources(SystemPackage PRIVATE
   Processes/SignalSending.swift
   Processes/SignalSet.swift
   Processes/Spawn.swift)
+target_sources(SystemPackage PRIVATE
+  Internals/Syscalls+Pseudoterminals.swift
+  Pseudoterminals/Pseudoterminal.swift)
+target_sources(SystemPackage PRIVATE
+  Internals/Syscalls+SendFile.swift
+  SendFile/SendFile.swift)
 target_sources(SystemPackage PRIVATE
   Internals/Constants+SystemControl.swift
   Internals/Syscalls+SystemControl.swift
