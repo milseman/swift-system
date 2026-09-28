@@ -247,3 +247,23 @@ semaphore's name gives another handle on the same count; sem_post at SEM_VALUE_M
 larger initial value fails EINVAL.
 
 Tests: SharedMemoryTest. XCTest 506 (4 skipped), swift-testing 443, all passing.
+
+## 11. os_unfair_lock and arc4random: `83b795d`
+
+The posix-darwin lane's unstarted cluster 8.
+
+- `UnfairLock` (Darwin): a noncopyable lock keeping its `os_unfair_lock` at one heap address, as `PThread.Mutex`
+  does its mutex: `lock()`, `tryLock()`, `unlock()` (noasync), `withLock(_:)`, `assertOwned()`, `assertNotOwned()`,
+  `init(unsafeAddress:)` for a lock in C memory, and from macOS 15 `lock(options: .adaptiveSpin)`
+  (`os_unfair_lock_lock_with_flags`; Swift can't import the flag, so its value is spelled out). Nothing throws.
+  Its doc sends value protection to `Synchronization.Mutex` (this lock on Darwin, from macOS 15), pthread kinds,
+  process sharing and conditions to `PThread.Mutex`, and notes that `os`'s `OSAllocatedUnfairLock` re-exports
+  Darwin. Rejected: a generic lock over a value (Mutex's job); the name `OSUnfairLock`.
+- `Entropy.generate()`, `generate(below:)`, `generate(into:)` (arc4random, arc4random_uniform, arc4random_buf),
+  on Darwin, FreeBSD, OpenBSD and Android, next to Entropy's throwing getentropy calls. Rejected: a
+  `RandomNumberGenerator` type, which `SystemRandomNumberGenerator` already is over the same generator.
+
+Found on macOS 26.3: misusing an unfair lock ends the process with SIGKILL, not a trap; the owner's `tryLock()`
+returns false.
+
+Tests: UnfairLockTests, RandomGeneratorTests. XCTest 506, swift-testing 452 in 69 suites, all passing.
