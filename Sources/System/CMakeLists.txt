@@ -267,6 +267,9 @@ target_sources(SystemPackage PRIVATE
 target_sources(SystemPackage PRIVATE
   SignalMessages/SignalMessage.swift)
 target_sources(SystemPackage PRIVATE
+  Internals/Syscalls+SpawnCredentials.swift
+  SpawnCredentials/SpawnCredentials.swift)
+target_sources(SystemPackage PRIVATE
   SynchronizedIO/SynchronizedIO.swift)
 target_sources(SystemPackage PRIVATE
   Internals/Constants+SystemControl.swift
