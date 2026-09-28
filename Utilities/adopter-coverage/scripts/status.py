@@ -130,6 +130,11 @@ ANSWERED = [
     # identifier, with Swift-named properties for the fields.
     (r"^malloc_type_descriptor_v0_t members$", "Memory.TypeDescriptor", "public var callSiteFlags",
      "Sources/System/TypedAllocation/TypeDescriptor.swift"),
+    # A marker that names no C interface: Subprocess's raw posix_spawn path,
+    # for the C values its configurator gets (RawSpawn.swift) and for other
+    # credentials, which System spawns with by forking first.
+    (r"^raw posix_spawn path$", "ProcessID.spawn's C-values and credentials forms",
+     "fileActionDescriptors: [FileDescriptor]", "Sources/System/SpawnCredentials/SpawnCredentials.swift"),
 ]
 
 
@@ -1149,6 +1154,11 @@ def main():
     def status(iface, g):
         names = sorted(g["names"])
         if not names:
+            # Only an ANSWERED entry can speak for a phrase.
+            answered, how = sys_head.covers(iface)
+            if answered and how.startswith("by "):
+                late = not sys_next.covers(iface)[0]
+                return "covered", how + (f"; not yet in `{a.system_next}`" if late else "")
             return "unread", ""
         covered = [n for n in names if sys_head.covers(n)[0]]
         if len(covered) == len(names):
@@ -1189,7 +1199,8 @@ def main():
       "alias names it, or, for `X members`, System gives `CInterop` alias of `X` Swift-named accessors. The "
       "marker is stale, or the package hasn't adopted the API yet." +
       (f" *Not yet in `{a.system_next}`* means only this branch has it." if sys_next is not sys_head else ""))
-    w("- **unread**: the marker names no C interface and nothing is imported under it; read the marker.")
+    w("- **unread**: the marker names no C interface, nothing is imported under it, and no `ANSWERED` entry "
+      "speaks for it; read the marker.")
     w("")
     counts = collections.Counter(r[4] for r in rows)
     w("A family marked *(provisional)* is a C-library layer above the OS (math, stdio, locales, string.h and "
@@ -1299,7 +1310,7 @@ api-delta's last run, and a few seconds when they haven't.
   A wildcard (`IP_*`, `DT_*`) becomes the names imported under the marker that match it. A marker whose head
   names nothing (`posix_spawn's raw attributes and file actions`) is counted under its phrase, and the scoped
   Darwin imports right under it (the file's own list of what the gap costs) decide its status; with none, it
-  is *unread*. Rejected: recognizing names by an SDK vocabulary alone, since the explanations are English
+  is *unread*, unless an `ANSWERED` entry matches its phrase. Rejected: recognizing names by an SDK vocabulary alone, since the explanations are English
   and `time`, `free`, `sleep` and `remove` are C functions; and taking the imports as the interfaces
   everywhere, since `import struct Darwin.msghdr` is there for msghdr's fields, not for the name CInterop
   already has.
@@ -1310,9 +1321,10 @@ api-delta's last run, and a few seconds when they haven't.
   by their `_r` forms, mkstemp and mkstemps by mkostemp(s), time and gettimeofday by clock_gettime), and the table
   says so. A family that System answers with a design of its own, rather than a wrapper, counts as covered once a
   witness in System's sources shows the answer has what the markers ask for (`ANSWERED`: fts is DirectoryWalk, with
-  its two-visit order, and `malloc_type_descriptor_v0_t`'s members are `Memory.TypeDescriptor`'s properties). This
-  sees what System documents, not whether the API fits the adopter's use: a partial wrapper counts as covered, and
-  an API whose doc comments don't name the C interface counts as missing.
+  its two-visit order, `malloc_type_descriptor_v0_t`'s members are `Memory.TypeDescriptor`'s properties, and
+  Subprocess's raw posix_spawn path, a marker that names no C interface, is `ProcessID.spawn`'s C-values and
+  credentials forms). This sees what System documents, not whether the API fits the adopter's use: a partial
+  wrapper counts as covered, and an API whose doc comments don't name the C interface counts as missing.
 - **Provisional families** (libm, C stdio, locale and xlocale, string.h and ctype.h, numeric conversion) are a
   fixed list in `scripts/status.py`, matched by name or by the name's SDK module in adopter-coverage's stored
   vocabulary when there is one. They're C-library layers above the OS that System wraps provisionally, in
