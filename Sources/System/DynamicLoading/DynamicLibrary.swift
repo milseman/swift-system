@@ -58,6 +58,8 @@ extension DynamicLibrary {
   public struct LoaderError: Error, Hashable, Sendable, CustomStringConvertible {
     /// The dynamic linker's description of the error,
     /// which usually names the library or the symbol.
+    ///
+    /// The corresponding C function is `dlerror`, which returns it.
     public var message: String
 
     /// Creates an error with the given description.

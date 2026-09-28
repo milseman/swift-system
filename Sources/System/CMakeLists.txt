@@ -66,6 +66,8 @@ target_sources(SystemPackage PRIVATE
   BrokenDownTime/BrokenDownTime.swift
   Internals/Syscalls+BrokenDownTime.swift)
 target_sources(SystemPackage PRIVATE
+  ClockTime/ClockTime.swift)
+target_sources(SystemPackage PRIVATE
   Directories/DirectoryStream.swift
   Directories/DirectoryWalk.swift)
 target_sources(SystemPackage PRIVATE
@@ -260,6 +262,10 @@ target_sources(SystemPackage PRIVATE
   SharedMemory/NamedSemaphore.swift
   SharedMemory/SharedMemory.swift)
 target_sources(SystemPackage PRIVATE
+  SignalMessages/SignalMessage.swift)
+target_sources(SystemPackage PRIVATE
+  SynchronizedIO/SynchronizedIO.swift)
+target_sources(SystemPackage PRIVATE
   Internals/Constants+SystemControl.swift
   Internals/Syscalls+SystemControl.swift
   SystemControl/SystemControl.swift
@@ -271,6 +277,9 @@ target_sources(SystemPackage PRIVATE
   Internals/Syscalls+SystemPaths.swift
   SystemPaths/ConfigurationStrings.swift
   SystemPaths/MakePath.swift)
+target_sources(SystemPackage PRIVATE
+  Internals/Syscalls+SmallGaps.swift
+  TemporaryFiles/UniqueFilesWithSuffix.swift)
 target_sources(SystemPackage PRIVATE
   Terminal/BaudRate.swift
   Terminal/ControlCharacters.swift

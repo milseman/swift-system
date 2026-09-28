@@ -114,7 +114,8 @@ TICKED = re.compile(r"`(?:struct |union |enum )?([A-Za-z_][A-Za-z0-9_]*)`")
 EQUIVALENTS = {
     "usleep": ("nanosleep",), "sleep": ("nanosleep",),
     "localtime": ("localtime_r",), "gmtime": ("gmtime_r",),
-    "mkstemp": ("mkostemp",), "time": ("clock_gettime",),
+    "mkstemp": ("mkostemp",), "mkstemps": ("mkostemps",), "time": ("clock_gettime",),
+    "gettimeofday": ("clock_gettime",),
 }
 
 
@@ -1302,7 +1303,8 @@ api-delta's last run, and a few seconds when they haven't.
   the interface in a doc comment's *The corresponding C … is* sentence, or a public typealias targets it, or,
   for `X members`, an `extension CInterop.<alias of X>` exists. A few interfaces count as covered by the
   replacement System wraps instead (`EQUIVALENTS` in `scripts/status.py`: usleep and sleep by nanosleep,
-  localtime and gmtime by their `_r` forms, mkstemp by mkostemp, time by clock_gettime), and the table says
+  localtime and gmtime by their `_r` forms, mkstemp and mkstemps by mkostemp(s), time and gettimeofday by
+  clock_gettime), and the table says
   so. A family that System answers with a design of its own, rather than a wrapper, counts as covered once a
   witness in System's sources shows the answer has what the markers ask for (`ANSWERED`: fts is DirectoryWalk,
   with its two-visit order). This sees what System documents, not whether the API fits the adopter's use: a
