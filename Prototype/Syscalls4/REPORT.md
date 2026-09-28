@@ -593,3 +593,92 @@ kernel's newer ones through `tcpi_snd_wnd` (Linux 5.4).
   45 suites pass.
 - Linux (swift:6.2-noble): XCTest 369 run, 2 skipped, 0 failures;
   swift-testing 322 tests in 47 suites pass.
+
+## 6. sendmmsg and recvmmsg
+
+### Commits and API
+
+`a6161fb`, in SystemSockets (`Sockets/SocketMultipleMessages.swift`,
+`Internals/SocketSyscalls+MultipleMessages.swift`, and `csystem_sendmmsg`
+and `csystem_recvmmsg` in CSystem); and `954d884`, the buffer forms, from
+the review of clusters 1 to 6.
+
+| API | C |
+|---|---|
+| `CInterop.MMsgHdr` (`msg_hdr`, `msg_len`), a Swift struct with the C layout | `struct mmsghdr` |
+| `sendMessages(_: UnsafeMutableBufferPointer<CInterop.MMsgHdr>, flags:retryOnInterrupt:) throws(Errno) -> Int` | `sendmmsg` |
+| `receiveMessages(_: UnsafeMutableBufferPointer<CInterop.MMsgHdr>, flags:retryOnInterrupt:) throws(Errno) -> Int` | `recvmmsg`, with no timeout |
+| `sendMessages(_: some Collection<UnsafeRawBufferPointer>, to:flags:retryOnInterrupt:)`, `sendMessages(_: some Collection<(UnsafeRawBufferPointer, SocketAddress)>, flags:retryOnInterrupt:)` | `sendmmsg`, headers built inside |
+| `receiveMessages(into: some Collection<UnsafeMutableRawBufferPointer>, flags:retryOnInterrupt:) throws(Errno) -> [ReceivedMessage]`, `SocketDescriptor.ReceivedMessage` (`byteCount`, `sender`, `flags`) | `recvmmsg`, headers built inside |
+
+### Design calls
+
+- **A Swift mirror of `struct mmsghdr`**, since glibc and Musl declare it
+  only with `_GNU_SOURCE` and Darwin not at all: a `CInterop.MsgHdr` and a
+  `CUnsignedInt`, with the C field names. Swift lays out a frozen struct's
+  stored properties as C does, so `shims.c` asserts that `struct mmsghdr`
+  has the layout of a C struct of those two fields, and a test that the
+  Swift one has it too (64 bytes on 64-bit Linux, 56 on Darwin). Rejected:
+  a C mirror in `CSystemLinux.h`, which would need `<sys/socket.h>` there
+  and so hand `msghdr`'s members to CSystem under MemberImportVisibility.
+  The shims take the vector (and the timeout) as `void *` for that reason.
+- **Darwin emulates both calls** with a `sendmsg` or `recvmsg` a message,
+  recording each count as `msg_len`: the first message's error is thrown,
+  and a later one's ends the call short, as Linux reports it (the next call
+  reports the error). An interruption is retried only before the first
+  message. Rejected: omitting them on Darwin, which leaves NIO's C loop
+  and its `recvmmsg` shim, which exits the process; emulating only
+  `sendmmsg`, as NIO does.
+- **No timeout parameter**: `recvmmsg` checks its timeout only after each
+  datagram arrives, so it can't end a wait for the first one (the BUGS
+  section of Linux's manual page). A receive timeout
+  (`setReceiveTimeout(_:)`) or a nonblocking socket does that job.
+- **An empty batch returns 0 without a call**, as the vectored I/O does.
+- **Two forms.** The header form is for callers that pool their vectors,
+  as NIO does, and send ancillary messages; filling a `msghdr` in means
+  importing the C library for its members (and `msg_iovlen` is a
+  `size_t` on glibc but an `int` on Musl and Darwin). The buffer forms,
+  added after the review, build the vectors, addresses and headers in
+  temporary allocations, so a client needs nothing from the C library;
+  each message can have its own destination, and each received one
+  reports its sender and flags. Rejected: spans, which an array can't
+  hold; ancillary messages in the buffer forms, which would need one
+  contiguous control buffer a batch.
+
+### Findings
+
+- Darwin limits a Unix-domain datagram to 2048 bytes: a 4096-byte one
+  fails with `EMSGSIZE`.
+
+### What it replaces in the adopters
+
+- NIO `Sources/NIOPosix/System.swift` `Posix.sendmmsg` and
+  `Posix.recvmmsg`, over `CNIOLinux_mmsghdr`, `CNIODarwin_mmsghdr` and
+  `CNIOOpenBSD_mmsghdr`, and `CNIODarwin_sendmmsg`'s loop and
+  `CNIODarwin_recvmmsg` (which calls `errx`), used by
+  `PendingDatagramWritesManager` and `DatagramVectorReadManager` through
+  `BSDSocketAPIPosix.swift`. The adopters' `SYSTEM-GAP` lists don't name
+  them, since NIO's migration left the C targets out of scope.
+
+### Platforms
+
+- `a6161fb` was built and tested on macOS 26.3 and on Linux
+  (swift:6.2-noble, with linux-build's then-pending probe fixes): the
+  shims and their `_Static_assert`s compiled, and every test passed,
+  sending and receiving batches through the real `sendmmsg` and
+  `recvmmsg`.
+- `954d884`, the buffer forms, was built and tested on macOS only: the
+  Linux runs were paused before it.
+- Unverified: Musl (whose `sendmmsg` and `recvmmsg` take `unsigned int`
+  flags, which the C shims convert) and Android.
+
+### Tests
+
+- New: `SocketMultipleMessagesTests` (7: the mirror's layout, a header
+  batch both ways over a datagram socketpair, a short send once a
+  nonblocking socket fills, an empty batch, the buffer forms over a
+  socketpair with a truncated datagram and over UDP loopback with
+  per-message addresses, and each platform's calls under mocking).
+- At `a6161fb`: macOS XCTest 430 run, 4 skipped, 0 failures,
+  swift-testing 325 tests in 46 suites pass; Linux XCTest 369 run, 2
+  skipped, 0 failures, swift-testing 327 tests in 48 suites pass.
