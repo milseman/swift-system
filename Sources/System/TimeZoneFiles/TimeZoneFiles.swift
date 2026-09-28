@@ -39,10 +39,10 @@ extension FilePath {
   public static var defaultTimeZoneFile: FilePath { FilePath(_TZDEFAULT) }
 }
 
-@usableFromInline
+@_alwaysEmitIntoClient
 internal var _TZDIR: String { TZDIR }
 
-@usableFromInline
+@_alwaysEmitIntoClient
 internal var _TZDEFAULT: String { TZDEFAULT }
 
 #endif // SYSTEM_PACKAGE_DARWIN
