@@ -205,6 +205,10 @@ target_sources(SystemPackage PRIVATE
   PathsAndFiles/ProcessDefaults.swift
   PathsAndFiles/UniqueFiles.swift)
 target_sources(SystemPackage PRIVATE
+  Internals/Constants+Provisional.swift
+  Internals/Syscalls+Provisional.swift
+  Provisional/Provisional+Stdio.swift)
+target_sources(SystemPackage PRIVATE
   Internals/Syscalls+ProcessCredentials.swift
   ProcessCredentials/ProcessCredentials.swift)
 target_sources(SystemPackage PRIVATE
