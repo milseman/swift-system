@@ -170,6 +170,11 @@ target_sources(SystemPackage PRIVATE
   Internals/Syscalls+MachTime.swift
   MachTime/MachTime.swift)
 target_sources(SystemPackage PRIVATE
+  Internals/Constants+MachVirtualMemory.swift
+  Internals/Syscalls+MachVirtualMemory.swift
+  MachVirtualMemory/MachKernelError.swift
+  MachVirtualMemory/MachVirtualMemory.swift)
+target_sources(SystemPackage PRIVATE
   MemoryMapping/MemoryMapping.swift)
 target_sources(SystemPackage PRIVATE
   NetworkInterfaces/NetworkInterface.swift)

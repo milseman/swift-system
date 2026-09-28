@@ -105,6 +105,7 @@ struct SystemSamples: ParsableCommand {
       // More POSIX and Darwin samples
       DateSample.self,
       SysDir.self,
+      VMCopy.self,
     ])
 }
 

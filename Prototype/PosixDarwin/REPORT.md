@@ -208,3 +208,74 @@ Tests: `SearchPathsTests` (swift-testing: search order, restarting, no
 domains, every directory against sysdir called directly) and
 `SearchPathsMockTests`. Totals after it: 454 XCTests (4 skipped) and 389
 swift-testing tests in 59 suites, all passing.
+
+## 3. Mach virtual memory
+
+`Sources/System/MachVirtualMemory/` (`MachKernelError.swift`,
+`MachVirtualMemory.swift`), `Internals/Syscalls+MachVirtualMemory.swift` and
+`Constants+MachVirtualMemory.swift`; the `vm-copy` sample. Darwin only.
+
+| API | C |
+|---|---|
+| `Mach.KernelError: Error`, `rawValue: kern_return_t`, `description` | `kern_return_t`, `mach_error_string` |
+| `.invalidAddress`, `.protectionFailure`, `.noSpace`, `.invalidArgument`, `.failure`, `.resourceShortage`, `.notReceiver`, `.noAccess`, `.memoryFailure`, `.memoryError`, `.aborted`, `.invalidName`, `.invalidTask`, `.invalidRight`, `.invalidValue`, `.invalidCapability`, `.notSupported`, `.operationTimedOut`, `.denied`, `.notFound` | `KERN_*` |
+| `Mach.VirtualMemory.allocate(byteCount:) throws(Mach.KernelError) -> UnsafeMutableRawBufferPointer` | `vm_allocate` with `VM_FLAGS_ANYWHERE` |
+| `Mach.VirtualMemory.deallocate(_:) throws(Mach.KernelError)` | `vm_deallocate` |
+| `Mach.VirtualMemory.copy(from:to:) throws(Mach.KernelError)` | `vm_copy` |
+
+Design calls:
+
+- **Errors are `Mach.KernelError`, not `Errno`.** Mach calls return a
+  `kern_return_t` and leave `errno` alone, and its codes have no faithful
+  errno mapping (`KERN_NO_SPACE` and `KERN_RESOURCE_SHORTAGE` would both be
+  `ENOMEM`, and most codes have none), as `DynamicLibrary.LoaderError` isn't
+  `Errno` either. It's a `RawRepresentable` struct, as `Errno` is, so any
+  code round-trips; the 20 named ones are those the VM and port calls
+  return. Rejected: `KernelReturn`, after C's type, which also names
+  success; and `Mach.Error`, which would shadow `Swift.Error` inside
+  `extension Mach`. `MachPort.swift` still traps or throws
+  `PortRightError`; it could adopt this type.
+- **Raw-pointer calls in a namespace, `Mach.VirtualMemory`**, as the malloc
+  lane's `Memory` namespace wraps the C allocator: `Data`'s deallocator and
+  `vm_copy` fallback work on memory they're given, which an owner can't
+  describe. Rejected, for now: an owned region, as `MemoryMapping` is. It
+  would be the next step, with the drop-errors deinit that item 54 leaves
+  open.
+- **Only `VM_FLAGS_ANYWHERE`**, as `MemoryMapping` has no `MAP_FIXED`: the
+  address is always the kernel's choice.
+- **`allocate` returns a buffer of the count asked for**, starting at a page
+  boundary, though the kernel allocates whole pages; zero allocates nothing
+  and returns an empty buffer, as `vm_allocate` does. A negative count traps,
+  as the malloc lane's does.
+- **`deallocate` documents the kernel's rounding** rather than checking the
+  region: it frees every page the region touches, so 10 bytes inside a page
+  free the page (a test shows it). Checking for a page-aligned start would
+  reject `Data`'s pattern (an aligned start, any length) no better than the
+  documentation does.
+- **`copy` takes any regions, overlapping ones included**: probes showed
+  `vm_copy` copies exactly the bytes asked for, at any alignment, and that
+  overlapping copies behave as `memmove`'s do.
+- **No `retryOnInterrupt`**: these are Mach traps, which don't return
+  `EINTR`. The mock hooks return the forced error number as the
+  `kern_return_t`, through `_mockReturningErrno`, and a mocked allocation
+  returns a made-up page boundary.
+- Not added: `vm_page_size` (`SystemConfig.value(.pageSize)` has it, and the
+  C global isn't concurrency-safe), `vm_protect` (`MemoryMapping` has
+  `mprotect`), `vm_read`, `vm_write`, other tasks' memory, the `mach_vm_*`
+  names (the same calls in a 64-bit process), and VM tags.
+
+Findings, probed on macOS 26.3:
+- A read-only or no-access page makes `vm_copy` fail with
+  `KERN_INVALID_ADDRESS`, not `KERN_PROTECTION_FAILURE`.
+- `vm_deallocate` of pages that aren't allocated, including a second
+  deallocation, succeeds.
+
+Adopters: Foundation's `__DataInvokeDeallocatorVirtualMemory` (`Data`'s
+`.virtualMemory` deallocator) and `Platform.copyMemoryPages` (`vm_copy`,
+falling back to `memmove`). No other adopter calls Mach VM.
+
+Tests: `MachVirtualMemoryTests` (zeroed pages, the empty allocation,
+`.noSpace`, copies at any alignment, overlaps, partial-page deallocation,
+read-only destinations, every error's code and description) and
+`MachVirtualMemoryMockTests`. Totals after it: 456 XCTests (4 skipped) and
+396 swift-testing tests in 60 suites, all passing.
