@@ -90,6 +90,9 @@ target_sources(SystemPackage PRIVATE
   Executable/CurrentExecutable.swift
   Internals/Syscalls+Executable.swift)
 target_sources(SystemPackage PRIVATE
+  ExitCodes/ExitCode.swift
+  Internals/Constants+ExitCodes.swift)
+target_sources(SystemPackage PRIVATE
   ExtendedAttributes/ExtendedAttributes.swift)
 target_sources(SystemPackage PRIVATE
   FileCopying/FileClone.swift

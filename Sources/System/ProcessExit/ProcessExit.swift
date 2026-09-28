@@ -37,7 +37,7 @@ extension ProcessID {
   /// C leaves undefined a second call to `exit`,
   /// from an exit handler or from another thread,
   /// while one is running;
-  /// ``exitImmediately(_:)`` is safe from anywhere.
+  /// ``exitImmediately(_:)-(CInt)`` is safe from anywhere.
   ///
   /// The corresponding C function is `exit`.
   @_alwaysEmitIntoClient
@@ -55,9 +55,9 @@ extension ProcessID {
   ///
   /// - Parameter status: The process's exit status, from 0 through 255.
   ///   By convention, 0 means success, and other values failure.
-  ///   See ``exit(_:)``.
+  ///   See ``exit(_:)-(CInt)``.
   ///
-  /// Unlike ``exit(_:)``, this method runs no code in the process:
+  /// Unlike ``exit(_:)-(CInt)``, this method runs no code in the process:
   /// output that a C stream still holds is lost,
   /// which includes what Swift's `print` wrote to a standard output
   /// that's a pipe or a file, unless the stream was flushed.
@@ -92,13 +92,13 @@ extension ProcessID {
   ///         Logger.shared.flush()
   ///       }
   ///
-  /// The handlers run when the process calls ``exit(_:)``,
+  /// The handlers run when the process calls ``exit(_:)-(CInt)``,
   /// or returns from its `main`,
   /// in the reverse of the order they were registered in,
   /// on the thread that ends the process,
   /// while other threads keep running.
   /// A handler registered twice runs twice.
-  /// They don't run when the process calls ``exitImmediately(_:)``,
+  /// They don't run when the process calls ``exitImmediately(_:)-(CInt)``,
   /// when a signal ends it, or when it traps,
   /// as a failed precondition or `fatalError` does.
   /// A handler can't be unregistered.
