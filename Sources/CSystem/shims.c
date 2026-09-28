@@ -79,6 +79,15 @@ int _system_ioctl_TIOCSWINSZ(int fd, const struct winsize *ws) {
   return ioctl(fd, TIOCSWINSZ, ws);
 }
 
+#include <stdlib.h>
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+char *csystem_mktemp(char *path) {
+  return mktemp(path);
+}
+#pragma clang diagnostic pop
+
 #endif
 
 #if defined(_WIN32)

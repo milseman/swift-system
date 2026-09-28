@@ -203,6 +203,9 @@ target_sources(SystemPackage PRIVATE
 target_sources(SystemPackage PRIVATE
   NetworkInterfaces/NetworkInterface.swift)
 target_sources(SystemPackage PRIVATE
+  Internals/Constants+Passphrase.swift
+  Passphrase/ReadPassphrase.swift)
+target_sources(SystemPackage PRIVATE
   PathsAndFiles/FilePath+Resolution.swift
   PathsAndFiles/ProcessDefaults.swift
   PathsAndFiles/UniqueFiles.swift)
@@ -279,6 +282,7 @@ target_sources(SystemPackage PRIVATE
   SystemPaths/MakePath.swift)
 target_sources(SystemPackage PRIVATE
   Internals/Syscalls+SmallGaps.swift
+  TemporaryFiles/UniqueFilesWithPermissions.swift
   TemporaryFiles/UniqueFilesWithSuffix.swift)
 target_sources(SystemPackage PRIVATE
   Terminal/BaudRate.swift

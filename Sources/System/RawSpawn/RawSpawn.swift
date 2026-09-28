@@ -11,8 +11,9 @@
 // raw: to hand them to a client that changes them, as Subprocess's
 // preSpawnProcessConfigurator does, or to pass them to a spawn of its own,
 // such as one that forks first to change credentials. SpawnAttributes and
-// SpawnFileAction build them; ProcessID.spawn(_:arguments:environment:
-// cFileActions:cAttributes:) spawns with them.
+// SpawnFileAction build them, SpawnAttributes.Flags reads and sets their
+// flags, and ProcessID.spawn(_:arguments:environment:cFileActions:
+// cAttributes:) spawns with them.
 
 #if !os(Windows) && !os(WASI) && !os(watchOS) && !os(tvOS) && !os(Android)
 
@@ -122,6 +123,62 @@ extension SpawnFileAction {
     }.get()
     if let bodyError { throw bodyError }
     return result!
+  }
+}
+
+// MARK: - Their flags
+
+@available(System 199, *)
+extension SpawnAttributes.Flags {
+  /// Reads the flags of C attributes.
+  ///
+  /// - Parameter cAttributes: The C attributes, such as
+  ///   ``SpawnAttributes/withCAttributes(_:)`` passes its closure.
+  ///
+  /// The flags include the ones that ``SpawnAttributes``'s other properties
+  /// set, such as `POSIX_SPAWN_SETPGROUP` for a
+  /// ``SpawnAttributes/processGroup``, which this type keeps but doesn't name.
+  ///
+  /// The corresponding C function is `posix_spawnattr_getflags`.
+  @_alwaysEmitIntoClient
+  public init(of cAttributes: UnsafePointer<CInterop.SpawnAttributes>) throws(Errno) {
+    self = try Self._flags(of: cAttributes).get()
+  }
+
+  @usableFromInline
+  internal static func _flags(
+    of cAttributes: UnsafePointer<CInterop.SpawnAttributes>
+  ) -> Result<Self, Errno> {
+    var flags: CShort = 0
+    return nothingOrReturnedErrno(retryOnInterrupt: false) {
+      system_posix_spawnattr_getflags(cAttributes, &flags)
+    }.map { Self(rawValue: flags) }
+  }
+
+  /// Replaces the flags of C attributes with these flags.
+  ///
+  /// - Parameter cAttributes: The C attributes, such as
+  ///   ``SpawnAttributes/withCAttributes(_:)`` passes its closure.
+  ///
+  /// To add a flag, read the flags first:
+  ///
+  ///     var flags = try SpawnAttributes.Flags(of: &attributes)
+  ///     flags.insert(.createSession)
+  ///     try flags.store(in: &attributes)
+  ///
+  /// The corresponding C function is `posix_spawnattr_setflags`.
+  @_alwaysEmitIntoClient
+  public func store(in cAttributes: UnsafeMutablePointer<CInterop.SpawnAttributes>) throws(Errno) {
+    try _store(in: cAttributes).get()
+  }
+
+  @usableFromInline
+  internal func _store(
+    in cAttributes: UnsafeMutablePointer<CInterop.SpawnAttributes>
+  ) -> Result<(), Errno> {
+    nothingOrReturnedErrno(retryOnInterrupt: false) {
+      system_posix_spawnattr_setflags(cAttributes, rawValue)
+    }
   }
 }
 

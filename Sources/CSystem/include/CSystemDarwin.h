@@ -38,4 +38,9 @@
 int _system_ioctl_TIOCGWINSZ(int fd, struct winsize *ws);
 int _system_ioctl_TIOCSWINSZ(int fd, const struct winsize *ws);
 
+// mktemp, which the SDK deprecates, so that a call from Swift would warn.
+// System makes a name with it and creates the file with O_EXCL itself, as
+// mkstemp does.
+char *csystem_mktemp(char *path);
+
 #endif // defined(__APPLE__)

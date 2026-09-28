@@ -8,11 +8,14 @@
 */
 
 // Unique files with a suffix, or relative to a directory (mkostemps,
-// mkostempsat_np), and a signal's description (strsignal).
+// mkostempsat_np), or with permissions (mktemp, then open), a signal's
+// description (strsignal), a passphrase (readpassphrase), and C spawn
+// attributes' flags (posix_spawnattr_getflags).
 
 #if !os(Windows) && !os(WASI)
 
 #if SYSTEM_PACKAGE_DARWIN
+import CSystem
 import Darwin
 #elseif canImport(Glibc)
 import Glibc
@@ -47,6 +50,43 @@ internal func system_mkostempsat_np(
   }
 #endif
   return mkostempsat_np(fd, template, suffixLength, flags)
+}
+
+// mktemp, through CSystem, since the SDK deprecates it. A mocked call that
+// succeeds leaves the template as it is.
+internal func system_mktemp(_ template: UnsafeMutablePointer<CChar>) -> UnsafeMutablePointer<CChar>? {
+#if ENABLE_MOCKING
+  if mockingEnabled {
+    if _mock(path: template) != 0 { return nil }
+    return template
+  }
+#endif
+  return csystem_mktemp(template)
+}
+
+// readpassphrase, whose prompt is recorded by value. A mocked call that
+// succeeds reads an empty passphrase.
+internal func system_readpassphrase(
+  _ prompt: UnsafePointer<CChar>, _ buffer: UnsafeMutablePointer<CChar>, _ size: Int, _ flags: CInt
+) -> UnsafeMutablePointer<CChar>? {
+#if ENABLE_MOCKING
+  if mockingEnabled {
+    if _mock(path: prompt, size, flags) != 0 { return nil }
+    if size > 0 { buffer.pointee = 0 }
+    return buffer
+  }
+#endif
+  return readpassphrase(prompt, buffer, size, flags)
+}
+#endif
+
+#if !os(watchOS) && !os(tvOS) && !os(Android)
+// posix_spawnattr_getflags, which returns an error number. Like the
+// posix_spawnattr setters in Syscalls+Processes.swift, it has no mock hook.
+internal func system_posix_spawnattr_getflags(
+  _ attributes: UnsafePointer<_SpawnAttributesStorage>, _ flags: UnsafeMutablePointer<CShort>
+) -> CInt {
+  posix_spawnattr_getflags(attributes, flags)
 }
 #endif
 

@@ -47,6 +47,48 @@ final class RawSpawnTests: XCTestCase {
     XCTAssertEqual(flags & CShort(POSIX_SPAWN_SETPGROUP), CShort(POSIX_SPAWN_SETPGROUP))
   }
 
+  /// C attributes' flags, read and replaced, keeping the flags that
+  /// System's other settings imply.
+  func testCAttributesFlags() throws {
+    let attributes = SpawnAttributes(flags: .resetIDs, processGroup: .new)
+    try attributes.withCAttributes { attributes in
+      var flags = try SpawnAttributes.Flags(of: &attributes)
+      XCTAssertTrue(flags.contains(.resetIDs))
+      XCTAssertEqual(flags.rawValue & CShort(POSIX_SPAWN_SETPGROUP), CShort(POSIX_SPAWN_SETPGROUP))
+      flags.insert(.closeOnExecByDefault)
+      flags.remove(.resetIDs)
+      try flags.store(in: &attributes)
+      let stored = try SpawnAttributes.Flags(of: &attributes)
+      XCTAssertEqual(stored, flags)
+      var cFlags: CShort = 0
+      XCTAssertEqual(posix_spawnattr_getflags(&attributes, &cFlags), 0)
+      XCTAssertEqual(cFlags, flags.rawValue)
+    }
+  }
+
+  /// A flag that a closure adds to C attributes takes effect,
+  /// as Subprocess's preSpawnProcessConfigurator adds one.
+  func testSpawningWithAStoredFlag() throws {
+    let (reader, writer) = try FileDescriptor.pipe()
+    let actions: [SpawnFileAction] = [.duplicate(reader, as: .standardInput), .close(writer)]
+    let child = try SpawnFileAction.withCFileActions(actions) { fileActions in
+      try SpawnAttributes().withCAttributes { attributes in
+        var flags = try SpawnAttributes.Flags(of: &attributes)
+        flags.insert(.createSession)
+        try flags.store(in: &attributes)
+        // The child waits for its standard input to close.
+        return try ProcessID.spawn(
+          "/bin/sh", arguments: ["sh", "-c", "read line; exit 3"],
+          cFileActions: &fileActions, cAttributes: &attributes)
+      }
+    }
+    try reader.close()
+    let session = try child.sessionID()
+    try writer.close()
+    XCTAssertEqual(try child.wait(), .exited(3))
+    XCTAssertEqual(session, child)
+  }
+
   /// A closure's error comes out, and a rejected setting stops the call
   /// before the closure runs.
   func testErrors() throws {
