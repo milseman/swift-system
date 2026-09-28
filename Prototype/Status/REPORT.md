@@ -186,3 +186,24 @@ POSIXErrorCode (3), then two files each for XATTR_MAXNAMELEN, UTIME_OMIT, fts, l
 attributes and tzfile.h, and one-file gaps. The order from here: C stdio, POSIXErrorCode, the remaining early
 items (shared memory and named semaphores, os_unfair_lock and arc4random, sync and chroot), then the two-file
 families.
+
+## 8. C stdio, provisionally: `768516e`
+
+The first provisional family, and the largest gap (5 files in swift-log, swift-nio, swift-tools-support-core; 4
+more in swiftpm by the next run). `Sources/System/Provisional/Provisional+Stdio.swift` holds it; its header says
+why it's provisional, and each type's doc notes that it may move to the standard library.
+
+- `CInterop.File` (FILE), for TSC's public `FILEPointer`.
+- `FileStream`, a `RawRepresentable` handle over `UnsafeMutablePointer<FILE>`, as FileDescriptor is over an fd:
+  the standard streams; `open(_:mode:)` for a path or C string (fopen) and a descriptor (fdopen), with C's mode
+  strings; `close()`, `fileDescriptor()`, `write(_:)` (bytes, or a String's UTF-8; a short fwrite throws),
+  `read(into:)` (short only at the end), `flush()`, `flushAll()`, `hasError`/`isAtEnd`/`clearError()`,
+  `Buffering` with `setBuffering(_:buffer:)` (setvbuf, so `setbuf(stdout, nil)` is
+  `setBuffering(.unbuffered)`), and off WASI `lock()`/`unlock()`/`tryLock()`/`withLock(_:)`.
+- Rejected: an owner that closes in its deinit (item 54's policy, left open; a handle matches FileDescriptor);
+  a typed mode (C's strings are what adopters pass); `retryOnInterrupt` (an interrupted stream call can have
+  written part of a buffer); passing C function values as swift-log does (`write: fwrite`), which the handle's
+  methods replace. The name avoids Foundation's `Stream`/`OutputStream`; no sister clone declares `FileStream`.
+- Mock tests run every fallible call over a placeholder stream address; the calls that can't fail have no hooks.
+
+Tests: ProvisionalStdioTest. XCTest 501 (4 skipped), swift-testing 441, all passing.
