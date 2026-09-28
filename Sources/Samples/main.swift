@@ -92,6 +92,8 @@ struct SystemSamples: ParsableCommand {
       IfConfig.self,
       XAttr.self,
       UUIDGen.self,
+      // Memory allocation samples
+      Malloc.self,
       // Darwin samples
       CopyFile.self,
       Sysctl.self,
