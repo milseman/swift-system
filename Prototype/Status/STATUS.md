@@ -2,8 +2,8 @@
 
 Generated 2026-09-28 by `Utilities/adopter-coverage/status.sh`, from commits only; rerun it rather than editing this file. How each figure is made, and what it can't see, is in [How this is computed](#how-this-is-computed).
 
-- **System**: `coverage` @ `1be2f2ba` (Add CInterop.TimeSpec.fileTimeNow and fileTimeUnchanged (UTIME_NOW, UTIME_OMIT) and SystemConfig.maxExtendedAttributeNameBytes (XATTR_MAXNAMELEN), and name UTIME_OMIT in setTimes' doc comments), which doesn't contain `system-next` @ `e8762dd1` (Merge branch 'coverage' into system-next); 6 commit(s) of `coverage` aren't in `system-next`.
-- **API delta**: `main` @ `1b452c29` → `HEAD` @ `1be2f2ba`.
+- **System**: `coverage` @ `c37d6384` (Add DirectoryWalk.Order.preorderAndPostorder and Entry.isPostorderVisit, what Foundation's copy and link still use fts for), which doesn't contain `system-next` @ `e8762dd1` (Merge branch 'coverage' into system-next); 8 commit(s) of `coverage` aren't in `system-next`.
+- **API delta**: `main` @ `1b452c29` → `HEAD` @ `c37d6384`.
 - **Adopters** (`../adopters`, branch `migrate-darwin`, against its merge base with `main`):
   - WasmKit @ `f5219fbf`, base `1e9c513d`
   - indexstore-db @ `cc966b89`, base `441ead77`
@@ -26,11 +26,11 @@ Copied verbatim from `Utilities/api-delta/regenerate.sh` (`BASE_REF=main`, `HEAD
 
 ## Summary
 
-- **2884 added, 0 removed, 0 changed** declarations in the macOS symbol graphs.
-  - SystemPackage: +2308 (448 → 2756 public symbols).
+- **2886 added, 0 removed, 0 changed** declarations in the macOS symbol graphs.
+  - SystemPackage: +2310 (448 → 2758 public symbols).
   - SystemSockets: +576 (0 → 576 public symbols). SystemSockets is a new module; it doesn't exist on `main`.
 - Availability of the additions:
-  - System 199: 2849
+  - System 199: 2851
   - System 199 + explicit OS floor: 26
   - System 0.0.1 + explicit OS floor: 8
   - System 0.0.1: 1
@@ -38,11 +38,11 @@ Copied verbatim from `Utilities/api-delta/regenerate.sh` (`BASE_REF=main`, `HEAD
   - 408 compiled only on other platforms;
   - 233 new `@available(*, unavailable, renamed:)` stubs;
   - 1 new underscored public declaration(s).
-  - 26 added, removed or changed graph symbols the scan didn't find (enum case: 25, no source location: 1). Enum cases have no `public` keyword, and synthesized members have no location; any others are scanner misses. Their platforms show as `?`.
+  - 27 added, removed or changed graph symbols the scan didn't find (enum case: 26, no source location: 1). Enum cases have no `public` keyword, and synthesized members have no location; any others are scanner misses. Their platforms show as `?`.
 - 0 public declarations hidden from the graphs were removed.
 - No public declaration is conditional on `ENABLE_MOCKING` or `DEBUG`, so a release build has the same public API as the debug graphs.
 - Cross-check with `swift-api-digester`, which dumps every declaration, implicit ones included:
-  - SystemPackage: +2589 / -0 declarations, which is the graphs' +2308 plus 281 implicit ones; it has every graph addition; `-diagnose-sdk` reports no breaking changes.
+  - SystemPackage: +2591 / -0 declarations, which is the graphs' +2310 plus 281 implicit ones; it has every graph addition; `-diagnose-sdk` reports no breaking changes.
   - SystemSockets: +648 / -0 declarations, which is the graphs' +576 plus 71 implicit ones; explicit declarations it has that the graphs don't: `SocketAddress._withUnsafeMutablePointer(_:)`; it has every graph addition.
 - Nothing was removed or changed: no public declaration left the graphs or the source scan. The *changed* check compares declaration text (including default arguments), availability, conformances, generic and extension constraints, and access level, and pairs symbols by path when a signature change alters the USR.
 
@@ -61,7 +61,7 @@ Each row is a top-level type, and nested types count toward it: `FilePath.Resolu
 | SystemPackage | [`ControlCharacters`](#systempackage-controlcharacters) | 8 | 0 | 0 | S199 ×8 |
 | SystemPackage | [`ControlFlags`](#systempackage-controlflags) | 20 | 0 | 0 | S199 ×20 |
 | SystemPackage | [`DirectoryStream`](#systempackage-directorystream) | 15 | 0 | 0 | S199 ×15 |
-| SystemPackage | [`DirectoryWalk`](#systempackage-directorywalk) | 16 | 0 | 0 | S199 ×16 |
+| SystemPackage | [`DirectoryWalk`](#systempackage-directorywalk) | 18 | 0 | 0 | S199 ×18 |
 | SystemPackage | [`DiskQuota`](#systempackage-diskquota) | 17 | 0 | 0 | S199 ×17 |
 | SystemPackage | [`DynamicLibrary`](#systempackage-dynamiclibrary) | 24 | 0 | 0 | S199 ×24 |
 | SystemPackage | [`Entropy`](#systempackage-entropy) | 7 | 0 | 0 | S199 ×7 |
@@ -137,7 +137,7 @@ Each row is a top-level type, and nested types count toward it: `FilePath.Resolu
 | SystemSockets | [`sockaddr_storage (extends Darwin)`](#systemsockets-sockaddr-storage-extends-darwin) | 3 | 0 | 0 | S199 ×3 |
 | SystemSockets | [`sockaddr_un (extends Darwin)`](#systemsockets-sockaddr-un-extends-darwin) | 5 | 0 | 0 | S199 ×5 |
 | SystemSockets | [`sockaddr_vm (extends Darwin)`](#systemsockets-sockaddr-vm-extends-darwin) | 5 | 0 | 0 | S199 ×5 |
-| **Total** | | **2884** | **0** | **0** | |
+| **Total** | | **2886** | **0** | **0** | |
 
 # 2. Adoption
 
@@ -369,7 +369,7 @@ Verbatim, not rerun: each package's own test totals (at the start, and the lates
 
 # 3. Gaps
 
-Every `SYSTEM-GAP:` marker in the packages' sources at the commits above: 51 markers in 34 files, of which 0 are outside the packages' targets. Each marker's text is read for the C interfaces it names (see [How this is computed](#how-this-is-computed)); a marker that names none is counted under its phrase, with the Darwin names imported under it deciding its status. Status is against System at `1be2f2ba`:
+Every `SYSTEM-GAP:` marker in the packages' sources at the commits above: 51 markers in 34 files, of which 0 are outside the packages' targets. Each marker's text is read for the C interfaces it names (see [How this is computed](#how-this-is-computed)); a marker that names none is counted under its phrase, with the Darwin names imported under it deciding its status. Status is against System at `c37d6384`:
 
 - **missing**: System documents none of it (or only some: *k of n*).
 - **covered**: a System declaration's doc comment names it as the corresponding C interface, a CInterop alias names it, or, for `X members`, System gives `CInterop` alias of `X` Swift-named accessors. The marker is stale, or the package hasn't adopted the API yet. *Not yet in `system-next`* means only this branch has it.
@@ -377,16 +377,16 @@ Every `SYSTEM-GAP:` marker in the packages' sources at the commits above: 51 mar
 
 A family marked *(provisional)* is a C-library layer above the OS (math, stdio, locales, string.h and ctype.h) that System wraps provisionally, in `Sources/System/Provisional/`, since it may move to the standard library; it counts like everything else.
 
-Interfaces: 52 missing, 23 covered, 1 unread, 76 in all.
+Interfaces: 26 missing, 49 covered, 1 unread, 76 in all.
 
 | # | Interface | Status | Files | Packages | Family |
 |---:|---|---|---:|---|---|
 | 1 | C stdio FILE streams | covered (all 11 names) | 4 | swift-package-manager, swift-tools-support-core | C stdio FILE streams |
-| 2 | `FTS_D` | missing | 2 | swift-foundation | fts |
-| 3 | `FTS_DP` | missing | 2 | swift-foundation | fts |
-| 4 | `fts_info` | missing | 2 | swift-foundation | fts |
-| 5 | `fts_path` | missing | 2 | swift-foundation | fts |
-| 6 | `FTSENT` | missing | 2 | swift-foundation | fts |
+| 2 | `FTS_D` | covered (by DirectoryWalk; not yet in `system-next`) | 2 | swift-foundation | fts |
+| 3 | `FTS_DP` | covered (by DirectoryWalk; not yet in `system-next`) | 2 | swift-foundation | fts |
+| 4 | `fts_info` | covered (by DirectoryWalk; not yet in `system-next`) | 2 | swift-foundation | fts |
+| 5 | `fts_path` | covered (by DirectoryWalk; not yet in `system-next`) | 2 | swift-foundation | fts |
+| 6 | `FTSENT` | covered (by DirectoryWalk; not yet in `system-next`) | 2 | swift-foundation | fts |
 | 7 | `memcmp` | covered (doc comment) | 2 | swift-syntax | string.h |
 | 8 | posix_spawn's raw attributes and file actions | missing (12 of 18 names covered) | 2 | swift-subprocess | posix_spawn |
 | 9 | `pow` | missing | 2 | swift-foundation | libm (provisional) |
@@ -402,27 +402,27 @@ Interfaces: 52 missing, 23 covered, 1 unread, 76 in all.
 | 19 | `fflush` | covered (doc comment) | 1 | swift-log | C stdio streams |
 | 20 | `FILE` | covered (doc comment) | 1 | swift-log | C stdio streams |
 | 21 | `flockfile` | covered (doc comment) | 1 | swift-log | C stdio streams |
-| 22 | `FTS` | missing | 1 | swift-foundation | fts |
-| 23 | `fts_close` | missing | 1 | swift-foundation | fts |
-| 24 | `FTS_DEFAULT` | missing | 1 | swift-foundation | fts |
-| 25 | `fts_dev` | missing | 1 | swift-foundation | fts |
-| 26 | `FTS_DNR` | missing | 1 | swift-foundation | fts |
-| 27 | `FTS_ERR` | missing | 1 | swift-foundation | fts |
-| 28 | `fts_errno` | missing | 1 | swift-foundation | fts |
-| 29 | `FTS_F` | missing | 1 | swift-foundation | fts |
-| 30 | `fts_ino` | missing | 1 | swift-foundation | fts |
-| 31 | `fts_level` | missing | 1 | swift-foundation | fts |
-| 32 | `fts_name` | missing | 1 | swift-foundation | fts |
-| 33 | `fts_namelen` | missing | 1 | swift-foundation | fts |
-| 34 | `FTS_NOCHDIR` | missing | 1 | swift-foundation | fts |
-| 35 | `FTS_NS` | missing | 1 | swift-foundation | fts |
-| 36 | `fts_open` | missing | 1 | swift-foundation | fts |
-| 37 | `FTS_PHYSICAL` | missing | 1 | swift-foundation | fts |
-| 38 | `fts_read` | missing | 1 | swift-foundation | fts |
-| 39 | `fts_set` | missing | 1 | swift-foundation | fts |
-| 40 | `FTS_SKIP` | missing | 1 | swift-foundation | fts |
-| 41 | `FTS_SL` | missing | 1 | swift-foundation | fts |
-| 42 | `FTS_SLNONE` | missing | 1 | swift-foundation | fts |
+| 22 | `FTS` | covered (by DirectoryWalk; not yet in `system-next`) | 1 | swift-foundation | fts |
+| 23 | `fts_close` | covered (by DirectoryWalk; not yet in `system-next`) | 1 | swift-foundation | fts |
+| 24 | `FTS_DEFAULT` | covered (by DirectoryWalk; not yet in `system-next`) | 1 | swift-foundation | fts |
+| 25 | `fts_dev` | covered (by DirectoryWalk; not yet in `system-next`) | 1 | swift-foundation | fts |
+| 26 | `FTS_DNR` | covered (by DirectoryWalk; not yet in `system-next`) | 1 | swift-foundation | fts |
+| 27 | `FTS_ERR` | covered (by DirectoryWalk; not yet in `system-next`) | 1 | swift-foundation | fts |
+| 28 | `fts_errno` | covered (by DirectoryWalk; not yet in `system-next`) | 1 | swift-foundation | fts |
+| 29 | `FTS_F` | covered (by DirectoryWalk; not yet in `system-next`) | 1 | swift-foundation | fts |
+| 30 | `fts_ino` | covered (by DirectoryWalk; not yet in `system-next`) | 1 | swift-foundation | fts |
+| 31 | `fts_level` | covered (by DirectoryWalk; not yet in `system-next`) | 1 | swift-foundation | fts |
+| 32 | `fts_name` | covered (by DirectoryWalk; not yet in `system-next`) | 1 | swift-foundation | fts |
+| 33 | `fts_namelen` | covered (by DirectoryWalk; not yet in `system-next`) | 1 | swift-foundation | fts |
+| 34 | `FTS_NOCHDIR` | covered (by DirectoryWalk; not yet in `system-next`) | 1 | swift-foundation | fts |
+| 35 | `FTS_NS` | covered (by DirectoryWalk; not yet in `system-next`) | 1 | swift-foundation | fts |
+| 36 | `fts_open` | covered (by DirectoryWalk; not yet in `system-next`) | 1 | swift-foundation | fts |
+| 37 | `FTS_PHYSICAL` | covered (by DirectoryWalk; not yet in `system-next`) | 1 | swift-foundation | fts |
+| 38 | `fts_read` | covered (by DirectoryWalk; not yet in `system-next`) | 1 | swift-foundation | fts |
+| 39 | `fts_set` | covered (by DirectoryWalk; not yet in `system-next`) | 1 | swift-foundation | fts |
+| 40 | `FTS_SKIP` | covered (by DirectoryWalk; not yet in `system-next`) | 1 | swift-foundation | fts |
+| 41 | `FTS_SL` | covered (by DirectoryWalk; not yet in `system-next`) | 1 | swift-foundation | fts |
+| 42 | `FTS_SLNONE` | covered (by DirectoryWalk; not yet in `system-next`) | 1 | swift-foundation | fts |
 | 43 | `funlockfile` | covered (doc comment) | 1 | swift-log | C stdio streams |
 | 44 | `fwrite` | covered (doc comment) | 1 | swift-log | C stdio streams |
 | 45 | gettimeofday before macOS 13 | missing (1 of 2 names covered) | 1 | swift-driver | gettimeofday before macOS 13 |
@@ -464,21 +464,20 @@ The missing interfaces above, grouped, largest first: the order to fill them in.
 
 | # | Family | Files | Packages | Interfaces |
 |---:|---|---:|---|---|
-| 1 | fts | 2 | swift-foundation | `FTS_D`, `FTS_DP`, `fts_info`, `fts_path`, `FTSENT`, `FTS`, `fts_close`, `FTS_DEFAULT`, `fts_dev`, `FTS_DNR`, `FTS_ERR`, `fts_errno`, `FTS_F`, `fts_ino`, `fts_level`, `fts_name`, `fts_namelen`, `FTS_NOCHDIR`, `FTS_NS`, `fts_open`, `FTS_PHYSICAL`, `fts_read`, `fts_set`, `FTS_SKIP`, `FTS_SL`, `FTS_SLNONE` |
-| 2 | libm (provisional) | 2 | swift-foundation | `pow`, `cos`, `log`, `sin` |
-| 3 | locale (provisional) | 2 | swift-foundation | `LC_ALL`, `locale_t`, `setlocale`, `strncasecmp_l`, `strtod_l`, `strtof_l` |
-| 4 | posix_spawn | 2 | swift-subprocess | posix_spawn's raw attributes and file actions |
-| 5 | tzfile.h | 2 | swift-foundation | `TZDIR`, `TZDEFAULT` |
-| 6 | C struct members (MemberImportVisibility) | 1 | swift-foundation | `malloc_type_descriptor_v0_t members` |
-| 7 | calendar time | 1 | swift-certificates | `time_t` |
-| 8 | dynamic loader | 1 | swift-tools-support-core | `dlerror` |
-| 9 | gettimeofday before macOS 13 | 1 | swift-driver | gettimeofday before macOS 13 |
-| 10 | libmalloc | 1 | swift-foundation | `malloc_type_calloc`, `malloc_type_descriptor_v0_t`, `malloc_type_malloc`, `malloc_type_realloc` |
-| 11 | mkstemps | 1 | swift-tools-support-core | `mkstemps` |
-| 12 | O_DSYNC | 1 | WasmKit | `O_DSYNC` |
-| 13 | readpassphrase | 1 | swift-package-manager | `readpassphrase` |
-| 14 | string.h and ctype.h (provisional) | 1 | swift-driver | `strsignal` |
-| 15 | temporary files | 1 | swift-foundation | `mktemp` |
+| 1 | libm (provisional) | 2 | swift-foundation | `pow`, `cos`, `log`, `sin` |
+| 2 | locale (provisional) | 2 | swift-foundation | `LC_ALL`, `locale_t`, `setlocale`, `strncasecmp_l`, `strtod_l`, `strtof_l` |
+| 3 | posix_spawn | 2 | swift-subprocess | posix_spawn's raw attributes and file actions |
+| 4 | tzfile.h | 2 | swift-foundation | `TZDIR`, `TZDEFAULT` |
+| 5 | C struct members (MemberImportVisibility) | 1 | swift-foundation | `malloc_type_descriptor_v0_t members` |
+| 6 | calendar time | 1 | swift-certificates | `time_t` |
+| 7 | dynamic loader | 1 | swift-tools-support-core | `dlerror` |
+| 8 | gettimeofday before macOS 13 | 1 | swift-driver | gettimeofday before macOS 13 |
+| 9 | libmalloc | 1 | swift-foundation | `malloc_type_calloc`, `malloc_type_descriptor_v0_t`, `malloc_type_malloc`, `malloc_type_realloc` |
+| 10 | mkstemps | 1 | swift-tools-support-core | `mkstemps` |
+| 11 | O_DSYNC | 1 | WasmKit | `O_DSYNC` |
+| 12 | readpassphrase | 1 | swift-package-manager | `readpassphrase` |
+| 13 | string.h and ctype.h (provisional) | 1 | swift-driver | `strsignal` |
+| 14 | temporary files | 1 | swift-foundation | `mktemp` |
 
 ## Markers that name no C interface
 
@@ -489,11 +488,11 @@ The missing interfaces above, grouped, largest first: the order to fill them in.
 <details><summary>Each interface's markers (package: file:line)</summary>
 
 - C stdio FILE streams (covered): swift-package-manager: `Sources/Basics/Concurrency/AsyncProcess.swift:25`; swift-package-manager: `Sources/Runtimes/PackagePlugin/Plugin.swift:47`; swift-package-manager: `Sources/Runtimes/PackagePlugin/Plugin.swift:48`; swift-package-manager: `Sources/Runtimes/PackagePlugin/Plugin.swift:49`; swift-tools-support-core: `Sources/TSCBasic/WritableByteStream.swift:15`; swift-tools-support-core: `Sources/TSCBasic/WritableByteStream.swift:16`; swift-tools-support-core: `Sources/TSCBasic/WritableByteStream.swift:17`; swift-tools-support-core: `Sources/TSCBasic/WritableByteStream.swift:18`; swift-tools-support-core: `Sources/TSCBasic/WritableByteStream.swift:19`; swift-tools-support-core: `Sources/TSCBasic/WritableByteStream.swift:20`; swift-tools-support-core: `Sources/TSCBasic/WritableByteStream.swift:21`; swift-tools-support-core: `Sources/TSCBasic/WritableByteStream.swift:22`; swift-tools-support-core: `Sources/TSCBasic/WritableByteStream.swift:23`; swift-tools-support-core: `Sources/TSCTestSupport/PseudoTerminal.swift:15`
-- `FTS_D` (missing): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:120`; swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
-- `FTS_DP` (missing): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:120`; swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
-- `fts_info` (missing): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:120`; swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
-- `fts_path` (missing): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:120`; swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
-- `FTSENT` (missing): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:120`; swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
+- `FTS_D` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:120`; swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
+- `FTS_DP` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:120`; swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
+- `fts_info` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:120`; swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
+- `fts_path` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:120`; swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
+- `FTSENT` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:120`; swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
 - `memcmp` (covered): swift-syntax: `Sources/SwiftCompilerPluginMessageHandling/JSON/JSONDecoding.swift:16`; swift-syntax: `Sources/SwiftSyntax/SyntaxText.swift:15`; swift-syntax: `Sources/SwiftSyntax/SyntaxText.swift:27`
 - posix_spawn's raw attributes and file actions (missing): swift-subprocess: `Sources/Subprocess/Platforms/Subprocess+Darwin.swift:14`; swift-subprocess: `Tests/SubprocessTests/DarwinTests.swift:15`
 - `pow` (missing): swift-foundation: `Sources/FoundationEssentials/Calendar/Calendar_Astronomy.swift:17`; swift-foundation: `Tests/FoundationInternationalizationTests/Formatting/DiscreteFormatStyleTestUtilities.swift:23`
@@ -509,27 +508,27 @@ The missing interfaces above, grouped, largest first: the order to fill them in.
 - `fflush` (covered): swift-log: `Tests/LoggingTests/StreamLogHandlerTest.swift:22`
 - `FILE` (covered): swift-log: `Sources/Logging/Handlers/StreamLogHandler.swift:17`
 - `flockfile` (covered): swift-log: `Tests/LoggingTests/StreamLogHandlerTest.swift:22`
-- `FTS` (missing): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:120`
-- `fts_close` (missing): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:120`
-- `FTS_DEFAULT` (missing): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
-- `fts_dev` (missing): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:120`
-- `FTS_DNR` (missing): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
-- `FTS_ERR` (missing): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
-- `fts_errno` (missing): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
-- `FTS_F` (missing): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
-- `fts_ino` (missing): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:120`
-- `fts_level` (missing): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
-- `fts_name` (missing): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:120`
-- `fts_namelen` (missing): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:120`
-- `FTS_NOCHDIR` (missing): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
-- `FTS_NS` (missing): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
-- `fts_open` (missing): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:120`
-- `FTS_PHYSICAL` (missing): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
-- `fts_read` (missing): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:120`
-- `fts_set` (missing): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:120`
-- `FTS_SKIP` (missing): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:120`
-- `FTS_SL` (missing): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
-- `FTS_SLNONE` (missing): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
+- `FTS` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:120`
+- `fts_close` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:120`
+- `FTS_DEFAULT` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
+- `fts_dev` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:120`
+- `FTS_DNR` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
+- `FTS_ERR` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
+- `fts_errno` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
+- `FTS_F` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
+- `fts_ino` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:120`
+- `fts_level` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
+- `fts_name` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:120`
+- `fts_namelen` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:120`
+- `FTS_NOCHDIR` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
+- `FTS_NS` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
+- `fts_open` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:120`
+- `FTS_PHYSICAL` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
+- `fts_read` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:120`
+- `fts_set` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:120`
+- `FTS_SKIP` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:120`
+- `FTS_SL` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
+- `FTS_SLNONE` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
 - `funlockfile` (covered): swift-log: `Tests/LoggingTests/StreamLogHandlerTest.swift:22`
 - `fwrite` (covered): swift-log: `Tests/LoggingTests/StreamLogHandlerTest.swift:22`
 - gettimeofday before macOS 13 (missing): swift-driver: `Sources/SwiftDriver/Utilities/DateAdditions.swift:20`; swift-driver: `Sources/SwiftDriver/Utilities/DateAdditions.swift:21`
@@ -618,9 +617,11 @@ api-delta's last run, and a few seconds when they haven't.
   for `X members`, an `extension CInterop.<alias of X>` exists. A few interfaces count as covered by the
   replacement System wraps instead (`EQUIVALENTS` in `scripts/status.py`: usleep and sleep by nanosleep,
   localtime and gmtime by their `_r` forms, mkstemp by mkostemp, time by clock_gettime), and the table says
-  so. This sees what System documents, not whether the API fits the adopter's use: a partial wrapper counts
-  as covered, and an API whose doc comments don't name the C interface (a `nil` that means `UTIME_OMIT`)
-  counts as missing.
+  so. A family that System answers with a design of its own, rather than a wrapper, counts as covered once a
+  witness in System's sources shows the answer has what the markers ask for (`ANSWERED`: fts is DirectoryWalk,
+  with its two-visit order). This sees what System documents, not whether the API fits the adopter's use: a
+  partial wrapper counts as covered, and an API whose doc comments don't name the C interface counts as
+  missing.
 - **Provisional families** (libm, C stdio, locale and xlocale, string.h and ctype.h, numeric conversion) are a
   fixed list in `scripts/status.py`, matched by name or by the name's SDK module in adopter-coverage's stored
   vocabulary when there is one. They're C-library layers above the OS that System wraps provisionally, in

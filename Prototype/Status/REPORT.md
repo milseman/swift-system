@@ -296,3 +296,23 @@ NIO's file system module imported Darwin for UTIME_NOW and UTIME_OMIT (the value
   covered but invisible to name matching (section 1's example).
 
 Tests: the markers through futimens, and 127- and 128-byte attribute names. XCTest 510, swift-testing 453.
+
+## 14. fts, answered by DirectoryWalk: `c37d638`
+
+Foundation's marker is specific: its copy and link keep fts for "each directory's preorder and postorder visits
+in one walk (to create it, then to copy its metadata), the root as an entry, and an unreadable directory
+(FTS_D, then FTS_DNR) told apart from an entry that can't be stat'ed (FTS_NS)". The Directories lane chose a
+walker of System's own over fts (Prototype/Directories/README.md), so this extends DirectoryWalk rather than
+wrapping fts, which would reverse that decision.
+
+- `DirectoryWalk.Order.preorderAndPostorder` visits each directory before and after its contents;
+  `Entry.isPostorderVisit` marks the second visit (and every directory's visit in a postorder walk). An
+  unopenable directory is visited once, with its error; `skipDescendants()` also skips the second visit.
+  Rejected: fts's balancing of a skipped directory's visits, which makes callers read past an extra entry.
+- The other two needs were there: the caller has the root's path (the walk visits its entries); an unreadable
+  directory is an entry with `type == .directory` and an error, an unstat-able one has no type.
+- status.py gains `ANSWERED`: fts names count as covered by DirectoryWalk once its two-visit order is in the
+  sources, since no *corresponding C* sentence could truthfully name fts.
+
+Tests: DirectoryWalkVisitsTests. XCTest 510, swift-testing 457 in 70 suites (one full run hit the known
+`acceptSetsExactlyTheOptions` EAGAIN flake; the rerun passed).
