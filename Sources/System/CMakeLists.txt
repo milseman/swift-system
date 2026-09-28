@@ -128,6 +128,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL Linux)
 endif()
 target_sources(SystemPackage PRIVATE
   Internals/Backcompat.swift
+  Internals/CInterop+Accessors.swift
   Internals/CInterop.swift
   Internals/Constants+DynamicLoading.swift
   Internals/Constants+Events.swift

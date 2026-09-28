@@ -146,7 +146,16 @@ let package = Package(
     // Fails if a C member of a vended type is attributed to the CSystem module.
     .testTarget(
       name: "MemberImportVisibility",
-      dependencies: ["SystemPackage"],
+      dependencies: [
+        "SystemPackage",
+        // For AccessorsProbe.swift's socket structures; SystemSockets
+        // builds only on these.
+        .target(
+          name: "SystemSockets",
+          condition: .when(platforms: [
+            .macOS, .macCatalyst, .iOS, .watchOS, .tvOS, .visionOS, .linux, .android,
+          ])),
+      ],
       swiftSettings: [.enableUpcomingFeature("MemberImportVisibility")]),
     .target(
       name: "SystemSockets",
