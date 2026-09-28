@@ -30,7 +30,7 @@ sockets, processes, spawn and signals, and anything Linux-only.
 10 ms one-shot timer reports 4 or 10 expirations instead of 1) and passes
 alone; it isn't this lane's.
 
-## 1. Broken-down time
+## 1. Broken-down time: `1d93826`
 
 `Sources/System/BrokenDownTime/BrokenDownTime.swift`,
 `Sources/System/Internals/Syscalls+BrokenDownTime.swift`; the `date` sample.
@@ -145,3 +145,66 @@ Tests: `BrokenDownTimeTests` (swift-testing, UTC only),
 `BrokenDownTimeZoneTests` (XCTest, since they set `TZ`), and
 `BrokenDownTimeMockTests`. Totals after it: 453 XCTests (4 skipped) and 384
 swift-testing tests in 58 suites, all passing but the flaky kqueue timer.
+
+## 2. Search paths
+
+`Sources/System/SearchPaths/SearchPaths.swift`,
+`Sources/System/Internals/Syscalls+SearchPaths.swift` and
+`Constants+SearchPaths.swift`; the `sysdir` sample. Darwin only.
+
+| API | C |
+|---|---|
+| `SearchPaths: Sequence` of `FilePath`, `init(_:in:)`, `directory`, `domains` | `sysdir_start_search_path_enumeration` |
+| `SearchPaths.Iterator.next()` | `sysdir_get_next_search_path_enumeration` |
+| `SearchPaths.Directory`: `.applications`, `.demoApplications`, `.developerApplications`, `.adminApplications`, `.library`, `.developer`, `.users`, `.documentation`, `.documents`, `.coreServices`, `.autosavedInformation`, `.desktop`, `.caches`, `.applicationSupport`, `.downloads`, `.inputMethods`, `.movies`, `.music`, `.pictures`, `.printerDescriptions`, `.sharedPublic`, `.preferencePanes`, `.allApplications`, `.allLibraries` | `SYSDIR_DIRECTORY_*` |
+| `SearchPaths.Domains` (an `OptionSet`): `.user`, `.local`, `.network`, `.system`, `.all` | `SYSDIR_DOMAIN_MASK_*` |
+
+Design calls:
+
+- **A `Sequence` value**, `SearchPaths(.caches, in: .user)`, whose every
+  iterator starts a new enumeration, so it can be iterated more than once
+  and `Array(_:)` collects it. Rejected: a function returning `[FilePath]`,
+  which is what `Array` already gives.
+- **The name is Foundation's**: "search paths", as in
+  `NSSearchPathForDirectoriesInDomains` and `FileManager.SearchPathDirectory`,
+  which this parallels as `SearchPaths.Directory` and `.Domains`; the member
+  names are Foundation's without its `Directory` suffix. Rejected:
+  `SystemDirectories`, after the C family's `sysdir`, where "system" reads as
+  the system domain; and a static on `FilePath`, as
+  `FilePath.temporaryDirectory()` is, which would still need the two types.
+- **A user-domain path keeps its `~`.** sysdir returns `~/Library/Caches`,
+  and which directory `~` means is the program's policy: `HOME` for most
+  programs, a container for a sandboxed app, the user database's entry for a
+  set-user-ID one. Foundation expands it with its own policy. The
+  documentation says so, and the sample shows the replacement
+  (`--expand-tilde`). Rejected: expanding with `HOME` or with `UserEntry`,
+  which each pick one policy for every caller.
+- **No errors, and mock hooks that record the arguments**: sysdir can't
+  fail, so nothing throws. The mocked start returns 0, which ends the
+  enumeration.
+- **Both types' raw values are `CUnsignedInt`**, the C enumeration's and
+  option set's own raw type, since `OptionSet` needs an integer. The C
+  constants are re-exposed in `Constants+SearchPaths.swift`; Swift imports
+  the domain masks as members of their option set
+  (`sysdir_search_path_domain_mask_t.SYSDIR_DOMAIN_MASK_USER`), not as globals.
+- **The Darwin module doesn't include sysdir** (`explicit module sysdir`), so
+  the files import `Darwin.sysdir`, as Foundation does.
+- **Availability: macOS 10.12, iOS 10, watchOS 3, tvOS 10**, sysdir's, on
+  the same declarations as `System 199`.
+- No `renamed:` stubs for the C constants, as `ClockID` has none.
+
+Finding: on macOS 26 the system domain has two paths for some directories:
+`.library` in `.system` is `/System/Library` and
+`/System/Cryptexes/App/System/Library`. And sysdir's system-domain path for
+`.applicationSupport` is `/Library/Application Support`, the local one's.
+
+Adopters: Foundation's `FileManager.urls(for:in:)`
+(`FileManager+DarwinSearchPaths.swift`, `_DarwinSearchPathsSequence`), which
+calls the private `sysdir_start_search_path_enumeration_private` in the
+framework build and the public one otherwise. The trash and application
+scripts directories, which Foundation finds with private SPI, aren't here.
+
+Tests: `SearchPathsTests` (swift-testing: search order, restarting, no
+domains, every directory against sysdir called directly) and
+`SearchPathsMockTests`. Totals after it: 454 XCTests (4 skipped) and 389
+swift-testing tests in 59 suites, all passing.

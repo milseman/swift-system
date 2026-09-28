@@ -202,6 +202,10 @@ target_sources(SystemPackage PRIVATE
   Internals/Syscalls+Pseudoterminals.swift
   Pseudoterminals/Pseudoterminal.swift)
 target_sources(SystemPackage PRIVATE
+  Internals/Constants+SearchPaths.swift
+  Internals/Syscalls+SearchPaths.swift
+  SearchPaths/SearchPaths.swift)
+target_sources(SystemPackage PRIVATE
   Internals/Syscalls+SendFile.swift
   SendFile/SendFile.swift)
 target_sources(SystemPackage PRIVATE

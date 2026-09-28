@@ -104,6 +104,7 @@ struct SystemSamples: ParsableCommand {
       GetAttrList.self,
       // More POSIX and Darwin samples
       DateSample.self,
+      SysDir.self,
     ])
 }
 
