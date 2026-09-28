@@ -2,8 +2,8 @@
 
 Generated 2026-09-28 by `Utilities/adopter-coverage/status.sh`, from commits only; rerun it rather than editing this file. How each figure is made, and what it can't see, is in [How this is computed](#how-this-is-computed).
 
-- **System**: `coverage` @ `7416b212` (Add ProcessID.ExitCode, with EXIT_SUCCESS, EXIT_FAILURE and the <sysexits.h> codes, and exit(_:) and exitImmediately(_:) overloads that take one), which contains `system-next` @ `ebc1231f` (Merge branch 'posix-darwin' into system-next); 6 commit(s) of `coverage` aren't in `system-next`.
-- **API delta**: `main` @ `1b452c29` → `HEAD` @ `7416b212`.
+- **System**: `coverage` @ `d6305052` (ProcessID.ExitCode: name the ExitCode overloads by their qualified type in doc links), which contains `system-next` @ `ebc1231f` (Merge branch 'posix-darwin' into system-next); 7 commit(s) of `coverage` aren't in `system-next`.
+- **API delta**: `main` @ `1b452c29` → `HEAD` @ `d6305052`.
 - **Adopters** (`../adopters`, branch `migrate-darwin`, against its merge base with `main`):
   - swift-argument-parser @ `0fbda276`, base `1021ac8c`
   - swift-async-algorithms @ `bd5f6f44`, base `789dcf1f`
@@ -11,7 +11,7 @@ Generated 2026-09-28 by `Utilities/adopter-coverage/status.sh`, from commits onl
   - swift-driver @ `15cf6766`, base `15cf6766` (no commits beyond the merge base yet)
   - swift-foundation @ `9e719127`, base `6669273a`
   - swift-log @ `4d6d77fe`, base `9c9acde6`
-  - swift-nio @ `aaf5a67e`, base `feaf4ac5` (uncommitted changes in the checkout aren't counted)
+  - swift-nio @ `4b59a655`, base `feaf4ac5` (uncommitted changes in the checkout aren't counted)
   - swift-package-manager @ `24a8a7b0`, base `24a8a7b0` (no commits beyond the merge base yet) (uncommitted changes in the checkout aren't counted)
   - swift-subprocess @ `1dc7dbb8`, base `8f099c6e`
   - swift-syntax @ `961f0b72`, base `e9289aa4`
@@ -315,7 +315,7 @@ Verbatim, not rerun: each package's own test totals (at the start, and the lates
 
 # 3. Gaps
 
-Every `SYSTEM-GAP:` marker in the packages' sources at the commits above: 93 markers in 69 files, of which 2 are outside the packages' targets. Each marker's text is read for the C interfaces it names (see [How this is computed](#how-this-is-computed)); a marker that names none is counted under its phrase, with the Darwin names imported under it deciding its status. Status is against System at `7416b212`:
+Every `SYSTEM-GAP:` marker in the packages' sources at the commits above: 93 markers in 69 files, of which 2 are outside the packages' targets. Each marker's text is read for the C interfaces it names (see [How this is computed](#how-this-is-computed)); a marker that names none is counted under its phrase, with the Darwin names imported under it deciding its status. Status is against System at `d6305052`:
 
 - **missing**: System documents none of it (or only some: *k of n*).
 - **covered**: a System declaration's doc comment names it as the corresponding C interface, a CInterop alias names it, or, for `X members`, System gives `CInterop` alias of `X` Swift-named accessors. The marker is stale, or the package hasn't adopted the API yet. *Not yet in `system-next`* means only this branch has it.

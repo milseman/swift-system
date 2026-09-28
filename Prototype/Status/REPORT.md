@@ -97,3 +97,27 @@ links and fails on the 33rd, counting links in the path itself (the temporary di
 opens its chains relative to a directory descriptor.
 
 Tests: CompileTimeLimitsTest, SearchAccessModeTest. XCTest 478 (4 skipped), swift-testing 437, all passing.
+
+## 4. Exit codes: `7416b21`, `d0f2ac3`
+
+swift-argument-parser imports Darwin for `EX_USAGE`, the code its validation failures exit with.
+
+- `ProcessID.ExitCode`, a `RawRepresentable` over `CInt`: `.success` and `.failure` (EXIT_SUCCESS,
+  EXIT_FAILURE; EX_OK is `.success`) and the fifteen `<sysexits.h>` codes (64 through 78) under Swift names
+  (`usageError`, `dataError`, `cannotOpenInput`, `unknownUser`, `unknownHost`, `serviceUnavailable`,
+  `internalError`, `systemError`, `systemFileError`, `cannotCreateOutput`, `ioError`, `temporaryFailure`,
+  `protocolError`, `permissionDenied`, `configurationError`), each with its renamed `EX_*` stub; the
+  description is the name and number. `ProcessID.exit(_:)` and `exitImmediately(_:)` gained overloads that
+  take one.
+- Nested in `ProcessID`, next to `exit(_:)`. Rejected: a top-level `ExitCode`, which ArgumentParser has
+  (public), and which System's own samples use, so every file importing both would be ambiguous; and constants
+  without a type, which `exit(_:)` couldn't take.
+- The overloads make DocC's `exit(_:)` links ambiguous, so ProcessExit.swift's now say ``exit(_:)-(CInt)``;
+  DocC 6.2 wants the nested type qualified (``exit(_:)-(ProcessID.ExitCode)``), which `d0f2ac3` fixed after
+  api-delta's DocC diagnostics showed it.
+- The sysexits codes are off on WASI, whose libc may lack `<sysexits.h>`.
+
+Tests: ExitCodeTests (values against the C constants, descriptions, exit tests of both overloads). XCTest 478
+(4 skipped), swift-testing 441 in 66 suites. One full run failed PThreadTests' `setCurrentQualityOfService`,
+whose background-QoS thread didn't run within 10 s with the machine's load average near 65; it passed alone
+three times and in the full rerun. It isn't this lane's.
