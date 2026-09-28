@@ -205,11 +205,6 @@ target_sources(SystemPackage PRIVATE
   PathsAndFiles/ProcessDefaults.swift
   PathsAndFiles/UniqueFiles.swift)
 target_sources(SystemPackage PRIVATE
-  Internals/Constants+Provisional.swift
-  Internals/Syscalls+Provisional.swift
-  Provisional/Provisional+POSIXErrorCode.swift
-  Provisional/Provisional+Stdio.swift)
-target_sources(SystemPackage PRIVATE
   Internals/Syscalls+ProcessCredentials.swift
   ProcessCredentials/ProcessCredentials.swift)
 target_sources(SystemPackage PRIVATE
@@ -234,8 +229,15 @@ target_sources(SystemPackage PRIVATE
   Processes/SignalSet.swift
   Processes/Spawn.swift)
 target_sources(SystemPackage PRIVATE
+  Internals/Constants+Provisional.swift
+  Internals/Syscalls+Provisional.swift
+  Provisional/Provisional+POSIXErrorCode.swift
+  Provisional/Provisional+Stdio.swift)
+target_sources(SystemPackage PRIVATE
   Internals/Syscalls+Pseudoterminals.swift
   Pseudoterminals/Pseudoterminal.swift)
+target_sources(SystemPackage PRIVATE
+  RandomGenerator/RandomGenerator.swift)
 target_sources(SystemPackage PRIVATE
   Internals/Constants+SearchPaths.swift
   Internals/Syscalls+SearchPaths.swift
@@ -292,6 +294,9 @@ target_sources(SystemPackage PRIVATE
   Internals/Syscalls+TimersAndPriority.swift
   TimersAndPriority/ProcessPriority.swift
   TimersAndPriority/ProcessTimer.swift)
+target_sources(SystemPackage PRIVATE
+  Internals/Syscalls+UnfairLockAndRandom.swift
+  UnfairLock/UnfairLock.swift)
 target_sources(SystemPackage PRIVATE
   VectoredIO/VectoredIO.swift)
 target_link_libraries(SystemPackage PUBLIC
