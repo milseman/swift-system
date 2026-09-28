@@ -195,6 +195,10 @@ target_sources(SystemPackage PRIVATE
 target_sources(SystemPackage PRIVATE
   MemoryMapping/MemoryMapping.swift)
 target_sources(SystemPackage PRIVATE
+  Internals/Constants+MemoryLocking.swift
+  Internals/Syscalls+MemoryLocking.swift
+  MemoryLocking/MemoryLocking.swift)
+target_sources(SystemPackage PRIVATE
   NetworkInterfaces/NetworkInterface.swift)
 target_sources(SystemPackage PRIVATE
   PathsAndFiles/FilePath+Resolution.swift
