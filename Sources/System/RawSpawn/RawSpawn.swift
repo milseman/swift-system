@@ -147,7 +147,7 @@ extension ProcessID {
   ///     or `nil` for the defaults.
   /// - Returns: The child's process ID.
   ///
-  /// See ``spawn(_:arguments:environment:fileActions:attributes:)``,
+  /// See ``spawn(_:arguments:environment:fileActions:attributes:)-(FilePath,_,_,_,_)``,
   /// which builds the C values from System's types.
   ///
   /// The corresponding C function is `posix_spawn`.
