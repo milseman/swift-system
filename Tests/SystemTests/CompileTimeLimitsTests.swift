@@ -66,6 +66,21 @@ final class CompileTimeLimitsTest: XCTestCase {
   }
 
   #if SYSTEM_PACKAGE_DARWIN
+  /// An extended attribute's name can be maxExtendedAttributeNameBytes
+  /// bytes long, and no longer.
+  func testExtendedAttributeNameLimit() throws {
+    XCTAssertEqual(SystemConfig.maxExtendedAttributeNameBytes, Int(XATTR_MAXNAMELEN))
+    try withTemporaryFilePath(basename: "testExtendedAttributeNameLimit") { dir in
+      let file = dir.appending("file")
+      try FileDescriptor.open(file, .writeOnly, options: .create, permissions: .ownerReadWrite).close()
+      let longest = String(repeating: "a", count: SystemConfig.maxExtendedAttributeNameBytes)
+      try file.setExtendedAttribute(longest, to: [1])
+      XCTAssertThrowsError(try file.setExtendedAttribute(longest + "a", to: [1])) {
+        XCTAssertEqual($0 as? Errno, .fileNameTooLong)
+      }
+    }
+  }
+
   /// Opening a path through a chain of maxSymbolicLinks links succeeds,
   /// and through one more fails. The chains are opened relative to the
   /// directory's descriptor, since the temporary directory's own path goes

@@ -32,6 +32,9 @@ internal var _PATH_MAX: CInt { PATH_MAX }
 #if SYSTEM_PACKAGE_DARWIN
 @_alwaysEmitIntoClient
 internal var _MAXSYMLINKS: CInt { MAXSYMLINKS }
+
+@_alwaysEmitIntoClient
+internal var _XATTR_MAXNAMELEN: CInt { XATTR_MAXNAMELEN }
 #endif
 
 #endif // !os(Windows) && !os(WASI)
