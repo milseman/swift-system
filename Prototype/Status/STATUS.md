@@ -2,17 +2,18 @@
 
 Generated 2026-09-28 by `Utilities/adopter-coverage/status.sh`, from commits only; rerun it rather than editing this file. How each figure is made, and what it can't see, is in [How this is computed](#how-this-is-computed).
 
-- **System**: `coverage` @ `768516ee` (Add FileStream, provisionally, wrapping C standard I/O (fopen, fdopen, fclose, fwrite, fread, fflush, setvbuf, flockfile and the rest), and CInterop.File for FILE), which contains `system-next` @ `ebc1231f` (Merge branch 'posix-darwin' into system-next); 16 commit(s) of `coverage` aren't in `system-next`.
-- **API delta**: `main` @ `1b452c29` → `HEAD` @ `768516ee`.
+- **System**: `coverage` @ `8a1cc640` (Add CInterop.POSIXErrorCode, provisionally, for the Darwin overlay's POSIXErrorCode, with init?(_: Errno) and errno), which contains `system-next` @ `ebc1231f` (Merge branch 'posix-darwin' into system-next); 18 commit(s) of `coverage` aren't in `system-next`.
+- **API delta**: `main` @ `1b452c29` → `HEAD` @ `8a1cc640`.
 - **Adopters** (`../adopters`, branch `migrate-darwin`, against its merge base with `main`):
-  - WasmKit @ `1e9c513d`, base `1e9c513d` (no commits beyond the merge base yet)
+  - WasmKit @ `1e9c513d`, base `1e9c513d` (no commits beyond the merge base yet) (uncommitted changes in the checkout aren't counted)
+  - indexstore-db @ `441ead77`, base `441ead77` (no commits beyond the merge base yet)
   - swift-argument-parser @ `0fbda276`, base `1021ac8c`
   - swift-async-algorithms @ `bd5f6f44`, base `789dcf1f`
   - swift-certificates @ `0df6bd14`, base `ff86b924`
-  - swift-driver @ `15cf6766`, base `15cf6766` (no commits beyond the merge base yet)
-  - swift-foundation @ `9e719127`, base `6669273a`
+  - swift-driver @ `33d2c7b5`, base `15cf6766`
+  - swift-foundation @ `8e0a70b5`, base `6669273a`
   - swift-log @ `4d6d77fe`, base `9c9acde6`
-  - swift-nio @ `734eaa62`, base `feaf4ac5`
+  - swift-nio @ `9ac12ff1`, base `feaf4ac5`
   - swift-package-manager @ `f7a4a9e1`, base `24a8a7b0`
   - swift-subprocess @ `1dc7dbb8`, base `8f099c6e`
   - swift-syntax @ `961f0b72`, base `e9289aa4`
@@ -24,11 +25,11 @@ Copied verbatim from `Utilities/api-delta/regenerate.sh` (`BASE_REF=main`, `HEAD
 
 ## Summary
 
-- **2839 added, 0 removed, 0 changed** declarations in the macOS symbol graphs.
-  - SystemPackage: +2263 (448 → 2711 public symbols).
+- **2842 added, 0 removed, 0 changed** declarations in the macOS symbol graphs.
+  - SystemPackage: +2266 (448 → 2714 public symbols).
   - SystemSockets: +576 (0 → 576 public symbols). SystemSockets is a new module; it doesn't exist on `main`.
 - Availability of the additions:
-  - System 199: 2804
+  - System 199: 2807
   - System 199 + explicit OS floor: 26
   - System 0.0.1 + explicit OS floor: 8
   - System 0.0.1: 1
@@ -40,7 +41,7 @@ Copied verbatim from `Utilities/api-delta/regenerate.sh` (`BASE_REF=main`, `HEAD
 - 0 public declarations hidden from the graphs were removed.
 - No public declaration is conditional on `ENABLE_MOCKING` or `DEBUG`, so a release build has the same public API as the debug graphs.
 - Cross-check with `swift-api-digester`, which dumps every declaration, implicit ones included:
-  - SystemPackage: +2537 / -0 declarations, which is the graphs' +2263 plus 274 implicit ones; it has every graph addition; `-diagnose-sdk` reports no breaking changes.
+  - SystemPackage: +2540 / -0 declarations, which is the graphs' +2266 plus 274 implicit ones; it has every graph addition; `-diagnose-sdk` reports no breaking changes.
   - SystemSockets: +648 / -0 declarations, which is the graphs' +576 plus 71 implicit ones; explicit declarations it has that the graphs don't: `SocketAddress._withUnsafeMutablePointer(_:)`; it has every graph addition.
 - Nothing was removed or changed: no public declaration left the graphs or the source scan. The *changed* check compares declaration text (including default arguments), availability, conformances, generic and extension constraints, and access level, and pairs symbols by path when a signature change alters the USR.
 
@@ -52,7 +53,7 @@ Each row is a top-level type, and nested types count toward it: `FilePath.Resolu
 |---|---|---:|---:|---:|---|
 | SystemPackage | [`BaudRate`](#systempackage-baudrate) | 26 | 0 | 0 | S199 ×26 |
 | SystemPackage | [`BrokenDownTime`](#systempackage-brokendowntime) | 29 | 0 | 0 | S199 ×29 |
-| SystemPackage | [`CInterop`](#systempackage-cinterop) | 36 | 0 | 0 | S199 ×36 |
+| SystemPackage | [`CInterop`](#systempackage-cinterop) | 37 | 0 | 0 | S199 ×37 |
 | SystemPackage | [`ChildProcess`](#systempackage-childprocess) | 9 | 0 | 0 | S199 ×9 |
 | SystemPackage | [`ClockID`](#systempackage-clockid) | 13 | 0 | 0 | S199 ×13 |
 | SystemPackage | [`ControlCharacter`](#systempackage-controlcharacter) | 21 | 0 | 0 | S199 ×21 |
@@ -87,6 +88,7 @@ Each row is a top-level type, and nested types count toward it: `FilePath.Resolu
 | SystemPackage | [`NetworkInterface`](#systempackage-networkinterface) | 32 | 0 | 0 | S199 ×32 |
 | SystemPackage | [`OutputFlags`](#systempackage-outputflags) | 34 | 0 | 0 | S199 ×34 |
 | SystemPackage | [`OwnedFD`](#systempackage-ownedfd) | 30 | 0 | 0 | S199 ×30 |
+| SystemPackage | [`POSIXErrorCode (extends _DarwinFoundation1)`](#systempackage-posixerrorcode-extends-darwinfoundation1) | 2 | 0 | 0 | S199 ×2 |
 | SystemPackage | [`PThread`](#systempackage-pthread) | 123 | 0 | 0 | S199 ×123 |
 | SystemPackage | [`ProcessEnvironment`](#systempackage-processenvironment) | 7 | 0 | 0 | S199 ×7 |
 | SystemPackage | [`ProcessID`](#systempackage-processid) | 209 | 0 | 0 | S199 ×209 |
@@ -132,7 +134,7 @@ Each row is a top-level type, and nested types count toward it: `FilePath.Resolu
 | SystemSockets | [`sockaddr_storage (extends Darwin)`](#systemsockets-sockaddr-storage-extends-darwin) | 3 | 0 | 0 | S199 ×3 |
 | SystemSockets | [`sockaddr_un (extends Darwin)`](#systemsockets-sockaddr-un-extends-darwin) | 5 | 0 | 0 | S199 ×5 |
 | SystemSockets | [`sockaddr_vm (extends Darwin)`](#systemsockets-sockaddr-vm-extends-darwin) | 5 | 0 | 0 | S199 ×5 |
-| **Total** | | **2839** | **0** | **0** | |
+| **Total** | | **2842** | **0** | **0** | |
 
 # 2. Adoption
 
@@ -141,10 +143,11 @@ Swift files of each package's own targets (from its manifest; not nested package
 | Package | Swift files | Whole module | Submodule | Scoped only | Framework only | Through a re-export (copied) | Markers (files) |
 |---|---:|---:|---:|---:|---:|---:|---:|
 | WasmKit | 333 | 14 | 0 | 0 | 0 | — | 0 (0) |
+| indexstore-db | 73 | 1 | 1 | 0 | 0 | — | 0 (0) |
 | swift-argument-parser | 166 | 1 → 0 | 0 | 0 → 1 | 0 | 1 → 0 | 0 (0) → 1 (1) |
 | swift-async-algorithms | 146 | 2 → 0 | 0 | 0 | 0 | 1 → 0 | 0 (0) |
 | swift-certificates | 133 | 2 → 0 | 0 | 0 → 1 | 0 | 3 → 0 | 0 (0) → 1 (1) |
-| swift-driver | 195 | 11 | 1 | 0 | 0 | — | 0 (0) |
+| swift-driver | 195 | 11 → 0 | 1 → 0 | 0 → 2 | 0 | — | 0 (0) → 3 (2) |
 | swift-foundation | 431 | 33 → 0 | 1 → 0 | 0 → 14 | 3 | 7 → 1 | 0 (0) → 22 (15) |
 | swift-log | 30 | 5 → 0 | 0 | 0 → 2 | 0 | 1 → 0 | 0 (0) → 3 (2) |
 | swift-nio | 479 | 41 → 0 | 3 → 0 | 0 → 8 | 0 | — | 0 (0) → 8 (8) |
@@ -152,15 +155,19 @@ Swift files of each package's own targets (from its manifest; not nested package
 | swift-subprocess | 36 | 17 → 0 | 0 | 0 → 2 | 0 | — | 0 (0) → 3 (2) |
 | swift-syntax | 586 | 2 → 0 | 0 | 0 → 2 | 0 | 3 → 0 | 0 (0) → 3 (2) |
 | swift-tools-support-core | 124 | 0 | 1 → 0 | 0 → 5 | 0 | 14 → 5 | 0 (0) → 13 (5) |
-| **All** | 3542 | 131 → 25 | 8 → 1 | 0 → 38 | 3 | | 0 (0) → 59 (39) |
+| **All** | 3615 | 132 → 15 | 9 → 1 | 0 → 40 | 3 | | 0 (0) → 62 (41) |
 
-Files whose imports aren't narrow yet: WasmKit: `Sources/CLICommands/Platform.swift` (whole module), WasmKit: `Sources/CLICommands/Run.swift` (whole module), WasmKit: `Sources/CLICommands/TCPListener.swift` (whole module), WasmKit: `Sources/WASI/Platform/PAL/PALClock.swift` (whole module), WasmKit: `Sources/WASI/Platform/PAL/PALErrnoMapping.swift` (whole module), WasmKit: `Sources/WASI/Platform/PAL/PALFileDescriptor.swift` (whole module), WasmKit: `Sources/WASI/Platform/PAL/PALPoll.swift` (whole module), WasmKit: `Sources/WasmKit/Execution/Profiler.swift` (whole module), WasmKit: `Sources/WasmKit/Execution/StatsCollector.swift` (whole module), WasmKit: `Sources/WasmKit/Platform/AtomicParkingLot.swift` (whole module), WasmKit: `Sources/WasmParser/Platform/FileIO.swift` (whole module), WasmKit: `Tests/WASITests/TestSupport.swift` (whole module), WasmKit: `Tests/WASITests/WASITests.swift` (whole module), WasmKit: `Tests/WasmKitTests/AtomicParkingLotTests.swift` (whole module), swift-driver: `Sources/SwiftDriver/SwiftScan/Loader.swift` (whole module), swift-driver: `Sources/SwiftDriver/Utilities/DateAdditions.swift` (whole module), swift-driver: `Sources/SwiftDriver/Utilities/System.swift` (whole module), swift-driver: `Sources/SwiftDriver/Utilities/VirtualPath.swift` (whole module), swift-driver: `Sources/swift-build-sdk-interfaces/main.swift` (whole module), swift-driver: `Sources/swift-driver/main.swift` (whole module), swift-driver: `Tests/SwiftDriverTests/Helpers/DriverTestHelpers.swift` (whole module), swift-driver: `Tests/SwiftDriverTests/MiscDriverTests.swift` (whole module), swift-driver: `Tests/SwiftDriverTests/SpecialModeTests.swift` (whole module), swift-driver: `Tests/SwiftDriverTests/TargetTests.swift` (whole module), swift-driver: `Tests/SwiftDriverTests/ToolchainTests.swift` (whole module), swift-driver: `Sources/SwiftDriver/Driver/ToolExecutionDelegate.swift` (submodule).
+Files whose imports aren't narrow yet: WasmKit: `Sources/CLICommands/Platform.swift` (whole module), WasmKit: `Sources/CLICommands/Run.swift` (whole module), WasmKit: `Sources/CLICommands/TCPListener.swift` (whole module), WasmKit: `Sources/WASI/Platform/PAL/PALClock.swift` (whole module), WasmKit: `Sources/WASI/Platform/PAL/PALErrnoMapping.swift` (whole module), WasmKit: `Sources/WASI/Platform/PAL/PALFileDescriptor.swift` (whole module), WasmKit: `Sources/WASI/Platform/PAL/PALPoll.swift` (whole module), WasmKit: `Sources/WasmKit/Execution/Profiler.swift` (whole module), WasmKit: `Sources/WasmKit/Execution/StatsCollector.swift` (whole module), WasmKit: `Sources/WasmKit/Platform/AtomicParkingLot.swift` (whole module), WasmKit: `Sources/WasmParser/Platform/FileIO.swift` (whole module), WasmKit: `Tests/WASITests/TestSupport.swift` (whole module), WasmKit: `Tests/WASITests/WASITests.swift` (whole module), WasmKit: `Tests/WasmKitTests/AtomicParkingLotTests.swift` (whole module), indexstore-db: `Sources/IndexStore/dlopen.swift` (whole module), indexstore-db: `Sources/IndexStoreDB/IndexStoreDB.swift` (submodule).
 
 ## Copied from the packages' reports
 
 Verbatim, not rerun: each package's own test totals (at the start, and the latest it reports), and the rows behind the re-export column. Line numbers are 1-based, in the file at the package's commit above.
 
 **WasmKit**
+
+- No MIGRATION.md or REPORT.md with test totals at this commit.
+
+**indexstore-db**
 
 - No MIGRATION.md or REPORT.md with test totals at this commit.
 
@@ -217,7 +224,14 @@ Verbatim, not rerun: each package's own test totals (at the start, and the lates
 
 **swift-driver**
 
-- No MIGRATION.md or REPORT.md with test totals at this commit.
+- MIGRATION.md, tests (lines 67, 68, 69, 70):
+
+  ```text
+  - XCTest: 3 tests (performance), passing before and after.
+  - Swift Testing: 471 tests in 40 suites, with 18 issues (17 known) before and after. The one failure
+    is the same both times: `MiscDriverTests.verifyEmittedInterfaceJob` (2 planned jobs, 3
+    expected).
+  ```
 
 **swift-foundation**
 
@@ -267,14 +281,14 @@ Verbatim, not rerun: each package's own test totals (at the start, and the lates
 
   ```text
   | | Start (`feaf4ac5`) | First round (`1bc83af0`) | Now |
-  | `swift test` | 2454 run, 43 skipped, 0 failed; swift-testing 303 passed | 2439 run, 43 skipped, 0 failed; 303 passed | 2432 run, 43 skipped, 1 failed (ENOSPC, see below); 303 passed |
+  | `swift test` | 2454 run, 43 skipped, 0 failed; swift-testing 303 passed | 2439 run, 43 skipped, 0 failed; 303 passed | 2432 run, 43 skipped, 0 failed; 303 passed |
   ```
 
-- REPORT.md, tests (lines 14, 15):
+- REPORT.md, tests (lines 58, 59):
 
   ```text
-  implements. In the last three full runs one test failed:
-  `FileSystemTests.testCopyLargeFile`, which writes 3 GiB, got ENOSPC. The disk was 99–100% full
+  43 skipped, 0 failed; swift-testing 303 passed. MIGRATION.md's result says so. `CInterop.Linger`
+  and `CInterop.TimeVal` still weren't in `../swift-system` (`ebc1231`).
   ```
 
 **swift-package-manager**
@@ -338,7 +352,7 @@ Verbatim, not rerun: each package's own test totals (at the start, and the lates
 
 # 3. Gaps
 
-Every `SYSTEM-GAP:` marker in the packages' sources at the commits above: 59 markers in 39 files, of which 0 are outside the packages' targets. Each marker's text is read for the C interfaces it names (see [How this is computed](#how-this-is-computed)); a marker that names none is counted under its phrase, with the Darwin names imported under it deciding its status. Status is against System at `768516ee`:
+Every `SYSTEM-GAP:` marker in the packages' sources at the commits above: 62 markers in 41 files, of which 0 are outside the packages' targets. Each marker's text is read for the C interfaces it names (see [How this is computed](#how-this-is-computed)); a marker that names none is counted under its phrase, with the Darwin names imported under it deciding its status. Status is against System at `8a1cc640`:
 
 - **missing**: System documents none of it (or only some: *k of n*).
 - **covered**: a System declaration's doc comment names it as the corresponding C interface, a CInterop alias names it, or, for `X members`, System gives `CInterop` alias of `X` Swift-named accessors. The marker is stale, or the package hasn't adopted the API yet. *Not yet in `system-next`* means only this branch has it.
@@ -346,14 +360,14 @@ Every `SYSTEM-GAP:` marker in the packages' sources at the commits above: 59 mar
 
 A family marked *(provisional)* is a C-library layer above the OS (math, stdio, locales, string.h and ctype.h) that System wraps provisionally, in `Sources/System/Provisional/`, since it may move to the standard library; it counts like everything else.
 
-Interfaces: 53 missing, 40 covered, 1 unread, 94 in all.
+Interfaces: 54 missing, 41 covered, 1 unread, 96 in all.
 
 | # | Interface | Status | Files | Packages | Family |
 |---:|---|---|---:|---|---|
 | 1 | C stdio FILE streams | covered (all 11 names; not yet in `system-next`) | 4 | swift-package-manager, swift-tools-support-core | C stdio FILE streams |
 | 2 | `linger` | covered (doc comment) | 3 | swift-nio | socket options |
 | 3 | `PATH_MAX` | covered (doc comment; not yet in `system-next`) | 3 | swift-foundation | compile-time limits |
-| 4 | `POSIXErrorCode` | missing | 3 | swift-foundation | POSIXErrorCode |
+| 4 | `POSIXErrorCode` | covered (doc comment; not yet in `system-next`) | 3 | swift-foundation | POSIXErrorCode |
 | 5 | `stdout` | covered (doc comment; not yet in `system-next`) | 2 | swift-log, swift-nio | C stdio streams |
 | 6 | `FTS_D` | missing | 2 | swift-foundation | fts |
 | 7 | `FTS_DP` | missing | 2 | swift-foundation | fts |
@@ -399,51 +413,53 @@ Interfaces: 53 missing, 40 covered, 1 unread, 94 in all.
 | 47 | `FTS_SLNONE` | missing | 1 | swift-foundation | fts |
 | 48 | `funlockfile` | covered (doc comment; not yet in `system-next`) | 1 | swift-log | C stdio streams |
 | 49 | `fwrite` | covered (doc comment; not yet in `system-next`) | 1 | swift-log | C stdio streams |
-| 50 | `gmtime_r` | covered (doc comment) | 1 | swift-certificates | calendar time |
-| 51 | `LC_ALL` | missing | 1 | swift-foundation | locale (provisional) |
-| 52 | `locale_t` | missing | 1 | swift-foundation | locale (provisional) |
-| 53 | `localtime` | covered (as `localtime_r`) | 1 | swift-log | calendar time |
-| 54 | `log` | missing | 1 | swift-foundation | libm (provisional) |
-| 55 | `malloc_type_calloc` | missing | 1 | swift-foundation | libmalloc |
-| 56 | `malloc_type_descriptor_v0_t` | missing | 1 | swift-foundation | libmalloc |
-| 57 | `malloc_type_descriptor_v0_t members` | missing | 1 | swift-foundation | C struct members (MemberImportVisibility) |
-| 58 | `malloc_type_malloc` | missing | 1 | swift-foundation | libmalloc |
-| 59 | `malloc_type_realloc` | missing | 1 | swift-foundation | libmalloc |
-| 60 | `MAXSYMLINKS` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | compile-time limits |
-| 61 | `mkstemps` | missing | 1 | swift-tools-support-core | mkstemps |
-| 62 | `mktemp` | missing | 1 | swift-foundation | temporary files |
-| 63 | `O_SEARCH` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | O_SEARCH |
-| 64 | raw posix_spawn path | unread | 1 | swift-subprocess | raw posix_spawn path |
-| 65 | `readpassphrase` | missing | 1 | swift-package-manager | readpassphrase |
-| 66 | `removefile` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | removefile |
-| 67 | `removefile_flags_t` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | removefile |
-| 68 | `REMOVEFILE_PROCEED` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | removefile |
-| 69 | `REMOVEFILE_RECURSIVE` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | removefile |
-| 70 | `REMOVEFILE_SKIP` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | removefile |
-| 71 | `removefile_state_alloc` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | removefile |
-| 72 | `REMOVEFILE_STATE_CONFIRM_CALLBACK` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | removefile |
-| 73 | `REMOVEFILE_STATE_CONFIRM_CONTEXT` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | removefile |
-| 74 | `REMOVEFILE_STATE_ERRNO` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | removefile |
-| 75 | `REMOVEFILE_STATE_ERROR_CALLBACK` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | removefile |
-| 76 | `REMOVEFILE_STATE_ERROR_CONTEXT` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | removefile |
-| 77 | `removefile_state_free` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | removefile |
-| 78 | `removefile_state_get` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | removefile |
-| 79 | `removefile_state_set` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | removefile |
-| 80 | `removefile_state_t` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | removefile |
-| 81 | `REMOVEFILE_STOP` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | removefile |
-| 82 | `setbuf` | missing | 1 | swift-nio | C stdio (provisional) |
-| 83 | `setlocale` | missing | 1 | swift-foundation | locale (provisional) |
-| 84 | `setvbuf` | covered (doc comment; not yet in `system-next`) | 1 | swift-log | C stdio streams |
-| 85 | `sin` | missing | 1 | swift-foundation | libm (provisional) |
-| 86 | `strftime` | covered (doc comment) | 1 | swift-log | calendar time |
-| 87 | `strncasecmp_l` | missing | 1 | swift-foundation | locale (provisional) |
-| 88 | `strtod_l` | missing | 1 | swift-foundation | locale (provisional) |
-| 89 | `strtof_l` | missing | 1 | swift-foundation | locale (provisional) |
-| 90 | `time` | covered (as `clock_gettime`) | 1 | swift-log | calendar time |
-| 91 | `time_t` | missing | 1 | swift-certificates | calendar time |
-| 92 | `timeval` | covered (doc comment; not yet in `system-next`) | 1 | swift-nio | socket options |
-| 93 | `tm` | covered (doc comment) | 1 | swift-certificates | calendar time |
-| 94 | `TZDEFAULT` | missing | 1 | swift-foundation | tzfile.h |
+| 50 | gettimeofday before macOS 13 | missing (1 of 2 names covered) | 1 | swift-driver | gettimeofday before macOS 13 |
+| 51 | `gmtime_r` | covered (doc comment) | 1 | swift-certificates | calendar time |
+| 52 | `LC_ALL` | missing | 1 | swift-foundation | locale (provisional) |
+| 53 | `locale_t` | missing | 1 | swift-foundation | locale (provisional) |
+| 54 | `localtime` | covered (as `localtime_r`) | 1 | swift-log | calendar time |
+| 55 | `log` | missing | 1 | swift-foundation | libm (provisional) |
+| 56 | `malloc_type_calloc` | missing | 1 | swift-foundation | libmalloc |
+| 57 | `malloc_type_descriptor_v0_t` | missing | 1 | swift-foundation | libmalloc |
+| 58 | `malloc_type_descriptor_v0_t members` | missing | 1 | swift-foundation | C struct members (MemberImportVisibility) |
+| 59 | `malloc_type_malloc` | missing | 1 | swift-foundation | libmalloc |
+| 60 | `malloc_type_realloc` | missing | 1 | swift-foundation | libmalloc |
+| 61 | `MAXSYMLINKS` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | compile-time limits |
+| 62 | `mkstemps` | missing | 1 | swift-tools-support-core | mkstemps |
+| 63 | `mktemp` | missing | 1 | swift-foundation | temporary files |
+| 64 | `O_SEARCH` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | O_SEARCH |
+| 65 | raw posix_spawn path | unread | 1 | swift-subprocess | raw posix_spawn path |
+| 66 | `readpassphrase` | missing | 1 | swift-package-manager | readpassphrase |
+| 67 | `removefile` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | removefile |
+| 68 | `removefile_flags_t` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | removefile |
+| 69 | `REMOVEFILE_PROCEED` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | removefile |
+| 70 | `REMOVEFILE_RECURSIVE` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | removefile |
+| 71 | `REMOVEFILE_SKIP` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | removefile |
+| 72 | `removefile_state_alloc` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | removefile |
+| 73 | `REMOVEFILE_STATE_CONFIRM_CALLBACK` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | removefile |
+| 74 | `REMOVEFILE_STATE_CONFIRM_CONTEXT` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | removefile |
+| 75 | `REMOVEFILE_STATE_ERRNO` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | removefile |
+| 76 | `REMOVEFILE_STATE_ERROR_CALLBACK` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | removefile |
+| 77 | `REMOVEFILE_STATE_ERROR_CONTEXT` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | removefile |
+| 78 | `removefile_state_free` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | removefile |
+| 79 | `removefile_state_get` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | removefile |
+| 80 | `removefile_state_set` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | removefile |
+| 81 | `removefile_state_t` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | removefile |
+| 82 | `REMOVEFILE_STOP` | covered (doc comment; not yet in `system-next`) | 1 | swift-foundation | removefile |
+| 83 | `setbuf` | missing | 1 | swift-nio | C stdio (provisional) |
+| 84 | `setlocale` | missing | 1 | swift-foundation | locale (provisional) |
+| 85 | `setvbuf` | covered (doc comment; not yet in `system-next`) | 1 | swift-log | C stdio streams |
+| 86 | `sin` | missing | 1 | swift-foundation | libm (provisional) |
+| 87 | `strftime` | covered (doc comment) | 1 | swift-log | calendar time |
+| 88 | `strncasecmp_l` | missing | 1 | swift-foundation | locale (provisional) |
+| 89 | `strsignal` | missing | 1 | swift-driver | string.h and ctype.h (provisional) |
+| 90 | `strtod_l` | missing | 1 | swift-foundation | locale (provisional) |
+| 91 | `strtof_l` | missing | 1 | swift-foundation | locale (provisional) |
+| 92 | `time` | covered (as `clock_gettime`) | 1 | swift-log | calendar time |
+| 93 | `time_t` | missing | 1 | swift-certificates | calendar time |
+| 94 | `timeval` | covered (doc comment; not yet in `system-next`) | 1 | swift-nio | socket options |
+| 95 | `tm` | covered (doc comment) | 1 | swift-certificates | calendar time |
+| 96 | `TZDEFAULT` | missing | 1 | swift-foundation | tzfile.h |
 
 ## Missing, by family
 
@@ -451,22 +467,23 @@ The missing interfaces above, grouped, largest first: the order to fill them in.
 
 | # | Family | Files | Packages | Interfaces |
 |---:|---|---:|---|---|
-| 1 | POSIXErrorCode | 3 | swift-foundation | `POSIXErrorCode` |
-| 2 | extended attributes | 2 | swift-nio | `XATTR_MAXNAMELEN` |
-| 3 | file times | 2 | swift-nio | `UTIME_OMIT` |
-| 4 | fts | 2 | swift-foundation | `FTS_D`, `FTS_DP`, `fts_info`, `fts_path`, `FTSENT`, `FTS`, `fts_close`, `FTS_DEFAULT`, `fts_dev`, `FTS_DNR`, `FTS_ERR`, `fts_errno`, `FTS_F`, `fts_ino`, `fts_level`, `fts_name`, `fts_namelen`, `FTS_NOCHDIR`, `FTS_NS`, `fts_open`, `FTS_PHYSICAL`, `fts_read`, `fts_set`, `FTS_SKIP`, `FTS_SL`, `FTS_SLNONE` |
-| 5 | libm (provisional) | 2 | swift-foundation | `pow`, `cos`, `log`, `sin` |
-| 6 | locale (provisional) | 2 | swift-foundation | `LC_ALL`, `locale_t`, `setlocale`, `strncasecmp_l`, `strtod_l`, `strtof_l` |
-| 7 | posix_spawn | 2 | swift-subprocess | posix_spawn's raw attributes and file actions |
-| 8 | tzfile.h | 2 | swift-foundation | `TZDIR`, `TZDEFAULT` |
-| 9 | C stdio (provisional) | 1 | swift-nio | `setbuf` |
-| 10 | C struct members (MemberImportVisibility) | 1 | swift-foundation | `malloc_type_descriptor_v0_t members` |
-| 11 | calendar time | 1 | swift-certificates | `time_t` |
-| 12 | dynamic loader | 1 | swift-tools-support-core | `dlerror` |
+| 1 | extended attributes | 2 | swift-nio | `XATTR_MAXNAMELEN` |
+| 2 | file times | 2 | swift-nio | `UTIME_OMIT` |
+| 3 | fts | 2 | swift-foundation | `FTS_D`, `FTS_DP`, `fts_info`, `fts_path`, `FTSENT`, `FTS`, `fts_close`, `FTS_DEFAULT`, `fts_dev`, `FTS_DNR`, `FTS_ERR`, `fts_errno`, `FTS_F`, `fts_ino`, `fts_level`, `fts_name`, `fts_namelen`, `FTS_NOCHDIR`, `FTS_NS`, `fts_open`, `FTS_PHYSICAL`, `fts_read`, `fts_set`, `FTS_SKIP`, `FTS_SL`, `FTS_SLNONE` |
+| 4 | libm (provisional) | 2 | swift-foundation | `pow`, `cos`, `log`, `sin` |
+| 5 | locale (provisional) | 2 | swift-foundation | `LC_ALL`, `locale_t`, `setlocale`, `strncasecmp_l`, `strtod_l`, `strtof_l` |
+| 6 | posix_spawn | 2 | swift-subprocess | posix_spawn's raw attributes and file actions |
+| 7 | tzfile.h | 2 | swift-foundation | `TZDIR`, `TZDEFAULT` |
+| 8 | C stdio (provisional) | 1 | swift-nio | `setbuf` |
+| 9 | C struct members (MemberImportVisibility) | 1 | swift-foundation | `malloc_type_descriptor_v0_t members` |
+| 10 | calendar time | 1 | swift-certificates | `time_t` |
+| 11 | dynamic loader | 1 | swift-tools-support-core | `dlerror` |
+| 12 | gettimeofday before macOS 13 | 1 | swift-driver | gettimeofday before macOS 13 |
 | 13 | libmalloc | 1 | swift-foundation | `malloc_type_calloc`, `malloc_type_descriptor_v0_t`, `malloc_type_malloc`, `malloc_type_realloc` |
 | 14 | mkstemps | 1 | swift-tools-support-core | `mkstemps` |
 | 15 | readpassphrase | 1 | swift-package-manager | `readpassphrase` |
-| 16 | temporary files | 1 | swift-foundation | `mktemp` |
+| 16 | string.h and ctype.h (provisional) | 1 | swift-driver | `strsignal` |
+| 17 | temporary files | 1 | swift-foundation | `mktemp` |
 
 ## Markers that name no C interface
 
@@ -479,7 +496,7 @@ The missing interfaces above, grouped, largest first: the order to fill them in.
 - C stdio FILE streams (covered): swift-package-manager: `Sources/Basics/Concurrency/AsyncProcess.swift:25`; swift-package-manager: `Sources/Runtimes/PackagePlugin/Plugin.swift:47`; swift-package-manager: `Sources/Runtimes/PackagePlugin/Plugin.swift:48`; swift-package-manager: `Sources/Runtimes/PackagePlugin/Plugin.swift:49`; swift-tools-support-core: `Sources/TSCBasic/WritableByteStream.swift:15`; swift-tools-support-core: `Sources/TSCBasic/WritableByteStream.swift:16`; swift-tools-support-core: `Sources/TSCBasic/WritableByteStream.swift:17`; swift-tools-support-core: `Sources/TSCBasic/WritableByteStream.swift:18`; swift-tools-support-core: `Sources/TSCBasic/WritableByteStream.swift:19`; swift-tools-support-core: `Sources/TSCBasic/WritableByteStream.swift:20`; swift-tools-support-core: `Sources/TSCBasic/WritableByteStream.swift:21`; swift-tools-support-core: `Sources/TSCBasic/WritableByteStream.swift:22`; swift-tools-support-core: `Sources/TSCBasic/WritableByteStream.swift:23`; swift-tools-support-core: `Sources/TSCTestSupport/PseudoTerminal.swift:15`
 - `linger` (covered): swift-nio: `Sources/NIOCore/SocketOptionProvider.swift:18`; swift-nio: `Tests/NIOPosixTests/SocketChannelTest.swift:25`; swift-nio: `Tests/NIOPosixTests/SocketOptionProviderTest.swift:28`
 - `PATH_MAX` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:30`; swift-foundation: `Sources/FoundationEssentials/TimeZone/TimeZone_Cache.swift:34`; swift-foundation: `Tests/FoundationEssentialsTests/StringTests.swift:17`
-- `POSIXErrorCode` (missing): swift-foundation: `Sources/FoundationEssentials/Error/CocoaError+FilePath.swift:20`; swift-foundation: `Sources/FoundationEssentials/Error/ErrorCodes+POSIX.swift:20`; swift-foundation: `Sources/FoundationEssentials/Error/ErrorCodes+POSIX.swift:21`; swift-foundation: `Tests/FoundationEssentialsTests/FileManager/FileManagerTests.swift:30`
+- `POSIXErrorCode` (covered): swift-foundation: `Sources/FoundationEssentials/Error/CocoaError+FilePath.swift:20`; swift-foundation: `Sources/FoundationEssentials/Error/ErrorCodes+POSIX.swift:20`; swift-foundation: `Sources/FoundationEssentials/Error/ErrorCodes+POSIX.swift:21`; swift-foundation: `Tests/FoundationEssentialsTests/FileManager/FileManagerTests.swift:30`
 - `stdout` (covered): swift-log: `Sources/Logging/Handlers/StreamLogHandler.swift:17`; swift-nio: `Sources/NIOPerformanceTester/main.swift:42`
 - `FTS_D` (missing): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:120`; swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
 - `FTS_DP` (missing): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:120`; swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
@@ -525,6 +542,7 @@ The missing interfaces above, grouped, largest first: the order to fill them in.
 - `FTS_SLNONE` (missing): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
 - `funlockfile` (covered): swift-log: `Tests/LoggingTests/StreamLogHandlerTest.swift:22`
 - `fwrite` (covered): swift-log: `Tests/LoggingTests/StreamLogHandlerTest.swift:22`
+- gettimeofday before macOS 13 (missing): swift-driver: `Sources/SwiftDriver/Utilities/DateAdditions.swift:20`; swift-driver: `Sources/SwiftDriver/Utilities/DateAdditions.swift:21`
 - `gmtime_r` (covered): swift-certificates: `Tests/X509Tests/TimeTests.swift:19`
 - `LC_ALL` (missing): swift-foundation: `Tests/FoundationEssentialsTests/JSONEncoderTests.swift:17`
 - `locale_t` (missing): swift-foundation: `Sources/FoundationEssentials/Platform.swift:22`
@@ -563,6 +581,7 @@ The missing interfaces above, grouped, largest first: the order to fill them in.
 - `sin` (missing): swift-foundation: `Sources/FoundationEssentials/Calendar/Calendar_Astronomy.swift:17`
 - `strftime` (covered): swift-log: `Sources/Logging/Handlers/StreamLogHandler.swift:23`
 - `strncasecmp_l` (missing): swift-foundation: `Sources/FoundationEssentials/Platform.swift:22`
+- `strsignal` (missing): swift-driver: `Sources/SwiftDriver/Driver/ToolExecutionDelegate.swift:17`
 - `strtod_l` (missing): swift-foundation: `Sources/FoundationEssentials/Platform.swift:22`
 - `strtof_l` (missing): swift-foundation: `Sources/FoundationEssentials/Platform.swift:22`
 - `time` (covered): swift-log: `Sources/Logging/Handlers/StreamLogHandler.swift:23`

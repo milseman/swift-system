@@ -207,3 +207,21 @@ why it's provisional, and each type's doc notes that it may move to the standard
 - Mock tests run every fallible call over a placeholder stream address; the calls that can't fail have no hooks.
 
 Tests: ProvisionalStdioTest. XCTest 501 (4 skipped), swift-testing 441, all passing.
+
+## 9. POSIXErrorCode, provisionally: `8a1cc64`
+
+`CInterop.POSIXErrorCode` aliases the Darwin overlay's enum (Darwin only), in
+`Sources/System/Provisional/Provisional+POSIXErrorCode.swift`, as Michael asked, so Foundation can name
+`POSIXError.Code` without importing Darwin.
+
+Found: the alias alone doesn't reach the enum's members under MemberImportVisibility, which Foundation
+enables: its cases, `rawValue` and `init(rawValue:)` still need their defining module (`_DarwinFoundation1` in
+the macOS 26 SDK), checked with a client compiled with the feature. So the alias also gets two
+System-declared, Swift-named members that such a client can use, `init?(_: Errno)` and `errno`. Rejected:
+re-declaring the cases as static members, which would be ambiguous wherever Darwin is imported. Foundation's
+static `POSIXError.EPERM`-style properties can then be `CInterop.POSIXErrorCode(.notPermitted)!`.
+
+Tests: ProvisionalPOSIXErrorCodeTests, and the MemberImportVisibility probe. XCTest 501, swift-testing 443 in 67
+suites. One full run failed AttributeListTests' `testVolumeAttributes`, which compares a volume's free space from
+getattrlist with statfs's a moment later; it fails alone too, two runs in three, while other sessions write to
+the disk. It isn't this lane's.
