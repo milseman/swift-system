@@ -167,6 +167,7 @@ private struct SocketMultipleMessagesTests {
   }
 
   @available(System 199, *)
+  @available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *)
   @Test(.requiresSocketBinding) func sendsToAndReceivesFromAddresses() throws {
     func bound() throws -> (SocketDescriptor, SocketAddress) {
       let socket = try SocketDescriptor.open(.ipv4, .datagram, options: [.closeOnExec, .nonBlocking])
@@ -194,13 +195,27 @@ private struct SocketMultipleMessagesTests {
     let storage = UnsafeMutableRawBufferPointer.allocate(byteCount: 64, alignment: 1)
     defer { storage.deallocate() }
     let buffers = (0 ..< 4).map { UnsafeMutableRawBufferPointer(rebasing: storage[$0 * 16 ..< ($0 + 1) * 16]) }
-    let atFirst = try first.receiveMessages(into: buffers)
-    #expect(atFirst.map(\.byteCount) == [2, 2])
+
+    /// Receives until `count` messages have arrived, since loopback
+    /// datagrams can arrive a moment after they're sent.
+    func receive(_ count: Int, from socket: SocketDescriptor) throws -> [(bytes: [UInt8], sender: SocketAddress)] {
+      var messages: [(bytes: [UInt8], sender: SocketAddress)] = []
+      while messages.count < count {
+        _ = try socket.fileDescriptor.poll(for: .readable, timeout: .seconds(5))
+        let received = try socket.receiveMessages(into: buffers.prefix(count - messages.count))
+        #expect(!received.isEmpty)
+        if received.isEmpty { break }
+        for (message, buffer) in zip(received, buffers) {
+          messages.append((Array(buffer.prefix(message.byteCount)), message.sender))
+        }
+      }
+      return messages
+    }
+    let atFirst = try receive(2, from: first)
+    #expect(atFirst.map(\.bytes) == [[1, 2], [5, 6]])
     #expect(atFirst.map(\.sender) == [senderAddress, senderAddress])
-    #expect(Array(buffers[1].prefix(2)) == [5, 6])
-    let atSecond = try second.receiveMessages(into: buffers)
-    #expect(atSecond.map(\.byteCount) == [2])
-    #expect(Array(buffers[0].prefix(2)) == [3, 4])
+    let atSecond = try receive(1, from: second)
+    #expect(atSecond.map(\.bytes) == [[3, 4]])
   }
 
   #if ENABLE_MOCKING
