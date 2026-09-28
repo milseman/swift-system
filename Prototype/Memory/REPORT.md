@@ -200,3 +200,114 @@ Nothing off Darwin was built. By platform:
   `usableSize`.
 - The Linux sample branch (glibc statistics and trim) and the Linux tests
   (`pagesAreWholePages`).
+
+## Part B: owned buffers (a prototype)
+
+Commit: `ae1a5d3` Prototype owned malloc buffers: Memory.Buffer, an owned
+zone, and a reusable I/O vector pool.
+
+Files: `Prototype/Memory/` (`README.md`, the design record; `Sources/`, a
+module of its own, `MemoryPrototype`; `Checks/`, `Policies/`, `Verify/`,
+`Bench/`; and `run.sh`, which builds and runs them under
+`$TMPDIR/malloc-prototype`). Nothing moved into `Sources/`.
+
+### What it is
+
+| Type | What |
+|---|---|
+| `Memory.Buffer<Element: BitwiseCopyable>: ~Copyable` | owns C's memory and frees it in its deinit: `count` initialized elements in `capacity`; `init(capacity:)`, `init(capacity:alignment:)`, `init(repeating:count:)` (`calloc` for zeros), zone forms; `append`, `reserveCapacity`, `shrinkToFit` (`realloc`); `span`, `mutableSpan`, `bytes`, `mutableBytes` (bytes only); `withUnusedCapacity` (`OutputSpan`), `withUnusedByteCapacity` (`OutputRawSpan`); `init(unsafeTaking:count:capacity:)`, `relinquish()`, `free()` |
+| `Memory.OwnedZone: ~Copyable` (Darwin) | a zone destroyed in its deinit or `destroy()` |
+| `Memory.ZoneBuffer<Element>: ~Copyable, ~Escapable` (Darwin) | a buffer in an owned zone, whose lifetime borrows the zone's |
+| `IOVectorPool: ~Copyable` | NIO's pattern: vectors allocated once, `write(_:to:)` and `writeAll(_:to:)` over `UnsafeRawBufferPointer`s, capped at `IOV_MAX` vectors and 32 bits of bytes, resuming inside a buffer |
+
+### Design calls, and the alternatives rejected
+
+The README has each in full; in short:
+- An initialized prefix within the capacity, since `malloc`'s memory starts
+  uninitialized and spans may cover only initialized memory. Rejected: a
+  wholly initialized block (`MemoryMapping` exactly), which must fill every
+  byte first; and spans over uninitialized memory.
+- Filling (output spans, throwing the closure's error) separate from
+  growing (`reserveCapacity`, throwing `Errno`). Rejected: one call that
+  grows and fills, with an error that's either.
+- One generic type for typed and raw (`Buffer<UInt8>`), of
+  `BitwiseCopyable` elements, which `realloc` can move. Rejected: two
+  types; non-trivial elements; `mutableBytes` for any element type.
+- Zeroed creation as `init(repeating:count:)`, `calloc` when the value's
+  bytes are zeros. Rejected: `init(zeroedCount:)`, since zero bits isn't a
+  valid value of every `BitwiseCopyable` type.
+- Alignment kept across growth by allocating anew, since `realloc` doesn't
+  keep it.
+- Doubling growth, rounded to `goodSize` on Darwin. Rejected: using
+  `usableSize`'s slack, which sanitizers report.
+- Pointers only in closures, since the buffer moves. Rejected:
+  `MemoryMapping`'s `unsafeBuffer` property.
+- Zones two ways: through part A's handle (which can outlive the zone, M5)
+  and through `OwnedZone` and `ZoneBuffer`, whose dependency makes the
+  compiler stop it (M2, M3). `ZoneBuffer` wraps `Buffer` with an empty
+  deinit, so that the inner buffer can't be moved out. Rejected: exposing
+  the inner buffer, and a closure-scoped zone.
+- Decision 54 stays open. The default frees in the deinit, which has no
+  error to drop; must-free and checked (the must-close and `EBADF`
+  analogs) are built with `-D` and compared in a table.
+- The pool allocates once and gathers without allocating (a first version
+  copied the caller's collection per write, which a review of it caught).
+  It fills iovecs through C's `iov_base` and `iov_len`, with a C import;
+  the syscalls-4 lane's `CInterop.IOVec(base:length:)`, `.base` and
+  `.length` (its `338401f`) aren't in system-next.
+
+### Findings
+
+- **`realloc` growth is 2.4 times faster than allocate-and-copy to 1 MiB,
+  and 2 to 2.5 times slower from 16 MiB,** on macOS 26.3, doubling a
+  buffer whose bytes are all written. Darwin's own `realloc`, measured
+  without `Memory.Buffer`, gives the same ratios. Numbers shared a process
+  badly, since the allocator reuses freed large blocks, so each runs alone.
+- **Deinit policies**: must-free traps on every ordinary scope end and
+  error path, for nothing, since freeing can't fail; checked catches a
+  large adopted block that something else freed, before libmalloc does,
+  but not a small one. **macOS 26 didn't detect a small block's double
+  free** at all; a large one's, it did ("pointer being freed was not
+  allocated", written to stderr only with `MallocDebugReport=stderr` when
+  it isn't a terminal).
+- **Swift 6.2**: a `let` owner can't be consumed after a non-Escapable
+  value borrowed it, even once the value is gone (M4a, as with
+  `MemoryMapping`'s spans); with a `var` owner, a dependent value used in
+  an autoclosure, such as `&&`'s right side, is reported as escaping (M4c);
+  a function that borrows the owner avoids both (M4d). A consuming call
+  can't be in a `defer` (`OutputSpan.finalize`). `@_alignment` stops at 16.
+  In an extension of `Memory.Buffer`, `Memory._Allocator` isn't found
+  unqualified.
+- Part A's API held up: the prototype used `allocate`, `allocateZeroed`,
+  `reallocate`, `free`, `usableSize`, `goodSize`, the zone calls and the C
+  function values as they are, and needed nothing new from part A.
+
+### Tests
+
+- `run.sh`: 15 checks pass; all 10 Verify snippets behave as their headers
+  expect (7 fail to compile, 3 compile); the policy table and the
+  benchmark are in the README.
+- Package totals after part B, which changed nothing in `Sources/`: XCTest
+  439 tests, 4 skipped, 0 failures; swift-testing 321 tests in 43 suites,
+  all passed.
+
+### Unverified
+
+- Linux: the prototype should build there without the zone types, but
+  nothing built it, and the `realloc` crossover is Darwin's; glibc can
+  `mremap` large blocks.
+- An imported C element type more aligned than `malloc`, which the
+  aligned path would serve.
+- The checked policy exists only on Darwin, where `malloc_size` answers
+  for any pointer.
+
+### What could move into Sources
+
+Nothing moved. `Memory.Buffer`'s core is the candidate: sound as far as
+the checks and the move checker go, but its deinit policy is decision
+54's, its growth strategy wants Linux's `realloc` measured, and its name
+and overlap with `Array`'s API want review. `OwnedZone`/`ZoneBuffer` wait
+on the 6.2 limits (M4); `IOVectorPool` is a client's policy over part A's
+`write(vectors:)`.
+
+The lane stops here, as asked.
