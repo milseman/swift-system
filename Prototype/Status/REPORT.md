@@ -316,3 +316,16 @@ wrapping fts, which would reverse that decision.
 
 Tests: DirectoryWalkVisitsTests. XCTest 510, swift-testing 457 in 70 suites (one full run hit the known
 `acceptSetsExactlyTheOptions` EAGAIN flake; the rerun passed).
+
+## 15. libm, provisionally: `9166bd5`
+
+Foundation's calendar astronomy (sin, cos, pow) and a test utility (pow, log).
+`Sources/System/Provisional/Provisional+Math.swift`: a `Math` namespace of 54 static functions, each for Double
+(`sin`) and Float (`sinf`): the trigonometric, hyperbolic, exponential, logarithmic, power (pow, cbrt, hypot),
+error and gamma functions. The namespace's doc lists what the standard library already has (squareRoot,
+rounded, the remainders, magnitude, minimum/maximum, addingProduct, sign/exponent/significand), which isn't
+repeated. Rejected: members of Double and Float, which swift-numerics' RealModule extends with the same names (a
+file importing both would be ambiguous); generics over BinaryFloatingPoint, which libm isn't.
+
+Tests: ProvisionalMathTests. XCTest 510, swift-testing 460 in 71 suites (one full run hit the known accept
+flake; the rerun passed).
