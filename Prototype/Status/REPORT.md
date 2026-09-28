@@ -281,3 +281,18 @@ The posix-darwin lane's unstarted cluster 9; truncating a path was already `File
 
 That ends the early list: posix-darwin's clusters 6 to 9 are done. Tests: RootAndSyncTest. XCTest 509,
 swift-testing 452, all passing.
+
+## 13. UTIME markers and the xattr name limit: `1be2f2b`
+
+NIO's file system module imported Darwin for UTIME_NOW and UTIME_OMIT (the values its public
+`FileInfo.Timespec.now`/`.omit` expose) and XATTR_MAXNAMELEN (quoted in its errors).
+
+- `CInterop.TimeSpec.fileTimeNow` and `.fileTimeUnchanged`: the timespecs whose nanoseconds are UTIME_NOW and
+  UTIME_OMIT, for code that passes futimens/utimensat their C structures. Rejected: `.now`/`.omit` (read as a
+  timestamp and a verb) and bare Int constants.
+- `SystemConfig.maxExtendedAttributeNameBytes` (Darwin's XATTR_MAXNAMELEN, 127), with the other compile-time
+  limits; Linux's XATTR_NAME_MAX lives in a kernel header the Glibc module lacks.
+- `setTimes`' doc comments now name UTIME_OMIT for a nil time, which the API already passed: UTIME_OMIT was
+  covered but invisible to name matching (section 1's example).
+
+Tests: the markers through futimens, and 127- and 128-byte attribute names. XCTest 510, swift-testing 453.
