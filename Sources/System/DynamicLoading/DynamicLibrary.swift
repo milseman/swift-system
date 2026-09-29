@@ -283,6 +283,40 @@ extension DynamicLibrary {
   }
 }
 
+@available(System 199, *)
+extension DynamicLibrary {
+  /// Returns the calling thread's pending dynamic loader error,
+  /// and clears it.
+  ///
+  /// - Returns: The error of the last loader call on this thread
+  ///   that failed since the error was last taken,
+  ///   or `nil` if there's none.
+  ///
+  /// `DynamicLibrary`'s initializers and ``close()`` throw their errors,
+  /// taking them as this method does.
+  /// This is for a call that fails without throwing,
+  /// such as ``address(of:)-(String)`` returning `nil`,
+  /// which clears the pending error first:
+  ///
+  ///     guard let address = library.address(of: "entry") else {
+  ///       print(DynamicLibrary.takePendingError()?.message ?? "not found")
+  ///       return
+  ///     }
+  ///
+  /// It's also for the loader calls that C code makes.
+  ///
+  /// The corresponding C function is `dlerror`.
+  @_alwaysEmitIntoClient
+  public static func takePendingError() -> LoaderError? {
+    _takePendingError()
+  }
+
+  @usableFromInline
+  internal static func _takePendingError() -> LoaderError? {
+    system_dlerror().map { LoaderError(message: String(platformString: $0)) }
+  }
+}
+
 /// The calling thread's last dynamic linking error.
 @available(System 199, *)
 internal func _loaderError() -> DynamicLibrary.LoaderError {

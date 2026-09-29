@@ -59,6 +59,24 @@ private struct DynamicLibraryTests {
     try library.close()
   }
 
+  /// A symbol that no library defines leaves the loader's reason pending,
+  /// which taking clears.
+  @available(System 199, *)
+  @Test func takingThePendingError() throws {
+    let program = try DynamicLibrary.mainProgram()
+    let symbol = "not_a_symbol_\(UInt64.random(in: 0 ... .max))"
+    let missing = program.address(of: symbol)
+    #expect(missing == nil)
+    let error = try #require(DynamicLibrary.takePendingError())
+    #expect(error.message.contains(symbol), "\(error)")
+    #expect(DynamicLibrary.takePendingError() == nil)
+    // A symbol that's found leaves none.
+    let found = program.address(of: "strlen")
+    #expect(found != nil)
+    #expect(DynamicLibrary.takePendingError() == nil)
+    try program.close()
+  }
+
   @available(System 199, *)
   @Test func failuresDescribeThemselves() {
     let missing = "/nonexistent/libnothing-\(UInt32.random(in: 0 ... .max)).so"
