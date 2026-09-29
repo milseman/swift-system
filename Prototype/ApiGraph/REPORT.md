@@ -59,8 +59,8 @@ Stored links, each kind separate:
 |---|---|---|---|
 | `memberOf` | declaration → type | A member to its host type. The strongest link: a type's members tend to appear in the same snippets, though they needn't be pitched with it. | `PThread.Mutex.lock()` → `PThread.Mutex` |
 | `nestedIn` | type → type | A nested type to the type it's declared in. | `PThread.Mutex.Attributes` → `PThread.Mutex` |
-| `extends` | declaration → type | A member declared in an `extension` of its host rather than in the host's own body; the host is often a base or external type. | `FileDescriptor.setOwner(user:group:retryOnInterrupt:)` → `FileDescriptor`; `timespec.seconds` → `timespec` |
-| `conformsTo` | type → protocol | A conformance, to a new, base or external protocol. | `FileDescriptor.StatusFlags` → `OptionSet` |
+| `extends` | declaration → type | A member an extension adds outside its host's own file: to a base or external type, or to a new type declared elsewhere. (An `extension T` beside `T` is how this repository writes most members, and isn't one.) | `FileDescriptor.setOwner(user:group:retryOnInterrupt:)` → `FileDescriptor`; `timespec.seconds` → `timespec` |
+| `conformsTo` | type → protocol | A conformance, to a new, base or external protocol (not the ones every type gets: Copyable, Escapable, BitwiseCopyable, SendableMetatype). | `FileDescriptor.StatusFlags` → `OptionSet` |
 | `usesInSignature` | declaration → type | A type its signature names, with its roles: `parameter`, `return`, `throws`, `type` (a property's or case payload's), `aliased` (a typealias's target), `generic` (a constraint). | `FileDescriptor.setOwner(user:group:retryOnInterrupt:)` → `UserID` (parameter), → `Errno` (throws); `FileDescriptor.statusFlags()` → `FileDescriptor.StatusFlags` (return) |
 | `wraps` | declaration → cname | A C interface its doc comment names ("The corresponding C function is `x`."), as adopter-coverage's `derive.py` reads it: role `subject`, `alternative` or `argument`, and whether the sentence restricts it to one use. | `PThread.Mutex.lock()` → `pthread_mutex_lock` (subject); `FileDescriptor.statusFlags()` → `fcntl` (subject, restricted), → `F_GETFL` (argument) |
 | `reaches` | declaration → internal | New internal code its body reaches, through the index. | `FileDescriptor.setOwner(…)` → `system_fchown(_:_:_:)` |
@@ -76,13 +76,16 @@ snapshot and its diffs hold each fact once:
 
 | Kind | From | Example |
 |---|---|---|
-| `sameCFamily` | two declarations that `wrap` C functions of one family (the functions one declaration's sentences name together: `chmod`, or `lchmod` if …) | `FilePath.setTimes(…)` and `FileDescriptor.setTimes(…)` (futimens, utimensat) |
-| `sameImplementation` | two declarations that `reach` one internal piece | the fcntl command accessors, through `system_fcntl` |
+| `sameCFamily` | two declarations that `wrap` C functions of one family: functions a sentence names as spellings of one call (`chmod`, or `lchmod` if …), joined with POSIX's variants of the call (`x`, `xat`, `fx`, `lx`, `fxat`) | `FilePath.setTimes(…)` and `FileDescriptor.setTimes(…)` (the utimensat family: futimens, utimensat) |
+| `sameImplementation` | two declarations that `reach` one internal piece, unless more than 20 do (a shared helper, like the mock hooks) | the fcntl command accessors, through `system_fcntl` |
 | `sameBlock`, `sameMark` | two declarations in one block, or in blocks under one MARK title in one file | the members of one `extension FilePath` family |
 | `couldUse` (reach) | a declaration, and a package that `calls` a cname it wraps (as subject, alternative or argument, not restricted), unless the base commit covers the cname | `ProcessID.current` → every package that calls `getpid` |
 
 Each head declaration's **reach** is `{usedBy: [packages], couldUse:
-[packages]}`, with the sites a query lists.
+[packages]}`, with the sites a query lists, and its **domains** (from
+`Utilities/api-graph/domains.json`, section 2's companion: C families by
+task, after *Advanced Programming in the UNIX Environment*; a type is in its
+members' domains).
 
 ### Snapshots, diffs and queries
 
@@ -151,6 +154,8 @@ Patterns:
 | `members-of-pitched-type` | The members of a type another pitch owns. | `terminal-attributes-members.json`: TerminalAttributes' members, after `terminal-types.json` |
 | `self-contained-type` | A type with its members and nested types. | `kernel-queue.json`: KernelQueue |
 | `function-family` | The wrappers of one C function family, on existing types. | `file-times.json`: futimens and utimensat |
+| `vocabulary-type` | A type many pitches name, with only the members they all need. | `process-id.json`: ProcessID, `current`, `parent`, its raw value |
+| `constants` | New constants, options or cases on an existing type. | `open-options-sync.json`: O_SYNC and O_DSYNC |
 
 The check, over every pitch file at once:
 
@@ -167,26 +172,128 @@ The check, over every pitch file at once:
 
 ## 3. Status and where to resume
 
-Build order (from the 2026-09-29 direction): graph, adopter reach, pitch files
-and checks, bundles, suggestions, domains.
+Every step of the 2026-09-29 direction is built, in its order: graph,
+adopter reach, pitch files and checks, bundles, suggestions, domains
+(commits `3a31998`..`a51afc5`). Local system-next is `7b0875f`, merged.
 
-| Step | State | Where |
-|---|---|---|
-| Graph | done: snapshot, store, diff, queries | `scripts/snapshot.py`, `scripts/graphq.py`; build_graph.py records signature roles, conformances and blocks; `scripts/cnames.py` the C names and families (`3a31998`, `188cd6c`) |
-| Adopter reach | done: `usedBy` and `calls` links, each declaration's reach | `scripts/adopters.py` (milestone 1), folded into the snapshot |
-| Pitch files and checks | done: format, resolver, checks, five examples | `scripts/pitches.py`, `Prototype/Pitches/` (`9791564`) |
-| Bundles | next: per-pitch bundles with adopter examples | bundles.py, generalized to any set of nodes |
-| Suggestions | to do: today's clustering as a report proposing pitches | cluster.py, report.py |
-| Domains | to do: C families by domain | a hand-kept data file |
+| Step | Where |
+|---|---|
+| Graph | `scripts/build_graph.py` (signature roles, conformances, blocks), `scripts/cnames.py` (C names and families), `scripts/snapshot.py` (the snapshot, store and diff), `scripts/graphq.py` (queries); `GRAPH.md`, `graph.json.gz`, `DIFF.md` |
+| Adopter reach | `scripts/adopters.py` (milestone 1), folded into the snapshot as `usedBy` and `calls` links and each declaration's reach |
+| Pitch files and checks | `scripts/pitches.py`; `Prototype/Pitches/` (seven examples, one per pattern); `PITCHES.md` |
+| Bundles | `scripts/pitches.py --units-out`, `scripts/bundles.py --units`, `scripts/units.py` (shared with the clustering); `pitches/<id>/` |
+| Suggestions | `scripts/cluster.py`, `scripts/report.py` (pitch coverage, draft pitch files); `SUGGESTIONS.md`, `suggestions/` |
+| Domains | `Utilities/api-graph/domains.json`; `graphq.py domain`; the pitch bundles' Related API |
 
-On system-next `7b0875f`: 9835 nodes, 37892 links; 58 packages (the
-ecosystem gained 21 clones during the session, picked up with no change).
+On system-next `7b0875f` the snapshot has 9835 nodes (3741 new
+declarations, 21 base and 130 external types, 1872 C names in 500
+families, 2308 pieces of internal code, 621 blocks, 982 tests, 102
+samples, 58 packages) and 38065 links. 689 new declarations are used on a
+migration branch, and 914 wrap a C interface some package calls. The seven
+example pitches cover 170 of the 3507 declarations (fix-it stubs follow
+what they rename). The adopters grew during the session, and each new
+clone was picked up with no change: the ecosystem gained 21 packages, and
+swift-build and swift-llbuild gained migrations (16 migrated now).
 
-To resume: read this section, then run `Utilities/api-graph/regenerate.sh`
-(about 5 minutes when every adopter index is cached) and read the output's
-`GRAPH.md` and `PITCHES.md`; `scripts/graphq.py --help` for queries.
+To resume: run `Utilities/api-graph/regenerate.sh` (4 minutes with the
+adopter cache warm), open `.build/api-graph/API-GRAPH.md`, and use
+`scripts/graphq.py`. A pitch chat edits `Prototype/Pitches/<id>.json`,
+reruns, and reads `PITCHES.md` and `pitches/<id>/bundle.md`. Open items are
+in section 4's known misses.
 
-## 4. Milestone 1: adopters for every carve-out (done)
+## 4. Milestone 2: the graph, pitch files, suggestions, domains (done)
+
+### What
+
+- **The graph** (section 1), built before any clustering and keeping every
+  link: base and external types are nodes, and promotion and link cutting
+  apply only to the suggestions. A snapshot per head commit goes to the store
+  beside the repository (`../api-graph-snapshots`), with an index, and each
+  run diffs it with the store's previous snapshot of the same head ref.
+  `graphq.py` answers: a node and its links (`show`), a neighborhood by link
+  kind and depth (`neighbors`), a type with or without its members and their
+  reach and sites (`type`), a C family or a C name with its wrappers and
+  callers (`family`, `cname`; `cname getpid` lists every package calling
+  getpid, which `ProcessID.current` wraps), a package's reach (`package`), a
+  domain (`domain`), and `diff`.
+- **Pitch files** (section 2): seven examples, one per pattern, checked
+  together into `PITCHES.md`: coverage, overlaps, prerequisites (found:
+  terminal-attributes-members needs terminal-types, listed in `requires`),
+  new types no pitch owns (`CInterop.KEvent`, `CInterop.TimeSpec`,
+  `FilePath.ResolutionFlags`, `BaudRate`, …), pattern fit, and changes since
+  the previous snapshot.
+- **Pitch bundles**: the suggestions' bundle format (source, tests, samples,
+  commit messages, open-question tags, prior text), plus the pitch file's
+  rules and what each matched, adopter examples whose hunks say what else they
+  use and which pitch owns it ("also uses `TerminalDescriptor` (pitch
+  descriptor-types); `openPseudoterminal` (no pitch yet)"), and related API by
+  domain. A type pitched without its members shows only its declaration's
+  head.
+- **Suggestions**: the clustering's report, now `SUGGESTIONS.md`, with a
+  Pitched column (how much of each suggestion pitch files cover) and draft
+  pitch files for every suggestion none covers (246 of 260), the first 15
+  listed as candidate pitches.
+- **Domains**: 21, from the APUE chapters plus time, memory, randomness,
+  dynamic loading, C strings, C math and Darwin's own; every C family but one
+  derivation artifact (`progress`) falls in one.
+
+### Design calls
+
+`scripts/method.md`, decisions 26-36, has each with the alternative it
+rejected: the graph as its own stage keeping every link (26); many-to-many
+relations as hubs derived at query time (27); USRs as IDs (28); `extends` as
+extension outside the host's file (29); C families from the sentences' `or`
+and POSIX's naming, not every co-mention (30); a store that outlives
+worktrees (31); pitch files as data the tool never writes, with rules rather
+than ID lists (32); prerequisites through signature-level links only (33);
+pitch bundles quoting only what the pitch holds (34); suggestions that
+propose and draft but never override (35); hand-kept domains by task, not by
+file (36).
+
+### Verification
+
+- `units.py` took the open-question tags, evidence, prior text and metrics
+  out of cluster.py; cluster.py's output was compared byte for byte with the
+  old one's under a fixed hash seed: identical. (The old output varied from
+  run to run in the order of tied prior-text names; now sorted.)
+- The pitch change report was checked against a doctored previous snapshot
+  (one declaration removed, one signature changed): it reported "now also
+  matches `timespec.fileTimeNow`" and "`FileDescriptor.setTimes(…)`
+  changed (decl)".
+- The snapshot diff reported the 2406 `extends` links the narrower
+  definition removed, and nothing else, between two snapshots of one commit.
+- Queries were run by hand on PThread.Mutex, ProcessID, KernelQueue, the chmod
+  family, getpid and swift-log, and their answers checked against the sources.
+
+### Runtime
+
+`regenerate.sh` in 3 minutes 57 seconds with the adopter cache warm (M1 Max,
+Swift 6.2, other lanes building): the adopters step 98 seconds (58 packages),
+cnames 4, the snapshot 5, the pitches and their bundles about 10, the
+suggestions about 30. A snapshot is 1 MB compressed.
+
+### Known misses
+
+- C function families follow the doc sentences and POSIX's naming: a family a
+  sentence calls two calls stays two, and a derivation artifact can be a
+  one-name family (`progress`).
+- `extends` misses a member added by an extension in the host's own file after
+  the fact; the repository's style makes that the common case, so it isn't
+  flagged.
+- A pitch's prerequisites come from links; a need only a doc comment or a
+  sample shows isn't one. Implementation-only needs are listed apart.
+- The related API a domain suggests is broad (a domain is a chapter), so a
+  pitch bundle shows the largest families first and stops at 40.
+- The snapshot diff compares facts, not lines: a declaration that moved in its
+  file isn't changed, and a doc comment's change counts only through its
+  summary.
+- Pitch files are read from the working tree (chats edit them between
+  commits), unlike everything else.
+- The store keeps one snapshot per head commit; a rerun of the same commit
+  replaces it, so a tool change is diffed against the previous commit's
+  snapshot, not the same commit's earlier one.
+
+## 5. Milestone 1: adopters for every carve-out (done)
 
 The brief before the new direction: say, for each automatic carve-out
 (cluster, part, batch), which adopters use its declarations and where, and
@@ -210,8 +317,8 @@ which would benefit. That work is the adopter reach the graph now carries.
   coverage tools' derivation reads from the doc comments, less what the base
   commit covers.
 - Output: per bundle, an Adopters section (`bundle.md`, `bundle.json`,
-  `adopters.md`); in `API-GRAPH.md`, Adopters columns and an Adopter reach
-  section; `scripts/reach.py` ranks and filters by reach. A clone in
+  `adopters.md`); in the report (then `API-GRAPH.md`, now `SUGGESTIONS.md`),
+  Adopters columns and an Adopter reach section; `scripts/reach.py` ranks and filters by reach. A clone in
   `../ecosystem` or `../adopters` is picked up by the next run.
 
 ### Design calls
@@ -338,7 +445,7 @@ declarations; `reach.py --kind part` ranks parts alone.
 - The lexical interface scan (packages the coverage store hasn't audited) reads
   library Swift sources only.
 
-## 5. For the coverage lane
+## 6. For the coverage lane
 
 Nothing needed. Noted: `derive.py` reads `nil` in "with `UTIME_OMIT` for a
 `nil` time" and `value` in "the 8 bytes of `value`" as argument C names;
