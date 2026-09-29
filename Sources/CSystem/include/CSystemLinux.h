@@ -237,6 +237,12 @@ extern int csystem_recvmmsg(int fd, void *msgvec, unsigned int vlen, int flags, 
 extern double csystem_strtod_l(const char *string, char **end, void *locale);
 extern float csystem_strtof_l(const char *string, char **end, void *locale);
 int _system_get_LC_ALL_MASK(void);
+
+// <tzfile.h>'s TZDIR and TZDEFAULT, which glibc doesn't install and Musl
+// doesn't have: the system's, where it has the header, and otherwise the
+// conventional paths; see shims.c.
+const char *_system_get_TZDEFAULT(void);
+const char *_system_get_TZDIR(void);
 #endif // defined(__linux__) && !defined(__ANDROID__)
 
 #if defined(__linux__) && defined(__GLIBC__)

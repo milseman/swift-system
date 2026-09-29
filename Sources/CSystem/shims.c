@@ -609,6 +609,21 @@ extern float csystem_strtof_l(const char *string, char **end, void *locale) {
 }
 
 int _system_get_LC_ALL_MASK(void) { return LC_ALL_MASK; }
+
+// MARK: - Time zone files
+
+#if __has_include(<tzfile.h>)
+#include <tzfile.h>
+#endif
+#ifndef TZDIR
+#define TZDIR "/usr/share/zoneinfo"
+#endif
+#ifndef TZDEFAULT
+#define TZDEFAULT "/etc/localtime"
+#endif
+
+const char *_system_get_TZDEFAULT(void) { return TZDEFAULT; }
+const char *_system_get_TZDIR(void) { return TZDIR; }
 #endif // defined(__linux__) && !defined(__ANDROID__)
 
 // MARK: - The allocator

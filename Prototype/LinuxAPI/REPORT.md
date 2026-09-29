@@ -10,10 +10,11 @@ interface at Swift's default API level (21), and said otherwise.
 
 ## Resume here
 
-- State: inventory (section 1) and batches 1 to 3 (sections 2.1 to 2.3)
+- State: inventory (section 1) and batches 1 to 4 (sections 2.1 to 2.4)
   committed.
-- Next: batch 4 in the plan (section 1.5): `currentExecutable()` and the
-  time zone paths on Linux, for Foundation.
+- Next: batch 5 in the plan (section 1.5): `makeUniqueFile(suffixLength:)`
+  (`mkostemps`) for TSC, `symbolInfo(containing:)` (`dladdr`) for
+  swift-build, `RTLD_DEEPBIND` for TSC and swift-driver.
 - This lane owns `Sources/System/**`, `Sources/CSystem`, `Tests/SystemTests`
   and this report, not SystemSockets or its tests: socket API (vsock, UDP
   offload) goes to section 4, with a patch where one is written.
@@ -64,6 +65,12 @@ later; a log goes to `../linux-logs/`.
    - To run the French checks: `Utilities/linux/build.sh shell`, then
      `apt-get update && apt-get install -y locales && locale-gen fr_FR.UTF-8`
      and the same `swift test` command in the container.
+4. Batch 4 (the time zone paths):
+   - `Utilities/linux/build.sh test -- --filter TimeZoneFiles`. Expect the
+     build to pass (the `TZDIR` and `TZDEFAULT` getters in `shims.c`) and
+     `TimeZoneFilesLinuxTests`' test to pass. Where
+     `/usr/share/zoneinfo` exists it also stats `Etc/UTC`; say whether the
+     image has it.
 
 ## Baseline (Darwin)
 
@@ -202,7 +209,8 @@ In the ranking's order, each small enough to review alone:
 2. Foundation (and TSC, indexstore-db): `POSIXErrorCode`;
    `maxSymbolicLinks` and `maxExtendedAttributeNameBytes` on Linux.
 3. Foundation: `CLocale` on glibc and musl.
-4. Foundation: `currentExecutable()` and the time zone paths on Linux.
+4. Foundation: the time zone paths on Linux. `currentExecutable()` stays
+   Darwin's (section 2.4).
 5. TSC: `makeUniqueFile(suffixLength:)` (`mkostemps`); swift-build:
    `symbolInfo(containing:)` (`dladdr`); TSC and swift-driver:
    `RTLD_DEEPBIND` on glibc.
@@ -385,6 +393,38 @@ Tests:
 - Darwin, after: XCTest 565 tests, 4 skipped, 0 failures; swift-testing 498
   tests in 81 suites passed (Darwin's `ProvisionalLocaleTest` unchanged:
   its mock locale and `global` are now spelled through `locale_t`).
+
+### 2.4 Batch 4: the time zone paths (swift-foundation)
+
+- `FilePath.timeZoneDirectory` (`TZDIR`) and `.defaultTimeZoneFile`
+  (`TZDEFAULT`) widen to Linux, glibc and Musl. Foundation's
+  `TimeZone_Cache.swift` reads them through System on Darwin, and on Linux
+  through its own `_CStdlib.h`, which includes `<tzfile.h>` where there's
+  one and otherwise defines `/usr/share/zoneinfo/` and `/etc/localtime`;
+  its Linux branch then calls `readlink` on `TZDEFAULT` itself. glibc
+  doesn't install `<tzfile.h>` and Musl has none, so `shims.c` does as
+  Foundation does, through `_system_get_TZDIR` and `_system_get_TZDEFAULT`.
+- The docs say what differs on Linux: the directory can be missing (a
+  container without tzdata), and `/etc/localtime` can be a copy rather than
+  a link, or missing, meaning UTC.
+- Android stays out: Bionic keeps every zone in one `tzdata` file and has
+  no `/etc/localtime`.
+- `FilePath.currentExecutable()` stays Darwin's. On Linux the path is
+  `/proc/self/exe`'s target, which `FilePath.readSymbolicLink` already reads
+  on every platform (Foundation's Linux branch reads it through
+  `FileManager`, not a C call). A Linux `currentExecutable()` would have to
+  throw, since `/proc` can be missing, where Darwin's doesn't, and it would
+  give the resolved path where Darwin's gives the one executed. Rejected
+  for now; open: a throwing `ProcessID.executablePath()` on Linux, beside
+  macOS's libproc one, which also resolves the path.
+
+Tests:
+
+- `Tests/SystemTests/TimeZoneFilesLinuxTests.swift` (Linux, swift-testing):
+  the two paths, and `Etc/UTC` a regular file where the directory exists.
+  Typechecked on Darwin in a scratch copy.
+- Darwin, after: XCTest 565 tests, 4 skipped, 0 failures; swift-testing 498
+  tests in 81 suites passed (no new Darwin tests).
 
 ## 3. Findings
 
