@@ -13,8 +13,10 @@
 // async-signal-safe functions: it sets its groups and user, clears
 // close-on-exec on the descriptors that the file actions use, and runs the
 // program with posix_spawn and POSIX_SPAWN_SETEXEC, which applies the file
-// actions and attributes to the child itself. A failure comes back to the
-// parent through a close-on-exec pipe.
+// actions and attributes to the child itself. For System's file actions,
+// actions added at the end close the ones among those descriptors that a
+// spawn's exec would close. A failure comes back to the parent through a
+// close-on-exec pipe.
 //
 // Only on Darwin, the one platform with POSIX_SPAWN_SETEXEC; elsewhere the
 // child would have to apply the file actions and attributes itself.
@@ -103,9 +105,29 @@ extension ProcessID {
   /// that the calling process can't give,
   /// and no child is left to reap.
   ///
+  /// With `POSIX_SPAWN_SETEXEC`, Darwin closes the descriptors
+  /// that have close-on-exec set before it applies the file actions,
+  /// rather than when the program starts,
+  /// so the child clears close-on-exec on the descriptors
+  /// that `fileActions` use.
+  /// So that the program gets the descriptors
+  /// that a spawn without credentials would give it,
+  /// this method adds an action at the end that closes each of them
+  /// that has close-on-exec set,
+  /// unless an action closes it, replaces it, or lets the child inherit it.
+  ///
   /// Between the fork and the program, the child runs only C code
   /// that's safe after a fork, and none of the calling process's
   /// signal handlers.
+  /// It reports a failure through a pipe whose ends are close-on-exec,
+  /// and this method waits for the program to start,
+  /// which closes the child's end.
+  /// Where `pipe2` is missing (before macOS 27,
+  /// or in a build of System with an older SDK),
+  /// the pipe gets close-on-exec in a second step;
+  /// a program that another thread starts between the two inherits the pipe,
+  /// and then this method doesn't return until that program, too,
+  /// exits or closes it.
   ///
   /// The corresponding C functions are `fork`, `setgroups`, `setgid`,
   /// `setuid`, and `posix_spawn`.
@@ -179,6 +201,18 @@ extension ProcessID {
   /// it can't read them from the C file actions.
   /// The flag is set on the child's copy of the attributes,
   /// so `cAttributes` keeps its flags.
+  ///
+  /// Unlike the form that takes ``SpawnFileAction`` values,
+  /// this method can't add actions:
+  /// each of `fileActionDescriptors` that had close-on-exec set
+  /// stays open in the program,
+  /// where a spawn without credentials would close it,
+  /// unless the actions close it, replace it, or let the child inherit it.
+  /// To close them, add a close action for each after its last use,
+  /// or set ``SpawnAttributes/Flags/closeOnExecByDefault``
+  /// (`POSIX_SPAWN_CLOEXEC_DEFAULT`) in `cAttributes`,
+  /// which closes every descriptor that the actions don't install,
+  /// even with `POSIX_SPAWN_SETEXEC`.
   /// See ``spawn(_:arguments:environment:fileActions:attributes:credentials:)``.
   ///
   /// The corresponding C functions are `fork`, `setgroups`, `setgid`,
@@ -239,7 +273,8 @@ extension ProcessID {
     attributes: SpawnAttributes,
     credentials: SpawnCredentials
   ) -> Result<ProcessID, Errno> {
-    SpawnFileAction._withUnsafeFileActions(fileActions) { cFileActions in
+    let closes = SpawnFileAction._closesOfCloseOnExecSources(fileActions)
+    return SpawnFileAction._withUnsafeFileActions(fileActions + closes) { cFileActions in
       attributes._withUnsafeAttributes(extraFlags: 0) { cAttributes in
         _spawn(
           path, searchingPath: searchingPath, arguments: arguments, environment: environment,
@@ -303,6 +338,42 @@ extension SpawnFileAction {
     case .open, .setWorkingDirectory, .closeAll:
       return []
     }
+  }
+
+  // Actions that close the descriptors that `actions` use as a source (a
+  // duplicate's, or a working directory) and leave with close-on-exec set,
+  // which a spawn's exec closes when the program starts. The child clears
+  // close-on-exec on them so that the actions can use them, since with
+  // POSIX_SPAWN_SETEXEC Darwin closes close-on-exec descriptors before it
+  // applies the actions, so they'd stay open in the program. An action that
+  // closes a descriptor, replaces it (opening or duplicating another
+  // descriptor as it) or lets the child inherit it settles its state; a
+  // duplicate onto itself doesn't, since on Darwin it keeps its flag. A
+  // descriptor that isn't open is left for the child to report.
+  internal static func _closesOfCloseOnExecSources(
+    _ actions: [SpawnFileAction]
+  ) -> [SpawnFileAction] {
+    var sources: [FileDescriptor] = []
+    var settled: Set<FileDescriptor> = []
+    for action in actions {
+      switch action._kind {
+      case .open(_, _, _, let descriptor), .close(let descriptor), .inherit(let descriptor):
+        settled.insert(descriptor)
+      case .duplicate(let source, let target):
+        if source != target { settled.insert(target) }
+        if !sources.contains(source) { sources.append(source) }
+      case .setWorkingDirectoryDescriptor(let directory):
+        if !sources.contains(directory) { sources.append(directory) }
+      case .setWorkingDirectory, .closeAll:
+        break
+      }
+    }
+    return sources.filter { source in
+      guard !settled.contains(source), let flags = try? source.descriptorFlags() else {
+        return false
+      }
+      return flags.contains(.closeOnExec)
+    }.map { .close($0) }
   }
 }
 
