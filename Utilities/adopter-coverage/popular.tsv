@@ -2,7 +2,9 @@
 # swift-server and swiftlang ecosystems' most used packages, and the libraries
 # they're built on. One per line: name, GitHub repository, ref (a tag or
 # branch), and why it's here. The survey audits those whose library code
-# imports Darwin.
+# imports Darwin. The first batch runs to swift-java; the second, from
+# RediStack, came when the first's queue ran out (Prototype/Status/REPORT.md,
+# sections 37 and 39).
 name	remote	ref	why
 async-http-client	swift-server/async-http-client	main	the swift-server HTTP client
 swift-service-lifecycle	swift-server/swift-service-lifecycle	main	swift-server's service lifecycle, signal handling
@@ -25,3 +27,28 @@ hummingbird	hummingbird-project/hummingbird	main	the Hummingbird web framework
 swift-otel	swift-otel/swift-otel	main	OpenTelemetry for the server API
 swiftly	swiftlang/swiftly	main	swiftlang's toolchain installer
 swift-java	swiftlang/swift-java	main	swiftlang's Java interoperability
+RediStack	swift-server/RediStack	main	the Redis client
+APNSwift	swift-server-community/APNSwift	main	Apple push notifications from servers
+soto-core	soto-project/soto-core	main	the AWS SDK's core
+swift-prometheus	swift-server/swift-prometheus	main	Prometheus for the metrics API
+swift-statsd-client	apple/swift-statsd-client	main	StatsD for the metrics API
+swift-kafka-client	swift-server/swift-kafka-client	main	the Kafka client
+swift-cassandra-client	apple/swift-cassandra-client	main	the Cassandra client
+swift-memcache-gsoc	swift-server/swift-memcache-gsoc	main	the memcached client
+valkey-swift	valkey-io/valkey-swift	main	the Valkey client
+MongoKitten	orlandos-nl/MongoKitten	main	the MongoDB client
+swift-profile-recorder	apple/swift-profile-recorder	main	the in-process sampling profiler for services
+swift-configuration	apple/swift-configuration	main	the configuration API
+swift-http-types	apple/swift-http-types	main	HTTP's currency types
+swift-async-dns-resolver	apple/swift-async-dns-resolver	main	the DNS resolver
+swift-nio-imap	apple/swift-nio-imap	main	NIO's IMAP
+mqtt-nio	swift-server-community/mqtt-nio	main	the MQTT client
+mysql-nio	vapor/mysql-nio	main	the MySQL client
+sqlite-nio	vapor/sqlite-nio	main	the SQLite client
+websocket-kit	vapor/websocket-kit	main	Vapor's WebSockets
+fluent-kit	vapor/fluent-kit	main	Vapor's ORM
+jwt-kit	vapor/jwt-kit	main	JSON Web Tokens
+swift-openapi-async-http-client	swift-server/swift-openapi-async-http-client	main	OpenAPI's HTTP client transport
+swift-webauthn	swift-server/swift-webauthn	main	WebAuthn
+swift-container-plugin	apple/swift-container-plugin	main	container images from SwiftPM
+swift-websocket	hummingbird-project/swift-websocket	main	Hummingbird's WebSockets
