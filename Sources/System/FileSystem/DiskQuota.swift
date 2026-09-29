@@ -23,6 +23,10 @@ import Darwin
 /// A Swift wrapper of the C `dqblk` struct: a user's or a group's disk quota
 /// on a file system, and their use of it.
 ///
+/// `FilePath`'s `quotasEnabled(for:)` and `diskQuota(for:)` read quotas,
+/// building each `quotactl` command as the C macro `QCMD` does;
+/// the corresponding C constants are `SUBCMDSHIFT` and `SUBCMDMASK`.
+///
 /// - Note: Only available on Darwin.
 @frozen
 @available(System 199, *)

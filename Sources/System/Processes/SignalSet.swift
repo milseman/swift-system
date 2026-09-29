@@ -56,6 +56,8 @@ extension SignalSet {
   /// The set of every signal that the platform has.
   ///
   /// The C library leaves out the signals it reserves for its own use.
+  /// Its members are numbered from 1 up to a limit, which it doesn't include;
+  /// the corresponding C constant is `NSIG`.
   ///
   /// The corresponding C function is `sigfillset`.
   @_alwaysEmitIntoClient
@@ -282,6 +284,7 @@ extension PThread {
   /// - Returns: The thread's previous mask.
   ///
   /// The corresponding C function is `pthread_sigmask`.
+  /// The corresponding C constant is `SIG_SETMASK`.
   @_alwaysEmitIntoClient
   @discardableResult
   @available(*, noasync, message: "The signal mask belongs to a thread, and an async function can resume on another")
@@ -300,6 +303,7 @@ extension PThread {
   /// - Returns: The thread's previous mask.
   ///
   /// The corresponding C function is `pthread_sigmask`.
+  /// The corresponding C constant is `SIG_BLOCK`.
   @_alwaysEmitIntoClient
   @discardableResult
   @available(*, noasync, message: "The signal mask belongs to a thread, and an async function can resume on another")
@@ -315,7 +319,10 @@ extension PThread {
   /// - Parameter signals: The signals to unblock.
   /// - Returns: The thread's previous mask.
   ///
+  /// In a process with one thread, this is what `sigprocmask` does.
+  ///
   /// The corresponding C function is `pthread_sigmask`.
+  /// The corresponding C constant is `SIG_UNBLOCK`.
   @_alwaysEmitIntoClient
   @discardableResult
   @available(*, noasync, message: "The signal mask belongs to a thread, and an async function can resume on another")

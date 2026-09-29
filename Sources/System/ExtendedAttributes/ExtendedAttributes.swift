@@ -40,6 +40,29 @@ public struct ExtendedAttributeOptions: OptionSet, Hashable, Sendable {
   public static var replace: Self { Self(rawValue: _XATTR_REPLACE) }
 }
 
+#if SYSTEM_PACKAGE_DARWIN
+/// The names of the extended attributes that Darwin itself keeps.
+///
+///     let info = try path.extendedAttribute(ExtendedAttributeName.finderInfo)
+///
+/// - Note: Only available on Darwin.
+@available(System 199, *)
+public enum ExtendedAttributeName {
+  /// The attribute that holds a file's Finder information:
+  /// 32 bytes of type and creator codes, flags, and positions.
+  ///
+  /// The corresponding C constant is `XATTR_FINDERINFO_NAME`.
+  @_alwaysEmitIntoClient
+  public static var finderInfo: String { _XATTR_FINDERINFO_NAME }
+
+  /// The attribute that holds a file's resource fork.
+  ///
+  /// The corresponding C constant is `XATTR_RESOURCEFORK_NAME`.
+  @_alwaysEmitIntoClient
+  public static var resourceFork: String { _XATTR_RESOURCEFORK_NAME }
+}
+#endif
+
 #if os(Linux) || os(Android)
 @available(System 199, *)
 extension Errno {
