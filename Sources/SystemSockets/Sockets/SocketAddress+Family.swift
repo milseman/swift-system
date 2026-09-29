@@ -83,7 +83,7 @@ extension SocketAddress {
 
     /// Raw network device address family.
     ///
-    /// The corresponding C constant is `AF_NDRV`
+    /// The corresponding C constant is `AF_NDRV`.
     @_alwaysEmitIntoClient
     public static var networkDevice: Family { Family(CInterop.SAFamily(AF_NDRV)) }
     #endif

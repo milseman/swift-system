@@ -283,7 +283,8 @@ extension FileDescriptor {
   /// - Returns: The number of entries whose returned events aren't empty,
   ///   which is zero if the timeout expired.
   ///
-  /// The corresponding C function is `poll`.
+  /// The corresponding C function is `poll`,
+  /// and the corresponding C type is `nfds_t`, for the count of entries.
   @available(System 199, *)
   @available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *)
   @_alwaysEmitIntoClient

@@ -102,6 +102,25 @@ private struct SocketIPMessagesTests {
     #expect(all.map { $0.withUnsafeBytes { $0.loadUnaligned(as: CInt.self) } } == [1, 2])
   }
 
+  @available(System 199, *)
+  @Test func explicitCongestionNotificationCodepoints() {
+    typealias ECN = SocketDescriptor.ExplicitCongestionNotification
+    #expect([ECN.notCapableTransport, .capableTransport1, .capableTransport0, .congestionExperienced]
+      .map(\.rawValue) == [0, 1, 2, 3])
+    #if SYSTEM_PACKAGE_DARWIN
+    #expect(ECN.notCapableTransport.rawValue == UInt8(IPTOS_ECN_NOTECT))
+    #expect(ECN.capableTransport1.rawValue == UInt8(IPTOS_ECN_ECT1))
+    #expect(ECN.capableTransport0.rawValue == UInt8(IPTOS_ECN_ECT0))
+    #expect(ECN.congestionExperienced.rawValue == UInt8(IPTOS_ECN_CE))
+    #expect(IPTOS_ECN_MASK == 0b11)
+    #endif
+    // The codepoint is the low 2 bits; the differentiated services field
+    // is the rest.
+    #expect(ECN(typeOfService: 0xb8 | 0b11) == .congestionExperienced)
+    #expect(ECN(typeOfService: 0xb8) == .notCapableTransport)
+    #expect(ECN(typeOfService: 0x02) == .capableTransport0)
+  }
+
   /// Receives one datagram and its ancillary messages.
   @available(System 199, *)
   @available(macOS 15, iOS 18, watchOS 11, tvOS 18, visionOS 2, *)
