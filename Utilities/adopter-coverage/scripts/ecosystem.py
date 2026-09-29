@@ -227,6 +227,67 @@ def latest_run(survey_path, results):
 
 
 TOP = 30
+# How many of the interfaces that Darwin-importing files use, per symbol, the
+# report lists; the JSON has them all.
+DARWIN_TOP = 60
+# Categories whose names come from modules other than Darwin's, which files
+# see through a re-export (Foundation's of Dispatch and ObjectiveC).
+NOT_DARWIN_CATEGORIES = {"dispatch", "Apple frameworks"}
+
+
+def darwin_queue(run, results):
+    """What the library files that import Darwin still need from it: every
+    interface that the files importing Darwin in any form but through Apple
+    Foundation's re-export use (the Darwin metric's interfacesByClass, in each
+    package's interfaces.json.gz), with System's coverage of it on Darwin, per
+    symbol: covered where the derivation's evidence for it is a doc sentence
+    (a `same.` name counts as its target), or where the entry's hand status
+    says covered. Answered by the standard library: an entry that's missing
+    with a `swift` answer. The packages' own C shims, and names from other
+    modules (NOT_DARWIN_CATEGORIES), are set apart."""
+    import gzip
+    rows = {}
+    for p in run["packages"]:
+        if not p.get("result"):
+            continue
+        d = os.path.join(results, p["result"])
+        cov = json.load(open(os.path.join(d, "coverage.json")))
+        ints = json.load(gzip.open(os.path.join(d, "interfaces.json.gz")))
+        shims = {i["name"] for i in ints["interfaces"] if i.get("shim")}
+        owner = {s_: e for e in cov["entries"] for s_ in e["symbols"]}
+        for cls, used in (ints["darwin"].get("interfacesByClass") or {}).items():
+            if cls == "Foundation":
+                continue
+            for it in used:
+                name = it["name"]
+                e = owner.get(name)
+                if e is None or e["status"] == "ignore":
+                    continue
+                ev = (((e.get("derived") or {}).get("Darwin") or {}).get("evidence") or {}).get(name) or [None]
+                hand = e.get("hand")
+                if hand == "covered" or (hand is None and ev[0] == "doc"):
+                    status = "covered"
+                elif hand in ("partial", "missing"):
+                    status = hand
+                else:
+                    status = "missing"
+                if name in shims:
+                    kind = "shim"
+                elif e["category"] in NOT_DARWIN_CATEGORIES:
+                    kind = "other module"
+                elif status == "missing" and e.get("swift"):
+                    kind = "standard library"
+                else:
+                    kind = "gap" if status != "covered" else "covered"
+                r = rows.setdefault(name, {"name": name, "entry": e["id"], "category": e["category"],
+                                           "status": status, "kind": kind, "packages": {}, "files": {}})
+                r["packages"][p["name"]] = r["packages"].get(p["name"], 0) + it["sites"]
+                r["files"].setdefault(p["name"], set()).update(it["files"])
+    out = sorted(rows.values(), key=lambda r: (-len(r["packages"]), -sum(r["packages"].values()), r["name"]))
+    for r in out:
+        r["files"] = {k: sorted(v) for k, v in r["files"].items()}
+        r["sites"] = sum(r["packages"].values())
+    return out
 
 
 def report(run_dir, results, survey_path, mapping, swiftshims_path, out_path):
@@ -358,6 +419,25 @@ def report(run_dir, results, survey_path, mapping, swiftshims_path, out_path):
           f"{len(g['adopters'])} | {g['allSites']} | {' '.join(A[p] for p in plats)} | "
           + ", ".join(sorted(g["adopters"])) + " |")
     w("")
+    queue = darwin_queue(run, results)
+    kinds = collections.Counter(r["kind"] for r in queue)
+    gaps_d = [r for r in queue if r["kind"] == "gap"]
+    w("## What the files that import Darwin still need")
+    w("")
+    w(f"The interfaces that library files importing Darwin use (in any form but through Apple Foundation's "
+      f"re-export; the Darwin metric's per-file classes), one row per symbol, and System's coverage of each on "
+      f"Darwin: **{len(queue)}** interfaces, {kinds['covered']} covered, **{len(gaps_d)}** gaps; set apart: "
+      f"{kinds['standard library']} the standard library answers (a `swift` answer in mapping.ini), "
+      f"{kinds['other module']} from other modules (Dispatch, ObjectiveC), {kinds['shim']} the packages' own C "
+      f"shims. Ranked by packages, then sites; the JSON next to this report has every row. This is the list "
+      f"a package's `import Darwin` waits on, whatever other platforms need.")
+    w("")
+    w("| # | Interface | Entry | Status | Packages | Sites | Packages that use it |")
+    w("|---|---|---|---|---|---|---|")
+    for i, r in enumerate(gaps_d[:DARWIN_TOP], 1):
+        w(f"| {i} | `{r['name']}` | {r['entry']} | {r['status']} | {len(r['packages'])} | {r['sites']} | "
+          + ", ".join(sorted(r["packages"])) + " |")
+    w("")
     per_lane = collections.defaultdict(list)
     for g in ranked:
         per_lane[g["lane"]].append(g)
@@ -374,7 +454,7 @@ def report(run_dir, results, survey_path, mapping, swiftshims_path, out_path):
       + ", ".join(f"{c} {n}" for c, n in collections.Counter(g["category"] for g in oos).most_common()) + ".")
     w("")
     open(out_path, "w").write("\n".join(out) + "\n")
-    json.dump({"run": run, "ranked": ranked, "outOfScope": oos, "totals": dict(totals),
+    json.dump({"run": run, "ranked": ranked, "outOfScope": oos, "totals": dict(totals), "darwinQueue": queue,
                "perLane": {k: [g["id"] for g in v] for k, v in per_lane.items()}},
               open(os.path.splitext(out_path)[0] + ".json", "w"), indent=1)
     print(f"ecosystem: {totals['packages']} packages, {len(ranked)} gaps in scope -> {out_path}")
