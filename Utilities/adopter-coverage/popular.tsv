@@ -3,8 +3,8 @@
 # they're built on. One per line: name, GitHub repository, ref (a tag or
 # branch), and why it's here. The survey audits those whose library code
 # imports Darwin. The first batch runs to swift-java; the second, from
-# RediStack, came when the first's queue ran out (Prototype/Status/REPORT.md,
-# sections 37 and 39).
+# RediStack, and the third, from swift-distributed-actors, came when the
+# batch before ran out (Prototype/Status/REPORT.md, sections 37 and 39).
 name	remote	ref	why
 async-http-client	swift-server/async-http-client	main	the swift-server HTTP client
 swift-service-lifecycle	swift-server/swift-service-lifecycle	main	swift-server's service lifecycle, signal handling
@@ -52,3 +52,19 @@ swift-openapi-async-http-client	swift-server/swift-openapi-async-http-client	mai
 swift-webauthn	swift-server/swift-webauthn	main	WebAuthn
 swift-container-plugin	apple/swift-container-plugin	main	container images from SwiftPM
 swift-websocket	hummingbird-project/swift-websocket	main	Hummingbird's WebSockets
+swift-distributed-actors	apple/swift-distributed-actors	main	the cluster actor system
+swift-cluster-membership	apple/swift-cluster-membership	main	SWIM cluster membership
+swift-service-context	apple/swift-service-context	main	the tracing API's context propagation
+swift-homomorphic-encryption	apple/swift-homomorphic-encryption	main	homomorphic encryption for servers
+pkl-swift	apple/pkl-swift	main	Pkl configuration bindings
+swift-http-server	swift-server/swift-http-server	main	swift-server's HTTP server
+swift-aws-lambda-events	swift-server/swift-aws-lambda-events	main	the Lambda runtime's event types
+swift-openapi-lambda	swift-server/swift-openapi-lambda	main	OpenAPI's Lambda transport
+swift-openapi-urlsession	apple/swift-openapi-urlsession	main	OpenAPI's URLSession transport
+postgres-kit	vapor/postgres-kit	main	Vapor's PostgreSQL driver
+redis	vapor/redis	main	Vapor's Redis
+queues	vapor/queues	main	Vapor's job queues
+hummingbird-auth	hummingbird-project/hummingbird-auth	main	Hummingbird's authentication
+swift-jobs	hummingbird-project/swift-jobs	main	Hummingbird's job queues
+swift-docc-plugin	swiftlang/swift-docc-plugin	main	swiftlang's DocC plugin
+swift-evolution-metadata-extractor	swiftlang/swift-evolution-metadata-extractor	main	swiftlang's evolution metadata tool
