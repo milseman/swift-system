@@ -18,6 +18,8 @@ import json
 import os
 import re
 
+import reach
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 PLATFORMS = ["Darwin", "Linux", "Musl", "Android", "FreeBSD", "OpenBSD", "WASI", "Windows"]
 SHORT = {"Darwin": "D", "Linux": "L", "Musl": "M", "Android": "A", "FreeBSD": "F", "OpenBSD": "O", "WASI": "W",
@@ -94,6 +96,91 @@ def compare(prev, cur):
     return added, removed, rows, matched
 
 
+def reach_section(w, adopters, cands, units, md):
+    """## Adopter reach: the packages, the carve-outs by reach, and each
+    package's carve-outs."""
+    am = adopters["meta"]
+    branch = am["branch"]
+    pk = adopters["packages"]
+    w("## Adopter reach")
+    w("")
+    w(f"Which packages use each carve-out's declarations on their `{branch}` branch (*using*), and which call "
+      "C interfaces it newly wraps (*would benefit*). A carve-out's reach is the number of packages that do "
+      "either. Adopted sites are the migration's uses, precise where the compiler's index of a build of the "
+      "branch against this head resolved them and lexical elsewhere; would-benefit sites are the coverage "
+      "tools' extraction of each package joined with the C names in the declarations' doc comments, less the "
+      "names the base commit already covers. Each carve-out's bundle lists its sites and quotes the hunks "
+      "that introduced them.")
+    w("")
+    w("To rank or filter by reach, run `Utilities/api-graph/scripts/reach.py` on this output: `--package "
+      "swift-nio`, `--min 3`, `--kind part`, `--sort using|benefit|sites|rank`, `--json`.")
+    w("")
+    w("### The packages")
+    w("")
+    w(f"Found in `{am['adopters']}` and `{am['ecosystem']}`; a clone of a new package in either is picked up "
+      "by the next run.")
+    w("")
+    w(f"| Package | `{branch}` | Resolution | Adopted sites | Carve-outs using | Interface data | "
+      "Would-benefit sites | Carve-outs it would benefit from |")
+    w("|---|---|---|---:|---:|---|---:|---:|")
+    for p in pk:
+        ad, be = p["adopted"], p["benefit"]
+        using = [x for x in cands if p["key"] in x["adopters"]["using"]]
+        benefiting = [x for x in cands if p["key"] in x["adopters"]["benefiting"]]
+        if ad:
+            b = ad["build"] or {}
+            mig = f"`{ad['commit'][:10]}`, {ad['commits']} commit{'s' if ad['commits'] != 1 else ''}"
+            res = {"index": "index", "partial index": "partial index", "lexical": "lexical"}[ad["resolution"]]
+            if b.get("status") not in ("indexed",) and b.get("reason"):
+                res += f" ({md(b['reason'][:90])})"
+            sites = f"{ad['sites']['precise'] + ad['sites']['lexical']} ({ad['sites']['precise']} precise)"
+        else:
+            mig = (p.get("adoptersClone") or {}).get("note", "—")
+            res, sites = "—", "—"
+        if be:
+            dat = (f"{be['role']} `{be['commit'][:10]}`: "
+                   + ("coverage extraction" + (" (lexical)" if be["extraction"] == "lexical" else "")
+                      if be["source"] == "coverage" else "lexical scan"))
+            bsites = str(be["sites"])
+        else:
+            dat, bsites = "—", "—"
+        w(f"| `{p['name']}` | {mig} | {res} | {sites} | {len(using)} | {dat} | {bsites} | {len(benefiting)} |")
+    w("")
+    order = sorted(cands, key=reach.order_key("reach"))
+    shown = [x for x in order if x["adopters"]["reach"]][:25]
+    w(f"### Carve-outs by reach")
+    w("")
+    w(f"The {len(shown)} with the widest reach; `reach.py` lists all of them. Pitch rank is the order above.")
+    w("")
+    w("| | Carve-out | Kind | Pitch rank | Decls | Reach | Using | Would benefit | Sites (adopted / would benefit) |")
+    w("|---:|---|---|---:|---:|---:|---|---|---|")
+    for k, x in enumerate(shown, 1):
+        r = x["adopters"]
+        w(f"| {k} | [`{x['id']}`](bundles/{x['id']}/bundle.md) | {x['kind']} | {x['rank']} | {x['declarations']} | "
+          f"{r['reach']} | {', '.join(r['using']) or '—'} | {', '.join(r['benefiting']) or '—'} | "
+          f"{r['adoptedSites']} / {r['benefitSites']} |")
+    w("")
+    w("### By package")
+    w("")
+    for p in pk:
+        using = sorted((x for x in cands if p["key"] in x["adopters"]["using"]),
+                       key=lambda x: -x["adopters"]["byPackage"][p["key"]]["adopted"])
+        ben = sorted((x for x in cands if p["key"] in x["adopters"]["benefiting"]),
+                     key=lambda x: -x["adopters"]["byPackage"][p["key"]]["benefit"])
+        if not using and not ben:
+            continue
+        w(f"- **`{p['name']}`**"
+          + (f" uses {len(using)}: " + ", ".join(f"`{x['id']}` ({x['adopters']['byPackage'][p['key']]['adopted']})"
+                                                for x in using[:12]) + (", …" if len(using) > 12 else "")
+             if using else "")
+          + ("; it " if using and ben else " ")
+          + (f"would benefit from {len(ben)}: " + ", ".join(
+              f"`{x['id']}` ({x['adopters']['byPackage'][p['key']]['benefit']})" for x in ben[:8])
+             + (", …" if len(ben) > 8 else "") if ben else "")
+          + ".")
+    w("")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--graph", required=True)
@@ -101,6 +188,7 @@ def main():
     ap.add_argument("--meta", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--previous")
+    ap.add_argument("--adopters", help="adopters.json, from adopters.py")
     a = ap.parse_args()
 
     g = load(a.graph)
@@ -118,7 +206,19 @@ def main():
         units[b["id"]] = b
     cands = cl["candidates"]
 
+    adopters = load(a.adopters) if a.adopters and os.path.exists(a.adopters) else None
+    if adopters:
+        # Every unit's reach, kept in api-graph.json for reach.py.
+        for u in list(units.values()) + [x for c in clusters for x in c["parts"]]:
+            if "adopters" not in u:
+                u["adopters"] = reach.summary(reach.aggregate(
+                    adopters, [n for n in u["nodes"] if nodes[n]["hiddenClass"] != "unavailable"]))
+        for x in cands:
+            x["adopters"] = units[x["id"]]["adopters"]
     doc = dict(cl, meta=meta)
+    if adopters:
+        doc["adopterPackages"] = [{k: v for k, v in p.items()} for p in adopters["packages"]]
+        doc["adopterMeta"] = adopters["meta"]
     json.dump(doc, open(os.path.join(a.out, "api-graph.json"), "w"), indent=1)
 
     L = []
@@ -178,6 +278,18 @@ def main():
     w("- **Off Darwin**: " + ", ".join(f"{v} cluster{'s' if v != 1 else ''} {k}" for k, v in verified.most_common())
       + ". Nothing in this checkout builds for Linux, Windows or WASI, so a platform a declaration's `#if` "
       "allows is only claimed unless `evidence.json` records a check.")
+    if adopters:
+        am = adopters["meta"]
+        mig = [p for p in adopters["packages"] if p["adopted"]]
+        dat = [p for p in adopters["packages"] if p["benefit"]]
+        used = [x for x in cands if x["adopters"]["using"]]
+        ben = [x for x in cands if x["adopters"]["benefiting"]]
+        n_used = len({s["node"] for s in adopters["adoptedSites"] if not s["qualifier"]})
+        w(f"- **Adopters**: {len(mig)} packages have a migration on `{am['branch']}`, and together use "
+          f"{n_used} of the new declarations, in {len(used)} of the {len(cands)} carve-outs; "
+          f"{sum(1 for p in mig if p['adopted']['resolution'] == 'index')} of them were resolved by the index of "
+          f"a build against this head. {len(dat)} packages have C interface data, and {len(ben)} carve-outs wrap "
+          "C interfaces that some of them call. See [Adopter reach](#adopter-reach).")
     w("")
 
     # ------------------------------------------------------------ pitch order
@@ -193,12 +305,19 @@ def main():
     w("")
     for x in cands[:TOP]:
         u = units[x["id"]]
-        w(f"{x['rank']}. **`{x['id']}`** — {md(u['name'])} ({x['kind']}, score {x['score']}). {md(x['reason'])}.")
+        extra = ""
+        if adopters:
+            r = x["adopters"]
+            extra = (f" Adopters: {len(r['using'])} using it" + (f" ({', '.join(r['using'])})" if r["using"] else "")
+                     + f", {len(r['benefiting'])} would benefit.")
+        w(f"{x['rank']}. **`{x['id']}`** — {md(u['name'])} ({x['kind']}, score {x['score']}). {md(x['reason'])}."
+          + extra)
     w("")
     w("### All of them")
     w("")
-    w("| # | Carve-out | Kind | Decls | Open questions | Needs | Platforms | Score |")
-    w("|---:|---|---|---:|---|---|---|---:|")
+    acol = " Adopters |" if adopters else ""
+    w("| # | Carve-out | Kind | Decls | Open questions | Needs | Platforms |" + acol + " Score |")
+    w("|---:|---|---|---:|---|---|---|" + ("---:|" if adopters else "") + "---:|")
     for x in cands:
         u = units[x["id"]]
         opens = [conts[k]["title"] for k in u["direct"]] + [
@@ -207,10 +326,14 @@ def main():
         needs = list(u["allPrerequisites"]) + [k + " (impl.)" for k in u.get("implPrerequisites", {})]
         w(f"| {x['rank']} | [`{x['id']}`](bundles/{x['id']}/bundle.md) | {x['kind']} | {x['declarations']} | "
           f"{md(', '.join(opens)) or '—'} | {md(', '.join(needs)) or '—'} | {plat(u['metrics']['platforms'])} | "
-          f"{x['score']} |")
+          + (f"{reach.cell(x['adopters'])} | " if adopters else "") + f"{x['score']} |")
     w("")
-    w("Platforms: " + ", ".join(f"{v} {k}" for k, v in SHORT.items()) + ".")
+    w("Platforms: " + ", ".join(f"{v} {k}" for k, v in SHORT.items()) + "."
+      + (" Adopters: packages using the carve-out on their migration branch / packages that would benefit "
+         "(see [Adopter reach](#adopter-reach))." if adopters else ""))
     w("")
+    if adopters:
+        reach_section(w, adopters, cands, units, md)
 
     # ------------------------------------------------------------ clusters
     w("## Clusters")
@@ -219,8 +342,9 @@ def main():
       "commit are vocabulary, and so are new types promoted to it; an edge into a promoted type becomes a "
       "prerequisite instead. Sizes count declarations, not fix-it stubs.")
     w("")
-    w("| Cluster | Decls | Types | Stubs | Parts | Files | Platforms | Off Darwin | Docs | Tests | Open (direct) | Inherited | Needs |")
-    w("|---|---:|---:|---:|---:|---:|---|---|---:|---:|---|---|---|")
+    w("| Cluster | Decls | Types | Stubs | Parts | Files | Platforms | Off Darwin | Docs | Tests | Open (direct) | "
+      "Inherited | Needs |" + (" Adopters |" if adopters else ""))
+    w("|---|---:|---:|---:|---:|---:|---|---|---:|---:|---|---|---|" + ("---:|" if adopters else ""))
     for c in sorted(clusters, key=lambda c: -c["metrics"]["declarations"]):
         m = c["metrics"]
         off = ("—" if m["platforms"] == ["Darwin"] else "not compiled here" if not m["darwin"] else
@@ -232,7 +356,8 @@ def main():
           f"{len(c['parts'])} | {len(m['files'])} | {plat(m['platforms'])} | {off} | "
           f"{round(100 * m['documented'] / max(1, m['declarations']))}% | "
           f"{round(100 * m['tested'] / max(1, m['declarations']))}% | "
-          f"{md(', '.join(conts[k]['title'] for k in c['direct'])) or '—'} | {md(inh) or '—'} | {md(needs) or '—'} |")
+          f"{md(', '.join(conts[k]['title'] for k in c['direct'])) or '—'} | {md(inh) or '—'} | {md(needs) or '—'} |"
+          + (f" {reach.cell(c['adopters'])} |" if adopters else ""))
     w("")
     multi = [c for c in clusters if c["parts"]]
     if multi:

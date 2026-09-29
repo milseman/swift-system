@@ -30,10 +30,16 @@ import os
 import re
 import subprocess
 
+import reach
+
 PLATFORMS = ["Darwin", "Linux", "Musl", "Android", "FreeBSD", "OpenBSD", "WASI", "Windows"]
 MAX_TESTS_MD = 60          # test functions quoted in tests.md
 MAX_COMMITS_FULL = 6       # commit messages quoted in full
 MAX_SAMPLES_MD = 8         # samples quoted in samples.md
+MAX_ADOPTED_MD = 30        # adopted sites listed per package in bundle.md (adopters.md has all)
+MAX_HUNKS_MD = 6           # hunks quoted per package in bundle.md
+MAX_HUNK_LINES = 40        # a longer hunk is quoted around its sites
+MAX_BENEFIT_MD = 30        # would-benefit sites listed per package in bundle.md
 
 
 def load(p):
@@ -92,6 +98,194 @@ def merge_ranges(ranges):
     return out
 
 
+def cell(s):
+    """Code in a table cell: backticks and pipes can't appear inside."""
+    return "`" + s.replace("`", "'").replace("|", "\\|") + "`"
+
+
+def hunk_excerpt(h, site_lines, context=5, limit=MAX_HUNK_LINES):
+    """A hunk's lines, header first; a long one only within `context` lines
+    of its sites, with the rest elided."""
+    lines = h["lines"]
+    if len(lines) <= limit:
+        return [h["header"]] + lines
+    nums, n = [], h["newStart"]
+    for line in lines:
+        nums.append(n)
+        if not line.startswith("-"):
+            n += 1
+    keep = [i for i, num in enumerate(nums) if any(abs(num - x) <= context for x in site_lines)]
+    out, last = [h["header"]], -1
+    for i in keep:
+        if i != last + 1:
+            out.append(f"… ({i - last - 1} lines)")
+        out.append(lines[i])
+        last = i
+    if last != len(lines) - 1:
+        out.append(f"… ({len(lines) - 1 - last} lines)")
+    return out
+
+
+def adopters_data(agg, adopters, nodes, nids):
+    """The bundle.json form of a carve-out's adopters."""
+    info = {p["key"]: p for p in adopters["packages"]}
+    names = {"joined": set(), "baseCovered": set(), "restricted": set()}
+    for nid in nids:
+        cn = adopters["cNames"].get(nid) or {}
+        names["joined"] |= set(cn.get("names", []))
+        names["baseCovered"] |= set(cn.get("baseCovered", []))
+        names["restricted"] |= set(cn.get("restricted", []))
+    pkgs = []
+    for key, v in agg["packages"].items():
+        p = info.get(key, {"key": key, "name": key})
+        rec = {"key": key, "name": p["name"], "remote": p.get("remote")}
+        if v["adopted"] or v["qualifiers"]:
+            ad = p.get("adopted") or {}
+            hids = list(dict.fromkeys(s["hunk"] for s in v["adopted"] if s["hunk"]))
+            rec["adopted"] = {
+                "branch": ad.get("branch"), "commit": ad.get("commit"), "subject": ad.get("subject"),
+                "base": ad.get("base"), "mainRef": ad.get("mainRef"), "resolution": ad.get("resolution"),
+                "build": (ad.get("build") or {}).get("status"),
+                "declarationsUsed": sorted(nodes[x]["path"] for x in v["declarationsUsed"]),
+                "qualifiers": v["qualifiers"],
+                "sites": [dict(s, declaration=nodes[s["node"]]["path"]) for s in v["adopted"]],
+                "hunks": [dict(adopters["hunks"][h], id=h) for h in hids],
+            }
+        if v["benefit"]:
+            b = p.get("benefit") or {}
+            rec["benefit"] = {
+                "commit": b.get("commit"), "subject": b.get("subject"), "role": b.get("role"),
+                "source": b.get("source"), "extraction": b.get("extraction"), "result": b.get("result"),
+                "interfaces": dict(v["interfaces"].most_common()),
+                "sites": [dict(s, declarations=sorted(nodes[x]["path"] for x in s["nodes"] if x in set(nids)))
+                          for s in v["benefit"]],
+            }
+        pkgs.append(rec)
+    return {"reach": agg["reach"], "using": agg["using"], "benefiting": agg["benefiting"],
+            "cNames": {k: sorted(v) for k, v in names.items()}, "packages": pkgs}
+
+
+def adopters_md(w, data, adopters, full=False):
+    """The Adopters section of bundle.md, or (full) all of adopters.md."""
+    meta = adopters["meta"]
+    branch = meta["branch"]
+    info = {p["key"]: p for p in adopters["packages"]}
+    n_migrated = sum(1 for p in adopters["packages"] if p["adopted"])
+    n_data = sum(1 for p in adopters["packages"] if p["benefit"])
+    pk = data["packages"]
+    w(f"{len(data['using'])} of the {n_migrated} packages migrated on `{branch}` use this carve-out's "
+      f"declarations, and {len(data['benefiting'])} of the {n_data} packages with C interface data call C "
+      "interfaces it newly wraps."
+      + ("" if full else " `adopters.md` lists every site and quotes every hunk."))
+    w("")
+    cn = data["cNames"]
+    if cn["joined"] or cn["baseCovered"] or cn["restricted"]:
+        w("C names its doc comments give, joined with the packages' C interfaces: "
+          + (", ".join(f"`{x}`" for x in cn["joined"][:30]) or "none")
+          + (f", and {len(cn['joined']) - 30} more" if len(cn["joined"]) > 30 else "") + "."
+          + (" Left out because the base commit already covers them: "
+             + ", ".join(f"`{x}`" for x in cn["baseCovered"][:20]) + "." if cn["baseCovered"] else "")
+          + (" Left out because the declaration covers only one use of them: "
+             + ", ".join(f"`{x}`" for x in cn["restricted"][:20]) + "." if cn["restricted"] else ""))
+    else:
+        w("Its doc comments give no C names, so no package's C interfaces can be joined with it.")
+    w("")
+    if not pk:
+        return
+    w(f"| Package | Uses on `{branch}` | Declarations used | Would benefit | C interfaces |")
+    w("|---|---:|---:|---:|---|")
+    for p in pk:
+        ad, be = p.get("adopted"), p.get("benefit")
+        uses = "—"
+        if ad and ad["sites"]:
+            prec = sum(1 for s in ad["sites"] if s["resolution"] == "precise")
+            uses = f"{len(ad['sites'])} ({prec} precise)"
+        elif ad:
+            uses = f"qualifier only ({ad['qualifiers']})"
+        ben = "—"
+        itf = "—"
+        if be:
+            prec = sum(1 for s in be["sites"] if s["resolution"] == "precise")
+            ben = f"{len(be['sites'])} ({prec} precise)"
+            itf = ", ".join(f"`{k}` ×{v}" for k, v in list(be["interfaces"].items())[:5]) + (
+                f", +{len(be['interfaces']) - 5}" if len(be["interfaces"]) > 5 else "")
+        w(f"| `{p['name']}` | {uses} | {len(ad['declarationsUsed']) if ad else 0} | {ben} | {itf} |")
+    w("")
+    for p in pk:
+        ad, be = p.get("adopted"), p.get("benefit")
+        w(f"{'###' if not full else '##'} `{p['name']}`")
+        w("")
+        if ad and ad["sites"]:
+            pinfo = info.get(p["key"], {}).get("adopted") or {}
+            how = {"index": "the index of a build against this head commit",
+                   "partial index": "the index of a build against this head commit that failed partway "
+                                    f"({(pinfo.get('build') or {}).get('reason') or ''}); lexical where it has no record",
+                   "lexical": "lexical matching: the build didn't run or failed "
+                              f"({(pinfo.get('build') or {}).get('reason') or ''})"}.get(ad["resolution"], ad["resolution"])
+            w(f"**Adopted** on `{ad['branch']}` @ `{(ad['commit'] or '')[:10]}` ({pinfo.get('commits', '?')} "
+              f"commit{'s' if pinfo.get('commits') != 1 else ''} past `{ad['mainRef']}` @ `{(ad['base'] or '')[:10]}`): "
+              f"{len(ad['sites'])} sites using {len(ad['declarationsUsed'])} declarations, resolved by {how}"
+              + (f"; {ad['qualifiers']} more only name a type to qualify a nested one" if ad["qualifiers"] else "")
+              + ".")
+            w("")
+            limit = None if full else MAX_ADOPTED_MD
+            w("| Site | Declaration | | Code |")
+            w("|---|---|---|---|")
+            for s in ad["sites"][:limit]:
+                flag = s["resolution"] + ("" if s["introduced"] else ", line not added by the migration")
+                w(f"| `{s['file']}:{s['line']}` | {cell(s['declaration'])} | {flag} | {cell(s['text'][:120])} |")
+            if limit and len(ad["sites"]) > limit:
+                w(f"| … and {len(ad['sites']) - limit} more | | | |")
+            w("")
+            hunks = ad["hunks"] if full else ad["hunks"][:MAX_HUNKS_MD]
+            if hunks:
+                w("The hunks of the migration that introduced them"
+                  + ("" if full or len(ad["hunks"]) <= MAX_HUNKS_MD else
+                     f" (the first {MAX_HUNKS_MD} of {len(ad['hunks'])})") + ":")
+                w("")
+                for h in hunks:
+                    lines_here = sorted({s["line"] for s in ad["sites"] if s["hunk"] == h["id"]})
+                    w(f"`{h['file']}`, sites at line{'s' if len(lines_here) != 1 else ''} "
+                      + ", ".join(map(str, lines_here)) + ":")
+                    w("")
+                    w("```diff")
+                    for line in (h["lines"] and ([h["header"]] + h["lines"]) if full else
+                                 hunk_excerpt(h, lines_here)):
+                        w(line)
+                    w("```")
+                    w("")
+        elif ad:
+            w(f"**Adopted** on `{ad['branch']}` only by name: {ad['qualifiers']} sites name one of its types to "
+              "qualify a nested type from another carve-out.")
+            w("")
+        if be:
+            src = {"coverage": f"the coverage tools' extraction ({be['extraction']})",
+                   "lexical": "a lexical scan of its library sources, since the coverage store has no extraction "
+                              "of this commit"}.get(be["source"], be["source"])
+            w(f"**Would benefit**: at `{(be['commit'] or '')[:10]}` ({be['role']}"
+              + (f", \"{be['subject']}\"" if be.get("subject") else "") + f"), from {src}: "
+              f"{len(be['sites'])} sites of {len(be['interfaces'])} C interfaces.")
+            w("")
+            mapped = any("onBranch" in s for s in be["sites"])
+            limit = None if full else MAX_BENEFIT_MD
+            w("| Site | C interface | Declarations | |" + (f" On `{branch}` |" if mapped else ""))
+            w("|---|---|---|---|" + ("---|" if mapped else ""))
+            for s in be["sites"][:limit]:
+                decls = ", ".join(cell(x) for x in s["declarations"][:3]) + (
+                    f" +{len(s['declarations']) - 3}" if len(s["declarations"]) > 3 else "")
+                itf = f"`{s['interface']}`" + (f" (wraps {', '.join('`' + v + '`' for v in s['via'])})"
+                                               if s.get("via") else "")
+                row = f"| `{s['file']}:{s['line']}` | {itf} | {decls} | {s['resolution']} |"
+                if mapped:
+                    ob = s.get("onBranch", "?")
+                    row += (" changed by the migration |" if ob is None else
+                            f" line {ob['line']}, unchanged |" if isinstance(ob, dict) else " ? |")
+                w(row)
+            if limit and len(be["sites"]) > limit:
+                w(f"| … and {len(be['sites']) - limit} more | | | |" + (" |" if mapped else ""))
+            w("")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--graph", required=True)
@@ -101,6 +295,7 @@ def main():
     ap.add_argument("--base", required=True)
     ap.add_argument("--head", required=True)
     ap.add_argument("--drafts")
+    ap.add_argument("--adopters", help="adopters.json, from adopters.py")
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
 
@@ -109,6 +304,7 @@ def main():
     nodes, atoms, tests, samples = g["nodes"], g["atoms"], g["tests"], g["samples"]
     conts = {c["id"]: c for c in cl["contingencies"]}
     src = Source(a.root)
+    adopters = json.load(open(a.adopters)) if a.adopters and os.path.exists(a.adopters) else None
     os.makedirs(a.out, exist_ok=True)
 
     units = {}
@@ -280,6 +476,9 @@ def main():
             "vocabulary": u.get("vocabulary", {}),
             "houseFormat": house,
         }
+        if adopters:
+            agg = reach.aggregate(adopters, [n for n in nids if nodes[n]["hiddenClass"] != "unavailable"])
+            data["adopters"] = adopters_data(agg, adopters, nodes, nids)
         json.dump(data, open(os.path.join(d, "bundle.json"), "w"), indent=1, default=sorted)
 
         # --------------------------------------------------------- bundle.md
@@ -312,6 +511,13 @@ def main():
           + (f" ({m['lexicallyTested']} matched by name, since they aren't compiled here)" if m["lexicallyTested"] else "")
           + f", by {len(m['tests'])} tests ({len(m['mockTests'])} mock) |")
         w(f"| Samples | {len(m['samples'])} |")
+        if adopters:
+            ad = data["adopters"]
+            w(f"| Adopters | {len(ad['using'])} using it on `{adopters['meta']['branch']}`"
+              + (f" ({', '.join(ad['using'])})" if ad["using"] else "")
+              + f"; {len(ad['benefiting'])} would benefit"
+              + (f" ({', '.join(ad['benefiting'][:8])}{', …' if len(ad['benefiting']) > 8 else ''})"
+                 if ad["benefiting"] else "") + " |")
         w(f"| C API | {', '.join('`' + c + '`' for c in m['cNames'][:24]) or '—'} |")
         w("")
         if u.get("reason"):
@@ -508,6 +714,10 @@ def main():
             w(f"`samples.md` quotes the first {min(MAX_SAMPLES_MD, len(sample_recs))}.")
         w("")
 
+        if adopters:
+            w("## Adopters")
+            w("")
+            adopters_md(w, data["adopters"], adopters)
         w("## Prior text")
         w("")
         if prior:
@@ -565,6 +775,10 @@ def main():
             lines = src.lines(s["file"])
             P += [f"## `{s['file']}`", "", "```swift", "\n".join(lines).rstrip(), "```", ""]
         open(os.path.join(d, "samples.md"), "w").write("\n".join(P) + "\n")
+        if adopters:
+            D = [f"# Adopters: {u['name']}", ""]
+            adopters_md(D.append, data["adopters"], adopters, full=True)
+            open(os.path.join(d, "adopters.md"), "w").write("\n".join(D) + "\n")
         index.append({"id": uid, "kind": u["kind"], "name": u["name"], "rank": data["rank"],
                       "declarations": m["declarations"], "path": os.path.join(uid, "bundle.md")})
 
