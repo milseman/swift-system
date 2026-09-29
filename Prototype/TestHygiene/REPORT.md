@@ -84,10 +84,16 @@ A short guard fails a test on a busy machine even though nothing is wrong.
 
 ### 1f. Shared names and paths
 
-None collide today; kept as they are.
-
-- Temporary files: `withTemporaryFilePath` makes a unique directory under `$TMPDIR`; `CInteropAccessorsTests.swift:81` and `SocketSendFileTests.swift:39` use `/tmp` with the process ID or `mkstemp`.
-- POSIX shared memory and semaphores (`SharedMemoryTests.swift:33`) include the process ID. A crashed run leaves its names behind, which a later process with the same ID would trip over; low.
+- `IORingTests.swift:101` (Linux): every run shares `/tmp/IORingTests/test.txt`, which
+  `testOpenReadAndWriteFixedFile` leaves behind (its cleanup's `rmdir` fails on the
+  file). The next run reuses it, and fails if an earlier run was another user's,
+  such as root's in a container; `--parallel` runs the three tests at once on it.
+- POSIX shared memory and semaphores (`SharedMemoryTests.swift:33`) include the
+  process ID. A crashed run leaves its names behind, which a later process with the
+  same ID would trip over with an exclusive create.
+- Kept: temporary files from `withTemporaryFilePath`, a unique directory under
+  `$TMPDIR`; `CInteropAccessorsTests.swift:81` and `SocketSendFileTests.swift:39` use
+  `/tmp` with the process ID or `mkstemp`.
 - Sockets bind to port 0 or use socket pairs. No fixed port or socket path is bound.
 - `TerminalJobControlTests.swift:65` hands the controlling terminal's foreground group back and forth, which briefly affects the terminal's other jobs; it skips without a terminal, as under Claude Code.
 
@@ -137,7 +143,7 @@ not in `SystemControl`'s retry loop.
 
 ## 3. Fixes
 
-Commits `5b29c65`, `ac6bdd1`, `a83fffe`, and the one that adds `Tests/TESTING.md`.
+Commits `5b29c65`, `ac6bdd1`, `a83fffe`, `4da9cc1`, and the one that adds `abi-check.sh`.
 Each fix makes the outcome depend on an event, an invariant, or isolation instead of
 on timing. Where a check had to get weaker to be deterministic, the entry says so.
 
@@ -190,6 +196,13 @@ on timing. Where a check had to get weaker to be deterministic, the entry says s
   a short one; the io_uring test waits for the cancelled poll's completion instead of
   retrying 100 times; the TCP test waits for `bytesAcknowledged` to reach 1000.
 
+### 3c'. Shared names
+
+- `IORingTests`' file lives in a directory from `makeUniqueDirectory()` under the
+  temporary directory, and the cleanup removes both (Linux, not yet run).
+- `SharedMemoryTests` removes any object of its name before creating one; only a
+  dead process with the same ID can have made it.
+
 ### 3d. Hang guards
 
 `hangGuardSeconds` (300, in `HangGuard.swift` in both test targets) bounds every wait
@@ -227,6 +240,12 @@ The 4 skips are by design and don't depend on load: `dup3` and `pipe2` need Darw
 run by Claude Code don't have.
 
 The lane close block no longer needs `--skip testVolumeAttributes`.
+
+`Prototype/TestHygiene/abi-check.sh` type-checks the test targets under
+`SYSTEM_ABI_STABLE` in a patched scratch copy (the recipe that SystemPackage's known
+failures make necessary). At `7b0875f` and at `4da9cc1`, SystemTests has the same 22
+errors and 31 warnings, and SystemSocketsTests stops at the same 8 errors in
+SystemSockets' sources: the fixes add no availability problems.
 
 ## 4. Rules
 

@@ -97,9 +97,14 @@ final class IORingTests: XCTestCase {
         XCTAssertEqual(completion.result, 0)
     }
 
+    /// Makes a directory of the test's own holding test.txt, which says
+    /// "Hello, World!", and returns the directory, open, and the file's path.
+    /// (A fixed path would be shared with every other run of these tests,
+    /// and with whatever an earlier run left there, perhaps as another user.)
     func makeHelloWorldFile() throws -> (dir: FileDescriptor, file: FilePath) {
-        mkdir("/tmp/IORingTests/", 0o777)
-        let path: FilePath = "/tmp/IORingTests/test.txt"
+        let directory = try FilePath.temporaryDirectory()
+            .appending("IORingTests.XXXXXX").makeUniqueDirectory()
+        let path = directory.appending("test.txt")
         let fd = try FileDescriptor.open(
             path, 
             .readWrite, 
@@ -108,14 +113,15 @@ final class IORingTests: XCTestCase {
         )
         try fd.writeAll("Hello, World!".utf8)
         try fd.close()
-        let parent = try FileDescriptor.open("/tmp/IORingTests/", .readOnly)
+        let parent = try FileDescriptor.open(directory, .readOnly)
 
         return (parent, path)
     }
 
-    func cleanUpHelloWorldFile(_ parent: FileDescriptor) throws {
+    func cleanUpHelloWorldFile(_ parent: FileDescriptor, _ file: FilePath) throws {
         try parent.close()
-        rmdir("/tmp/IORingTests/")
+        try? file.unlink()
+        try? file.removingLastComponent().removeDirectory()
     }
 
     func setupTestRing(depth: Int, fileSlots: Int, buffers: [UnsafeMutableRawBufferPointer]) throws -> IORing {
@@ -180,7 +186,7 @@ final class IORingTests: XCTestCase {
         XCTAssert(bytesRead == 13)
         let result2 = String(cString: rawBuffer.assumingMemoryBound(to: CChar.self).baseAddress!)
         XCTAssertEqual(result2, "Hello, World!")
-        try cleanUpHelloWorldFile(parent)
+        try cleanUpHelloWorldFile(parent, path)
         efdBuf.deallocate()
         rawBuffer.deallocate()
     }
@@ -192,11 +198,11 @@ final class IORingTests: XCTestCase {
     // between prepare and submit, then churn the heap to make UAFs observable.
     func testPathBufferLifetimeAcrossPrepareSubmit() throws {
         try XCTSkipIf(!uringEnabled, failureMessage)
-        let (parent, _) = try makeHelloWorldFile()
+        let (parent, file) = try makeHelloWorldFile()
         var ring = try IORing(queueDepth: 6)
 
         func enqueueOpen() {
-            let path: FilePath = "/tmp/IORingTests/test.txt"
+            let path = FilePath(file.string)
             let ok = ring.prepare(request: .open(path, in: parent, mode: .readOnly))
             XCTAssertTrue(ok)
         }
@@ -221,17 +227,17 @@ final class IORingTests: XCTestCase {
             let fd = FileDescriptor(rawValue: Int32(completion.result))
             try fd.close()
         }
-        try cleanUpHelloWorldFile(parent)
+        try cleanUpHelloWorldFile(parent, file)
     }
   
     func testPathBufferLifetimeAcrossLinkedRequests() throws {
         try XCTSkipIf(!uringEnabled, failureMessage)
-        let (parent, _) = try makeHelloWorldFile()
+        let (parent, file) = try makeHelloWorldFile()
         let rawBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 13, alignment: 16)
         var ring = try setupTestRing(depth: 6, fileSlots: 1, buffers: [rawBuffer])
 
         func enqueueLinkedReadback() {
-            let path: FilePath = "/tmp/IORingTests/test.txt"
+            let path = FilePath(file.string)
             let ok = ring.prepare(linkedRequests:
                 .open(path, in: parent, into: ring.registeredFileSlots[0], mode: .readOnly),
                 .read(ring.registeredFileSlots[0], into: ring.registeredBuffers[0]),
@@ -256,7 +262,7 @@ final class IORingTests: XCTestCase {
         let result = String(cString: rawBuffer.assumingMemoryBound(to: CChar.self).baseAddress!)
         XCTAssertEqual(result, "Hello, World!")
 
-        try cleanUpHelloWorldFile(parent)
+        try cleanUpHelloWorldFile(parent, file)
         rawBuffer.deallocate()
     }
 
