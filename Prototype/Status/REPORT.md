@@ -42,7 +42,7 @@ say; the standard library's answers (off_t, ssize_t, size_t and uintptr_t are In
 memset; round, sqrt, ceil, floor, fabs, modf); Dispatch and ObjectiveC names; the packages' own C shims
 (CNIODarwin_*, c_nio_posix_*, _subprocess_*).
 
-Done: step 0, what the tools couldn't see (section 25); clusters 1 (section 26), 2 (section 27), 3 and 7 (section 28).
+Done: step 0, what the tools couldn't see (section 25); clusters 1 (section 26), 2 (section 27), 3 and 7 (section 28); and Subprocess's new marker, C arrays for the C-values spawns (section 29). New SYSTEM-GAP markers in `../adopters` come first: status.sh lists them.
 
 ## 1. status.sh and STATUS.md (2026-09-28)
 
@@ -660,3 +660,26 @@ Tests: SocketIPMessagesTests' codepoints against the C constants and from type-o
 AF_VSOCK. XCTest 552 (4 skipped, and testVolumeAttributes skipped), swift-testing 468 in 74 suites, all passing with
 PThreadTests' `setCurrentQualityOfService` skipped: at a load average near 70 (other sessions' builds) it fails alone
 too, since its background-QoS thread doesn't run within 10 s (section 4 saw the same). It isn't this lane's.
+
+## 29. C arrays for the C-values and credentials spawns: `52d8c03`, `97d00c6`
+
+A new SYSTEM-GAP marker in swift-subprocess's migration (status.sh read it as *unread*): "C-string arguments for the
+C-values spawns". `ProcessID.spawn` with `cFileActions:` and `cAttributes:`, and with `credentials:`, took the
+arguments and the environment only as `[String]`, which can't carry bytes that aren't UTF-8, so Subprocess kept its
+own `_subprocess_spawn` for them. The plain spawn already had a C-array form.
+
+- `spawn(_:arguments:environment:cFileActions:cAttributes:)`,
+  `spawn(_:arguments:environment:fileActions:attributes:credentials:)` and
+  `spawn(_:arguments:environment:cFileActions:cAttributes:credentials:fileActionDescriptors:)`, each with a C-string
+  path and null-terminated C arrays of C strings (the environment `nil` for the calling process's), as the plain
+  spawn's C-array form takes. The internals convert `[String]` once and share one core per form, so the close
+  actions of section 24 apply to the new form with System's actions too.
+- Only path-given forms, as the plain spawn's: Subprocess resolves the executable itself. Rejected: `searchingPathFor:`
+  C-array forms, which no caller needs yet; a `[[UInt8]]` form, which would copy what callers already hold as C arrays.
+- The overloads made the existing doc links ambiguous; they now name the `FilePath` forms.
+- status.py (`97d00c6`): an `ANSWERED` entry for the marker's phrase.
+
+Tests: RawSpawnTests' `testSpawningWithCArrays` and SpawnCredentialsTest's `testCArrays` run a shell that compares
+its argument and an environment variable with a lone 0xFF byte (and fails for 0xFE); `testCalls` records a C-array
+credentials spawn as the others. XCTest 554 (4 skipped, and testVolumeAttributes skipped), swift-testing 468 in 74
+suites, passing with `setCurrentQualityOfService` skipped (section 28).
