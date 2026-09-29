@@ -50,6 +50,20 @@ extension SystemConfig {
   @_alwaysEmitIntoClient
   public static var guaranteedArgumentBytes: Int { Int(__POSIX_ARG_MAX) }
 
+  #if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
+  /// The maximum number of buffers that one vectored read or write takes,
+  /// as the C library's headers define it.
+  ///
+  /// More buffers throw ``Errno/invalidArgument``.
+  /// ``Name/maxIOVectors`` is the system's own limit, at run time.
+  ///
+  /// The corresponding C constant is `IOV_MAX`, or on Linux `UIO_MAXIOV`.
+  ///
+  /// - Note: Only available on Darwin, Linux, and Android.
+  @_alwaysEmitIntoClient
+  public static var maxIOVectors: Int { Int(_IOV_MAX) }
+  #endif
+
   #if SYSTEM_PACKAGE_DARWIN
   /// The maximum number of bytes in an extended attribute's name,
   /// not counting the null terminator.

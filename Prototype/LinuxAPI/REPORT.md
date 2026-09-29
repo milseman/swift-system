@@ -10,18 +10,34 @@ interface at Swift's default API level (21), and said otherwise.
 
 ## Resume here
 
-- State: inventory done (section 1). No batch committed yet.
-- Next: batch 1 (section 2), then down the plan in section 1.4.
+- State: inventory (section 1) and batch 1 (section 2.1) committed.
+- Next: batch 2 in the plan (section 1.5): Foundation's `POSIXErrorCode`,
+  `maxSymbolicLinks`, `maxExtendedAttributeNameBytes`.
+- This lane owns `Sources/System/**`, `Sources/CSystem`, `Tests/SystemTests`
+  and this report, not SystemSockets or its tests: socket API (vsock, UDP
+  offload) goes to section 4, with a patch where one is written.
 - Before each batch: read the newest log in `../linux-logs/`; compile errors
-  in System come first. The only log so far,
-  `6a9833f-noble-test.log`, is empty: the container service wasn't running
-  (`XPC connection error`), so nothing was built.
+  in System come first. The only log so far, `6a9833f-noble-test.log`, is
+  empty: the container service wasn't running (`XPC connection error`), so
+  nothing was built.
 - After each batch: add its commands to "For the Linux run", and update this
   section.
 
 ## For the Linux run
 
-(Filled in per batch.)
+Each check is run from this worktree (`../linux-api`) at the batch's commit or
+later; a log goes to `../linux-logs/`.
+
+1. Batch 1 (O_TMPFILE, AT_EMPTY_PATH, the I/O vector limit):
+   - `Utilities/linux/build.sh test -- --filter "UnnamedTemporaryFileTests|IOVectorLimitTests"`,
+     as root, then again with `--user 1000:1000`. Expect the build to pass
+     (the two CSystem getters in `shims.c`, `UIO_MAXIOV` from the C
+     library's module) and 6 swift-testing tests to pass in both runs. As
+     root, `anUnnamedFileGetsAName` links through `AT_EMPTY_PATH`; as 1000 it
+     may take the `/proc/self/fd` fallback. If the scratch directory's file
+     system has no `O_TMPFILE`, the two file tests pass without checking
+     anything past the open: say so if the log shows it.
+   - `Utilities/linux/build.sh test`: nothing else should change.
 
 ## Baseline (Darwin)
 
@@ -154,25 +170,87 @@ Counts are references in the files that import a Linux C module
 
 In the ranking's order, each small enough to review alone:
 
-1. NIO: vsock on Linux and Android.
-2. NIO: `O_TMPFILE`, `AT_EMPTY_PATH`, `UDP_SEGMENT`/`UDP_GRO`, a
-   compile-time `UIO_MAXIOV`.
-3. Foundation (and TSC, indexstore-db): `POSIXErrorCode`;
+1. NIO: `O_TMPFILE`, `AT_EMPTY_PATH`, a compile-time `UIO_MAXIOV`
+   (done, section 2.1). vsock and `UDP_SEGMENT`/`UDP_GRO` are SystemSockets
+   API, outside this lane's files: section 4.
+2. Foundation (and TSC, indexstore-db): `POSIXErrorCode`;
    `maxSymbolicLinks` and `maxExtendedAttributeNameBytes` on Linux.
-4. Foundation: `CLocale` on glibc and musl.
-5. Foundation: `currentExecutable()` and the time zone paths on Linux.
-6. TSC: `makeUniqueFile(suffixLength:)` (`mkostemps`); swift-build:
+3. Foundation: `CLocale` on glibc and musl.
+4. Foundation: `currentExecutable()` and the time zone paths on Linux.
+5. TSC: `makeUniqueFile(suffixLength:)` (`mkostemps`); swift-build:
    `symbolInfo(containing:)` (`dladdr`); TSC and swift-driver:
    `RTLD_DEEPBIND` on glibc.
-7. swift-sdk-generator: the three default pthread initializers; `O_SYNC`
+6. swift-sdk-generator: the three default pthread initializers; `O_SYNC`
    and `O_DSYNC`.
-8. Larger, later: `readPassphrase` on Linux (SwiftPM), `SpawnCredentials` on
+7. Larger, later: `readPassphrase` on Linux (SwiftPM), `SpawnCredentials` on
    Linux (Subprocess), inotify (TSC), `copy_file_range` and `FICLONE`
    (Foundation, NIO), `clone3` (Subprocess).
 
 ## 2. Batches
 
-(One section per batch, as each lands.)
+### 2.1 Batch 1: unnamed temporary files and the I/O vector limit (swift-nio)
+
+What NIO's Linux branch defines for itself from CNIOLinux, or per C library:
+
+- `FileDescriptor.OpenOptions.temporaryFile` (`O_TMPFILE`) and
+  `FilePath.ResolutionFlags.emptyPath` (`AT_EMPTY_PATH`), on Linux and
+  Android, in `TemporaryFiles/UnnamedTemporaryFiles.swift`. NIO's
+  SystemFileHandle opens an unnamed file with `temporaryFile` (its own
+  extension of System's `OpenOptions`, from `CNIOLinux_O_TMPFILE`) and names
+  it with `linkat` and its own `emptyPath` flag; System's `makeHardLink(relativeTo:to:relativeTo:flags:)`
+  takes the flag. glibc and Musl declare both constants only with
+  `_GNU_SOURCE`, so `shims.c`, which defines it, returns them through
+  `_system_get_O_TMPFILE` and `_system_get_AT_EMPTY_PATH`, as the `ST_*`
+  getters do. Bionic defines both.
+- `SystemConfig.maxIOVectors`, the headers' limit on a vectored call's
+  buffers, on Darwin (`IOV_MAX`), Linux and Android (`UIO_MAXIOV`, which
+  glibc exposes where `IOV_MAX` needs `_XOPEN_SOURCE`): 1024 everywhere.
+  NIO's `Posix.UIO_MAXIOV` is 1024 on Darwin, and `Glibc.UIO_MAXIOV`,
+  `Musl.UIO_MAXIOV` or `Android.UIO_MAXIOV` elsewhere.
+  `SystemConfig.Name.maxIOVectors` is the `sysconf` limit; the static
+  property follows `maxFileNameBytes`, the headers' limit beside the run
+  time's.
+
+Design calls:
+
+- Getters rather than `CSYSTEM_` macros: `O_TMPFILE` includes `O_DIRECTORY`,
+  which differs by architecture (x86_64 `020200000`, arm64 `020040000`), and
+  glibc's `__O_TMPFILE` includes it where the kernel's doesn't, so a
+  hardcoded value would need one per architecture. Rejected: a macro with a
+  `_Static_assert` per architecture.
+- `temporaryFile` gets the `O_TMPFILE` renamed stub, as the other
+  `OpenOptions` do; `ResolutionFlags` has none, so `emptyPath` doesn't.
+- `open` doesn't require permissions with `temporaryFile`, as it does
+  (with a trap) for `create`, though the kernel reads a mode for both. The
+  doc says to pass them. Open: whether `_open` should trap for
+  `temporaryFile` too; that's a change to `FileOperations.swift`'s behavior
+  on Linux, not a gate.
+- `emptyPath` is only a `ResolutionFlags`; `Stat.Flags` (for `fstatat`)
+  could take it too, which NIO doesn't need.
+- Naming: NIO's own `temporaryFile` extension will shadow System's in NIO's
+  module until NIO deletes it.
+- `maxIOVectors` is gated to Darwin, Linux and Android; FreeBSD and OpenBSD
+  have `IOV_MAX` too, unchecked here.
+
+Tests:
+
+- `Tests/SystemTests/UnnamedTemporaryFileTests.swift` (Linux and Android,
+  swift-testing): the flags' values; an unnamed file has no links, links
+  through `emptyPath` (or, without `CAP_DAC_READ_SEARCH`, through
+  `/proc/self/fd` and `symlinkFollow`), and then has one, with the same
+  inode and size; `exclusiveCreate` prevents the link; opening read-only
+  throws `EINVAL`. A file system without `O_TMPFILE` ends the file tests
+  after the open.
+- `Tests/SystemTests/IOVectorLimitTests.swift` (Darwin, Linux, Android): the
+  limit is 1024 and no more than `sysconf`'s; a `writev` of that many
+  buffers to `/dev/null` writes them all, and one more throws `EINVAL`.
+- The Linux code was typechecked on Darwin in a scratch copy, with its
+  conditions made true and the getters' values stubbed, which caught two
+  catch clauses comparing `any Error` with an `Errno` (a `do` inside a
+  closure doesn't infer the typed error).
+- Darwin, after (`swift build && swift test`): XCTest 565 tests, 4 skipped,
+  0 failures; swift-testing 498 tests in 81 suites passed (the two new
+  I/O vector tests; the unnamed-file tests don't build on Darwin).
 
 ## 3. Findings
 
@@ -182,4 +260,623 @@ In the ranking's order, each small enough to review alone:
 
 ## 4. Needs outside this lane's files
 
-(None yet.)
+- **vsock on Linux and Android** (SystemSockets, for swift-nio). Appendix A
+  is the patch, written and then reverted here: it builds on Darwin, where
+  the vsock and accessor tests pass (9 swift-testing tests), and is
+  otherwise unchecked. Its shape:
+  - `SocketDescriptor.Domain.vsock`, `VMSocketAddress`, `SocketAddress(vsock:)`
+    and `.vsock` widen to Linux and Android. The context IDs are numbers
+    there (`<linux/vm_sockets.h>` is in no C library's module), which
+    `shims.c` checks against the header.
+  - On Linux, `CInterop.SockAddrVM` is a Swift structure with the kernel's
+    layout (as `CInterop.MMsgHdr` is): SystemSockets imports CSystem
+    `@_implementationOnly`, so it can't vend the header's C type. No
+    `svm_len`, so no `length` accessor there; `svm_flags` (Linux 5.11) is a
+    field. `shims.c` checks size and offsets.
+  - Linux's `IOCTL_VM_SOCKETS_GET_LOCAL_CID` works on `/dev/vsock`, not a
+    socket, so the call is `FileDescriptor.localContextID()` there, beside
+    Darwin's `SocketDescriptor.localContextID()`. The request comes from a
+    CSystem getter, since `_IO`'s encoding differs by architecture.
+    Rejected: NIO's shape, a socket method that ignores its socket on Linux;
+    open: a static `ContextID` property that opens the device itself.
+  - Tests: the Darwin ones widen; on Linux, creating a socket succeeds or
+    throws `EAFNOSUPPORT`, or `EPERM` under a seccomp filter such as
+    Docker's default; `/dev/vsock`, where it exists, returns any, the host,
+    or a guest's ID; a pipe throws `ENOTTY`; the mock test checks the
+    request (`0x7B9` on x86_64 and arm64).
+  - A MemberImportVisibility probe for `CInterop.SockAddrVM` on Linux
+    (Tests/MemberImportVisibility is also outside this lane).
+- **`UDP_SEGMENT` and `UDP_GRO`** (SystemSockets, for swift-nio): options at
+  `IPPROTO_UDP` (`SOL_UDP`, 17), 103 and 104 in `<netinet/udp.h>` /
+  `<linux/udp.h>`, which Glibc's module doesn't include. NIO hardcodes them.
+
+## Appendix A: vsock on Linux, the patch
+
+Against `6a9833f`; apply with `git apply`.
+
+<details>
+<summary>SystemSockets, CSystem and SystemSocketsTests (313 lines added)</summary>
+
+```diff
+diff --git a/Sources/CSystem/include/CSystemLinux.h b/Sources/CSystem/include/CSystemLinux.h
+index 783f5e4..9d7ddd9 100644
+--- a/Sources/CSystem/include/CSystemLinux.h
++++ b/Sources/CSystem/include/CSystemLinux.h
+@@ -212,6 +212,12 @@ extern int csystem_accept4(int fd, void *addr, void *addrlen, int flags);
+ // timespec, untyped for the same reason as accept4's arguments.
+ extern int csystem_sendmmsg(int fd, void *msgvec, unsigned int vlen, int flags);
+ extern int csystem_recvmmsg(int fd, void *msgvec, unsigned int vlen, int flags, void *timeout);
++
++// IOCTL_VM_SOCKETS_GET_LOCAL_CID, from <linux/vm_sockets.h>, which no C
++// library's Swift module includes, and which this header doesn't include
++// either, so as not to declare struct sockaddr_vm here: SystemSockets'
++// CInterop.SockAddrVM mirrors it, and shims.c checks the two agree.
++unsigned long _system_get_IOCTL_VM_SOCKETS_GET_LOCAL_CID(void);
+ #endif // __linux__
+ 
+ #if defined(__linux__) && defined(__GLIBC__)
+diff --git a/Sources/CSystem/shims.c b/Sources/CSystem/shims.c
+index 317f2b1..9193432 100644
+--- a/Sources/CSystem/shims.c
++++ b/Sources/CSystem/shims.c
+@@ -574,6 +574,48 @@ extern int csystem_sendmmsg(int fd, void *msgvec, unsigned int vlen, int flags)
+ extern int csystem_recvmmsg(int fd, void *msgvec, unsigned int vlen, int flags, void *timeout) {
+   return recvmmsg(fd, (struct mmsghdr *)msgvec, vlen, flags, (struct timespec *)timeout);
+ }
++
++// VM sockets. <linux/vm_sockets.h> needs struct sockaddr, from
++// <sys/socket.h>, first.
++#if __has_include(<linux/vm_sockets.h>)
++#include <linux/vm_sockets.h>
++
++// CInterop.SockAddrVM, in Swift, is these fields, laid out as C lays them
++// out; Linux 5.11 took svm_flags from the start of svm_zero. And the
++// context IDs that VMSocketAddress.ContextID spells as numbers.
++struct csystem_sockaddr_vm_layout {
++  sa_family_t svm_family;
++  unsigned short svm_reserved1;
++  unsigned int svm_port;
++  unsigned int svm_cid;
++  unsigned char svm_flags;
++  unsigned char svm_zero[3];
++};
++_Static_assert(sizeof(struct sockaddr_vm) == sizeof(struct csystem_sockaddr_vm_layout),
++               "CInterop.SockAddrVM must match struct sockaddr_vm");
++_Static_assert(offsetof(struct sockaddr_vm, svm_port) ==
++                   offsetof(struct csystem_sockaddr_vm_layout, svm_port),
++               "CInterop.SockAddrVM must match struct sockaddr_vm");
++_Static_assert(offsetof(struct sockaddr_vm, svm_cid) ==
++                   offsetof(struct csystem_sockaddr_vm_layout, svm_cid),
++               "CInterop.SockAddrVM must match struct sockaddr_vm");
++_Static_assert(VMADDR_CID_HYPERVISOR == 0, "VMADDR_CID_HYPERVISOR");
++_Static_assert(VMADDR_CID_HOST == 2, "VMADDR_CID_HOST");
++_Static_assert(VMADDR_CID_ANY == -1U, "VMADDR_CID_ANY");
++_Static_assert(VMADDR_PORT_ANY == -1U, "VMADDR_PORT_ANY");
++#ifdef VMADDR_CID_LOCAL
++_Static_assert(VMADDR_CID_LOCAL == 1, "VMADDR_CID_LOCAL");
++#endif
++#endif // __has_include(<linux/vm_sockets.h>)
++
++#ifndef IOCTL_VM_SOCKETS_GET_LOCAL_CID
++// The kernel's value, for a C library without the header.
++#define IOCTL_VM_SOCKETS_GET_LOCAL_CID _IO(7, 0xb9)
++#endif
++
++unsigned long _system_get_IOCTL_VM_SOCKETS_GET_LOCAL_CID(void) {
++  return IOCTL_VM_SOCKETS_GET_LOCAL_CID;
++}
+ #endif // __linux__
+ 
+ // MARK: - The allocator
+diff --git a/Sources/SystemSockets/Internals/CInterop+SocketAccessors.swift b/Sources/SystemSockets/Internals/CInterop+SocketAccessors.swift
+index f23a74f..a44c4e2 100644
+--- a/Sources/SystemSockets/Internals/CInterop+SocketAccessors.swift
++++ b/Sources/SystemSockets/Internals/CInterop+SocketAccessors.swift
+@@ -559,7 +559,7 @@ extension CInterop.In6Addr {
+ 
+ // MARK: - sockaddr_vm
+ 
+-#if SYSTEM_PACKAGE_DARWIN
++#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
+ @available(System 199, *)
+ extension CInterop.SockAddrVM {
+   /// Creates a VM socket address from its fields, by default all zero.
+@@ -580,14 +580,18 @@ extension CInterop.SockAddrVM {
+     self.contextID = contextID
+   }
+ 
++  #if SYSTEM_PACKAGE_DARWIN
+   /// The address's length in bytes.
+   ///
+   /// The corresponding C field is `svm_len`.
++  ///
++  /// - Note: Only available on Darwin.
+   @_alwaysEmitIntoClient
+   public var length: UInt8 {
+     get { svm_len }
+     set { svm_len = newValue }
+   }
++  #endif
+ 
+   /// The address's family.
+   ///
+@@ -616,7 +620,7 @@ extension CInterop.SockAddrVM {
+     set { svm_cid = newValue }
+   }
+ }
+-#endif // SYSTEM_PACKAGE_DARWIN
++#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
+ 
+ // MARK: - linger
+ 
+diff --git a/Sources/SystemSockets/Internals/SocketSyscalls+VMSockets.swift b/Sources/SystemSockets/Internals/SocketSyscalls+VMSockets.swift
+index f95bbad..735eb75 100644
+--- a/Sources/SystemSockets/Internals/SocketSyscalls+VMSockets.swift
++++ b/Sources/SystemSockets/Internals/SocketSyscalls+VMSockets.swift
+@@ -11,6 +11,18 @@
+ 
+ #if SYSTEM_PACKAGE_DARWIN
+ import Darwin
++#elseif os(Linux) || os(Android)
++@_implementationOnly import CSystem
++#if canImport(Glibc)
++import Glibc
++#elseif canImport(Musl)
++import Musl
++#elseif canImport(Android)
++import Android
++#endif
++#endif
++
++#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
+ import SystemPackage
+ 
+ internal func system_ioctl(
+@@ -21,10 +33,19 @@ internal func system_ioctl(
+ #endif
+   return ioctl(fd, request, value)
+ }
++#endif
+ 
++#if SYSTEM_PACKAGE_DARWIN
+ // IOCTL_VM_SOCKETS_GET_LOCAL_CID, _IOR('s', 209, uint32_t), a macro that
+ // Swift can't import: IOC_OUT, the argument's size, the group, the number.
+ internal var _IOCTL_VM_SOCKETS_GET_LOCAL_CID: UInt {
+   0x4000_0000 | UInt(MemoryLayout<UInt32>.size) << 16 | UInt(UInt8(ascii: "s")) << 8 | 209
+ }
++#elseif os(Linux) || os(Android)
++// IOCTL_VM_SOCKETS_GET_LOCAL_CID, _IO(7, 0xb9), from <linux/vm_sockets.h>,
++// which no C library's Swift module includes. _IO's encoding differs by
++// architecture, so this is the header's own value, from shims.c.
++internal var _IOCTL_VM_SOCKETS_GET_LOCAL_CID: UInt {
++  UInt(_system_get_IOCTL_VM_SOCKETS_GET_LOCAL_CID())
++}
+ #endif
+diff --git a/Sources/SystemSockets/Sockets/SocketAddress+VMSocket.swift b/Sources/SystemSockets/Sockets/SocketAddress+VMSocket.swift
+index fa52c1a..0968889 100644
+--- a/Sources/SystemSockets/Sockets/SocketAddress+VMSocket.swift
++++ b/Sources/SystemSockets/Sockets/SocketAddress+VMSocket.swift
+@@ -11,15 +11,31 @@ import SystemPackage
+ 
+ #if SYSTEM_PACKAGE_DARWIN
+ import Darwin
++#elseif os(Linux) || os(Android)
++#if canImport(Glibc)
++import Glibc
++#elseif canImport(Musl)
++import Musl
++#elseif canImport(Android)
++import Android
++#endif
++#endif
++
++#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
+ 
+ @available(System 199, *)
+ extension SocketDescriptor.Domain {
+   /// Communication between a virtual machine and its host,
+   /// through VM sockets.
+   ///
+-  /// The transport is in a virtual machine, which it connects to its host:
++  /// On Darwin the transport is in a virtual machine,
++  /// which it connects to its host:
+   /// on a Mac that isn't a virtual machine, creating such a socket fails
+   /// with ``Errno/operationNotSupportedByDevice`` (`ENODEV`).
++  /// On Linux a guest's transport connects it to its host,
++  /// and a host's (`vhost_vsock`) to its guests;
++  /// without one, creating such a socket fails
++  /// with ``Errno/addressFamilyNotSupported`` (`EAFNOSUPPORT`).
+   ///
+   /// A socket address's ``SocketAddress/family`` is this domain
+   /// for a VM socket address.
+@@ -27,7 +43,7 @@ extension SocketDescriptor.Domain {
+   /// The corresponding C constants are `PF_VSOCK` and `AF_VSOCK`,
+   /// which have the same value.
+   ///
+-  /// - Note: Only available on Darwin.
++  /// - Note: Only available on Darwin, Linux, and Android.
+   @_alwaysEmitIntoClient
+   public static var vsock: Self { Self(rawValue: PF_VSOCK) }
+ }
+@@ -40,7 +56,7 @@ extension SocketDescriptor.Domain {
+ ///
+ /// The corresponding C type is `struct sockaddr_vm`.
+ ///
+-/// - Note: Only available on Darwin.
++/// - Note: Only available on Darwin, Linux, and Android.
+ @frozen
+ @available(System 199, *)
+ public struct VMSocketAddress: Hashable, Sendable, CustomStringConvertible {
+@@ -87,24 +103,47 @@ extension VMSocketAddress {
+     @_alwaysEmitIntoClient
+     public static var any: Self { Self(rawValue: UInt32(bitPattern: -1)) }
+ 
++    // Linux declares the context IDs in <linux/vm_sockets.h>, which no C
++    // library's Swift module includes; these are its values, which shims.c
++    // checks against it.
++
+     /// The hypervisor.
+     ///
+     /// The corresponding C constant is `VMADDR_CID_HYPERVISOR`.
+     @_alwaysEmitIntoClient
+-    public static var hypervisor: Self { Self(rawValue: UInt32(VMADDR_CID_HYPERVISOR)) }
++    public static var hypervisor: Self {
++      #if SYSTEM_PACKAGE_DARWIN
++      Self(rawValue: UInt32(VMADDR_CID_HYPERVISOR))
++      #else
++      Self(rawValue: 0)
++      #endif
++    }
+ 
+     /// Context ID 1, which Darwin reserves, and Linux uses for local
+-    /// communication (`VMADDR_CID_LOCAL`).
++    /// communication, from Linux 5.6.
+     ///
+-    /// The corresponding C constant is `VMADDR_CID_RESERVED`.
++    /// The corresponding C constant is `VMADDR_CID_RESERVED`,
++    /// or on Linux `VMADDR_CID_LOCAL`.
+     @_alwaysEmitIntoClient
+-    public static var local: Self { Self(rawValue: UInt32(VMADDR_CID_RESERVED)) }
++    public static var local: Self {
++      #if SYSTEM_PACKAGE_DARWIN
++      Self(rawValue: UInt32(VMADDR_CID_RESERVED))
++      #else
++      Self(rawValue: 1)
++      #endif
++    }
+ 
+     /// The host of the virtual machine that the socket is in.
+     ///
+     /// The corresponding C constant is `VMADDR_CID_HOST`.
+     @_alwaysEmitIntoClient
+-    public static var host: Self { Self(rawValue: UInt32(VMADDR_CID_HOST)) }
++    public static var host: Self {
++      #if SYSTEM_PACKAGE_DARWIN
++      Self(rawValue: UInt32(VMADDR_CID_HOST))
++      #else
++      Self(rawValue: 2)
++      #endif
++    }
+ 
+     public var description: String { self == .any ? "-1" : rawValue.description }
+   }
+@@ -133,18 +172,79 @@ extension VMSocketAddress {
+   }
+ }
+ 
++#if SYSTEM_PACKAGE_DARWIN
+ @available(System 199, *)
+ extension CInterop {
+   /// The corresponding C type is `struct sockaddr_vm`.
+   public typealias SockAddrVM = sockaddr_vm
+ }
++#else
++@available(System 199, *)
++extension CInterop {
++  /// A VM socket address, as the system calls take it.
++  ///
++  /// This is a Swift structure with the C structure's layout,
++  /// since Linux declares `struct sockaddr_vm`
++  /// in `<linux/vm_sockets.h>`, which no C library's Swift module includes.
++  /// Its fields have the C names;
++  /// the accessors ``family``, ``port``, and ``contextID`` name them in Swift,
++  /// and ``VMSocketAddress`` is the Swift type for these addresses.
++  ///
++  /// The corresponding C type is `struct sockaddr_vm`.
++  @frozen
++  public struct SockAddrVM {
++    /// The address's family, ``SocketDescriptor/Domain/vsock``.
++    ///
++    /// The corresponding C field is `svm_family`.
++    public var svm_family: sa_family_t
++
++    /// Reserved, and zero.
++    ///
++    /// The corresponding C field is `svm_reserved1`.
++    public var svm_reserved1: UInt16
++
++    /// The port.
++    ///
++    /// The corresponding C field is `svm_port`.
++    public var svm_port: UInt32
++
++    /// The context ID.
++    ///
++    /// The corresponding C field is `svm_cid`.
++    public var svm_cid: UInt32
++
++    /// Flags for the address, from Linux 5.11; zero before it.
++    ///
++    /// The corresponding C field is `svm_flags`.
++    public var svm_flags: UInt8
++
++    /// Padding to the size of `struct sockaddr`, which must be zero.
++    ///
++    /// The corresponding C field is `svm_zero`.
++    public var svm_zero: (UInt8, UInt8, UInt8)
++
++    /// Creates an address whose fields are all zero.
++    @_alwaysEmitIntoClient
++    public init() {
++      svm_family = 0
++      svm_reserved1 = 0
++      svm_port = 0
++      svm_cid = 0
++      svm_flags = 0
++      svm_zero = (0, 0, 0)
++    }
++  }
++}
++#endif
+ 
+ @available(System 199, *)
+ extension SocketAddress {
+   /// Creates a socket address from a VM socket address.
+   public init(vsock address: VMSocketAddress) {
+-    var vm = sockaddr_vm()
+-    vm.svm_len = UInt8(MemoryLayout<sockaddr_vm>.size)
++    var vm = CInterop.SockAddrVM()
++    #if SYSTEM_PACKAGE_DARWIN
++    vm.svm_len = UInt8(MemoryLayout<CInterop.SockAddrVM>.size)
++    #endif
+     vm.svm_family = sa_family_t(AF_VSOCK)
+     vm.svm_port = address.port.rawValue
+     vm.svm_cid = address.contextID.rawValue
+@@ -153,17 +253,21 @@ extension SocketAddress {
+ 
+   /// The address as a VM socket address, if it's one.
+   public var vsock: VMSocketAddress? {
+-    guard family == .vsock, length >= MemoryLayout<sockaddr_vm>.size else { return nil }
+-    let vm = Swift.withUnsafeBytes(of: _storage) { $0.loadUnaligned(as: sockaddr_vm.self) }
++    guard family == .vsock, length >= MemoryLayout<CInterop.SockAddrVM>.size else { return nil }
++    let vm = Swift.withUnsafeBytes(of: _storage) { $0.loadUnaligned(as: CInterop.SockAddrVM.self) }
+     return VMSocketAddress(contextID: .init(rawValue: vm.svm_cid), port: .init(rawValue: vm.svm_port))
+   }
+ }
+ 
++#if SYSTEM_PACKAGE_DARWIN
+ @available(System 199, *)
+ extension SocketDescriptor {
+   /// Returns the context ID of the machine that this VM socket is on:
+   /// the virtual machine's, in a guest.
+   ///
++  /// On Linux, the call takes a descriptor for `/dev/vsock` instead:
++  /// see `FileDescriptor.localContextID()`.
++  ///
+   /// The corresponding C constant is `IOCTL_VM_SOCKETS_GET_LOCAL_CID`.
+   ///
+   /// - Note: Only available on Darwin.
+@@ -180,5 +284,41 @@ extension SocketDescriptor {
+     }.map { VMSocketAddress.ContextID(rawValue: contextID) }
+   }
+ }
++#else
++@available(System 199, *)
++extension FileDescriptor {
++  /// Returns the context ID of this machine, through the VM sockets device:
++  /// the virtual machine's, in a guest, or the host's, on a host.
++  ///
++  /// Call it on a descriptor for `/dev/vsock`:
++  ///
++  ///     let device = try FileDescriptor.open(
++  ///       "/dev/vsock", .readOnly, options: .closeOnExec)
++  ///     defer { try? device.close() }
++  ///     let contextID = try device.localContextID()
++  ///
++  /// With no transport, the context ID is ``VMSocketAddress/ContextID/any``.
++  /// Another descriptor throws
++  /// ``Errno/inappropriateIOCTLForDevice`` (`ENOTTY`).
++  /// On Darwin, the call takes a VM socket instead:
++  /// see `SocketDescriptor.localContextID()`.
++  ///
++  /// The corresponding C constant is `IOCTL_VM_SOCKETS_GET_LOCAL_CID`.
++  ///
++  /// - Note: Only available on Linux and Android.
++  @_alwaysEmitIntoClient
++  public func localContextID() throws(Errno) -> VMSocketAddress.ContextID {
++    try _localContextID().get()
++  }
++
++  @usableFromInline
++  internal func _localContextID() -> Result<VMSocketAddress.ContextID, Errno> {
++    var contextID = VMSocketAddress.ContextID.any.rawValue
++    return nothingOrErrno(retryOnInterrupt: false) {
++      system_ioctl(self.rawValue, _IOCTL_VM_SOCKETS_GET_LOCAL_CID, &contextID)
++    }.map { VMSocketAddress.ContextID(rawValue: contextID) }
++  }
++}
++#endif
+ 
+-#endif // SYSTEM_PACKAGE_DARWIN
++#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
+diff --git a/Sources/SystemSockets/Sockets/SocketDescriptor.swift b/Sources/SystemSockets/Sockets/SocketDescriptor.swift
+index 895c950..b73b143 100644
+--- a/Sources/SystemSockets/Sockets/SocketDescriptor.swift
++++ b/Sources/SystemSockets/Sockets/SocketDescriptor.swift
+@@ -170,6 +170,8 @@ extension SocketDescriptor {
+       #if SYSTEM_PACKAGE_DARWIN
+       case .system: return "system"
+       case .networkDevice: return "networkDevice"
++      #endif
++      #if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
+       case .vsock: return "vsock"
+       #endif
+       default: return "Domain(\(rawValue))"
+diff --git a/Tests/SystemSocketsTests/CInteropSocketAccessorsTests.swift b/Tests/SystemSocketsTests/CInteropSocketAccessorsTests.swift
+index 8143bad..ed96842 100644
+--- a/Tests/SystemSocketsTests/CInteropSocketAccessorsTests.swift
++++ b/Tests/SystemSocketsTests/CInteropSocketAccessorsTests.swift
+@@ -130,11 +130,24 @@ private struct CInteropSocketAccessorsTests {
+     #if SYSTEM_PACKAGE_DARWIN
+     ipv4.length = 16
+     #expect(ipv4.sin_len == 16)
++    #endif
++    #if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
+     var vm = CInterop.SockAddrVM(family: .vsock, port: 1024, contextID: 2)
+     #expect(vm.svm_family == sa_family_t(AF_VSOCK) && vm.svm_port == 1024 && vm.svm_cid == 2)
++    #if SYSTEM_PACKAGE_DARWIN
+     vm.length = 12
+     #expect(vm.svm_len == 12)
+     #expect(sameBytes(CInterop.SockAddrVM(), sockaddr_vm()))
++    #else
++    // Linux's is System's structure, with the C layout: 16 bytes.
++    vm.contextID = 3
++    vm.port = 1025
++    #expect(vm.svm_cid == 3 && vm.svm_port == 1025 && vm.family == .vsock)
++    #expect(MemoryLayout<CInterop.SockAddrVM>.size == 16)
++    #expect(MemoryLayout<CInterop.SockAddrVM>.offset(of: \.svm_port) == 4)
++    #expect(MemoryLayout<CInterop.SockAddrVM>.offset(of: \.svm_cid) == 8)
++    #expect(sameBytes(CInterop.SockAddrVM(), CInterop.SockAddrVM(family: .unspecified)))
++    #endif
+     #endif
+   }
+ 
+diff --git a/Tests/SystemSocketsTests/SocketVMSocketTests.swift b/Tests/SystemSocketsTests/SocketVMSocketTests.swift
+index 6ebc9a6..cdecf26 100644
+--- a/Tests/SystemSocketsTests/SocketVMSocketTests.swift
++++ b/Tests/SystemSocketsTests/SocketVMSocketTests.swift
+@@ -7,10 +7,18 @@
+  See https://swift.org/LICENSE.txt for license information
+ */
+ 
+-#if SYSTEM_PACKAGE_DARWIN
++#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
+ 
+ import Testing
++#if SYSTEM_PACKAGE_DARWIN
+ import Darwin
++#elseif canImport(Glibc)
++import Glibc
++#elseif canImport(Musl)
++import Musl
++#elseif canImport(Android)
++import Android
++#endif
+ 
+ import SystemPackage
+ #if ENABLE_MOCKING
+@@ -41,19 +49,26 @@ private struct SocketVMSocketTests {
+ 
+     let socketAddress = SocketAddress(vsock: address)
+     #expect(socketAddress.family == .vsock)
+-    #expect(socketAddress.length == MemoryLayout<sockaddr_vm>.size)
++    #expect(socketAddress.length == MemoryLayout<CInterop.SockAddrVM>.size)
+     #expect(socketAddress.vsock == address)
+     #expect(socketAddress.ipv4 == nil)
+     #expect(SocketAddress(ipv4: .loopback(port: 1)).vsock == nil)
+ 
+-    // The C structure's fields, as a client that imports Darwin reads them.
++    // The C structure's fields, as a client that imports the C library
++    // reads them.
+     let vm = socketAddress.withUnsafePointer { pointer, _ in
+       UnsafeRawPointer(pointer).loadUnaligned(as: CInterop.SockAddrVM.self)
+     }
+     #expect(vm.svm_cid == 2 && vm.svm_port == 1024)
++    #expect(vm.svm_family == sa_family_t(AF_VSOCK))
++    #if SYSTEM_PACKAGE_DARWIN
+     #expect(Int(vm.svm_len) == MemoryLayout<sockaddr_vm>.size)
++    #else
++    #expect(MemoryLayout<CInterop.SockAddrVM>.size == 16)
++    #endif
+   }
+ 
++  #if SYSTEM_PACKAGE_DARWIN
+   /// A Mac that isn't a virtual machine has no VM socket transport.
+   @available(System 199, *)
+   @Test func aSocketNeedsATransport() throws {
+@@ -66,20 +81,71 @@ private struct SocketVMSocketTests {
+       #expect(error == .operationNotSupportedByDevice)
+     }
+   }
++  #else
++  /// A socket needs the kernel's VM sockets, which a container may not
++  /// load, or a seccomp filter (such as Docker's default) may refuse.
++  @available(System 199, *)
++  @Test func aSocketNeedsVMSockets() throws {
++    do {
++      let socket = try SocketDescriptor.open(.vsock, .stream, options: .closeOnExec)
++      try socket.close()
++    } catch {
++      #expect(error == .addressFamilyNotSupported || error == .notPermitted)
++    }
++  }
++
++  /// The VM sockets device reports this machine's context ID: a guest's,
++  /// the host's, or with no transport, any. Without the device, as in most
++  /// containers, there's nothing to ask.
++  @available(System 199, *)
++  @Test func theDeviceHasTheLocalContextID() throws {
++    let device: FileDescriptor
++    do {
++      device = try FileDescriptor.open("/dev/vsock", .readOnly, options: .closeOnExec)
++    } catch {
++      return
++    }
++    defer { try? device.close() }
++    let id = try device.localContextID()
++    #expect(id == .any || id == .host || id.rawValue >= 3)
++  }
++
++  /// Only the device answers the call.
++  @available(System 199, *)
++  @Test func anotherDescriptorIsNotTheDevice() throws {
++    let pipe = try FileDescriptor.pipe()
++    defer {
++      try? pipe.readEnd.close()
++      try? pipe.writeEnd.close()
++    }
++    #expect(throws: Errno.inappropriateIOCTLForDevice) {
++      try pipe.readEnd.localContextID()
++    }
++  }
++  #endif
+ 
+   #if ENABLE_MOCKING
+   @available(System 199, *)
+   @Test func theLocalContextIDCall() throws {
+     try MockingDriver.withMockingEnabled { mocking in
++      #if SYSTEM_PACKAGE_DARWIN
+       let id = try SocketDescriptor(rawValue: 9).localContextID()
++      #else
++      let id = try FileDescriptor(rawValue: 9).localContextID()
++      #endif
+       // A mocked ioctl writes nothing.
+       #expect(id == .any)
+       let entry = mocking.trace.dequeue()
+       #expect(entry?.name == "ioctl")
++      #if SYSTEM_PACKAGE_DARWIN
+       #expect(entry?.arguments == [CInt(9), UInt(0x4004_73D1)])
++      #elseif arch(x86_64) || arch(arm64)
++      // _IO(7, 0xb9), from the header, through shims.c.
++      #expect(entry?.arguments == [CInt(9), UInt(0x7B9)])
++      #endif
+     }
+   }
+   #endif
+ }
+ 
+-#endif // SYSTEM_PACKAGE_DARWIN
++#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
+```
+
+</details>

@@ -34,6 +34,16 @@ internal var __POSIX_ARG_MAX: CInt { _POSIX_ARG_MAX }
 
 #if SYSTEM_PACKAGE_DARWIN
 @_alwaysEmitIntoClient
+internal var _IOV_MAX: CInt { IOV_MAX }
+#elseif os(Linux) || os(Android)
+// glibc declares IOV_MAX only with _XOPEN_SOURCE. UIO_MAXIOV, in every Linux
+// C library's <sys/uio.h>, is the same limit.
+@_alwaysEmitIntoClient
+internal var _IOV_MAX: CInt { CInt(UIO_MAXIOV) }
+#endif
+
+#if SYSTEM_PACKAGE_DARWIN
+@_alwaysEmitIntoClient
 internal var _MAXSYMLINKS: CInt { MAXSYMLINKS }
 
 @_alwaysEmitIntoClient

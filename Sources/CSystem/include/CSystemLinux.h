@@ -62,6 +62,13 @@ extern int csystem_renameat2(int olddirfd, const char *oldpath,
 #define CSYSTEM_F_SETPIPE_SZ 1031
 #define CSYSTEM_F_GETPIPE_SZ 1032
 
+// open's O_TMPFILE and the *at functions' AT_EMPTY_PATH, which glibc and
+// Musl declare only with _GNU_SOURCE, which can't be defined here; see
+// shims.c. O_TMPFILE includes O_DIRECTORY, whose value differs by
+// architecture, so these are the headers' own values.
+int _system_get_AT_EMPTY_PATH(void);
+int _system_get_O_TMPFILE(void);
+
 // The special times for futimens and utimensat, which glibc and Bionic define
 // as expressions that Swift can't import. They have these values on every
 // architecture; shims.c checks them against <sys/stat.h>.

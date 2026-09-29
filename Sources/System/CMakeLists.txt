@@ -296,7 +296,8 @@ target_sources(SystemPackage PRIVATE
 target_sources(SystemPackage PRIVATE
   Internals/Syscalls+SmallGaps.swift
   TemporaryFiles/UniqueFilesWithPermissions.swift
-  TemporaryFiles/UniqueFilesWithSuffix.swift)
+  TemporaryFiles/UniqueFilesWithSuffix.swift
+  TemporaryFiles/UnnamedTemporaryFiles.swift)
 target_sources(SystemPackage PRIVATE
   Terminal/BaudRate.swift
   Terminal/ControlCharacters.swift
