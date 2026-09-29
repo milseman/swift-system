@@ -148,7 +148,7 @@ not in `SystemControl`'s retry loop.
 
 ## 3. Fixes
 
-Commits `5b29c65`, `ac6bdd1`, `a83fffe`, `4da9cc1`, `98d1562`, `80f3d1c`.
+Commits `5b29c65`, `ac6bdd1`, `a83fffe`, `4da9cc1`, `98d1562`, `80f3d1c`, `c75cd7d`.
 Each fix makes the outcome depend on an event, an invariant, or isolation instead of
 on timing. Where a check had to get weaker to be deterministic, the entry says so.
 
@@ -194,7 +194,8 @@ on timing. Where a check had to get weaker to be deterministic, the entry says s
   either way.
 - Running children: `spawnWaitingChild()` (sh reading a pipe that only the test
   process holds) replaces `sleep 10` and `sleep 30`; the two deinit tests use a
-  `sleep` of twice the hang guard and require the deinit to finish within the guard.
+  `sleep` of twice the hang guard and require the deinit to finish within the guard,
+  timed with the monotonic clock rather than `time(nil)`.
 - `StatTests.times`, `SocketIPMessagesTests`: timestamps lie between clock readings
   made around the operation, instead of within 4 s or 60 s of one.
 - `acceptSetsExactlyTheOptions`: polls the listener until it's readable, which it is
