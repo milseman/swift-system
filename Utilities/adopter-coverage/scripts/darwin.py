@@ -219,7 +219,10 @@ def analyze(root, swift_scans, interfaces, own_modules, dep_modules, dep_reexpor
             continue
         if mods and not any(is_darwin(m) for m in mods):
             continue
-        if not mods and "lexical-darwin-name" not in it["evidence"] and "index" not in it["evidence"]:
+        # A lexical name counts when the SDK's vocabulary has it, or when a
+        # site qualifies it with Darwin's module (`Darwin.write`).
+        if not mods and "lexical-darwin-name" not in it["evidence"] and "index" not in it["evidence"] \
+                and not ("lexical-qualified" in it["evidence"] and "Darwin" in (it.get("reachedThrough") or [])):
             continue
         classes = {files[s["file"]]["class"] for s in darwin_sites}
         best = next((c for c in CLASSES if c in classes), None)
