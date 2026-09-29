@@ -35,6 +35,8 @@ disk) is shared by everything, including other checkouts' test runs.
 | `AttributeListTests.swift:204` | `testVolumeAttributes` | **Seen, 3 of 10.** getattrlist's available space against statfs's a moment later; anything that writes to the disk in between changes it. |
 | `LibProcTests.swift:166` | `testLists` | proc_listpids against sysctl's process table, needing 90% overlap. Under enough process churn (builds) more than a tenth can come and go between the calls, since the thread can be descheduled between them. |
 | `ProcessCredentialsTests.swift:63` | `aUsersGroups` | System's group list against `getgrouplist` a moment later. Changes only if the directory service's answer changes; low. |
+| `UserDatabaseTest.swift:105,134` | `testUserEntry`, `testGroupEntry` | The reentrant calls' entries against the non-reentrant ones' a moment later; the same, low. |
+| `SystemIdentityTests.swift:38,54` | `currentIsUname`, `hostNameIsTheNodeName` | The node name against a second reading: the system renames the host when the network changes. |
 | `ProcessResourceTests.swift:63` | `testProcessorTimes` | proc_pid_rusage's user time bracketed by two getrusage calls. Sound if both read the same counter, which the passes suggest; kept. |
 
 ### 1c. Upper bounds on elapsed time, and events assumed to happen within a time
@@ -166,6 +168,8 @@ on timing. Where a check had to get weaker to be deterministic, the entry says s
 - `LibProcTest.testLists`: both lists must hold the processes that live through both
   calls (this one, its parent, launchd, and a child it keeps running), instead of 90%
   overlap. **Weaker**: other processes aren't compared.
+- `SystemIdentityTests`: the host name, or `SystemIdentity`'s node name, must equal a
+  node name read just before or just after it.
 
 ### 3c. Timing
 
@@ -275,8 +279,8 @@ name shared things uniquely; restore everything.
   resident; heavy memory pressure could evict one first. Not seen.
 - `SharedMemoryTests` names include the process ID; a crashed run's leftovers would
   trip a later process with the same ID.
-- `ProcessCredentialsTests.aUsersGroups` compares two answers from the directory
-  service.
+- `ProcessCredentialsTests.aUsersGroups` and `UserDatabaseTest`'s entry tests compare
+  two answers from the directory service.
 - `LibProcTest.testLists` and `SystemControlTest.testProcesses` can take a minute
   under load: the first `KERN_PROC_ALL` size query of a process took 38 s and 253 s
   in a probe. Nothing times out, so they pass slowly.
