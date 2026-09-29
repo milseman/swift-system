@@ -7,52 +7,42 @@ everything here is built and tested on Darwin only.
 
 ## Queue
 
-The work list for toolchain packages to drop `import Darwin` in every form, kept current. Source: the ecosystem run
-`05d4974d68bb-8ed49538` (System `05d4974`, the 21 main-scheme packages that import Darwin, at the scheme's refs;
-`ecosystem.sh run` then `report`). Counted: the interfaces that library files importing Darwin use, in any form
-but through Apple Foundation's re-export (`darwin.interfacesByClass` in each package's `interfaces.json.gz`: direct
-imports, the packages' own re-exports, other modules' and the SDK's), not covered on Darwin: 756 interfaces, 259 not
-covered. Grouped into clusters, ranked by packages, then call sites. Checking each against System's sources shows
-many aren't gaps: the tools can't see API that doesn't name them in the standard sentence, or mapping.ini holds a
-status that predates the lanes. So step 0 is to make the tools see what System covers; the ranks are then redone.
+The work list for toolchain packages to drop `import Darwin` in every form, kept current. Source: `ecosystem.sh
+report`'s *What the files that import Darwin still need* (section 25), which counts the interfaces that library files
+importing Darwin in any form but through Apple Foundation's re-export use, per symbol, with System's coverage on
+Darwin; grouped here into clusters and ranked by packages, then call sites. Latest: run `6e784c6e7026-4676fb13`
+(System `6e784c6`, the 21 main-scheme packages that import Darwin): 756 interfaces, 567 covered, 131 gaps (24 in two
+or more packages); set apart, 14 the standard library answers, 18 other modules' names, 26 the packages' own shims.
 
-Next: step 0, then the clusters from the re-ranked list.
+Next: cluster 1. Resume from the first row not marked done.
 
 | # | Cluster | Packages | Sites | Interfaces | Plan |
 |---|---|---:|---:|---|---|
-| 0 | What the tools can't see | | | stdout, stderr (`The corresponding C variable` isn't read); localtime_r (a DocC link breaks the sentence); S_IFMT and S_I* bits, pthread destroy calls, DT_UNKNOWN, XATTR_NOFOLLOW (undocumented); PATH_MAX, linger (stale partials); fts (answered by DirectoryWalk, section 14); localtime, gettimeofday, time, getpwuid, getgrgid, mkstemp(s) (replaced by the reentrant or newer call System wraps) | derive.py fixes, doc sentences, mapping.ini |
-| 1 | string.h and ctype.h | 10 | 93 | strdup (7 packages; four migrations each wrote their own), strlen, strnlen, strncmp, strerror_r, strlcpy, tolower, isspace; memset, memcpy, memmove | Provisional+StringH; the mem* three are the standard library's (section 1) |
-| 2 | C stdio beyond FileStream | 10 | 30 | stderr, stdout, fputs, putc, perror, snprintf | stderr/stdout in step 0; fputs, putc, perror on FileStream |
-| 3 | C scalar types | 6 | 60 | off_t (NIO 26), ssize_t, size_t, suseconds_t, u_int, uintptr_t, LONG_MAX, _POSIX_ARG_MAX, u_short | CInterop aliases where Swift has no spelling |
-| 4 | File mode bits | 6 | 34 | S_IFMT, S_IRWXU/G/O, S_IWGRP, S_IWOTH, S_ISVTX | step 0 (FilePermissions, FileMode name none) |
-| 5 | pthreads | 5 | 31 | destroy calls (step 0); pthread_attr_getstacksize, setdetachstate, setscope, pthread_exit, pthread_yield_np, the error-checking initializer | the rest |
-| 6 | Time of day | 5 | 8 | time, gettimeofday, localtime, gmtime_r | step 0 |
-| 7 | PATH_MAX | 4 | 13 | PATH_MAX | step 0 (covered since section 3) |
-| 8 | Sockets | 3 | 140 | sockaddr_storage (NIO 34), ifaddrs, inet_pton, freeaddrinfo, AF_UNIX, INADDR_ANY, multicast and packet-info options, nfds_t, NI_MAXHOST | check each; mostly NIO's |
-| 9 | fts | 3 | 108 | fts_* and FTS_* | step 0 |
-| 10 | libm | 3 | 39 | round, sqrt, ceil, floor, fabs, modf | the standard library's; record it |
-| 11 | Mach | 3 | 24 | mach_task_self_, KERN_SUCCESS, ERR_SUCCESS, vm_address_t, vm_prot_t, integer_t, mach_msg_type_number_t, task_info with TASK_VM_INFO, USEC_PER_SEC | check each |
-| 12 | Directory entry types | 3 | 4 | DT_UNKNOWN | step 0 |
-| 13 | ioctl | 3 | 3 | ioctl (terminal size, vsock CID) | check the requests |
-| 14 | sysctl names | 2 | 22 | kinfo_proc, CTL_KERN, KERN_PROC, KERN_PROC_PID, CTL_HW, HW_NCPU, HW_AVAILCPU, P_TRACED, extern_proc | check SystemControl |
-| 15 | MacTypes | 2 | 12 | OSStatus, DarwinBoolean (UniChar there is CoreFoundation's) | |
-| 16 | Extended attributes | 2 | 9 | XATTR_NOFOLLOW (step 0), XATTR_FINDERINFO_NAME, XATTR_RESOURCEFORK_NAME | |
-| 17 | Signals | 2 | 7 | signal, SIG_ERR, SIG_UNBLOCK, sigprocmask, NSIG | check the processes lane's API |
-| 18 | Spawn attributes | 2 | 6 | posix_spawnattr_setpgroup, setsigdefault, setsigmask (partial) | check |
-| 19 | Mounts and quotas | 2 | 6 | getfsstat, quotactl (partial), SUBCMDMASK, SUBCMDSHIFT, getmntinfo_r_np | |
-| 20 | flock | 2 | 4 | LOCK_EX, LOCK_SH, LOCK_NB | |
-| 21 | File times | 2 | 5 | utimes, futimens (partial) | |
-| 22 | mmap constants | 2 | 3 | MAP_FAILED, PROT_NONE | |
-| 23 | CPU types | 1 | 22 | cpu_type_t, cpu_subtype_t, CPU_TYPE_*, CPU_ARCH_ABI64 (swift-build) | |
-| 24 | wait | 1 | 17 | siginfo_t, id_t, idtype_t, CLD_*, waitid (Subprocess) | check ProcessWait |
-| 25 | One-package gaps | 1 each | 1-3 each | dladdr and Dl_info, AT_EACCESS/AT_FDONLY/AT_REALDEV, backtrace, getiopolicy_np, strtod and strtof, sysdir's enumeration state, execv, getdtablesize, ATTR_BIT_MAP_COUNT, _NSGetEnviron, abort | |
+| 1 | string.h and ctype.h | 9 | 60 | strdup (7 packages), strlen, strnlen, strncmp, strlcpy, tolower, isspace | `CString` and `CType`, provisional |
+| 2 | C stdio beyond FileStream | 5 | 12 | fputs, perror, putc, snprintf | FileStream |
+| 3 | Sockets | 4 | 104 | sockaddr_storage (NIO 34), inet_pton (partial), freeaddrinfo, INADDR_ANY and the address-string lengths, NI_MAXHOST, NIO's multicast and packet-info options, nfds_t, AF_VSOCK | check each against SystemSockets |
+| 4 | C scalar types | 4 | 7 | suseconds_t, u_int, LONG_MAX, _POSIX_ARG_MAX | `swift` answers where the standard library has them |
+| 5 | File times | 4 | 5 | futimens, utimes | check setTimes' docs |
+| 6 | Mach | 3 | 24 | mach_task_self_, KERN_SUCCESS, ERR_SUCCESS, vm_address_t, vm_prot_t, integer_t, mach_msg_type_number_t, task_info with TASK_VM_INFO and task_vm_info, USEC_PER_SEC | task information, the Mach names |
+| 7 | ioctl | 3 | 3 | ioctl (terminal size, vsock CID) | check the requests |
+| 8 | MacTypes | 2 | 12 | OSStatus, DarwinBoolean (UniChar there is CoreFoundation's) | |
+| 9 | sysctl process information | 2 | 9 | kinfo_proc's fields, P_TRACED, extern_proc | accessors |
+| 10 | pthreads | 2 | 8 | pthread_attr_getstacksize, setdetachstate, setscope, PTHREAD_CREATE_DETACHED, PTHREAD_SCOPE_SYSTEM, pthread_exit, pthread_yield_np, the error-checking initializer | |
+| 11 | Signals | 2 | 7 | signal, SIG_ERR, SIG_UNBLOCK, sigprocmask, NSIG | check the processes lane's API |
+| 12 | Spawn attributes | 2 | 6 | posix_spawnattr_setpgroup, setsigdefault, setsigmask | check SpawnAttributes' docs |
+| 13 | Mounts and quotas | 2 | 6 | getfsstat, quotactl, SUBCMDMASK, SUBCMDSHIFT, getmntinfo_r_np | |
+| 14 | Extended attribute names | 2 | 4 | XATTR_FINDERINFO_NAME, XATTR_RESOURCEFORK_NAME | |
+| 15 | CPU types | 1 | 22 | cpu_type_t, cpu_subtype_t, CPU_TYPE_*, CPU_ARCH_ABI64 (swift-build) | |
+| 16 | wait | 1 | 17 | siginfo_t, id_t, idtype_t, CLD_*, waitid (Subprocess) | check ProcessWait |
+| 17 | One-package gaps | 1 each | 1-3 each | dladdr and Dl_info, backtrace, strtod and strtof, AT_FDONLY and AT_REALDEV, sysdir's enumeration state, getiopolicy_np, ATTR_BIT_MAP_COUNT, execv, getdtablesize | |
 
-Not counted, with the reason: Dispatch (its own module; 3 packages, 200 sites), ObjectiveC, CoreFoundation, os and
-Foundation names (ObjCBool, NSObject, objc_getClass, Logger, NSDictionary, CFRunLoopStop, UniChar), the packages'
-own C shims (CNIODarwin_*, c_nio_posix_*, _subprocess_*), and false positives of the lexical scan (`index(after:)`
-read as strings.h's index, Float80).
+Not counted, with the reason: the lexical scan's false positives (`index(after:)` read as strings.h's index;
+Float80) and other modules' names it can't place (Logger, NSDictionary, CFRunLoopStop), which mapping.ini should
+say; the standard library's answers (off_t, ssize_t, size_t and uintptr_t are Int64, Int, UInt; memcpy, memmove,
+memset; round, sqrt, ceil, floor, fabs, modf); Dispatch and ObjectiveC names; the packages' own C shims
+(CNIODarwin_*, c_nio_posix_*, _subprocess_*).
 
-Done: none yet.
+Done: step 0, what the tools couldn't see (section 25).
 
 ## 1. status.sh and STATUS.md (2026-09-28)
 
@@ -556,3 +546,39 @@ Tests: SpawnCredentialsTest's `testTheProgramGetsTheDescriptorsASpawnWould` (a s
 descriptors are open, spawned with and without credentials; before the fix three more were open with them) and
 `testCValuesKeepTheDescriptorsTheyUse`; `testCalls` now expects the parent's F_GETFD. XCTest 551 (4 skipped, and
 testVolumeAttributes skipped), swift-testing 461 in 72 suites, all passing.
+
+## 25. What the tools couldn't see: `128dcc8`, `6e784c6`
+
+The first ecosystem run of this stage (`05d4974d68bb-8ed49538`) ranked 259 interfaces as gaps of the files that import
+Darwin. Checked against System's sources, many weren't: System covered them, but the coverage tools couldn't tell.
+Fixing that came first, since every later rank depends on it.
+
+- **Doc sentences** (`128dcc8`, doc comments only): FilePermissions' members name their constants (S_IRUSR through
+  S_IRWXO, S_ISUID, S_ISGID, S_ISVTX) and FileMode.type names S_IFMT; PThread's Mutex, Condition, ReadWriteLock and
+  Key name what their deinits call (pthread_mutex_destroy, pthread_cond_destroy, pthread_rwlock_destroy,
+  pthread_key_delete), and each Attributes type the init and destroy calls that creating the object makes;
+  DT_UNKNOWN, XATTR_NOFOLLOW, LOCK_EX/LOCK_SH/LOCK_NB, PROT_NONE, MAP_FAILED, AT_EACCESS, freeifaddrs and struct
+  ifaddrs, the sysctl MIB constants behind SystemControl's names (CTL_KERN, KERN_PROC, KERN_PROC_PID, CTL_HW, HW_NCPU,
+  HW_AVAILCPU: a C probe showed HW_AVAILCPU is `hw.activecpu`'s MIB), _NSGetEnviron, and AF_UNIX (only
+  `.local`'s unavailable renamed stub named it). BrokenDownTime's sentences named gmtime_r and timegm "for
+  ``Zone/utc``": DocC's doubled backticks paired with the C names', so localtime_r and mktime were never read and
+  gmtime_r and timegm read as restricted to one use; the zones now have a sentence of their own.
+- **derive.py** (`6e784c6`): reads "The corresponding C variable is" (FileStream's stdout and stderr and
+  ProcessEnvironment's environ used it; only "global variable" was read), and blanks DocC links before pairing
+  backticks. Rejected: rewording those doc comments to fit the parser, which already read "global variable".
+- **mapping.ini** (`6e784c6`): fts is covered by DirectoryWalk, as section 14 decided and status.py already said;
+  PATH_MAX's and linger's hand partials predate SystemConfig.maxPathBytes and CInterop.Linger; the old calls that a
+  reentrant or newer one System wraps answers read as it (`same.`: gettimeofday and time as clock_gettime, usleep as
+  nanosleep, localtime and gmtime, getpwuid, getpwnam, getgrgid and getgrnam as their _r forms, mkstemp(s) as
+  mkostemp(s), strerror_r as strerror), as status.py's replacements did. The standard library's answers get entries
+  with a `swift` key (memory copies; rounding and roots), and string.h and stdio lose theirs, since section 7 put
+  those families in scope. Rejected: hand `covered` statuses, which need System declarations and hide what answers.
+- **ecosystem.py** (`6e784c6`): the report's new section *What the files that import Darwin still need* ranks, per
+  symbol, the interfaces that files importing Darwin in any form but through Apple Foundation use, by packages and
+  then sites, with coverage from the derivation's evidence for that symbol (an entry's status is its worst symbol's);
+  the standard library's answers, Dispatch and ObjectiveC names, and the packages' own C shims are set apart.
+  ECOSYSTEM.json keeps every row. Rejected: the report's existing top-30 gaps, which rank entries over every platform,
+  so Windows' dominate, and don't say which gaps a Darwin import waits on.
+
+Result, run `6e784c6e7026-4676fb13`: 756 interfaces, 567 covered, 131 gaps, 24 of them in two or more packages (259
+gaps before). The Queue above is ranked from it. No tests changed: the build is unchanged but for doc comments.
