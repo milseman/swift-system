@@ -102,6 +102,10 @@ def reach_section(w, adopters, cands, units, md):
     am = adopters["meta"]
     branch = am["branch"]
     pk = adopters["packages"]
+    name = {p["key"]: p["name"] for p in pk}
+
+    def names(keys):
+        return ", ".join(name.get(k, k) for k in keys)
     w("## Adopter reach")
     w("")
     w(f"Which packages use each carve-out's declarations on their `{branch}` branch (*using*), and which call "
@@ -157,7 +161,7 @@ def reach_section(w, adopters, cands, units, md):
     for k, x in enumerate(shown, 1):
         r = x["adopters"]
         w(f"| {k} | [`{x['id']}`](bundles/{x['id']}/bundle.md) | {x['kind']} | {x['rank']} | {x['declarations']} | "
-          f"{r['reach']} | {', '.join(r['using']) or '—'} | {', '.join(r['benefiting']) or '—'} | "
+          f"{r['reach']} | {names(r['using']) or '—'} | {names(r['benefiting']) or '—'} | "
           f"{r['adoptedSites']} / {r['benefitSites']} |")
     w("")
     w("### By package")
@@ -308,7 +312,9 @@ def main():
         extra = ""
         if adopters:
             r = x["adopters"]
-            extra = (f" Adopters: {len(r['using'])} using it" + (f" ({', '.join(r['using'])})" if r["using"] else "")
+            pname = {p["key"]: p["name"] for p in adopters["packages"]}
+            extra = (f" Adopters: {len(r['using'])} using it"
+                     + (f" ({', '.join(pname.get(k, k) for k in r['using'])})" if r["using"] else "")
                      + f", {len(r['benefiting'])} would benefit.")
         w(f"{x['rank']}. **`{x['id']}`** — {md(u['name'])} ({x['kind']}, score {x['score']}). {md(x['reason'])}."
           + extra)

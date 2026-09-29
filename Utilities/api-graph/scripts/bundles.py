@@ -513,11 +513,12 @@ def main():
         w(f"| Samples | {len(m['samples'])} |")
         if adopters:
             ad = data["adopters"]
+            pname = {p["key"]: p["name"] for p in adopters["packages"]}
             w(f"| Adopters | {len(ad['using'])} using it on `{adopters['meta']['branch']}`"
-              + (f" ({', '.join(ad['using'])})" if ad["using"] else "")
+              + (f" ({', '.join(pname.get(k, k) for k in ad['using'])})" if ad["using"] else "")
               + f"; {len(ad['benefiting'])} would benefit"
-              + (f" ({', '.join(ad['benefiting'][:8])}{', …' if len(ad['benefiting']) > 8 else ''})"
-                 if ad["benefiting"] else "") + " |")
+              + (f" ({', '.join(pname.get(k, k) for k in ad['benefiting'][:8])}"
+                 f"{', …' if len(ad['benefiting']) > 8 else ''})" if ad["benefiting"] else "") + " |")
         w(f"| C API | {', '.join('`' + c + '`' for c in m['cNames'][:24]) or '—'} |")
         w("")
         if u.get("reason"):

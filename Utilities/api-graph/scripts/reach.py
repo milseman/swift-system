@@ -124,6 +124,9 @@ def main():
     if not doc:
         raise SystemExit(f"reach: no api-graph.json in {a.dir}")
     kinds = set(x for x in a.kind.split(",") if x)
+    pname = {p["key"]: p["name"] for p in doc.get("adopterPackages", [])}
+    if a.package and a.package not in pname:
+        a.package = next((k for k, v in pname.items() if v == a.package), a.package)
     rows = []
     for c in doc["candidates"]:
         r = c.get("adopters")
@@ -154,9 +157,9 @@ def main():
               f"{x['kind']:<7} {x['id']}{extra}")
         if not a.package:
             if r["using"]:
-                print(f"{'':>34}using: {', '.join(r['using'])}")
+                print(f"{'':>34}using: {', '.join(pname.get(k, k) for k in r['using'])}")
             if r["benefiting"]:
-                print(f"{'':>34}would benefit: {', '.join(r['benefiting'])}")
+                print(f"{'':>34}would benefit: {', '.join(pname.get(k, k) for k in r['benefiting'])}")
 
 
 if __name__ == "__main__":

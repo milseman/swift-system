@@ -164,16 +164,28 @@ def export(repo, commit, dest):
 
 
 class Commit:
-    """Files of one commit, read with `git show`, never from a working tree."""
+    """Files of one commit, read through one `git cat-file --batch` process,
+    never from a working tree."""
 
     def __init__(self, repo, commit):
         self.repo, self.commit = repo, commit
         self.cache = {}
+        self.proc = None
 
     def text(self, rel):
         if rel not in self.cache:
-            r = subprocess.run(["git", "-C", self.repo, "show", f"{self.commit}:{rel}"], capture_output=True)
-            self.cache[rel] = r.stdout.decode("utf-8", "replace") if r.returncode == 0 else None
+            if self.proc is None:
+                self.proc = subprocess.Popen(["git", "-C", self.repo, "cat-file", "--batch"],
+                                             stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+            self.proc.stdin.write(f"{self.commit}:{rel}\n".encode())
+            self.proc.stdin.flush()
+            header = self.proc.stdout.readline().decode().split()
+            if len(header) == 3 and header[1] == "blob":
+                data = self.proc.stdout.read(int(header[2]))
+                self.proc.stdout.read(1)   # the newline after the contents
+                self.cache[rel] = data.decode("utf-8", "replace")
+            else:
+                self.cache[rel] = None     # "<name> missing", or not a file
         return self.cache[rel]
 
     def lines(self, rel):
@@ -181,6 +193,12 @@ class Commit:
             t = self.text(rel)
             self.cache[("lines", rel)] = t.split("\n") if t is not None else []
         return self.cache[("lines", rel)]
+
+    def close(self):
+        if self.proc:
+            self.proc.stdin.close()
+            self.proc.wait()
+            self.proc = None
 
 
 # ---------------------------------------------------------------- discovery
@@ -996,6 +1014,7 @@ def map_line(hunks, line):
 
 # ---------------------------------------------------------------- would benefit: C names
 
+C_FILES = (".c", ".h", ".cpp", ".cc", ".cxx", ".hpp", ".hh", ".m", ".mm", ".def", ".inc")
 SWIFT_WORDS = {"nil", "true", "false", "self", "Self", "super", "init", "Void", "Any", "some", "any", "inout"}
 
 
@@ -1073,7 +1092,7 @@ def lexical_interfaces(commit_obj, kinds, library):
     sites = collections.defaultdict(list)
     for rel in files:
         t = commit_obj.text(rel)
-        if not t or not any(n in t for n in want):
+        if not t or not pat.search(t):
             continue
         code = ss.strip_comments_and_strings(t)[0]
         for k, line in enumerate(code.split("\n"), 1):
@@ -1271,6 +1290,7 @@ def main():
             "sites": {"precise": n_precise, "lexical": n_lexical, "qualifier": n_qualifier},
             "seconds": round(time.time() - t0),
         }
+        co.close()
         print(f"adopters: {key}: {resolution} ({idx['build'].get('status')}"
               f"{', cached' if idx['build'].get('cached') else ''}"
               f"{': ' + idx['build']['reason'] if idx['build'].get('reason') else ''}); "
@@ -1318,8 +1338,9 @@ def main():
             interfaces = data["interfaces"]
             source, extraction = "coverage", data.get("extraction", "index")
         else:
-            interfaces = lexical_interfaces(Commit(src["path"], commit), {n: c_kinds.get(n, []) for n in name_nodes},
-                                            matcher.library)
+            cobj = Commit(src["path"], commit)
+            interfaces = lexical_interfaces(cobj, {n: c_kinds.get(n, []) for n in name_nodes}, matcher.library)
+            cobj.close()
             source, extraction = "lexical", "lexical"
         # For a package with a migration, whether each site's line survives
         # on the branch: the diff from this commit to the branch's tip, in
@@ -1342,7 +1363,10 @@ def main():
                 continue
             via = sorted(nm for nm in names if nm in name_nodes)
             used.add(itf["name"])
+            type_only = not ({"function", "constant", "macro", "variable", "error"} & set(itf.get("kinds") or []))
             for s in itf["sites"]:
+                if type_only and s["file"].endswith(C_FILES):
+                    continue   # C code spelling a C type can't adopt a Swift one; a shim's calls can go
                 site = {"package": rec["key"], "file": s["file"], "line": s["line"], "interface": itf["name"],
                         "via": [v for v in via if v != itf["name"]], "target": s.get("target"),
                         "platforms": sorted(k for k, v in (s.get("platforms") or {}).items() if v),
