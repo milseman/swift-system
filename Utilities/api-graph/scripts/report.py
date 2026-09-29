@@ -166,7 +166,11 @@ def draft_pitch(uid, u, nodes, edges):
     if rest:
         include.append({"paths": rest})
     kinds = {nodes[n]["kind"] for n in mine}
-    pattern = ("self-contained-type" if whole else "types-without-members" if partial and not rest else
+    # A guess, for the editor to correct: new types make it a type's pitch
+    # (the check then lists any members it leaves out), and members only a
+    # family's or a set of constants.
+    pattern = ("types-without-members" if partial and not whole and not rest else
+               "self-contained-type" if whole or partial else
                "constants" if kinds <= {"swift.property", "swift.type.property", "swift.enum.case"} else
                "function-family")
     return {"id": uid, "title": u["name"], "pattern": pattern, "status": "draft", "include": include,
