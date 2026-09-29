@@ -21,7 +21,7 @@ snapshot of the same head ref (graphq.py's diff), into --diff-out.
 
 Usage: snapshot.py --graph graph.json --cnames cnames.json [--adopters adopters.json]
                    --delta-dir DIR --meta meta.json --out graph.json.gz
-                   [--store DIR] [--previous SNAPSHOT] [--diff-out DIR]
+                   [--store DIR] [--previous SNAPSHOT] [--diff-out DIR] [--previous-out FILE]
 """
 
 import sys
@@ -304,6 +304,7 @@ def main():
     ap.add_argument("--store")
     ap.add_argument("--previous", help="a snapshot to diff with, instead of the store's previous one")
     ap.add_argument("--diff-out", help="a directory for DIFF.md and diff.json")
+    ap.add_argument("--previous-out", help="where to copy the snapshot it diffed with, for the pitch checks")
     a = ap.parse_args()
     doc = build(a)
     dump(doc, a.out)
@@ -330,6 +331,8 @@ def main():
             "nodes": len(doc["nodes"]), "links": len(doc["links"])}]
         json.dump(index, open(idx_path, "w"), indent=1)
         print(f"snapshot: filed as {os.path.join(a.store, name)}")
+    if a.previous_out and previous and os.path.exists(previous):
+        shutil.copyfile(previous, a.previous_out)
     if a.diff_out:
         import graphq
         os.makedirs(a.diff_out, exist_ok=True)

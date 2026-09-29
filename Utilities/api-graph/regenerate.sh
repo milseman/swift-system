@@ -36,6 +36,12 @@
 #   API_GRAPH_SNAPSHOTS  the graph snapshots' store, one per commit (default
 #                        ../api-graph-snapshots beside the repository); set it
 #                        empty to keep only the output's copy
+#   API_GRAPH_SNAPSHOT_PREVIOUS  a snapshot to diff with and to check the
+#                        pitches' changes against, instead of the store's
+#                        previous one of the same head ref
+#   API_GRAPH_PITCHES    the pitch files (default Prototype/Pitches in the
+#                        worktree: read from the working tree, since pitch
+#                        chats edit them between commits)
 #
 # Refs resolve as in api-delta: in the git worktree of the current directory
 # if it belongs to this repository, else in the worktree holding this script.
@@ -299,12 +305,17 @@ if [ -n "$ADOPTERS$ECOSYSTEM" ]; then
 fi
 log "graph snapshot"
 snapshot=(--graph "$WORK/graph.json" --cnames "$WORK/cnames.json" --delta-dir "$DELTA" --meta "$WORK/meta.json"
-  --out "$STAGE/graph.json.gz" --diff-out "$STAGE")
+  --out "$STAGE/graph.json.gz" --diff-out "$STAGE" --previous-out "$WORK/previous-snapshot.json.gz")
 if [ -f "$WORK/adopters.json" ]; then snapshot+=(--adopters "$WORK/adopters.json"); fi
 if [ -n "$SNAPSHOTS" ]; then snapshot+=(--store "$SNAPSHOTS"); fi
 if [ -n "${API_GRAPH_SNAPSHOT_PREVIOUS:-}" ]; then snapshot+=(--previous "$API_GRAPH_SNAPSHOT_PREVIOUS"); fi
 python3 "$S/snapshot.py" "${snapshot[@]}"
 python3 "$S/graphq.py" --snapshot "$STAGE/graph.json.gz" summary --diff "$STAGE/DIFF.md" --out "$STAGE/GRAPH.md"
+PITCHES="${API_GRAPH_PITCHES:-$REPO/Prototype/Pitches}"
+log "pitch files ($PITCHES)"
+pitches=(--snapshot "$STAGE/graph.json.gz" --pitches "$PITCHES" --out "$STAGE")
+if [ -f "$WORK/previous-snapshot.json.gz" ]; then pitches+=(--previous "$WORK/previous-snapshot.json.gz"); fi
+python3 "$S/pitches.py" "${pitches[@]}"
 log "clusters"
 clusters=(--graph "$WORK/graph.json" --config "$TOOL/config.json" --contingencies "$TOOL/contingencies.json"
   --evidence "$TOOL/evidence.json" --root "$WORK/head/src" --out "$WORK/clusters.json")

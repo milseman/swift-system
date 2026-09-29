@@ -1,0 +1,10 @@
+{
+  "id": "descriptor-types",
+  "title": "Descriptor types: SocketDescriptor and TerminalDescriptor",
+  "pattern": "types-without-members",
+  "status": "draft",
+  "include": [
+    {"types": ["SocketDescriptor", "TerminalDescriptor"], "members": false}
+  ],
+  "notes": "An example of the pattern: a family of types, and nothing else. Each type's conversions (init(unchecked:), the checked init(_:), fileDescriptor) and operations go to pitches of its members."
+}

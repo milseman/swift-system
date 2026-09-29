@@ -1,0 +1,10 @@
+{
+  "id": "terminal-types",
+  "title": "Terminal attribute types",
+  "pattern": "types-without-members",
+  "status": "draft",
+  "include": [
+    {"types": ["TerminalAttributes"], "members": false, "nested": true}
+  ],
+  "notes": "TerminalAttributes and the types nested in it (CharacterSize, Parity, StopBits, SetAction), without members, so terminal-attributes-members can pitch the members on top."
+}

@@ -1,0 +1,11 @@
+{
+  "id": "file-times",
+  "title": "File times: futimens and utimensat",
+  "pattern": "function-family",
+  "status": "draft",
+  "include": [
+    {"cFamily": "utimensat"},
+    {"cNames": ["UTIME_NOW", "UTIME_OMIT"]}
+  ],
+  "notes": "An example of the pattern: the wrappers of one C function family (futimens on FileDescriptor, utimensat on FilePath), and the timespec markers they take."
+}

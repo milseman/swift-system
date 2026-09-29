@@ -1,0 +1,11 @@
+{
+  "id": "terminal-attributes-members",
+  "title": "TerminalAttributes' members",
+  "pattern": "members-of-pitched-type",
+  "status": "draft",
+  "requires": ["terminal-types"],
+  "include": [
+    {"membersOf": "TerminalAttributes", "nested": true}
+  ],
+  "notes": "An example of the pattern: the members of a type terminal-types owns, and of its nested types."
+}
