@@ -143,6 +143,10 @@ internal func system_sched_yield() -> CInt {
   sched_yield()
 }
 
+internal func system_pthread_exit() -> Never {
+  pthread_exit(nil)
+}
+
 #if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
 internal func system_pthread_main_np() -> CInt {
   pthread_main_np()
@@ -211,6 +215,12 @@ internal func system_pthread_attr_setstacksize(
   _ attributes: UnsafeMutablePointer<_PThreadAttrStorage>, _ size: Int
 ) -> CInt {
   pthread_attr_setstacksize(attributes, size)
+}
+
+internal func system_pthread_attr_getstacksize(
+  _ attributes: UnsafePointer<_PThreadAttrStorage>, _ size: UnsafeMutablePointer<Int>
+) -> CInt {
+  pthread_attr_getstacksize(attributes, size)
 }
 
 internal func system_pthread_attr_setguardsize(

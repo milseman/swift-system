@@ -153,6 +153,32 @@ extension PThread {
     _ = system_sched_yield()
   }
 
+  /// Ends the calling thread.
+  ///
+  /// The code on the thread's stack doesn't finish:
+  /// its `defer` blocks don't run,
+  /// and the values it holds aren't destroyed, so what they own leaks.
+  /// The thread's thread-specific values are destroyed, as when it returns.
+  /// Returning from the closure that ``init(attributes:_:)`` runs
+  /// is the way to end a thread that it created;
+  /// this is for a thread that ends from deep in code that can't return,
+  /// as Foundation's `Thread.exit()` does.
+  ///
+  /// Ending the main thread this way doesn't end the process,
+  /// which runs until its last thread ends.
+  ///
+  /// The corresponding C function is `pthread_exit`.
+  @_alwaysEmitIntoClient
+  @available(*, noasync, message: "A task's code can't end the thread it runs on")
+  public static func exit() -> Never {
+    _exit()
+  }
+
+  @usableFromInline
+  internal static func _exit() -> Never {
+    system_pthread_exit()
+  }
+
   #if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
   /// Whether the calling thread is the process's main thread.
   ///

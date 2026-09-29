@@ -313,7 +313,8 @@ target_sources(SystemPackage PRIVATE
   Threads/PThreadMutex.swift
   Threads/PThreadNames.swift
   Threads/PThreadReadWriteLock.swift
-  Threads/PThreadScheduling.swift)
+  Threads/PThreadScheduling.swift
+  Threads/PThreadStaticInitializers.swift)
 target_sources(SystemPackage PRIVATE
   Time/ClockID.swift
   Time/Sleep.swift)
