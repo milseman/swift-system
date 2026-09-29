@@ -143,6 +143,28 @@ ANSWERED = [
 ]
 
 
+# Interfaces that System's docs name, but where the adopters' markers ask for
+# more than the API that names them gives: (the names, what the markers ask
+# for, a witness in System's sources that the ask is met). Until the witness
+# is there, such an interface counts as missing, though a doc names it.
+STILL_NEEDED = [
+    # TSC's public `extension dirent { var name }` extends the C type itself,
+    # which needs a public name, with Swift-named accessors (decision 84);
+    # DirectoryStream.Entry, which names struct dirent, is another type.
+    (r"^dirent$", "a CInterop alias for struct dirent, with Swift-named accessors",
+     "public typealias DirectoryEntry = dirent"),
+    # TSC's public dlerror() returns and clears the loader's pending error;
+    # LoaderError, which names dlerror, carries only the errors System throws.
+    (r"^dlerror$", "a call that returns and clears the loader's pending error",
+     "public static func takePendingError()"),
+    # Subprocess's configurator test adds a working-directory action to C
+    # file actions that Subprocess built; SpawnFileAction names addchdir_np,
+    # but only for the C file actions System builds itself.
+    (r"^posix_spawn_file_actions_addchdir(_np)?$", "adding a SpawnFileAction to C file actions that other code built",
+     "public func add(to cFileActions: inout CInterop.SpawnFileActions)"),
+]
+
+
 class SystemNames:
     """What System's library modules name at a commit: the C names in their
     doc comments' "corresponding C" sentences, their public typealiases'
@@ -184,6 +206,13 @@ class SystemNames:
             if found:
                 self.answered.append((pattern, api))
 
+        self.still_needed = []
+        for pattern, ask, witness in STILL_NEEDED:
+            found = subprocess.run(["git", "-C", repo, "grep", "-q", "-F", "-e", witness, commit, "--",
+                                    *SYSTEM_SOURCES]).returncode == 0
+            if not found:
+                self.still_needed.append((pattern, ask))
+
         self.accessor_structs = set()
         out = git(repo, "grep", "-h", "-I", "-E", "-e", r"^[[:space:]]*extension[[:space:]]+CInterop\.", commit, "--",
                   *SYSTEM_SOURCES, ok=(0, 1))
@@ -198,6 +227,9 @@ class SystemNames:
 
     def covers(self, name):
         """(covered, how) for a gap interface's name."""
+        for pattern, ask in self.still_needed:
+            if re.search(pattern, name):
+                return False, f"named, but the marker asks for {ask}"
         for pattern, api in self.answered:
             if re.search(pattern, name):
                 return True, f"by {api}"
@@ -1172,7 +1204,8 @@ def main():
             return "covered", how + (f"; not yet in `{a.system_next}`" if late else "")
         if covered:
             return "missing", f"{len(covered)} of {len(names)} names covered"
-        return "missing", ""
+        asks = [how for how in (sys_head.covers(n)[1] for n in names) if how.startswith("named, but")]
+        return "missing", asks[0] if asks else ""
 
     rows = []
     for iface, g in gaps.items():
@@ -1328,8 +1361,12 @@ api-delta's last run, and a few seconds when they haven't.
   witness in System's sources shows the answer has what the markers ask for (`ANSWERED`: fts is DirectoryWalk, with
   its two-visit order, `malloc_type_descriptor_v0_t`'s members are `Memory.TypeDescriptor`'s properties, and
   Subprocess's raw posix_spawn path, a marker that names no C interface, is `ProcessID.spawn`'s C-values and
-  credentials forms). This sees what System documents, not whether the API fits the adopter's use: a partial
-  wrapper counts as covered, and an API whose doc comments don't name the C interface counts as missing.
+  credentials forms). The other way round, an interface that System's docs name counts as missing while the
+  markers ask for more than the naming API gives, until a witness shows the ask is met (`STILL_NEEDED`: struct
+  dirent needs a public name with accessors, dlerror a call that takes the pending error, and addchdir_np a way to
+  add an action to C file actions that other code built). This sees what System documents, not whether the API
+  fits the adopter's use: a partial wrapper counts as covered, and an API whose doc comments don't name the C
+  interface counts as missing.
 - **Provisional families** (libm, C stdio, locale and xlocale, string.h and ctype.h, numeric conversion) are a
   fixed list in `scripts/status.py`, matched by name or by the name's SDK module in adopter-coverage's stored
   vocabulary when there is one. They're C-library layers above the OS that System wraps provisionally, in
