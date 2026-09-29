@@ -477,3 +477,33 @@ places (FileTimes.swift, FilePathOperations.swift, Syscalls.swift's UserID and G
 Where the branch stands: every interface that the adopters' 51 markers name is covered (76 of 76), 12 DocC
 diagnostics remain (none in this branch's files; the processes lane's ambiguous spawn links are two of them), and
 local system-next is still `e8762dd`.
+
+## 24. Spawning with other credentials: two fixes from review: `06c9245`
+
+- **Close-on-exec sources.** The child clears close-on-exec on every descriptor that the file actions use (section
+  22), so one used only as a source stayed open in the program, where a spawn's exec closes it. Found on macOS
+  26.3 with a C probe (fork, then posix_spawn with SETEXEC): a close-on-exec pipe end duplicated as the standard
+  output, a working directory's descriptor, and a descriptor duplicated onto itself (Darwin's adddup2 keeps its
+  flag then) all stayed open; POSIX_SPAWN_CLOEXEC_DEFAULT still closes what the actions don't install; a close
+  action on a descriptor that isn't open fails the spawn with EBADF, so closes can't be added blindly. For
+  System's file actions, the parent now appends a close action for each descriptor that the actions use as a
+  source, that has close-on-exec set, and that no action closes, replaces or inherits. Rejected: adding the
+  closes in the child (adding to C file actions allocates, which the forked child of a threaded process
+  mustn't); always setting CLOEXEC_DEFAULT, as Subprocess does, which also closes the descriptors without
+  close-on-exec that a spawn passes on; following each descriptor's state action by action (an action that
+  closes, replaces or inherits one settles it whatever comes after, so a set does). The C-values forms can't read
+  their actions, so their doc says what the caller must do: a close action after each descriptor's last use, or
+  CLOEXEC_DEFAULT.
+- **The error pipe's window.** Where pipe2 is missing (macOS 26, or a build with an older SDK), the pipe becomes
+  close-on-exec in a second step; a program that another thread starts in between inherits it, and the parent's
+  read, which ends when every write end has closed, waits until that program exits or closes it. Nothing in the
+  macOS 26 SDK makes a pipe or a socket pair close-on-exec at once (no SOCK_CLOEXEC), so the shim's comment and
+  the spawn doc state the window and its consequence. Rejected: watching the child with a kqueue (EVFILT_PROC,
+  NOTE_EXEC and NOTE_EXIT), which no inherited descriptor can delay, but which misses an exec that comes before
+  the registration unless the child waits for the parent: a second channel and a round trip in every spawn, for
+  a window that pipe2 closes from macOS 27.
+
+Tests: SpawnCredentialsTest's `testTheProgramGetsTheDescriptorsASpawnWould` (a shell reports which of seven
+descriptors are open, spawned with and without credentials; before the fix three more were open with them) and
+`testCValuesKeepTheDescriptorsTheyUse`; `testCalls` now expects the parent's F_GETFD. XCTest 551 (4 skipped, and
+testVolumeAttributes skipped), swift-testing 461 in 72 suites, all passing.
