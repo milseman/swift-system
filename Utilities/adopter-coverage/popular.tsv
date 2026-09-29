@@ -1,0 +1,27 @@
+# Popular Swift packages beyond the toolchain, for ecosystem.sh --popular: the
+# swift-server and swiftlang ecosystems' most used packages, and the libraries
+# they're built on. One per line: name, GitHub repository, ref (a tag or
+# branch), and why it's here. The survey audits those whose library code
+# imports Darwin.
+name	remote	ref	why
+async-http-client	swift-server/async-http-client	main	the swift-server HTTP client
+swift-service-lifecycle	swift-server/swift-service-lifecycle	main	swift-server's service lifecycle, signal handling
+swift-aws-lambda-runtime	swift-server/swift-aws-lambda-runtime	main	swift-server's AWS Lambda runtime
+swift-metrics	apple/swift-metrics	main	the server metrics API
+swift-distributed-tracing	apple/swift-distributed-tracing	main	the server tracing API
+swift-nio-ssl	apple/swift-nio-ssl	main	NIO's TLS
+swift-nio-http2	apple/swift-nio-http2	main	NIO's HTTP/2
+swift-nio-extras	apple/swift-nio-extras	main	NIO's extra handlers
+swift-nio-transport-services	apple/swift-nio-transport-services	main	NIO on Network.framework
+swift-nio-ssh	apple/swift-nio-ssh	main	NIO's SSH
+swift-openapi-generator	apple/swift-openapi-generator	main	the OpenAPI generator
+swift-openapi-runtime	apple/swift-openapi-runtime	main	the OpenAPI runtime
+swift-protobuf	apple/swift-protobuf	main	Protocol Buffers
+grpc-swift-2	grpc/grpc-swift-2	main	gRPC's core library
+grpc-swift-nio-transport	grpc/grpc-swift-nio-transport	main	gRPC's NIO transport
+vapor	vapor/vapor	main	the Vapor web framework
+postgres-nio	vapor/postgres-nio	main	the PostgreSQL client
+hummingbird	hummingbird-project/hummingbird	main	the Hummingbird web framework
+swift-otel	swift-otel/swift-otel	main	OpenTelemetry for the server API
+swiftly	swiftlang/swiftly	main	swiftlang's toolchain installer
+swift-java	swiftlang/swift-java	main	swiftlang's Java interoperability

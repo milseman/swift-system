@@ -78,8 +78,9 @@ def load(path):
 
 
 # Where package files are found, in order: the audited adopters, then the
-# generated files of the toolchain's other packages (ecosystem.sh).
-SEARCH = ("", "ecosystem")
+# generated files of the toolchain's other packages and of the popular
+# packages beyond it (ecosystem.sh, and its --popular).
+SEARCH = ("", "ecosystem", "popular")
 
 
 def path_of(packages, name):
