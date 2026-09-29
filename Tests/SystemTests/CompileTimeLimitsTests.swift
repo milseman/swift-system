@@ -27,7 +27,8 @@ import Android
 @testable import System
 #endif
 
-// The C library's compile-time limits on names, paths and symbolic links.
+// The C library's compile-time limits on names, paths, symbolic links and
+// arguments.
 @available(System 199, *)
 final class CompileTimeLimitsTest: XCTestCase {
   func testLimitsAreTheHeaders() {
@@ -38,6 +39,16 @@ final class CompileTimeLimitsTest: XCTestCase {
     XCTAssertEqual(SystemConfig.maxPathBytes, 1024)
     XCTAssertEqual(SystemConfig.maxSymbolicLinks, Int(MAXSYMLINKS))
     #endif
+  }
+
+  /// POSIX's least limit on a program's arguments is 4096 bytes,
+  /// and the system's own is no less.
+  func testGuaranteedArgumentBytes() throws {
+    XCTAssertEqual(SystemConfig.guaranteedArgumentBytes, Int(_POSIX_ARG_MAX))
+    XCTAssertEqual(SystemConfig.guaranteedArgumentBytes, 4096)
+    if let system = try SystemConfig.value(.maxArgumentBytes) {
+      XCTAssertGreaterThanOrEqual(system, SystemConfig.guaranteedArgumentBytes)
+    }
   }
 
   /// A file system's own limit is no more than the headers'.

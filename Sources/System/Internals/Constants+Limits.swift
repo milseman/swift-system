@@ -7,7 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-// The C library's compile-time limits on names and paths.
+// The C library's compile-time limits on names, paths and arguments.
 
 #if !os(Windows) && !os(WASI)
 
@@ -28,6 +28,9 @@ internal var _NAME_MAX: CInt { NAME_MAX }
 
 @_alwaysEmitIntoClient
 internal var _PATH_MAX: CInt { PATH_MAX }
+
+@_alwaysEmitIntoClient
+internal var __POSIX_ARG_MAX: CInt { _POSIX_ARG_MAX }
 
 #if SYSTEM_PACKAGE_DARWIN
 @_alwaysEmitIntoClient
