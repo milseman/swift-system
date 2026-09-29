@@ -14,11 +14,11 @@ Darwin; grouped here into clusters and ranked by packages, then call sites. Late
 (System `6e784c6`, the 21 main-scheme packages that import Darwin): 756 interfaces, 567 covered, 131 gaps (24 in two
 or more packages); set apart, 14 the standard library answers, 18 other modules' names, 26 the packages' own shims.
 
-Next: cluster 1. Resume from the first row not marked done.
+Next: cluster 2. Resume from the first row not marked done.
 
 | # | Cluster | Packages | Sites | Interfaces | Plan |
 |---|---|---:|---:|---|---|
-| 1 | string.h and ctype.h | 9 | 60 | strdup (7 packages), strlen, strnlen, strncmp, strlcpy, tolower, isspace | `CString` and `CType`, provisional |
+| 1 | string.h and ctype.h | 9 | 60 | strdup (7 packages), strlen, strnlen, strncmp, strlcpy, tolower, isspace | done: `CString` and `CType` (section 26) |
 | 2 | C stdio beyond FileStream | 5 | 12 | fputs, perror, putc, snprintf | FileStream |
 | 3 | Sockets | 4 | 104 | sockaddr_storage (NIO 34), inet_pton (partial), freeaddrinfo, INADDR_ANY and the address-string lengths, NI_MAXHOST, NIO's multicast and packet-info options, nfds_t, AF_VSOCK | check each against SystemSockets |
 | 4 | C scalar types | 4 | 7 | suseconds_t, u_int, LONG_MAX, _POSIX_ARG_MAX | `swift` answers where the standard library has them |
@@ -42,7 +42,7 @@ say; the standard library's answers (off_t, ssize_t, size_t and uintptr_t are In
 memset; round, sqrt, ceil, floor, fabs, modf); Dispatch and ObjectiveC names; the packages' own C shims
 (CNIODarwin_*, c_nio_posix_*, _subprocess_*).
 
-Done: step 0, what the tools couldn't see (section 25).
+Done: step 0, what the tools couldn't see (section 25); cluster 1 (section 26).
 
 ## 1. status.sh and STATUS.md (2026-09-28)
 
@@ -582,3 +582,33 @@ Fixing that came first, since every later rank depends on it.
 
 Result, run `6e784c6e7026-4676fb13`: 756 interfaces, 567 covered, 131 gaps, 24 of them in two or more packages (259
 gaps before). The Queue above is ranked from it. No tests changed: the build is unchanged but for doc comments.
+
+## 26. C strings and character classes, provisionally: `f29fa08`
+
+The top of the Queue: string.h's C-string functions are the gap that the most packages' Darwin-importing files share
+(9 packages, 60 sites; strdup alone 7, and four of the migrations each wrote a strdup of their own), with ctype.h's
+tolower (swift-build's header maps) and isspace (Foundation's property list scanner).
+`Sources/System/Provisional/Provisional+StringH.swift` and `Provisional+CType.swift`:
+
+- `CString`, a namespace, as `Math` is for libm: `length(of:)` and `length(of:maxLength:)` (strlen, strnlen),
+  `duplicate(_:)` and `duplicate(_:maxLength:)` (strdup, strndup; `throws(Errno)`), whose copies `Memory.free`
+  frees, `compare(_:_:)` and `compare(_:_:maxLength:)` (strcmp, strncmp, returning the sign as an `Int`), and
+  `copy(_:into:)` (strlcpy, into a buffer pointer, returning the source's length). A `String` argument converts to a
+  temporary C string, as it does for the C functions. Negative lengths trap.
+- `CType`: `isSpace`, `isBlank`, `isDigit`, `isHexDigit`, `isLetter`, `isLetterOrDigit`, `isUppercase`, `isLowercase`,
+  `isPunctuation`, `isPrintable`, `isGraphic`, `isControl`, `lowercased`, `uppercased`, on `UInt8`, so C's undefined
+  behavior for a negative `char` can't arise; they follow the C library's current locale, as C's do.
+- memcpy, memmove and memset stay the standard library's (section 1), and memcmp and memchr `Memory`'s.
+- Rejected: members of `UnsafePointer<CChar>` or `UInt8`, which would sit on every pointer and byte and read as the
+  standard library's; a `String`-only duplicate, since callers also copy from C memory; `Bool` results for
+  `compare`, which serve equality but not ordering; `CCharacter` for the ctype namespace (`CType` is the header's
+  name, as `Math` is libm's role). Where glibc (before 2.38) or WASI's libc may lack strlcpy, it's strlen and a copy.
+  Not on Windows, whose C library names several of these differently.
+- strdup and strndup are mocked (a success copies for real, as mocked allocations do); the others can't fail.
+
+Tests: ProvisionalStringTests (CString: lengths, duplicates, comparisons, copies; CType: every ASCII byte's classes
+and case, and agreement with the C functions for all 256 bytes) and ProvisionalStringMockTest. XCTest 552 (4
+skipped, and testVolumeAttributes skipped), swift-testing 468 in 74 suites, all passing.
+
+Local system-next moved to `3d1e67d` (Michael's merge of coverage up to `0a3c801`); merging it back (`a87b3be`)
+changed nothing.
