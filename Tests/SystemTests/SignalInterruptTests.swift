@@ -49,7 +49,7 @@ final class SignalInterruptTest: XCTestCase {
       }
       // With nothing to read, the read blocks until it's interrupted.
       let reader = pipe.readEnd
-      let result = try interruptingCall({
+      let result = try interruptingCall(retried: retry, {
         var byte: UInt8 = 0
         return try withUnsafeMutableBytes(of: &byte) {
           try reader.read(into: $0, retryOnInterrupt: retry)
@@ -69,7 +69,7 @@ final class SignalInterruptTest: XCTestCase {
 
   func testWriteRetriesOnlyWhenAsked() throws {
     for retry in [false, true] {
-      let result = try writeToAFullPipe { fd, byte in
+      let result = try writeToAFullPipe(retried: retry) { fd, byte in
         try withUnsafeBytes(of: byte) { try fd.write($0, retryOnInterrupt: retry) }
       }
       if retry {
@@ -87,7 +87,7 @@ final class SignalInterruptTest: XCTestCase {
       throw XCTSkip("Span-based I/O requires macOS 15 or later")
     }
     for retry in [false, true] {
-      let result = try writeToAFullPipe { fd, byte in
+      let result = try writeToAFullPipe(retried: retry) { fd, byte in
         try withUnsafeBytes(of: byte) {
           try fd.writeAll(RawSpan(_unsafeBytes: $0), retryOnInterrupt: retry)
         }
@@ -109,6 +109,7 @@ final class SignalInterruptTest: XCTestCase {
 /// so that a write that was retried can finish.
 @available(System 199, *)
 private func writeToAFullPipe(
+  retried: Bool,
   _ write: @escaping @Sendable (FileDescriptor, UInt8) throws -> Int
 ) throws -> Result<Int, any Error> {
   let pipe = try FileDescriptor.pipe()
@@ -118,7 +119,7 @@ private func writeToAFullPipe(
   }
   try fill(pipe.writeEnd)
   let writer = pipe.writeEnd
-  return try interruptingCall({ try write(writer, 1) }, thenUnblock: {
+  return try interruptingCall(retried: retried, { try write(writer, 1) }, thenUnblock: {
     let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 64 * 1024, alignment: 1)
     defer { buffer.deallocate() }
     _ = try pipe.readEnd.read(into: buffer)
@@ -144,15 +145,28 @@ private func fill(_ fd: FileDescriptor) throws {
   }
 }
 
-/// Calls `call` on a thread of its own,
-/// interrupting it with SIGUSR2 until it returns, up to 20 times.
+/// How many times the SIGUSR2 handler has run.
+nonisolated(unsafe) private var handledSignals: CInt = 0
+
+/// Calls `call` on a thread of its own, interrupting it with SIGUSR2.
 ///
 /// Then this function calls `unblock`, so that a call that was retried
 /// can finish, and returns the result of `call`.
+///
+/// A signal that arrives before the call blocks doesn't interrupt it, and
+/// how soon the thread gets that far depends on the machine's load. So
+/// this sends one signal at a time, each once the thread has handled the
+/// last, until the call returns, which a call that isn't retried does at
+/// its first interruption. One that is `retried` never returns by itself,
+/// so for it this stops after three: it can't tell which of them reached
+/// the call rather than the code before it, but the result it checks is
+/// the same either way.
 private func interruptingCall(
+  retried: Bool,
   _ call: @escaping @Sendable () throws -> Int,
   thenUnblock unblock: () throws -> Void
 ) throws -> Result<Int, any Error> {
+  handledSignals = 0
   var previous = try installInterruptingHandler(for: SIGUSR2)
   defer { sigaction(SIGUSR2, &previous, nil) }
 
@@ -177,10 +191,15 @@ private func interruptingCall(
   defer { state.release() }
 
   let thread = try XCTUnwrap(state.waitForStart(), "The thread didn't start")
-  usleep(10_000)
-  for _ in 0..<20 where !state.isFinished {
+  // The guard counts milliseconds slept, which take at least as long.
+  var guardLeft = hangGuardSeconds * 1_000
+  while !state.isFinished && !(retried && handledSignals >= 3) && guardLeft > 0 {
+    let handled = handledSignals
     pthread_kill(thread, SIGUSR2)
-    usleep(5_000)
+    repeat {
+      usleep(1_000)
+      guardLeft -= 1
+    } while handledSignals == handled && !state.isFinished && guardLeft > 0
   }
   try unblock()
   return try XCTUnwrap(state.waitForResult(), "The call didn't return")
@@ -189,7 +208,7 @@ private func interruptingCall(
 /// Handles `signal` without SA_RESTART, so that it interrupts a blocked call,
 /// and returns the action it replaces.
 private func installInterruptingHandler(for signal: CInt) throws(Errno) -> sigaction {
-  let handler: @convention(c) (CInt) -> Void = { _ in }
+  let handler: @convention(c) (CInt) -> Void = { _ in handledSignals += 1 }
   var action = sigaction()
   // Each C library names the handler field differently, as in SwiftPM.
   #if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
@@ -238,9 +257,9 @@ private final class InterruptedCall: @unchecked Sendable {
 
   func release() { releaseSemaphore.signal() }
 
-  /// Polls `value` for up to 10 seconds.
+  /// Polls `value` for up to the hang guard.
   private func wait<T>(for value: () -> T?) -> T? {
-    for _ in 0..<10_000 {
+    for _ in 0..<(hangGuardSeconds * 1_000) {
       if let value = lock.withLock(value) { return value }
       usleep(1_000)
     }

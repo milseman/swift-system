@@ -8,7 +8,8 @@
 */
 
 // Helpers for the PThread tests. Waits are bounded, so that a broken
-// implementation fails a test instead of hanging it.
+// implementation fails a test instead of hanging it, but only by
+// `hangGuardSeconds`: a busy machine can keep a thread waiting for seconds.
 
 #if !os(Windows) && !os(WASI)
 
@@ -80,7 +81,7 @@ final class Latch: @unchecked Sendable {
 
   /// Waits until the latch opens, for at most `seconds`.
   /// Returns whether it opened.
-  func wait(seconds: Int = 10) -> Bool {
+  func wait(seconds: Int = hangGuardSeconds) -> Bool {
     let deadline = realtimeDeadline(seconds: seconds)
     return try! mutex.withLock {
       while !isOpen {

@@ -267,6 +267,11 @@ private struct PThreadTests {
     #expect(seen.value == .utility)
   }
 
+  /// A busy machine can leave a background thread without a processor for
+  /// many seconds, and until it runs again after lowering itself, it hasn't
+  /// recorded its new class where another thread reads it. So an override
+  /// keeps it at the default class meanwhile, which pthread_get_qos_class_np
+  /// doesn't report.
   @available(System 199, *)
   @Test func setCurrentQualityOfService() throws {
     let seen = Locked<(PThread.QoSClass, CInt)?>(nil)
@@ -277,6 +282,9 @@ private struct PThreadTests {
       ready.open()
       _ = release.wait()
     }
+    // Ended after the join, so that the thread exits at the default class too.
+    let override = pthread_override_qos_class_start_np(thread.id.rawValue, QOS_CLASS_DEFAULT, 0)
+    defer { pthread_override_qos_class_end_np(override) }
     do {
       defer { release.open() }
       #expect(ready.wait())

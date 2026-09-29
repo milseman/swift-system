@@ -153,11 +153,13 @@ final class KernelQueueTests: XCTestCase {
     try queue.register(
       KernelEvent(identifier: 42, filter: .timer, flags: [.add, .oneShot], data: 10))
 
-    let event = try XCTUnwrap(try poll(queue, timeout: .seconds(10)).first)
+    let event = try XCTUnwrap(try poll(queue, timeout: .seconds(hangGuardSeconds)).first)
     XCTAssertGreaterThanOrEqual(ContinuousClock.now - start, .milliseconds(9))
     XCTAssertEqual(event.identifier, 42)
     XCTAssertEqual(event.filter, .timer)
-    XCTAssertEqual(event.data, 1, "the number of expirations")
+    // Darwin counts the intervals that passed before the poll read the
+    // event, more than one when the poll runs late.
+    XCTAssertGreaterThanOrEqual(event.data, 1, "the number of expirations")
 
     assertThrows(.noSuchFileOrDirectory, "a one-shot timer is gone once reported") {
       try queue.register(KernelEvent(identifier: 42, filter: .timer, flags: .delete))
@@ -170,7 +172,12 @@ final class KernelQueueTests: XCTestCase {
     try queue.register(KernelEvent(
       identifier: 1, filter: .timer, flags: .add,
       filterFlags: .timerNanoseconds, data: 2_000_000))
-    usleep(30_000)
+    // Once the timer has fired, which the queue's readability shows without
+    // reading the event, each interval that passes before the poll reads it
+    // adds to its count.
+    XCTAssertEqual(
+      try queue.fileDescriptor.poll(for: .readable, timeout: .seconds(hangGuardSeconds)), .readable)
+    usleep(10_000)
     let event = try XCTUnwrap(try poll(queue).first)
     XCTAssertGreaterThan(event.data, 1, "a repeating timer counts its expirations")
   }
@@ -190,7 +197,7 @@ final class KernelQueueTests: XCTestCase {
       try? loop.queue.register(
         KernelEvent(identifier: 7, filter: .user, filterFlags: .userTrigger))
     }
-    let event = try XCTUnwrap(try poll(loop.queue, timeout: .seconds(10)).first)
+    let event = try XCTUnwrap(try poll(loop.queue, timeout: .seconds(hangGuardSeconds)).first)
     XCTAssertEqual(event.identifier, 7)
     XCTAssertEqual(event.filter, .user)
 
@@ -222,12 +229,13 @@ final class KernelQueueTests: XCTestCase {
       buffer in
       buffer.initialize(repeating: KernelEvent(identifier: 0, filter: .user))
       var events = OutputSpan(buffer: buffer, initializedCount: 1)
-      let count = try queue.poll(into: &events, timeout: .seconds(10))
+      // Waiting would take the whole timeout, which is twice the guard.
+      let count = try queue.poll(into: &events, timeout: .seconds(2 * hangGuardSeconds))
       _ = events.finalize(for: buffer)
       return count
     }
     XCTAssertEqual(count, 0)
-    XCTAssertLessThan(ContinuousClock.now - start, .seconds(5))
+    XCTAssertLessThan(ContinuousClock.now - start, .seconds(hangGuardSeconds))
   }
 
   func testPollAppendsToSpan() throws {
@@ -277,12 +285,12 @@ final class KernelQueueTests: XCTestCase {
         filterFlags: [.vnodeWrite, .vnodeDelete]))
 
       try file.writeAll("x".utf8)
-      let written = try XCTUnwrap(try poll(queue, timeout: .seconds(10)).first)
+      let written = try XCTUnwrap(try poll(queue, timeout: .seconds(hangGuardSeconds)).first)
       XCTAssertTrue(written.filterFlags.contains(.vnodeWrite))
       XCTAssertFalse(written.filterFlags.contains(.vnodeDelete))
 
       try path.unlink()
-      let deleted = try XCTUnwrap(try poll(queue, timeout: .seconds(10)).first)
+      let deleted = try XCTUnwrap(try poll(queue, timeout: .seconds(hangGuardSeconds)).first)
       XCTAssertTrue(deleted.filterFlags.contains(.vnodeDelete))
     }
   }
@@ -296,7 +304,7 @@ final class KernelQueueTests: XCTestCase {
 
     // The filter reports only signals sent to the process, not to a thread.
     kill(getpid(), SIGUSR1)
-    let event = try XCTUnwrap(try poll(queue, timeout: .seconds(10)).first)
+    let event = try XCTUnwrap(try poll(queue, timeout: .seconds(hangGuardSeconds)).first)
     XCTAssertEqual(event.identifier, UInt(SIGUSR1))
     XCTAssertEqual(event.data, 1, "the number of times the signal arrived")
   }
@@ -317,7 +325,7 @@ final class KernelQueueTests: XCTestCase {
       filterFlags: [.processExit, .processExitStatus]))
     try writeEnd.close()
 
-    let event = try XCTUnwrap(try poll(queue, timeout: .seconds(30)).first)
+    let event = try XCTUnwrap(try poll(queue, timeout: .seconds(hangGuardSeconds)).first)
     XCTAssertEqual(event.identifier, UInt(child.rawValue))
     XCTAssertTrue(event.filterFlags.contains(.processExit))
     XCTAssertEqual(event.data, 3 << 8, "the wait status of `exit 3`")

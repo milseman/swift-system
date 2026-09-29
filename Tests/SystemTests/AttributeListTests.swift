@@ -185,7 +185,7 @@ final class AttributeListTest: XCTestCase {
     try withTemporaryFilePath(basename: "testVolumeAttributes") { path in
       let volume = try path.attributes([
         .volumeCapabilities, .volumeFileSystemTypeName, .volumeName, .volumeMountPoint,
-        .volumeAvailableSpace, .volumeUsedSpace, .volumeIOBlockSize,
+        .volumeSize, .volumeFreeSpace, .volumeAvailableSpace, .volumeUsedSpace, .volumeIOBlockSize,
       ])
       let capabilities = try XCTUnwrap(volume.volumeCapabilities)
       XCTAssertTrue(capabilities.format.contains(.symbolicLinks))
@@ -194,16 +194,28 @@ final class AttributeListTest: XCTestCase {
       XCTAssertFalse(try XCTUnwrap(volume.volumeName).isEmpty)
       let mountPoint = try XCTUnwrap(volume.volumeMountPoint)
       XCTAssertTrue(mountPoint.isAbsolute)
-      XCTAssertGreaterThan(volume.value(of: .volumeAvailableSpace, as: Int64.self) ?? 0, 0)
       XCTAssertGreaterThan(volume.value(of: .volumeIOBlockSize, as: UInt32.self) ?? 0, 0)
 
       // The values after ATTR_VOL_SPACEUSED, which isn't in bit order,
-      // are where the order that getattrlist(2) documents puts them.
+      // are where the order that getattrlist(2) documents puts them. Only
+      // what the volume doesn't change is compared with statfs: its free
+      // space changes whenever anything writes to the disk, so the space
+      // values are checked against the volume's fixed size, and each other.
       var statistics = statfs()
       XCTAssertEqual(statfs(mountPoint.string, &statistics), 0)
-      XCTAssertEqual(
-        volume.value(of: .volumeAvailableSpace, as: Int64.self),
-        Int64(statistics.f_bavail) * Int64(statistics.f_bsize))
+      let blockSize = Int64(statistics.f_bsize)
+      let size = try XCTUnwrap(volume.value(of: .volumeSize, as: Int64.self))
+      XCTAssertEqual(size, Int64(statistics.f_blocks) * blockSize)
+      // A full disk has no space available, so zero is allowed.
+      let free = try XCTUnwrap(volume.value(of: .volumeFreeSpace, as: Int64.self))
+      let available = try XCTUnwrap(volume.value(of: .volumeAvailableSpace, as: Int64.self))
+      XCTAssertLessThanOrEqual(available, free)
+      XCTAssertLessThanOrEqual(free, size)
+      XCTAssertEqual(available % blockSize, 0)
+      XCTAssertEqual(free % blockSize, 0)
+      if let used = volume.value(of: .volumeUsedSpace, as: Int64.self) {
+        XCTAssertLessThanOrEqual(used, size)
+      }
       XCTAssertEqual(volume.value(of: .volumeIOBlockSize, as: UInt32.self), UInt32(statistics.f_iosize))
       let typeName = withUnsafeBytes(of: statistics.f_fstypename) {
         String(decoding: $0.prefix { $0 != 0 }, as: UTF8.self)
