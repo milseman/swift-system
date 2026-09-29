@@ -9,7 +9,8 @@ The `utilities` lane (worktree `../utilities`, branch `utilities`, based on syst
 | `f5ad1be` | `Utilities/adopter-tools/`: 14 scripts, a shared module and a README (section 2) |
 | `39960fd` | `Utilities/nio-coverage/` deleted; the Events and Threads write-ups point at adopter-coverage's mapping (section 3) |
 | `86ecdbb` | `Utilities/README.md`, the index (section 1) |
-| this commit | this report |
+| `13d6f8f` | this report |
+| `7299e08` | `dgrep.py` and `freefuncs.py` skip `#if` branches a macOS build doesn't compile, and `dgrep.py` argument labels |
 
 Local system-next hasn't moved since `7b0875f`, so there was nothing to merge.
 
@@ -67,7 +68,7 @@ The seven directories in `../adopters` hold two lines of copies: `tools` (the `a
 | `cmap.py`, `cfuncs.py`, `sysapi.sh` | System declarations for C names | `tools-p2`, `tools-p3`/`p4`, `tools-p2`/`p3`/`p4` |
 | `step.sh`, `test-summary.sh`, `outcomes.sh` | Build and test with logs; per-test outcomes to diff | `tools-2`, `tools-3`, `tools-p3`, `tools-p4` |
 | `watchdog.py`, `tests-by-target.sh` | Tests one target or suite at a time, stopped if they hang | `tools-p4` (`swb-tests.sh` and `swb-suites.sh`, generalized) |
-| `common.py` | The shared Swift blanker, import and marker parser, file lists, System lookup | new |
+| `common.py` | The shared Swift blanker, import and marker parser, `#if` evaluator for macOS, file lists, System's declarations | new |
 
 Left out: `wasmkit-cli-compare.sh`, `gdb-probe.py` and `mig.py` (one package each), `lexical_inventory.py` and `render_lexical.py` (superseded by adopter-coverage's lexical extraction; their vocabulary file has no recipe), `darwin_block.py` and `errno_names.json` (one lane's editing style; `cmap.py '^EBADF$'` gives an errno's name), `watch-products.sh` (a one-off diagnostic), `dgrep.sh` (in `dgrep.py`).
 
