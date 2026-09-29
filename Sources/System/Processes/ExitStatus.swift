@@ -40,8 +40,8 @@ public enum ExitStatus: Hashable, Sendable {
   ///
   /// By convention, 0 means success.
   ///
-  /// The corresponding C macros are `WIFEXITED` and `WEXITSTATUS`,
-  /// and the C constant is `CLD_EXITED`.
+  /// The corresponding C macros are `WIFEXITED` and `WEXITSTATUS`.
+  /// The corresponding C constant is `CLD_EXITED`.
   case exited(CInt)
 
   /// A signal ended the process.
@@ -50,8 +50,8 @@ public enum ExitStatus: Hashable, Sendable {
   /// which some signals' default actions do,
   /// when the resource limit on core files allows it.
   ///
-  /// The corresponding C macros are `WIFSIGNALED`, `WTERMSIG`,
-  /// and `WCOREDUMP`, and the C constants are `CLD_KILLED` and `CLD_DUMPED`.
+  /// The corresponding C macros are `WIFSIGNALED`, `WTERMSIG`, and `WCOREDUMP`.
+  /// The corresponding C constants are `CLD_KILLED` and `CLD_DUMPED`.
   case signaled(Signal, coreDumped: Bool)
 }
 
@@ -114,15 +114,15 @@ public enum ProcessStateChange: Hashable, Sendable {
   ///
   /// A traced process that stops is also reported this way.
   ///
-  /// The corresponding C macros are `WIFSTOPPED` and `WSTOPSIG`,
-  /// and the C constants are `CLD_STOPPED` and `CLD_TRAPPED`.
+  /// The corresponding C macros are `WIFSTOPPED` and `WSTOPSIG`.
+  /// The corresponding C constants are `CLD_STOPPED` and `CLD_TRAPPED`.
   case stopped(Signal)
 
   /// The process continued after a stop,
   /// because it received ``Signal/continue``.
   ///
-  /// The corresponding C macro is `WIFCONTINUED`,
-  /// and the C constant is `CLD_CONTINUED`.
+  /// The corresponding C macro is `WIFCONTINUED`.
+  /// The corresponding C constant is `CLD_CONTINUED`.
   case continued
 }
 
