@@ -14,9 +14,22 @@ Darwin; grouped here into clusters and ranked by packages, then call sites. Afte
 (System `6e784c6`, the 21 main-scheme packages that import Darwin): 756 interfaces, 567 covered, 131 gaps (24 in two
 or more packages).
 
-Next: cluster 11. Resume from the first row not marked done. Latest re-rank: run `b64ee9f1591b-d229d468` (System
+Next: cluster 15. Resume from the first row not marked done. Latest re-rank: run `b64ee9f1591b-d229d468` (System
 `b64ee9f`): 756 interfaces, 615 covered, 78 gaps; set apart, 19 the standard library answers, 18 other modules' names,
 26 the packages' own shims.
+
+Ahead of the ranked clusters, the adopters' own asks (Michael, 2026-09-29), in this order:
+
+| # | Ask | For | Plan |
+|---|---|---|---|
+| A1 | A public name for C's `struct dirent`: a CInterop alias with Swift-named accessors (decision 84) | TSC's public `extension dirent { var name }` (TSCBasic/FileSystem.swift:19) | done: `CInterop.DirectoryEntry` (section 34) |
+| A2 | A call that returns and clears the dynamic loader's pending error (dlerror) | TSC's deprecated public `dlerror()` (TSCUtility/dlopen.swift:20) | done: `DynamicLibrary.takePendingError()` (section 34) |
+| A3 | C-string argument and environment overloads of the C-values spawn and its `credentials:` form | Subprocess+Darwin.swift:618 | done (section 29) |
+| A4 | Adding a SpawnFileAction to C file actions that other code built (`inout CInterop.SpawnFileActions`) | Subprocess's configurator test (DarwinTests.swift:15-20) | done: `SpawnFileAction.add(to:)` (section 34) |
+| A5 | A DirectoryWalk option that opens a directory's stream when the walk goes into it, not when it reads the directory's entry; section 14's two corrections (on APFS an unreadable entry still has a type; fts's FTS_DNR also covers paths of PATH_MAX bytes or more) | Foundation's copy and link (its REPORT.md, "fts for copy and link: tried, kept") | done: `opening: .whenEntered`, corrections (section 35); one descriptor per level kept, a known difference |
+
+status.sh's `STILL_NEEDED` (section 34) counts an interface that System names as missing while a marker asks for more;
+dirent, dlerror and posix_spawn_file_actions_addchdir_np were, until A1, A2 and A4 landed.
 
 | # | Cluster | Packages | Sites | Interfaces | Plan |
 |---|---|---:|---:|---|---|
@@ -30,10 +43,10 @@ Next: cluster 11. Resume from the first row not marked done. Latest re-rank: run
 | 8 | MacTypes | 2 | 12 | OSStatus, UniChar, DarwinBoolean | done: `swift` answers (section 31) |
 | 9 | sysctl process information | 2 | 9 | kinfo_proc's fields, P_TRACED, extern_proc | done: `CInterop.KernelProcessInfo` (section 31) |
 | 10 | pthreads | 2 | 8 | pthread_attr_getstacksize, setdetachstate, setscope, PTHREAD_CREATE_DETACHED, PTHREAD_SCOPE_SYSTEM, pthread_exit, pthread_yield_np, the error-checking initializer | done: exit(), defaultStackSize(), static initializers, mapping (section 32) |
-| 11 | Signals | 2 | 7 | signal, SIG_ERR, SIG_UNBLOCK, sigprocmask, NSIG | check the processes lane's API |
-| 12 | Spawn attributes | 2 | 6 | posix_spawnattr_setpgroup, setsigdefault, setsigmask | check SpawnAttributes' docs |
-| 13 | Mounts and quotas | 2 | 6 | getfsstat, quotactl, SUBCMDMASK, SUBCMDSHIFT, getmntinfo_r_np | |
-| 14 | Extended attribute names | 2 | 4 | XATTR_FINDERINFO_NAME, XATTR_RESOURCEFORK_NAME | |
+| 11 | Signals | 2 | 7 | signal, SIG_ERR, SIG_UNBLOCK, sigprocmask, NSIG | done: docs, mapping (section 33) |
+| 12 | Spawn attributes | 2 | 6 | posix_spawnattr_setpgroup, setsigdefault, setsigmask | done: docs (section 33) |
+| 13 | Mounts and quotas | 2 | 6 | getfsstat, quotactl, SUBCMDMASK, SUBCMDSHIFT, getmntinfo_r_np | done: docs, mapping (section 33) |
+| 14 | Extended attribute names | 2 | 4 | XATTR_FINDERINFO_NAME, XATTR_RESOURCEFORK_NAME | done: `ExtendedAttributeName` (section 33) |
 | 15 | CPU types | 1 | 22 | cpu_type_t, cpu_subtype_t, CPU_TYPE_*, CPU_ARCH_ABI64 (swift-build) | |
 | 16 | wait | 1 | 17 | siginfo_t, id_t, idtype_t, CLD_*, waitid (Subprocess) | check ProcessWait |
 | 17 | One-package gaps | 1 each | 1-3 each | dladdr and Dl_info, backtrace, strtod and strtof, AT_FDONLY and AT_REALDEV, sysdir's enumeration state, getiopolicy_np, ATTR_BIT_MAP_COUNT, execv, getdtablesize | |
@@ -44,7 +57,7 @@ say; the standard library's answers (off_t, ssize_t, size_t and uintptr_t are In
 memset; round, sqrt, ceil, floor, fabs, modf); Dispatch and ObjectiveC names; the packages' own C shims
 (CNIODarwin_*, c_nio_posix_*, _subprocess_*).
 
-Done: step 0, what the tools couldn't see (section 25); clusters 1 (section 26), 2 (section 27), 3 and 7 (section 28), 4 and 5 (section 30), 6, 8 and 9 (section 31), 10 (section 32); and Subprocess's new marker, C arrays for the C-values spawns (section 29). New SYSTEM-GAP markers in `../adopters` come first: status.sh lists them.
+Done: step 0, what the tools couldn't see (section 25); clusters 1 (section 26), 2 (section 27), 3 and 7 (section 28), 4 and 5 (section 30), 6, 8 and 9 (section 31), 10 (section 32), 11 to 14 (section 33), the asks A1 to A5 (sections 34 and 35); and Subprocess's new marker, C arrays for the C-values spawns (section 29). New SYSTEM-GAP markers in `../adopters` come first: status.sh lists them.
 
 ## 1. status.sh and STATUS.md (2026-09-28)
 
@@ -351,7 +364,10 @@ wrapping fts, which would reverse that decision.
   unopenable directory is visited once, with its error; `skipDescendants()` also skips the second visit.
   Rejected: fts's balancing of a skipped directory's visits, which makes callers read past an extra entry.
 - The other two needs were there: the caller has the root's path (the walk visits its entries); an unreadable
-  directory is an entry with `type == .directory` and an error, an unstat-able one has no type.
+  directory is an entry with `type == .directory` and an error, an unstat-able one has no type. (Corrected in
+  section 35: where a file system records types in its directories, as APFS does, an entry whose status can't be
+  read still has its type, since the walk doesn't read the status then, so fts's FTS_NS needs the caller's own
+  fstatat; and fts's FTS_DNR also covers a directory whose path is PATH_MAX bytes or longer, which the walk reads.)
 - status.py gains `ANSWERED`: fts names count as covered by DirectoryWalk once its two-visit order is in the
   sources, since no *corresponding C* sentence could truthfully name fts.
 
@@ -756,3 +772,85 @@ Tests: PThreadTests' `defaultStackSize` and `exitEndsTheThread`; PThreadMutexTes
 EDEADLK and EPERM for error checking, relocking the recursive mutex, a condition and a read-write lock). XCTest 555 (4
 skipped, and testVolumeAttributes skipped), swift-testing 471 in 74 suites, passing with `setCurrentQualityOfService`
 skipped (section 28).
+
+## 33. Signals, spawn attributes, mounts and quotas, xattr names: `470bf2c`, `52d74d3`
+
+Queue clusters 11 to 14 (two packages each).
+
+- **Signals**: swiftpm resets every signal with `signal()` from 1 to NSIG and unblocks them with `sigprocmask`;
+  swift-tools-protocols ignores SIGPIPE with `signal`. `SignalSet.all`, a sequence of every signal, `Signal`'s
+  `setAction(_:)` and `PThread.unblockSignals(_:)` do that; the mask calls now name SIG_SETMASK, SIG_BLOCK and
+  SIG_UNBLOCK, `unblockSignals` says it's sigprocmask's effect with one thread, and `SignalSet.all` names NSIG. In
+  mapping.ini, signal and SIG_ERR read as sigaction and sigprocmask as pthread_sigmask, and the notes that said System
+  has no signal API go.
+- **Spawn attributes**: `processGroup`, `signalMask` and `defaultSignals` named their functions "with the
+  POSIX_SPAWN_* flag", which the tools read as restricting each function to one use; the flags have sentences of
+  their own now. Rejected: rewording all 25 such sentences, most of which are real restrictions (fcntl with one
+  command).
+- **Mounts and quotas**: `StatFS.mountedFileSystems` named getfsstat "with MNT_NOWAIT, or with MNT_WAIT", read the
+  same way; getmntinfo and getmntinfo_r_np read as getfsstat; quotactl is covered for the commands Foundation uses
+  (Q_QUOTASTAT, Q_GETQUOTA), each form of which the tools read as restricted to its command, and DiskQuota names QCMD's
+  SUBCMDSHIFT and SUBCMDMASK.
+- **`ExtendedAttributeName`** (Darwin): `finderInfo` and `resourceFork` (XATTR_FINDERINFO_NAME,
+  XATTR_RESOURCEFORK_NAME), for Foundation's and swift-build's copies. Rejected: static members of FilePath, which the
+  names aren't about.
+
+Tests: ExtendedAttributesTests' `darwinsNames`. XCTest 555, swift-testing 472 in 74 suites, passing with
+`setCurrentQualityOfService` skipped.
+
+## 34. The adopters' asks: a dirent name, the pending loader error, adding to C file actions: `3b21234`, `f7b06e3`, `a3012f9`, `273f560`
+
+Michael's asks A1 to A4, ahead of the ranked clusters. A3, C-string arguments for the C-values spawns, was section 29.
+
+- **status.py** (`3b21234`): `STILL_NEEDED` lists interfaces that System's docs name but whose markers ask for more,
+  each with a witness in System's sources; until the witness is there, the interface counts as missing, with the
+  ask as the reason. dirent (DirectoryStream.Entry names it, but it's another type), dlerror (LoaderError names it,
+  but carries only the errors System throws) and posix_spawn_file_actions_addchdir_np (named for System's own C file
+  actions) went from covered to missing, and STATUS.md then showed 47 of 50 interfaces covered.
+- **`CInterop.DirectoryEntry`** (`f7b06e3`, A1): the alias for struct dirent, with Swift-named accessors
+  `fileName` (`FilePath.Component?`, nil only for an entry without a name, such as a zero one), `fileType` and
+  `inode`, for TSC's public `extension dirent { var name }`, which can now extend the alias and read `fileName`.
+  Rejected: `name` and `type`, DirectoryStream.Entry's names, since TSC's own public `dirent.name: String?` would make
+  every use ambiguous for a client importing both. The MemberImportVisibility probes read the accessors, and the
+  accessors probe gains section 31's kinfo_proc ones, which had none.
+- **`DynamicLibrary.takePendingError()`** (`a3012f9`, A2): dlerror, the calling thread's pending loader error, taken
+  and cleared, as a `LoaderError?`, for TSC's deprecated public `dlerror()`. `address(of:)` clears the pending
+  error before dlsym, so after a `nil` it's dlsym's reason. Rejected: `pendingError`, a property-like name for a
+  read that clears; `String?`, when LoaderError is what the other calls throw.
+- **`SpawnFileAction.add(to:)`** (`273f560`, A4): adds an action to `inout CInterop.SpawnFileActions` that other code
+  built, such as the ones Subprocess's `preSpawnProcessConfigurator` hands its closure, with the C call for the
+  action's kind and its error. Rejected: a static form over an array, which a loop is.
+
+Tests: DirectoryEntryTypeTests' `cEntryAccessors` (readdir's entries against Stat, the dot entries, a zero entry),
+DynamicLibraryTests' `takingThePendingError`, RawSpawnTests' `testAddingActionsToCFileActions` (/bin/pwd with a
+working directory, a duplicate and a close added to empty C file actions; an invalid close throws EBADF). XCTest
+556, swift-testing 474 in 74 suites, passing with `setCurrentQualityOfService` skipped. STATUS.md after these: all
+50 of the markers' interfaces covered again.
+
+## 35. DirectoryWalk's opening option, and section 14's corrections: `6666fbe`
+
+Michael's ask A5, for Foundation's copy and link, which keep fts. Foundation's REPORT.md ("fts for copy and link:
+tried, kept") compared the two in 382 runs: 366 identical, and 16 differing in two properties of DirectoryWalk. It
+opened a directory when it read the directory's entry, and Darwin's fdopendir reads the entries then, before the
+copy has handled the directory's first visit, so copying a directory into its own tree copied it as it was, where
+fts recursed until ENAMETOOLONG (12 runs); and it holds a descriptor per level, where fts with FTS_NOCHDIR holds
+none (4 runs, EMFILE at about level 250 under a 256-descriptor limit).
+
+- `DirectoryWalk.DirectoryOpening`: `.whenRead`, the default, as before, and `.whenEntered`, an `opening:` parameter
+  of both initializers. With `.whenEntered`, a walk opens a directory on the next call after the directory's first
+  visit, relative to its parent, unless `skipDescendants()` forgets it; one it can't open then gets a second visit,
+  marked `isPostorderVisit`, with the error, in place of its contents (fts's FTS_D and FTS_DNR). A postorder walk
+  opens a directory before its contents whichever the option. Rejected: a Bool parameter; throwing the open's error
+  from `next()`, which ends the walk's directory as a read error does, where fts goes on.
+- Kept, as Michael asked: one descriptor per level. The type's doc now names it as a known difference from fts,
+  with the other one: fts opens each directory by its path, so it reports a directory whose path is PATH_MAX bytes
+  or longer as FTS_DNR, which the walk reads.
+- Section 14's two corrections, made there: on a file system that records types in its directories, as APFS does,
+  an entry whose status can't be read still has its type (the walk reads the status only when the directory records
+  no type), so FTS_NS needs the caller's own fstatat; and FTS_DNR also covers paths of PATH_MAX bytes or more.
+
+Tests: DirectoryWalkVisitsTests' `openingWhenEnteredVisitsTheSame` (every order, and skipping),
+`openingWhenEnteredReadsWhatTheFirstVisitAdded` (a file created on a directory's first visit is walked with
+`.whenEntered`, and on Darwin not with `.whenRead`), `anUnreadableDirectoryWhenEntered` (both preorder orders: the two
+visits, the directory the error's visit is in, and skipping). XCTest 556 (4 skipped, and testVolumeAttributes
+skipped), swift-testing 477 in 74 suites, passing with `setCurrentQualityOfService` skipped (section 28).
