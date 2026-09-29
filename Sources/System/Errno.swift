@@ -1459,7 +1459,8 @@ extension Errno {
   public static var EOWNERDEAD: Errno { previousOwnerDied }
 #endif
 
-#if os(FreeBSD)
+// Darwin's SDKs define ENOTCAPABLE from the macOS 26 generation on.
+#if canImport(Darwin, _version: 346) || os(FreeBSD)
   /// Capabilities insufficient.
   ///
   /// The corresponding C error is `ENOTCAPABLE`.
@@ -1469,7 +1470,9 @@ extension Errno {
   @_alwaysEmitIntoClient
   @available(*, unavailable, renamed: "notCapable")
   public static var ENOTCAPABLE: Errno { notCapable }
+#endif
 
+#if os(FreeBSD)
   /// Not permitted in capability mode.
   ///
   /// The corresponding C error is `ECAPMODE`.

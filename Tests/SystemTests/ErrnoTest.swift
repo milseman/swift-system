@@ -205,8 +205,11 @@ final class ErrnoTest: XCTestCase {
     XCTAssert(EOWNERDEAD == Errno.previousOwnerDied.rawValue)
 #endif
 
-#if os(FreeBSD)
+#if canImport(Darwin, _version: 346) || os(FreeBSD)
     XCTAssert(ENOTCAPABLE == Errno.notCapable.rawValue)
+#endif
+
+#if os(FreeBSD)
     XCTAssert(ECAPMODE == Errno.capabilityMode.rawValue)
     XCTAssert(EINTEGRITY == Errno.integrityCheckFailed.rawValue)
 #endif
