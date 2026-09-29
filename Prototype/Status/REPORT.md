@@ -7,16 +7,31 @@ everything here is built and tested on Darwin only.
 
 ## Queue
 
-The work list for toolchain packages to drop `import Darwin` in every form, kept current. Source: `ecosystem.sh
-report`'s *What the files that import Darwin still need* (section 25), which counts the interfaces that library files
+The work list for packages to drop `import Darwin` in every form, kept current. Source: the ecosystem report's
+*What the files that import Darwin still need* (section 25), which counts the interfaces that library files
 importing Darwin in any form but through Apple Foundation's re-export use, per symbol, with System's coverage on
-Darwin; grouped here into clusters and ranked by packages, then call sites. After step 0: run `6e784c6e7026-4676fb13`
-(System `6e784c6`, the 21 main-scheme packages that import Darwin): 756 interfaces, 567 covered, 131 gaps (24 in two
-or more packages).
+Darwin; grouped here into clusters and ranked by packages, then call sites. `ecosystem.sh report` writes it for the
+toolchain's packages, and `ecosystem.sh --popular report` for popular.tsv's (section 37). Counts are in the runs'
+reports and in STATUS.md, not here.
 
-Next: rerun the ecosystem report and re-rank; then step 4, packages beyond the toolchain. Resume from the first row not marked done. Latest re-rank: run `b64ee9f1591b-d229d468` (System
-`b64ee9f`): 756 interfaces, 615 covered, 78 gaps; set apart, 19 the standard library answers, 18 other modules' names,
-26 the packages' own shims.
+**Resume here** (stopped 2026-09-29, quota; STATUS.md regenerated at `145df6b`). Nothing is in progress; take the
+rows in order:
+
+| # | Item | For | Plan |
+|---|---|---|---|
+| B1 | `Errno.notCapable` (ENOTCAPABLE, 107) is in the macOS 26 SDK, but System declares it on FreeBSD only (Errno.swift, near line 1465); Samples/Beneath.swift works around it with `Errno(rawValue: ENOTCAPABLE)` | the foundation lane (Michael's ask) | widen the declaration's `#if` to Darwin, gated on the SDK if older SDKs lack it; a test; leave Beneath.swift to the demos lane |
+| B2 | Utilities/adopter-coverage/README.md still names `Utilities/nio-coverage/check.sh` (the bullet at line 58 since `9541436`), which the utilities merge retired | Michael's ask | drop the bullet |
+| M1 | New SYSTEM-GAP markers in `../adopters` (STATUS.md's gaps part lists them): swift-build's Mach-O file structures (mach_header, load_command, segment_command, section, fat_header, fat_arch, dylib_command, rpath_command, uuid_command, build_version_command, version_min_command), mach-o/utils.h's three functions, ar.h's archive header (ar_hdr, AR_EFMT1, SARMAG), MacTypes OSStatus, abort, off_t, vm_prot_t, `constants`; swift-docc's PIPE_BUF | swift-build, swift-docc | decide first: section 36 rejected Mach-O's header types as the MachO module's, which a file can import instead of Darwin; the markers ask anyway. OSStatus, off_t and vm_prot_t have `swift` answers already (sections 25, 31 and 37), so check what the markers say |
+| P3a | pthread_cancel (swift-distributed-actors' Concurrency/_Thread.swift) | popular.tsv's third batch, run `145df6bd3157-16fa0c4f` | PThread has no cancel: design it with the Threads API's conventions (section 32) |
+| P3b | `Comment` in swift-homomorphic-encryption's `_TestUtilities`: a test-support target the survey's pattern misses, read lexically | the same run | `skip._TestUtilities` in packages/popular/swift-homomorphic-encryption.ini, or widen ecosystem.py's test-support pattern to `_Test*` |
+
+Then: when the rows above are done, rerun `ecosystem.sh --popular run` and `report` to confirm the popular queue is
+empty, and decide whether popular.tsv needs a fourth batch. sqlite-nio's extraction takes minutes on each run,
+scanning its vendored SQLite; a `skip.CSQLite` would speed runs, but would drop SQLite's OS use from the package's
+table.
+
+The toolchain's queue has been empty since run `a3a634eb2b19-06a7ddd5` (section 37), and popular.tsv's first and
+second batches since sections 38 and 39. What follows is the toolchain's work, all done.
 
 Ahead of the ranked clusters, the adopters' own asks (Michael, 2026-09-29), in this order:
 
@@ -884,3 +899,106 @@ Queue clusters 15 to 17.
 Tests: MachCPUTypeTests (constants, the ABI bit, the host's type, feature flags), SmallDarwinGapsTest (the stat
 flags against fstat, dladdr, the call stack, a thread's disk policy, mocks). XCTest 561 (4 skipped, and
 testVolumeAttributes skipped), swift-testing 481 in 75 suites, passing with `setCurrentQualityOfService` skipped.
+
+## 37. The toolchain's queue is empty; popular packages beyond it: `4365a83`, `9541436`, `d3c7a3a`, `55841f0`
+
+The ecosystem run after section 36 left four gaps, all swift-build's, and `4365a83` mapped them: extern_proc and
+eproc read as kinfo_proc, whose kp_proc and kp_eproc CInterop.KernelProcessInfo's accessors read; dl_info is
+Dl_info's structure tag; USEC_PER_SEC and vm_prot_t, which swift-build declares only off Darwin, get the standard
+library's answers (Duration's units or the literal, and Int32).
+
+The toolchain's queue is now empty. In run `a3a634eb2b19-06a7ddd5` (System `a3a634e`), System covers on Darwin every
+interface that the toolchain's library files importing Darwin use, except the ones set apart: the standard
+library's answers, other modules' names, and the packages' own C shims. Its ECOSYSTEM.md has the counts. Step 4
+extends the survey:
+
+- `Utilities/adopter-coverage/popular.tsv` lists the packages beyond the toolchain, with why each is there. They're
+  cloned shallowly into `../ecosystem`, next to the toolchain's, each at `main`. The first batch has 21:
+  - swift-server's own: async-http-client (the HTTP client), swift-service-lifecycle (service lifecycle and signal
+    handling), swift-aws-lambda-runtime;
+  - the server APIs and a backend: swift-metrics, swift-distributed-tracing, swift-otel (OpenTelemetry);
+  - NIO's libraries beyond swift-nio: swift-nio-ssl, swift-nio-http2, swift-nio-extras,
+    swift-nio-transport-services, swift-nio-ssh;
+  - OpenAPI and gRPC: swift-openapi-generator, swift-openapi-runtime, swift-protobuf, grpc-swift-2,
+    grpc-swift-nio-transport;
+  - the web frameworks and their database client: vapor, hummingbird, postgres-nio;
+  - swiftlang's packages outside update-checkout's scheme: swiftly, swift-java.
+
+  Why these: they're the swift-server ecosystem's most used packages and the libraries under them, plus swiftlang's
+  packages that the toolchain doesn't clone. None is in the main scheme. Three import Darwin in no library file
+  (swift-nio-http2, swift-openapi-generator, swiftly), so they get no package file; the report's table lists them.
+- `ecosystem.sh --popular` (`9541436`) runs clone, survey, run and report over that list. Its survey is
+  `survey-popular.json`, its package files are generated into `packages/popular/`, and its report is a run's
+  POPULAR.md, without the standard library's section. Rejected: folding the list into the main scheme's survey,
+  which would mix the toolchain's figures with the others'.
+- Three packages don't build with Swift 6.2, so they're extracted lexically: vapor's main (Vapor 5, tools 6.4),
+  swift-aws-lambda-runtime's main (a Sendable conversion 6.2 rejects), and swift-java's JExtractSwiftLib.
+- The run needed two tool fixes. `d3c7a3a` lowers a newer tools version anywhere in the manifest's first three
+  lines, because vapor's opens with an import; it also cites DirectoryWalk's path initializer with section 35's
+  `opening:`, whose absence every run had reported as a cited declaration missing on the tip. `55841f0` makes the
+  Darwin metric count a lexical name that a site qualifies with Darwin (`Darwin.write`). That found
+  swift-aws-lambda-runtime's write and, in the toolchain, a calloc, both covered.
+
+Tests: the runs at `a3a634e`, the toolchain's and the popular set's.
+
+## 38. The popular packages' first queue: gai_strerror, IF_NAMESIZE, frexp, M_LOG2E: `a3a634e`
+
+The popular set's first run (at `d3c7a3a`) found four interfaces that its library files importing Darwin use and
+System didn't cover on Darwin, each in one package:
+
+- **gai_strerror** (grpc-swift-nio-transport's DNS resolver): `AddressResolutionError.message` calls it, and now
+  says so.
+- **IF_NAMESIZE** (grpc-swift-nio-transport sizes an if_indextoname buffer with it, for an IPv6 scope's name):
+  `NetworkInterface.Index.name()` now says its buffer is IF_NAMESIZE bytes, as `reverseLookup` says of NI_MAXHOST
+  and NI_MAXSERV. The call spares its caller both.
+- **frexp and M_LOG2E** (swift-otel's exponential histogram): the standard library answers both. mapping.ini's
+  `[floating-point parts]` gives frexp as `significand / 2` and `exponent + 1` for a finite, nonzero value, which
+  is how the Darwin overlay's own frexp computes it. `[math constants]` gives M_LOG2E as the literal. Math's doc
+  now names the frexp conversion next to the other standard-library answers. Rejected: `Math.frexp`, and math.h's
+  M_ constants as Math members, each for one call site the standard library already answers.
+
+After this commit the popular set's queue is empty too (run `a3a634eb2b19-67e0cd30`).
+
+Tests: SocketAddressResolutionTests, the first tests of `SocketAddress.resolve`. A numeric host and service
+resolve to the loopback address and port, and a non-numeric host under `.numericHost` fails with EAI_NONAME and
+gai_strerror's message. The full suite passes with testVolumeAttributes skipped.
+
+## 39. The popular list's second batch, and its queue: getline, MAP_FILE, timespec_get: `7a5b6bc`, `6953d40`
+
+With the first batch's queue empty, `7a5b6bc` adds 25 more swift-server ecosystem packages to popular.tsv, each at
+`main`:
+
+- the database and cache clients: RediStack, valkey-swift, swift-memcache-gsoc, swift-cassandra-client, MongoKitten,
+  mysql-nio, sqlite-nio, fluent-kit;
+- the metrics API's backends: swift-prometheus, swift-statsd-client;
+- messaging: swift-kafka-client, mqtt-nio, APNSwift;
+- the rest: soto-core (the AWS SDK's core), swift-profile-recorder (the in-process sampling profiler),
+  swift-configuration, swift-http-types, swift-async-dns-resolver, swift-nio-imap, websocket-kit, swift-websocket,
+  jwt-kit, swift-openapi-async-http-client, swift-webauthn, swift-container-plugin.
+
+Eight of them import Darwin in library code: soto-core, swift-prometheus, swift-memcache-gsoc, valkey-swift,
+swift-profile-recorder, swift-configuration, swift-nio-imap and sqlite-nio. The report's per-package table is much
+larger than the queue. It counts every platform and the packages' C targets, which is where swift-profile-recorder's
+sampler and sqlite-nio's vendored SQLite do their OS work. The queue counts only what Swift files importing Darwin
+use on Darwin.
+
+Their queue (run `7a5b6bcd3804-48fa9ade`) had four gaps, in two packages, and `6953d40` closes them:
+
+- **getline** (swift-profile-recorder reads its sampler's messages from a stream, line by line):
+  `FileStream.readLine(strippingNewline:)`. It reads any stream the way the standard library's
+  `readLine(strippingNewline:)` reads the standard input, and has its name and parameter: the line is decoded as
+  UTF-8 with invalid bytes repaired, the newline (and a carriage return before it) is stripped by default, and the
+  end of the file is `nil`. A failure throws without retrying, as FileStream's other reads do; the stream's error
+  indicator is set. Rejected: a bytes result, and reusing a caller's buffer across calls as getline can, since the
+  adopter decodes each line.
+- **MAP_FILE** (swift-profile-recorder maps an image with `MAP_FILE|MAP_PRIVATE`): `MemoryMapping(file:)` now says
+  a file mapping needs no option, and that MAP_FILE is zero.
+- **timespec_get and TIME_UTC** (swift-memcache-gsoc's timestamps): `ClockID.currentTimeSpec()` now says they give
+  realtime's reading.
+- `system_free` moves to Exports.swift. It was in Syscalls+PathsAndFiles.swift, which WASI doesn't compile, and
+  FileStream, which now calls it, exists on WASI.
+
+Tests: ProvisionalStdioTest's `testReadingLines` covers lines with and without a newline, CRLF, an empty line, a
+line longer than getline's first buffer, a NUL byte, an invalid UTF-8 byte, the end of the file, and a write-only
+stream's EBADF. The getline mock case is new too. SmallGapsTest checks timespec_get against realtime, and checks
+that MAP_FILE is zero. The full suite passes with testVolumeAttributes skipped.
