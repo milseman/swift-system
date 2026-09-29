@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """List the free-function calls in a package's Swift sources that the package doesn't declare.
 
-Usage: freefuncs.py [--min N] [--all] PACKAGE [SUBDIR...]
+Usage: freefuncs.py [--min N] [--all] [--all-platforms] PACKAGE [SUBDIR...]
 
 Counts the calls `name(` that aren't members (`.name(`), in the Swift files under the SUBDIRs
 (default: the whole package, without Fixtures), whose names no Swift file of the package declares
@@ -9,7 +9,8 @@ Counts the calls `name(` that aren't members (`.name(`), in the Swift files unde
 standard library, Foundation, Dispatch, XCTest and Swift Testing functions. What's left are the
 candidates for C library calls reached through an import (Darwin, Foundation's re-export, a C
 shim), and the package's C targets' functions, which --all lists too. Most used first, with the
-first places each is called. Comments and string literals are skipped (interpolations aren't).
+first places each is called. Comments and string literals are skipped (interpolations aren't), and
+so is code in an `#if` branch a macOS build certainly doesn't compile, unless --all-platforms.
 It reads the working tree; it can't tell a C function from a Swift one it doesn't know, so check
 each with darwin_audit.py or by reading.
 """
@@ -58,13 +59,16 @@ def main():
     ap.add_argument("subdirs", nargs="*", metavar="SUBDIR")
     ap.add_argument("--min", type=int, default=1, help="only names called at least this often")
     ap.add_argument("--all", action="store_true", help="also list names a C target of the package declares")
+    ap.add_argument("--all-platforms", action="store_true",
+                    help="also calls in #if branches a macOS build doesn't compile (#if os(Linux))")
     a = ap.parse_args()
     root = os.path.abspath(a.package)
     everything = common.swift_files(root)
     scanned = common.swift_files(root, paths=a.subdirs or None)
     if not a.subdirs:
         scanned = [f for f in scanned if "/Fixtures/" not in f"/{f}"]
-    texts = {f: common.blank_swift(t) for f, t in common.read_sources(root, everything).items()}
+    sources = common.read_sources(root, everything)
+    texts = {f: common.blank_swift(t) for f, t in sources.items()}
     declared = set()
     for t in texts.values():
         for pattern in DECLARED:
@@ -82,9 +86,11 @@ def main():
                 pass
     hits = {}
     for f in scanned:
-        for i, line in enumerate(texts[f].split("\n")):
-            if DIRECTIVE.match(line):
-                continue            # `#if os(Linux)` isn't a call
+        lines = texts[f].split("\n")
+        compiled = common.macos_lines(sources[f]) if not a.all_platforms else [True] * len(lines)
+        for i, line in enumerate(lines):
+            if DIRECTIVE.match(line) or not compiled[i]:
+                continue            # `#if os(Linux)` isn't a call, and what it guards isn't macOS's
             for m in CALL.finditer(line):
                 n = m.group(1)
                 if n in STD or n in declared or n in c_declared or FUNC_BEFORE.search(line[:m.start()]):

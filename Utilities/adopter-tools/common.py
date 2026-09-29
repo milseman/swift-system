@@ -473,3 +473,108 @@ def _braces(line, scopes, pending):
         elif c == "}" and scopes:
             scopes.pop()
     return pending
+
+
+# ---------------------------------------------------------------- #if, for macOS
+
+_OTHER_OS = {"iOS", "tvOS", "watchOS", "visionOS", "xrOS", "Linux", "Windows", "FreeBSD", "OpenBSD", "Android",
+             "WASI", "Cygwin", "PS4", "Haiku", "none"}
+# Modules a macOS package build can import, and modules it can't.
+_MAC_MODULES = {"Darwin", "Foundation", "Dispatch", "os", "ObjectiveC", "MachO", "XCTest", "CoreFoundation",
+                "Security", "Combine", "OSLog", "Network", "AppKit", "Testing", "Synchronization", "_Concurrency"}
+_OTHER_MODULES = {"Glibc", "Musl", "WinSDK", "ucrt", "CRT", "Android", "Bionic", "WASILibc", "wasi_pthread",
+                  "Foundation_Windows", "WinSDK_Private"}
+_COND_TOKEN = re.compile(r"\s*(\|\||&&|!|\(|\)|[A-Za-z_]\w*(?:\s*\((?:[^()]|\([^()]*\))*\))?)")
+T, F, U = True, False, None
+
+
+def _atom(tok):
+    m = re.match(r"(\w+)\s*\((.*)\)$", tok, re.S)
+    if not m:
+        return {"true": T, "false": F, "SWIFT_PACKAGE": T}.get(tok, U)
+    fn, arg = m.group(1), m.group(2).split(",")[0].strip()
+    if fn == "os":
+        return T if arg in ("macOS", "OSX") else F if arg in _OTHER_OS else U
+    if fn == "canImport":
+        top = arg.split(".")[0]
+        return T if top in _MAC_MODULES else F if top in _OTHER_MODULES else U
+    if fn == "targetEnvironment":
+        return F
+    return U
+
+
+def evaluate_condition(text):
+    """A `#if` condition for a macOS package build: True, False, or None
+    when it depends on something unknown here (a flag, the compiler's
+    version, an architecture, a module the package might provide)."""
+    toks = _COND_TOKEN.findall(text.split("//")[0])
+    pos = [0]
+
+    def peek():
+        return toks[pos[0]] if pos[0] < len(toks) else None
+
+    def take():
+        pos[0] += 1
+        return toks[pos[0] - 1]
+
+    def primary():
+        t = take() if peek() else None
+        if t == "!":
+            v = primary()
+            return None if v is None else not v
+        if t == "(":
+            v = disjunction()
+            if peek() == ")":
+                take()
+            return v
+        return _atom(t) if t else U
+
+    def conjunction():
+        v = primary()
+        while peek() == "&&":
+            take()
+            w = primary()
+            v = F if (v is F or w is F) else (T if v is T and w is T else U)
+        return v
+
+    def disjunction():
+        v = conjunction()
+        while peek() == "||":
+            take()
+            w = conjunction()
+            v = T if (v is T or w is T) else (F if v is F and w is F else U)
+        return v
+
+    try:
+        return disjunction()
+    except IndexError:
+        return U
+
+
+def macos_lines(text):
+    """For each line of `text`, whether a macOS build might compile it:
+    False only inside an `#if` branch that's certainly not taken there
+    (`#if os(Linux)`, `#elseif canImport(Glibc)`, the `#else` of
+    `#if canImport(Darwin)`)."""
+    out = []
+    stack = []      # [branch value, some branch certainly taken, every branch so far false]
+    for line in text.split("\n"):
+        d = _DIRECTIVE.match(line)
+        if d:
+            kind, cond = d.group(1), d.group(2)
+            if kind == "if":
+                v = evaluate_condition(cond)
+                stack.append([v, v is T, v is F])
+            elif kind == "elseif" and stack:
+                fr = stack[-1]
+                v = F if fr[1] else evaluate_condition(cond)
+                fr[0], fr[1], fr[2] = v, fr[1] or v is T, fr[2] and v is F
+            elif kind == "else" and stack:
+                fr = stack[-1]
+                fr[0] = F if fr[1] else (T if fr[2] else U)
+            elif kind == "endif" and stack:
+                stack.pop()
+            out.append(all(fr[0] is not F for fr in stack))
+            continue
+        out.append(all(fr[0] is not F for fr in stack))
+    return out

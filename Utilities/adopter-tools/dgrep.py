@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 """List the lines of Swift sources that import Darwin or name common Darwin and libc interfaces.
 
-Usage: dgrep.py [--via Foundation,XCTest] [--no-darwin] [--files] PATH...
+Usage: dgrep.py [--via Foundation,XCTest] [--no-darwin] [--files] [--all-platforms] PATH...
 
 For each Swift file under the PATHs (directories are listed as git lists them, without ignored
 files; outside a checkout, every file but .build's), prints `file:line: [hits] source` for each line
 that imports Darwin (any form), a module that re-exports it (TSCLibc, MachO), or names a Darwin or
 libc function, type, constant or errno. Comments and string literals are skipped, but the code in
 a string's interpolation isn't (`"\\(String(cString: strerror(errno)))"`). Names the file declares
-itself (a method, a local, a case) don't count.
+itself (a method, a local, a case, a parameter or argument label) don't count, and neither does code in an `#if` branch that a
+macOS build certainly doesn't compile (`#if os(Linux)`, `#elseif canImport(Glibc)`, the `#else` of
+`#if canImport(Darwin)`), unless --all-platforms; a branch that depends on a flag or the compiler's
+version counts.
 
 It's the quick way to find Darwin names reached through another module's re-export, without a
 build: `--via Foundation,XCTest` keeps only files that import one of those modules, and
@@ -68,6 +71,7 @@ DECL = re.compile(r'\b(?:func|case|var|let)\s+$')
 NAME = re.compile(r'(?<![\w.])(' + '|'.join(map(re.escape, NAMES)) + '|' + PREFIXES + r')(?![\w])')
 MEMBER = re.compile(r'(?<=\.)(E[A-Z0-9]{3,}|SIG[A-Z]{3,})\b')
 LOCAL = re.compile(r'\b(?:func|var|let|case)\s+`?(\w+)`?')
+LABEL = re.compile(r'\b(\w+):(?!:)')      # argument labels and parameter names (not a ternary's ` : `)
 DIRECTIVE = re.compile(r'\s*#(?:if|elseif)\b')
 
 
@@ -82,21 +86,22 @@ def files(args):
             print(f"dgrep.py: {a}: no such file or directory", file=sys.stderr)
 
 
-def hits_of(text, via, no_darwin):
+def hits_of(text, via, no_darwin, all_platforms=False):
     code = common.blank_swift(text)
     lines = code.split("\n")
+    compiled = common.macos_lines(text) if not all_platforms else [True] * len(lines)
     imports = common.imports(text, code)
     modules = {im.module for im in imports}
     if via and not modules & via:
         return []
     if no_darwin and "Darwin" in modules:
         return []
-    local = set(LOCAL.findall(code))
+    local = set(LOCAL.findall(code)) | set(LABEL.findall(code))
     import_lines = {im.line: im for im in imports}
     out = []
     for i, line in enumerate(lines):
-        if DIRECTIVE.match(line):
-            continue            # `#if canImport(Darwin)` names a module, it doesn't use one
+        if DIRECTIVE.match(line) or not compiled[i]:
+            continue            # `#if canImport(Darwin)` names a module; `#if os(Linux)` code isn't macOS's
         hits = []
         im = import_lines.get(i + 1)
         if im and im.module in DARWINISH:
@@ -121,6 +126,8 @@ def main():
     ap.add_argument("--via", default="", help="only files that import one of these modules (comma-separated)")
     ap.add_argument("--no-darwin", action="store_true", help="only files that don't import Darwin")
     ap.add_argument("--files", action="store_true", help="print each file's number of hits instead of the lines")
+    ap.add_argument("--all-platforms", action="store_true",
+                    help="also lines in #if branches a macOS build doesn't compile (#if os(Linux))")
     a = ap.parse_args()
     via = {m for m in a.via.split(",") if m}
     total = 0
@@ -130,7 +137,7 @@ def main():
                 raw = h.read()
         except OSError:
             continue
-        found = hits_of(raw, via, a.no_darwin)
+        found = hits_of(raw, via, a.no_darwin, a.all_platforms)
         if not found:
             continue
         total += 1
