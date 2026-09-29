@@ -45,7 +45,7 @@ extension SocketAddress {
 
     /// Local address family.
     ///
-    /// The corresponding C constant is `AF_LOCAL`.
+    /// The corresponding C constants are `AF_LOCAL` and its synonym `AF_UNIX`.
     @_alwaysEmitIntoClient
     public static var local: Family { Family(CInterop.SAFamily(AF_LOCAL)) }
 

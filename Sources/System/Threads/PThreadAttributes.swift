@@ -34,6 +34,10 @@ extension PThread {
   ///     attributes.stackSize = 1 << 20
   ///     let worker = try PThread(attributes: attributes) { work() }
   ///
+  /// Creating a thread makes C attributes from these;
+  /// the corresponding C functions are `pthread_attr_init`
+  /// and `pthread_attr_destroy`.
+  ///
   /// The corresponding C type is `pthread_attr_t`.
   @frozen
   public struct Attributes: Hashable, Sendable {

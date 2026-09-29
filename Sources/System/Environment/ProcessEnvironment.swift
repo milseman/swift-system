@@ -172,7 +172,9 @@ extension ProcessEnvironment {
   /// including entries that aren't valid UTF-8,
   /// and entries without an `=`.
   ///
-  /// The corresponding C variable is `environ`.
+  /// The corresponding C variable is `environ`, which on Darwin
+  /// a library reaches through a function;
+  /// the corresponding C function is `_NSGetEnviron`.
   @_alwaysEmitIntoClient
   public static func withUnsafeEntries<R>(
     _ body: (UnsafePointer<UnsafeMutablePointer<CChar>?>) throws -> R
