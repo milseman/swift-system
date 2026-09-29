@@ -227,7 +227,7 @@ extension ProcessID {
   /// searching for it in the directories that `PATH` names,
   /// with C file actions and attributes.
   ///
-  /// See ``spawn(_:arguments:environment:cFileActions:cAttributes:)``
+  /// See ``spawn(_:arguments:environment:cFileActions:cAttributes:)-(FilePath,_,_,_,_)``
   /// and ``spawn(searchingPathFor:arguments:environment:fileActions:attributes:)``.
   ///
   /// The corresponding C function is `posix_spawnp`.
@@ -246,6 +246,41 @@ extension ProcessID {
     }.get()
   }
 
+  /// Starts a child process running a program,
+  /// with arguments and an environment as C arrays,
+  /// and C file actions and attributes.
+  ///
+  /// - Parameters:
+  ///   - path: The program to run, as a C string.
+  ///   - arguments: The program's arguments, as a null-terminated array
+  ///     of C strings, including the first,
+  ///     which by convention is the program's name.
+  ///   - environment: The program's environment,
+  ///     as a null-terminated array of C strings
+  ///     of the form `NAME=value`,
+  ///     or `nil` for the calling process's environment.
+  ///   - cFileActions: The C file actions, or `nil` for none.
+  ///   - cAttributes: The C attributes, or `nil` for the defaults.
+  /// - Returns: The child's process ID.
+  ///
+  /// Use this method for arguments that aren't valid UTF-8.
+  /// See ``spawn(_:arguments:environment:cFileActions:cAttributes:)-(FilePath,_,_,_,_)``.
+  ///
+  /// The corresponding C function is `posix_spawn`.
+  @_alwaysEmitIntoClient
+  public static func spawn(
+    _ path: UnsafePointer<CChar>,
+    arguments: UnsafePointer<UnsafeMutablePointer<CChar>?>,
+    environment: UnsafePointer<UnsafeMutablePointer<CChar>?>?,
+    cFileActions: UnsafePointer<CInterop.SpawnFileActions>?,
+    cAttributes: UnsafePointer<CInterop.SpawnAttributes>?
+  ) throws(Errno) -> ProcessID {
+    try ProcessID._spawn(
+      path, searchingPath: false, arguments: arguments, environment: environment,
+      cFileActions: cFileActions, cAttributes: cAttributes
+    ).get()
+  }
+
   @usableFromInline
   internal static func _spawn(
     _ path: UnsafePointer<CChar>,
@@ -257,18 +292,40 @@ extension ProcessID {
   ) -> Result<ProcessID, Errno> {
     arguments._withCStringArray { arguments in
       let arguments = _mutableCStrings(arguments)
-      func spawn(_ environment: UnsafePointer<UnsafeMutablePointer<CChar>?>) -> Result<ProcessID, Errno> {
-        var pid: pid_t = 0
-        return nothingOrReturnedErrno(retryOnInterrupt: false) {
-          if searchingPath {
-            return system_posix_spawnp(&pid, path, cFileActions, cAttributes, arguments, environment)
-          }
-          return system_posix_spawn(&pid, path, cFileActions, cAttributes, arguments, environment)
-        }.map { ProcessID(rawValue: pid) }
+      guard let environment else {
+        return _spawn(
+          path, searchingPath: searchingPath, arguments: arguments, environment: nil,
+          cFileActions: cFileActions, cAttributes: cAttributes)
       }
-      guard let environment else { return _withCallingEnvironment(spawn) }
-      return environment._withCStringArray { spawn(_mutableCStrings($0)) }
+      return environment._withCStringArray { environment in
+        _spawn(
+          path, searchingPath: searchingPath, arguments: arguments,
+          environment: _mutableCStrings(environment),
+          cFileActions: cFileActions, cAttributes: cAttributes)
+      }
     }
+  }
+
+  @usableFromInline
+  internal static func _spawn(
+    _ path: UnsafePointer<CChar>,
+    searchingPath: Bool,
+    arguments: UnsafePointer<UnsafeMutablePointer<CChar>?>,
+    environment: UnsafePointer<UnsafeMutablePointer<CChar>?>?,
+    cFileActions: UnsafePointer<CInterop.SpawnFileActions>?,
+    cAttributes: UnsafePointer<CInterop.SpawnAttributes>?
+  ) -> Result<ProcessID, Errno> {
+    func spawn(_ environment: UnsafePointer<UnsafeMutablePointer<CChar>?>) -> Result<ProcessID, Errno> {
+      var pid: pid_t = 0
+      return nothingOrReturnedErrno(retryOnInterrupt: false) {
+        if searchingPath {
+          return system_posix_spawnp(&pid, path, cFileActions, cAttributes, arguments, environment)
+        }
+        return system_posix_spawn(&pid, path, cFileActions, cAttributes, arguments, environment)
+      }.map { ProcessID(rawValue: pid) }
+    }
+    guard let environment else { return _withCallingEnvironment(spawn) }
+    return spawn(environment)
   }
 }
 

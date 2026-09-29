@@ -30,6 +30,26 @@ import Musl
 @testable import System
 #endif
 
+/// Calls `body` with a null-terminated C array of null-terminated C strings
+/// that hold `strings`' bytes, which needn't be UTF-8.
+internal func withCStringArray<R>(
+  _ strings: [[UInt8]], _ body: (UnsafePointer<UnsafeMutablePointer<CChar>?>) throws -> R
+) rethrows -> R {
+  let copies: [UnsafeMutablePointer<CChar>?] = strings.map { bytes in
+    let copy = UnsafeMutablePointer<CChar>.allocate(capacity: bytes.count + 1)
+    for (i, byte) in bytes.enumerated() { copy[i] = CChar(bitPattern: byte) }
+    copy[bytes.count] = 0
+    return copy
+  } + [nil]
+  defer { copies.forEach { $0?.deallocate() } }
+  return try copies.withUnsafeBufferPointer { try body($0.baseAddress!) }
+}
+
+/// A shell script that exits 0 if its first argument is one byte, 0xFF,
+/// which isn't UTF-8, and so is the environment variable `BYTE` if it's set.
+internal let checksTheByte: [UInt8] = Array(
+  #"b="$(printf '\377')"; [ "$1" = "$b" ] && [ "${BYTE-$b}" = "$b" ]"#.utf8)
+
 @available(System 199, *)
 final class RawSpawnTests: XCTestCase {
   /// The C attributes have System's settings, and a closure can add more.
@@ -123,6 +143,23 @@ final class RawSpawnTests: XCTestCase {
     defer { buffer.deallocate() }
     let count = try reader.read(into: buffer)
     XCTAssertEqual(String(decoding: buffer[..<count], as: UTF8.self), "raw\n")
+  }
+
+  /// Arguments and an environment as C arrays, whose bytes needn't be UTF-8.
+  func testSpawningWithCArrays() throws {
+    let child = try withCStringArray([Array("sh".utf8), Array("-c".utf8), checksTheByte, Array("sh".utf8), [0xff]]) {
+      arguments in
+      try withCStringArray([Array("BYTE=".utf8) + [0xff]]) { environment in
+        try ProcessID.spawn(
+          "/bin/sh", arguments: arguments, environment: environment, cFileActions: nil, cAttributes: nil)
+      }
+    }
+    XCTAssertEqual(try child.wait(), .exited(0))
+    // The byte is what the child compares: another one fails.
+    let other = try withCStringArray([Array("sh".utf8), Array("-c".utf8), checksTheByte, Array("sh".utf8), [0xfe]]) {
+      try ProcessID.spawn("/bin/sh", arguments: $0, environment: nil, cFileActions: nil, cAttributes: nil)
+    }
+    XCTAssertEqual(try other.wait(), .exited(1))
   }
 
   func testSpawningWithoutCValues() throws {
