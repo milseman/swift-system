@@ -1186,6 +1186,12 @@ internal var _AT_EACCESS: CInt { AT_EACCESS }
 #if SYSTEM_PACKAGE_DARWIN
 @_alwaysEmitIntoClient
 internal var _AT_SYMLINK_NOFOLLOW_ANY: CInt { AT_SYMLINK_NOFOLLOW_ANY }
+
+@_alwaysEmitIntoClient
+internal var _AT_REALDEV: CInt { AT_REALDEV }
+
+@_alwaysEmitIntoClient
+internal var _AT_FDONLY: CInt { AT_FDONLY }
 #endif
 
 #if canImport(Darwin, _version: 346) || os(FreeBSD)

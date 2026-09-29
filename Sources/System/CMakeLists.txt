@@ -242,6 +242,7 @@ target_sources(SystemPackage PRIVATE
   Internals/Syscalls+ProvisionalLocale.swift
   Internals/Syscalls+ProvisionalMath.swift
   Provisional/Provisional+CType.swift
+  Provisional/Provisional+Execinfo.swift
   Provisional/Provisional+Locale.swift
   Provisional/Provisional+Math.swift
   Provisional/Provisional+POSIXErrorCode.swift
@@ -326,6 +327,7 @@ target_sources(SystemPackage PRIVATE
 target_sources(SystemPackage PRIVATE
   Internals/Constants+TimersAndPriority.swift
   Internals/Syscalls+TimersAndPriority.swift
+  TimersAndPriority/IOPolicy.swift
   TimersAndPriority/ProcessPriority.swift
   TimersAndPriority/ProcessTimer.swift)
 target_sources(SystemPackage PRIVATE

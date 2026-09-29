@@ -74,6 +74,22 @@ public struct Stat: RawRepresentable, Sendable {
     /// - Note: Only available on Darwin.
     @_alwaysEmitIntoClient
     public static var symlinkNoFollowAny: Flags { Flags(rawValue: _AT_SYMLINK_NOFOLLOW_ANY) }
+
+    /// Report the device that the file is on,
+    /// rather than the one that a union or null mount presents.
+    ///
+    /// The corresponding C constant is `AT_REALDEV`.
+    /// - Note: Only available on Darwin.
+    @_alwaysEmitIntoClient
+    public static var realDevice: Flags { Flags(rawValue: _AT_REALDEV) }
+
+    /// Use only the directory descriptor, and ignore the path:
+    /// return the descriptor's own status, as `fstat` does.
+    ///
+    /// The corresponding C constant is `AT_FDONLY`.
+    /// - Note: Only available on Darwin.
+    @_alwaysEmitIntoClient
+    public static var descriptorOnly: Flags { Flags(rawValue: _AT_FDONLY) }
     #endif
 
     #if canImport(Darwin, _version: 346) || os(FreeBSD)

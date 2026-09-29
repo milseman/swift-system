@@ -120,6 +120,23 @@ internal func system_iscntrl(_ c: CInt) -> CInt { iscntrl(c) }
 internal func system_tolower(_ c: CInt) -> CInt { tolower(c) }
 internal func system_toupper(_ c: CInt) -> CInt { toupper(c) }
 
+// MARK: - execinfo.h
+
+#if SYSTEM_PACKAGE_DARWIN
+// Neither sets errno; backtrace_symbols returns NULL when it can't allocate.
+internal func system_backtrace(
+  _ buffer: UnsafeMutablePointer<UnsafeMutableRawPointer?>, _ count: CInt
+) -> CInt {
+  backtrace(buffer, count)
+}
+
+internal func system_backtrace_symbols(
+  _ addresses: UnsafePointer<UnsafeMutableRawPointer?>, _ count: CInt
+) -> UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>? {
+  backtrace_symbols(addresses, count)
+}
+#endif
+
 // MARK: - stdio
 
 // fopen

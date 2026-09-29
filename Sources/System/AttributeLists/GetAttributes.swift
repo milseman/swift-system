@@ -46,6 +46,7 @@ extension FilePath {
   /// throws ``Errno/invalidArgument``.
   ///
   /// The corresponding C function is `getattrlist`.
+  /// The corresponding C constant is `ATTR_BIT_MAP_COUNT`, the number of attribute groups it passes.
   /// - Note: Only available on Darwin.
   @_alwaysEmitIntoClient
   public func attributes(
@@ -80,6 +81,7 @@ extension FilePath {
   /// throws ``Errno/invalidArgument``.
   ///
   /// The corresponding C function is `getattrlist`.
+  /// The corresponding C constant is `ATTR_BIT_MAP_COUNT`, the number of attribute groups it passes.
   /// - Note: Only available on Darwin.
   @_alwaysEmitIntoClient
   public static func attributes(
