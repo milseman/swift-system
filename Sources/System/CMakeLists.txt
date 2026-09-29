@@ -76,6 +76,9 @@ target_sources(SystemPackage PRIVATE
 target_sources(SystemPackage PRIVATE
   DynamicLoading/DynamicLibrary.swift)
 target_sources(SystemPackage PRIVATE
+  DynamicLoading/LoadedImages.swift
+  Internals/Syscalls+LoadedImages.swift)
+target_sources(SystemPackage PRIVATE
   Entropy/Entropy.swift)
 target_sources(SystemPackage PRIVATE
   Environment/ProcessEnvironment.swift)

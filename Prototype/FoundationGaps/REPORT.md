@@ -7,9 +7,13 @@ status, and the number of loaded images. Out of scope: the environment lock (`en
 interface) and swift-foundation itself. Base: system-next at `eee1da2`, after the coverage merge. Built and tested
 on Darwin only.
 
-Before any change: XCTest 565 tests (4 skipped), swift-testing 485 tests in 76 suites, all passing.
+Before any change: XCTest 565 tests (4 skipped), swift-testing 485 tests in 76 suites, all passing. After item 4:
+XCTest 565 tests (4 skipped), swift-testing 496 tests in 80 suites, all passing. The ABI-stable build of
+SystemPackage fails only in its known files (FileTimes.swift, FilePathOperations.swift, Syscalls.swift); none of
+this lane's files has an error there.
 
-**Resume here:** sections 1 to 3 are done; next is item 4, the number of loaded images.
+**Resume here:** all four items are done (sections 1 to 4); nothing is in progress. What's left is for other lanes
+and for Foundation (section 5). This worktree's `.build` and scratch output are deleted.
 
 ## 1. `Errno.notCapable` on Darwin: `6ba9b30`
 
@@ -105,7 +109,7 @@ Findings: Prototype/Directories/README.md's "Descriptors" paragraph ("Rejected f
 Next: item 3. For Foundation: pass `options: .boundedDescriptors` in `_LinkOrCopyWalk` and `_subpathsOfDirectory`,
 and drop the EMFILE notes.
 
-## 3. DirectoryWalk visiting the root, and giving each entry's status
+## 3. DirectoryWalk visiting the root, and giving each entry's status: `ae2bc09`
 
 What: two more `DirectoryWalk.Options`.
 - `.includesRoot`: the walk visits the root itself where its order puts any directory's visits: first, last, or
@@ -150,3 +154,48 @@ EACCES and the type their directory records, and its subdirectory also fails to 
 Next: item 4. For Foundation: `_LinkOrCopyWalk` can take `options: [.boundedDescriptors, .includesRoot,
 .includesStatus]` with `opening: .whenEntered`, keeping its `lstat` of the root, its `PATH_MAX` check and its "._"
 filter.
+
+## 4. The number of loaded images
+
+What: `DynamicLibrary.loadedImageCount`, Darwin only: the number of images the dynamic loader has loaded (the
+program, and every library and bundle, asked for or depended on), as `_dyld_image_count` returns it. It's for
+AttributeScope's cache in Foundation's framework build: a count different from the last one means images have loaded
+or unloaded since, so a scope it didn't find may be there now (its SYSTEM-GAP marker). The doc says the converse
+doesn't hold (a load and an unload leave the count the same) and that another thread can change it at any time.
+
+Design calls, with the alternatives rejected:
+- A static property of `DynamicLibrary`, beside the loader-wide `mainProgram(options:)`, `takePendingError()` and
+  `symbolInfo(containing:)`, returning `Int`. Rejected: a new top-level type for the loaded images (a collection
+  with each image's name, header and slide, `_dyld_get_image_name`, `_dyld_get_image_header`,
+  `_dyld_get_image_vmaddr_slide`): more than was asked, and those calls race with other threads by index, which
+  `dladdr` (already `symbolInfo(containing:)`) doesn't; a `UInt32` result, the C type.
+- Not added, as asked: a callback for each image that loads (`_dyld_register_func_for_add_image`). It's the exact
+  answer to "was a scope loaded since", but a registration can't be undone, dyld calls it at once for every image
+  already loaded and then for each new one while holding its lock, and it takes a C function pointer with no
+  context, so a Swift wrapper needs a global registry of closures. `_dyld_register_func_for_remove_image` is the
+  same.
+- No mock hook: `_dyld_image_count` can't fail, like `_NSGetExecutablePath`'s wrapper in
+  `Syscalls+Executable.swift`, whose pattern the new `Internals/Syscalls+LoadedImages.swift` follows
+  (`import MachO.dyld`, Darwin only). The API is in the new `DynamicLoading/LoadedImages.swift`; both are in
+  Sources/System/CMakeLists.txt, as a block of their own after DynamicLoading's (an insert only). No throws and no
+  `retryOnInterrupt`: it neither fails nor blocks.
+
+Tests (LoadedImagesTests.swift, swift-testing, Darwin): `theProgramAndItsLibraries` (at least two), and the exit
+test `loadingALibraryAddsToTheCount` (in a process of its own, where nothing else loads or unloads: loading the first
+of three system libraries that `.noLoad` shows isn't loaded yet raises the count).
+
+## 5. For others
+
+- swift-foundation (`no-darwin`): `_LinkOrCopyWalk` can take `opening: .whenEntered` and `options:
+  [.boundedDescriptors, .includesRoot, .includesStatus]`, keeping its `lstat` of the root, its `PATH_MAX` check and
+  its "._" filter, and `_subpathsOfDirectory` `.boundedDescriptors`; that removes their SYSTEM-GAP markers for the
+  descriptor limit, the root's visits and the per-entry `fstatat`. AttributeScope's can use
+  `DynamicLibrary.loadedImageCount`, once System ships in the SDK with it. `Errno.notCapable` closes the SYSTEM-GAP
+  at `POSIXError.Code`.
+- The demos lane: Samples/Beneath.swift can drop its `Errno(rawValue: ENOTCAPABLE)` for `.notCapable`.
+- The Directories README (Prototype/Directories/README.md): its "Descriptors" paragraph and "The root isn't
+  visited" decision predate `.boundedDescriptors` and `.includesRoot`.
+- Not done, noted: the one-call reopen (`O_NOFOLLOW_ANY`, `openat2`) and a measurement of the option's cost
+  (section 2); `_dyld_register_func_for_add_image` (section 4). Linux is unbuilt here: the walk's new code uses only
+  calls it already made on every Unix-like platform (`openat`, `fdopendir`, `readdir`, `fstat`, `fstatat`, `close`),
+  and the loaded-image count is Darwin only.
