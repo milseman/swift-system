@@ -471,10 +471,12 @@ internal var _ENOTRECOVERABLE: CInt { ENOTRECOVERABLE }
 internal var _EOWNERDEAD: CInt { EOWNERDEAD }
 #endif
 
-#if os(FreeBSD)
+#if canImport(Darwin, _version: 346) || os(FreeBSD)
 @_alwaysEmitIntoClient
 internal var _ENOTCAPABLE: CInt { ENOTCAPABLE }
+#endif
 
+#if os(FreeBSD)
 @_alwaysEmitIntoClient
 internal var _ECAPMODE: CInt { ECAPMODE }
 
