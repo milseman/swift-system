@@ -98,6 +98,10 @@ def merge_ranges(ranges):
     return out
 
 
+def plural(n, word):
+    return f"{n} {word}{'' if n == 1 else 's'}"
+
+
 def cell(s):
     """Code in a table cell: backticks and pipes can't appear inside."""
     return "`" + s.replace("`", "'").replace("|", "\\|") + "`"
@@ -224,7 +228,8 @@ def adopters_md(w, data, adopters, full=False):
                               f"({(pinfo.get('build') or {}).get('reason') or ''})"}.get(ad["resolution"], ad["resolution"])
             w(f"**Adopted** on `{ad['branch']}` @ `{(ad['commit'] or '')[:10]}` ({pinfo.get('commits', '?')} "
               f"commit{'s' if pinfo.get('commits') != 1 else ''} past `{ad['mainRef']}` @ `{(ad['base'] or '')[:10]}`): "
-              f"{len(ad['sites'])} sites using {len(ad['declarationsUsed'])} declarations, resolved by {how}"
+              f"{plural(len(ad['sites']), 'site')} using {plural(len(ad['declarationsUsed']), 'declaration')}, "
+              f"resolved by {how}"
               + (f"; {ad['qualifiers']} more only name a type to qualify a nested one" if ad["qualifiers"] else "")
               + ".")
             w("")
@@ -264,7 +269,7 @@ def adopters_md(w, data, adopters, full=False):
                               "of this commit"}.get(be["source"], be["source"])
             w(f"**Would benefit**: at `{(be['commit'] or '')[:10]}` ({be['role']}"
               + (f", \"{be['subject']}\"" if be.get("subject") else "") + f"), from {src}: "
-              f"{len(be['sites'])} sites of {len(be['interfaces'])} C interfaces.")
+              f"{plural(len(be['sites']), 'site')} of {plural(len(be['interfaces']), 'C interface')}.")
             w("")
             mapped = any("onBranch" in s for s in be["sites"])
             limit = None if full else MAX_BENEFIT_MD
