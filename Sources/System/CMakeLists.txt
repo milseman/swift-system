@@ -277,7 +277,8 @@ target_sources(SystemPackage PRIVATE
   Internals/Constants+SystemControl.swift
   Internals/Syscalls+SystemControl.swift
   SystemControl/SystemControl.swift
-  SystemControl/SystemControlNames.swift)
+  SystemControl/SystemControlNames.swift
+  SystemControl/SystemControlProcessInfo.swift)
 target_sources(SystemPackage PRIVATE
   SystemIdentity/SystemIdentity.swift)
 target_sources(SystemPackage PRIVATE
