@@ -238,10 +238,12 @@ target_sources(SystemPackage PRIVATE
   Internals/Syscalls+Provisional.swift
   Internals/Syscalls+ProvisionalLocale.swift
   Internals/Syscalls+ProvisionalMath.swift
+  Provisional/Provisional+CType.swift
   Provisional/Provisional+Locale.swift
   Provisional/Provisional+Math.swift
   Provisional/Provisional+POSIXErrorCode.swift
-  Provisional/Provisional+Stdio.swift)
+  Provisional/Provisional+Stdio.swift
+  Provisional/Provisional+StringH.swift)
 target_sources(SystemPackage PRIVATE
   Internals/Syscalls+Pseudoterminals.swift
   Pseudoterminals/Pseudoterminal.swift)
@@ -275,7 +277,8 @@ target_sources(SystemPackage PRIVATE
   Internals/Constants+SystemControl.swift
   Internals/Syscalls+SystemControl.swift
   SystemControl/SystemControl.swift
-  SystemControl/SystemControlNames.swift)
+  SystemControl/SystemControlNames.swift
+  SystemControl/SystemControlProcessInfo.swift)
 target_sources(SystemPackage PRIVATE
   SystemIdentity/SystemIdentity.swift)
 target_sources(SystemPackage PRIVATE
@@ -310,7 +313,8 @@ target_sources(SystemPackage PRIVATE
   Threads/PThreadMutex.swift
   Threads/PThreadNames.swift
   Threads/PThreadReadWriteLock.swift
-  Threads/PThreadScheduling.swift)
+  Threads/PThreadScheduling.swift
+  Threads/PThreadStaticInitializers.swift)
 target_sources(SystemPackage PRIVATE
   Time/ClockID.swift
   Time/Sleep.swift)

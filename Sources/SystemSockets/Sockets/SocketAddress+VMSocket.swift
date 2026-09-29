@@ -21,7 +21,11 @@ extension SocketDescriptor.Domain {
   /// on a Mac that isn't a virtual machine, creating such a socket fails
   /// with ``Errno/operationNotSupportedByDevice`` (`ENODEV`).
   ///
-  /// The corresponding C constant is `PF_VSOCK`.
+  /// A socket address's ``SocketAddress/family`` is this domain
+  /// for a VM socket address.
+  ///
+  /// The corresponding C constants are `PF_VSOCK` and `AF_VSOCK`,
+  /// which have the same value.
   ///
   /// - Note: Only available on Darwin.
   @_alwaysEmitIntoClient

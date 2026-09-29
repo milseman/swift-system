@@ -28,14 +28,20 @@ public struct FilePermissions: OptionSet, Sendable, Hashable, Codable {
   public init(rawValue: CModeT) { self.rawValue = rawValue }
 
   /// Indicates that other users have read-only permission.
+  ///
+  /// The corresponding C constant is `S_IROTH`.
   @_alwaysEmitIntoClient
   public static var otherRead: FilePermissions { .init(rawValue: 0o4) }
 
   /// Indicates that other users have write-only permission.
+  ///
+  /// The corresponding C constant is `S_IWOTH`.
   @_alwaysEmitIntoClient
   public static var otherWrite: FilePermissions { .init(rawValue: 0o2) }
 
   /// Indicates that other users have execute-only permission.
+  ///
+  /// The corresponding C constant is `S_IXOTH`.
   @_alwaysEmitIntoClient
   public static var otherExecute: FilePermissions { .init(rawValue: 0o1) }
 
@@ -52,18 +58,26 @@ public struct FilePermissions: OptionSet, Sendable, Hashable, Codable {
   public static var otherWriteExecute: FilePermissions { .init(rawValue: 0o3) }
 
   /// Indicates that other users have read, write, and execute permission.
+  ///
+  /// The corresponding C constant is `S_IRWXO`.
   @_alwaysEmitIntoClient
   public static var otherReadWriteExecute: FilePermissions { .init(rawValue: 0o7) }
 
   /// Indicates that the group has read-only permission.
+  ///
+  /// The corresponding C constant is `S_IRGRP`.
   @_alwaysEmitIntoClient
   public static var groupRead: FilePermissions { .init(rawValue: 0o40) }
 
   /// Indicates that the group has write-only permission.
+  ///
+  /// The corresponding C constant is `S_IWGRP`.
   @_alwaysEmitIntoClient
   public static var groupWrite: FilePermissions { .init(rawValue: 0o20) }
 
   /// Indicates that the group has execute-only permission.
+  ///
+  /// The corresponding C constant is `S_IXGRP`.
   @_alwaysEmitIntoClient
   public static var groupExecute: FilePermissions { .init(rawValue: 0o10) }
 
@@ -80,18 +94,26 @@ public struct FilePermissions: OptionSet, Sendable, Hashable, Codable {
   public static var groupWriteExecute: FilePermissions { .init(rawValue: 0o30) }
 
   /// Indicates that the group has read, write, and execute permission.
+  ///
+  /// The corresponding C constant is `S_IRWXG`.
   @_alwaysEmitIntoClient
   public static var groupReadWriteExecute: FilePermissions { .init(rawValue: 0o70) }
 
   /// Indicates that the owner has read-only permission.
+  ///
+  /// The corresponding C constant is `S_IRUSR`.
   @_alwaysEmitIntoClient
   public static var ownerRead: FilePermissions { .init(rawValue: 0o400) }
 
   /// Indicates that the owner has write-only permission.
+  ///
+  /// The corresponding C constant is `S_IWUSR`.
   @_alwaysEmitIntoClient
   public static var ownerWrite: FilePermissions { .init(rawValue: 0o200) }
 
   /// Indicates that the owner has execute-only permission.
+  ///
+  /// The corresponding C constant is `S_IXUSR`.
   @_alwaysEmitIntoClient
   public static var ownerExecute: FilePermissions { .init(rawValue: 0o100) }
 
@@ -108,18 +130,24 @@ public struct FilePermissions: OptionSet, Sendable, Hashable, Codable {
   public static var ownerWriteExecute: FilePermissions { .init(rawValue: 0o300) }
 
   /// Indicates that the owner has read, write, and execute permission.
+  ///
+  /// The corresponding C constant is `S_IRWXU`.
   @_alwaysEmitIntoClient
   public static var ownerReadWriteExecute: FilePermissions { .init(rawValue: 0o700) }
 
   /// Indicates that the file is executed as the owner.
   ///
   /// For more information, see the `setuid(2)` man page.
+  ///
+  /// The corresponding C constant is `S_ISUID`.
   @_alwaysEmitIntoClient
   public static var setUserID: FilePermissions { .init(rawValue: 0o4000) }
 
   /// Indicates that the file is executed as the group.
   ///
   /// For more information, see the `setgid(2)` man page.
+  ///
+  /// The corresponding C constant is `S_ISGID`.
   @_alwaysEmitIntoClient
   public static var setGroupID: FilePermissions { .init(rawValue: 0o2000) }
 
@@ -128,6 +156,8 @@ public struct FilePermissions: OptionSet, Sendable, Hashable, Codable {
   ///
   /// For more information, see the `chmod(2)` man page's
   /// discussion of `S_ISVTX` (the sticky bit).
+  ///
+  /// The corresponding C constant is `S_ISVTX`.
   @_alwaysEmitIntoClient
   public static var saveText: FilePermissions { .init(rawValue: 0o1000) }
 }

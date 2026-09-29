@@ -1518,7 +1518,8 @@ extension FilePath {
   /// If this path is relative, it is resolved against the directory given by `fd`.
   ///
   /// The corresponding C function is `faccessat`.
-  /// Passing `true` for `useEffectiveIDs` passes the `AT_EACCESS` flag.
+  /// The corresponding C flag is `AT_EACCESS`,
+  /// which it passes when `useEffectiveIDs` is `true`.
   @_alwaysEmitIntoClient
   public func checkAccess(
     _ access: FilePath.Access = [],
@@ -1562,7 +1563,8 @@ extension FilePath {
   /// If `path` is relative, it is resolved against the directory given by `fd`.
   ///
   /// The corresponding C function is `faccessat`.
-  /// Passing `true` for `useEffectiveIDs` passes the `AT_EACCESS` flag.
+  /// The corresponding C flag is `AT_EACCESS`,
+  /// which it passes when `useEffectiveIDs` is `true`.
   @_alwaysEmitIntoClient
   public static func checkAccess(
     _ path: UnsafePointer<CChar>,

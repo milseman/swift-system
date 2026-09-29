@@ -180,6 +180,24 @@ final class SystemControlTest: XCTestCase {
     XCTAssertEqual(current.kp_eproc.e_pcred.p_ruid, getuid())
     XCTAssertEqual(current.kp_eproc.e_ucred.cr_uid, geteuid())
 
+    // The Swift-named accessors, which a client that doesn't import
+    // Darwin reads.
+    XCTAssertEqual(current.processID, .current)
+    XCTAssertEqual(current.parentProcessID, .parent)
+    XCTAssertEqual(current.processGroupID.rawValue, getpgrp())
+    XCTAssertEqual(current.realUserID, .real)
+    XCTAssertEqual(current.effectiveUserID, .effective)
+    XCTAssertEqual(current.savedUserID, .effective)
+    XCTAssertEqual(current.realGroupID, .real)
+    XCTAssertEqual(current.savedGroupID, .effective)
+    XCTAssertFalse(current.isTraced)
+    let program = String(CommandLine.arguments[0].split(separator: "/").last ?? "")
+    XCTAssertFalse(current.commandName.isEmpty)
+    XCTAssertTrue(program.hasPrefix(current.commandName), "\(current.commandName) \(program)")
+    XCTAssertLessThanOrEqual(current.commandName.utf8.count, Int(MAXCOMLEN))
+    // Nor is launchd, process 1.
+    XCTAssertFalse(try SystemControl.value(.process(ProcessID(1))).isTraced)
+
     // The kernel returns no information, rather than an error, for a
     // process that doesn't exist.
     XCTAssertThrowsError(try SystemControl.value(.process(ProcessID(.max)))) {

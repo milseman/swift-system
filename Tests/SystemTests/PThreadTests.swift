@@ -213,6 +213,22 @@ private struct PThreadTests {
     #expect(stackSize.value >= 1 << 20)
   }
 
+  /// A thread without a stack size gets the default; Darwin's threads
+  /// report at least as much.
+  @available(System 199, *)
+  @Test func defaultStackSize() throws {
+    let size = try PThread.Attributes.defaultStackSize()
+    #expect(size > 0)
+    #expect(size % Int(getpagesize()) == 0)
+    #if SYSTEM_PACKAGE_DARWIN
+    let seen = Locked(0)
+    let thread = try PThread { seen.withValue { $0 = pthread_get_stacksize_np(pthread_self()) } }
+    try thread.join()
+    #expect(seen.value >= size)
+    #expect(size == 512 << 10)
+    #endif
+  }
+
   @available(System 199, *)
   @Test func invalidStackSize() {
     var attributes = PThread.Attributes()
@@ -317,6 +333,19 @@ private struct PThreadTests {
   @Test func yield() throws {
     let thread = try PThread { PThread.yield() }
     try thread.join()
+  }
+
+  /// A thread that ends itself doesn't run the rest of its body,
+  /// and joining it returns.
+  @available(System 199, *)
+  @Test func exitEndsTheThread() throws {
+    let steps = Locked<[String]>([])
+    let thread = try PThread {
+      steps.withValue { $0.append("before") }
+      PThread.exit()
+    }
+    try thread.join()
+    #expect(steps.value == ["before"])
   }
 
   #if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)

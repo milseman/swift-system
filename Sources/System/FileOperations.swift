@@ -827,6 +827,7 @@ extension FileDescriptor {
   /// options place, where they're available.
   ///
   /// The corresponding C function is `flock`.
+  /// The corresponding C constants are `LOCK_EX`, `LOCK_SH`, and `LOCK_NB`.
   @_alwaysEmitIntoClient
   public func lockWholeFile(
     shared: Bool = false,

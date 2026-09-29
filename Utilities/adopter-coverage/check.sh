@@ -127,6 +127,9 @@ if [ -e "$WORK" ]; then
 fi
 mkdir -p "$WORK"
 echo "$$" > "$WORK/.adopter-coverage-work"
+# Give the directory up at exit, so that a later run doesn't take a process
+# that reused this one's ID for a run still using it.
+trap ': > "$WORK/.adopter-coverage-work"' EXIT
 rm -rf "${STAGE:?}" "${WORK:?}/system" "${WORK:?}/system-package"
 mkdir -p "$STAGE"
 touch "$STAGE/.adopter-coverage-out"

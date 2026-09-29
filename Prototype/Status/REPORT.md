@@ -7,52 +7,44 @@ everything here is built and tested on Darwin only.
 
 ## Queue
 
-The work list for toolchain packages to drop `import Darwin` in every form, kept current. Source: the ecosystem run
-`05d4974d68bb-8ed49538` (System `05d4974`, the 21 main-scheme packages that import Darwin, at the scheme's refs;
-`ecosystem.sh run` then `report`). Counted: the interfaces that library files importing Darwin use, in any form
-but through Apple Foundation's re-export (`darwin.interfacesByClass` in each package's `interfaces.json.gz`: direct
-imports, the packages' own re-exports, other modules' and the SDK's), not covered on Darwin: 756 interfaces, 259 not
-covered. Grouped into clusters, ranked by packages, then call sites. Checking each against System's sources shows
-many aren't gaps: the tools can't see API that doesn't name them in the standard sentence, or mapping.ini holds a
-status that predates the lanes. So step 0 is to make the tools see what System covers; the ranks are then redone.
+The work list for toolchain packages to drop `import Darwin` in every form, kept current. Source: `ecosystem.sh
+report`'s *What the files that import Darwin still need* (section 25), which counts the interfaces that library files
+importing Darwin in any form but through Apple Foundation's re-export use, per symbol, with System's coverage on
+Darwin; grouped here into clusters and ranked by packages, then call sites. After step 0: run `6e784c6e7026-4676fb13`
+(System `6e784c6`, the 21 main-scheme packages that import Darwin): 756 interfaces, 567 covered, 131 gaps (24 in two
+or more packages).
 
-Next: step 0, then the clusters from the re-ranked list.
+Next: cluster 11. Resume from the first row not marked done. Latest re-rank: run `b64ee9f1591b-d229d468` (System
+`b64ee9f`): 756 interfaces, 615 covered, 78 gaps; set apart, 19 the standard library answers, 18 other modules' names,
+26 the packages' own shims.
 
 | # | Cluster | Packages | Sites | Interfaces | Plan |
 |---|---|---:|---:|---|---|
-| 0 | What the tools can't see | | | stdout, stderr (`The corresponding C variable` isn't read); localtime_r (a DocC link breaks the sentence); S_IFMT and S_I* bits, pthread destroy calls, DT_UNKNOWN, XATTR_NOFOLLOW (undocumented); PATH_MAX, linger (stale partials); fts (answered by DirectoryWalk, section 14); localtime, gettimeofday, time, getpwuid, getgrgid, mkstemp(s) (replaced by the reentrant or newer call System wraps) | derive.py fixes, doc sentences, mapping.ini |
-| 1 | string.h and ctype.h | 10 | 93 | strdup (7 packages; four migrations each wrote their own), strlen, strnlen, strncmp, strerror_r, strlcpy, tolower, isspace; memset, memcpy, memmove | Provisional+StringH; the mem* three are the standard library's (section 1) |
-| 2 | C stdio beyond FileStream | 10 | 30 | stderr, stdout, fputs, putc, perror, snprintf | stderr/stdout in step 0; fputs, putc, perror on FileStream |
-| 3 | C scalar types | 6 | 60 | off_t (NIO 26), ssize_t, size_t, suseconds_t, u_int, uintptr_t, LONG_MAX, _POSIX_ARG_MAX, u_short | CInterop aliases where Swift has no spelling |
-| 4 | File mode bits | 6 | 34 | S_IFMT, S_IRWXU/G/O, S_IWGRP, S_IWOTH, S_ISVTX | step 0 (FilePermissions, FileMode name none) |
-| 5 | pthreads | 5 | 31 | destroy calls (step 0); pthread_attr_getstacksize, setdetachstate, setscope, pthread_exit, pthread_yield_np, the error-checking initializer | the rest |
-| 6 | Time of day | 5 | 8 | time, gettimeofday, localtime, gmtime_r | step 0 |
-| 7 | PATH_MAX | 4 | 13 | PATH_MAX | step 0 (covered since section 3) |
-| 8 | Sockets | 3 | 140 | sockaddr_storage (NIO 34), ifaddrs, inet_pton, freeaddrinfo, AF_UNIX, INADDR_ANY, multicast and packet-info options, nfds_t, NI_MAXHOST | check each; mostly NIO's |
-| 9 | fts | 3 | 108 | fts_* and FTS_* | step 0 |
-| 10 | libm | 3 | 39 | round, sqrt, ceil, floor, fabs, modf | the standard library's; record it |
-| 11 | Mach | 3 | 24 | mach_task_self_, KERN_SUCCESS, ERR_SUCCESS, vm_address_t, vm_prot_t, integer_t, mach_msg_type_number_t, task_info with TASK_VM_INFO, USEC_PER_SEC | check each |
-| 12 | Directory entry types | 3 | 4 | DT_UNKNOWN | step 0 |
-| 13 | ioctl | 3 | 3 | ioctl (terminal size, vsock CID) | check the requests |
-| 14 | sysctl names | 2 | 22 | kinfo_proc, CTL_KERN, KERN_PROC, KERN_PROC_PID, CTL_HW, HW_NCPU, HW_AVAILCPU, P_TRACED, extern_proc | check SystemControl |
-| 15 | MacTypes | 2 | 12 | OSStatus, DarwinBoolean (UniChar there is CoreFoundation's) | |
-| 16 | Extended attributes | 2 | 9 | XATTR_NOFOLLOW (step 0), XATTR_FINDERINFO_NAME, XATTR_RESOURCEFORK_NAME | |
-| 17 | Signals | 2 | 7 | signal, SIG_ERR, SIG_UNBLOCK, sigprocmask, NSIG | check the processes lane's API |
-| 18 | Spawn attributes | 2 | 6 | posix_spawnattr_setpgroup, setsigdefault, setsigmask (partial) | check |
-| 19 | Mounts and quotas | 2 | 6 | getfsstat, quotactl (partial), SUBCMDMASK, SUBCMDSHIFT, getmntinfo_r_np | |
-| 20 | flock | 2 | 4 | LOCK_EX, LOCK_SH, LOCK_NB | |
-| 21 | File times | 2 | 5 | utimes, futimens (partial) | |
-| 22 | mmap constants | 2 | 3 | MAP_FAILED, PROT_NONE | |
-| 23 | CPU types | 1 | 22 | cpu_type_t, cpu_subtype_t, CPU_TYPE_*, CPU_ARCH_ABI64 (swift-build) | |
-| 24 | wait | 1 | 17 | siginfo_t, id_t, idtype_t, CLD_*, waitid (Subprocess) | check ProcessWait |
-| 25 | One-package gaps | 1 each | 1-3 each | dladdr and Dl_info, AT_EACCESS/AT_FDONLY/AT_REALDEV, backtrace, getiopolicy_np, strtod and strtof, sysdir's enumeration state, execv, getdtablesize, ATTR_BIT_MAP_COUNT, _NSGetEnviron, abort | |
+| 1 | string.h and ctype.h | 9 | 60 | strdup (7 packages), strlen, strnlen, strncmp, strlcpy, tolower, isspace | done: `CString` and `CType` (section 26) |
+| 2 | C stdio beyond FileStream | 5 | 12 | fputs, perror, putc, snprintf | done: FileStream's write(cString:) and write(byte:), mapping (section 27) |
+| 3 | Sockets | 4 | 104 | sockaddr_storage, inet_pton, freeaddrinfo, INADDR_ANY, NI_MAXHOST, NIO's options, nfds_t, AF_VSOCK | done: ExplicitCongestionNotification, docs, mapping (section 28) |
+| 4 | C scalar types | 4 | 7 | suseconds_t, u_int, LONG_MAX, _POSIX_ARG_MAX | done: `guaranteedArgumentBytes`, `swift` answers (section 30) |
+| 5 | File times | 4 | 5 | futimens, utimes | done: setTimes' sentences, `same.` (section 30) |
+| 6 | Mach | 3 | 24 | mach_task_self_, KERN_SUCCESS, ERR_SUCCESS, vm_address_t, task_info with TASK_VM_INFO | done: docs, [task_info] (section 31); swift-build's own vm_prot_t and USEC_PER_SEC stay listed |
+| 7 | ioctl | 3 | 3 | ioctl (terminal size, vsock CID) | done: both requests are System's (section 28) |
+| 8 | MacTypes | 2 | 12 | OSStatus, UniChar, DarwinBoolean | done: `swift` answers (section 31) |
+| 9 | sysctl process information | 2 | 9 | kinfo_proc's fields, P_TRACED, extern_proc | done: `CInterop.KernelProcessInfo` (section 31) |
+| 10 | pthreads | 2 | 8 | pthread_attr_getstacksize, setdetachstate, setscope, PTHREAD_CREATE_DETACHED, PTHREAD_SCOPE_SYSTEM, pthread_exit, pthread_yield_np, the error-checking initializer | done: exit(), defaultStackSize(), static initializers, mapping (section 32) |
+| 11 | Signals | 2 | 7 | signal, SIG_ERR, SIG_UNBLOCK, sigprocmask, NSIG | check the processes lane's API |
+| 12 | Spawn attributes | 2 | 6 | posix_spawnattr_setpgroup, setsigdefault, setsigmask | check SpawnAttributes' docs |
+| 13 | Mounts and quotas | 2 | 6 | getfsstat, quotactl, SUBCMDMASK, SUBCMDSHIFT, getmntinfo_r_np | |
+| 14 | Extended attribute names | 2 | 4 | XATTR_FINDERINFO_NAME, XATTR_RESOURCEFORK_NAME | |
+| 15 | CPU types | 1 | 22 | cpu_type_t, cpu_subtype_t, CPU_TYPE_*, CPU_ARCH_ABI64 (swift-build) | |
+| 16 | wait | 1 | 17 | siginfo_t, id_t, idtype_t, CLD_*, waitid (Subprocess) | check ProcessWait |
+| 17 | One-package gaps | 1 each | 1-3 each | dladdr and Dl_info, backtrace, strtod and strtof, AT_FDONLY and AT_REALDEV, sysdir's enumeration state, getiopolicy_np, ATTR_BIT_MAP_COUNT, execv, getdtablesize | |
 
-Not counted, with the reason: Dispatch (its own module; 3 packages, 200 sites), ObjectiveC, CoreFoundation, os and
-Foundation names (ObjCBool, NSObject, objc_getClass, Logger, NSDictionary, CFRunLoopStop, UniChar), the packages'
-own C shims (CNIODarwin_*, c_nio_posix_*, _subprocess_*), and false positives of the lexical scan (`index(after:)`
-read as strings.h's index, Float80).
+Not counted, with the reason: the lexical scan's false positives (`index(after:)` read as strings.h's index;
+Float80) and other modules' names it can't place (Logger, NSDictionary, CFRunLoopStop), which mapping.ini should
+say; the standard library's answers (off_t, ssize_t, size_t and uintptr_t are Int64, Int, UInt; memcpy, memmove,
+memset; round, sqrt, ceil, floor, fabs, modf); Dispatch and ObjectiveC names; the packages' own C shims
+(CNIODarwin_*, c_nio_posix_*, _subprocess_*).
 
-Done: none yet.
+Done: step 0, what the tools couldn't see (section 25); clusters 1 (section 26), 2 (section 27), 3 and 7 (section 28), 4 and 5 (section 30), 6, 8 and 9 (section 31), 10 (section 32); and Subprocess's new marker, C arrays for the C-values spawns (section 29). New SYSTEM-GAP markers in `../adopters` come first: status.sh lists them.
 
 ## 1. status.sh and STATUS.md (2026-09-28)
 
@@ -556,3 +548,211 @@ Tests: SpawnCredentialsTest's `testTheProgramGetsTheDescriptorsASpawnWould` (a s
 descriptors are open, spawned with and without credentials; before the fix three more were open with them) and
 `testCValuesKeepTheDescriptorsTheyUse`; `testCalls` now expects the parent's F_GETFD. XCTest 551 (4 skipped, and
 testVolumeAttributes skipped), swift-testing 461 in 72 suites, all passing.
+
+## 25. What the tools couldn't see: `128dcc8`, `6e784c6`
+
+The first ecosystem run of this stage (`05d4974d68bb-8ed49538`) ranked 259 interfaces as gaps of the files that import
+Darwin. Checked against System's sources, many weren't: System covered them, but the coverage tools couldn't tell.
+Fixing that came first, since every later rank depends on it.
+
+- **Doc sentences** (`128dcc8`, doc comments only): FilePermissions' members name their constants (S_IRUSR through
+  S_IRWXO, S_ISUID, S_ISGID, S_ISVTX) and FileMode.type names S_IFMT; PThread's Mutex, Condition, ReadWriteLock and
+  Key name what their deinits call (pthread_mutex_destroy, pthread_cond_destroy, pthread_rwlock_destroy,
+  pthread_key_delete), and each Attributes type the init and destroy calls that creating the object makes;
+  DT_UNKNOWN, XATTR_NOFOLLOW, LOCK_EX/LOCK_SH/LOCK_NB, PROT_NONE, MAP_FAILED, AT_EACCESS, freeifaddrs and struct
+  ifaddrs, the sysctl MIB constants behind SystemControl's names (CTL_KERN, KERN_PROC, KERN_PROC_PID, CTL_HW, HW_NCPU,
+  HW_AVAILCPU: a C probe showed HW_AVAILCPU is `hw.activecpu`'s MIB), _NSGetEnviron, and AF_UNIX (only
+  `.local`'s unavailable renamed stub named it). BrokenDownTime's sentences named gmtime_r and timegm "for
+  ``Zone/utc``": DocC's doubled backticks paired with the C names', so localtime_r and mktime were never read and
+  gmtime_r and timegm read as restricted to one use; the zones now have a sentence of their own.
+- **derive.py** (`6e784c6`): reads "The corresponding C variable is" (FileStream's stdout and stderr and
+  ProcessEnvironment's environ used it; only "global variable" was read), and blanks DocC links before pairing
+  backticks. Rejected: rewording those doc comments to fit the parser, which already read "global variable".
+- **mapping.ini** (`6e784c6`): fts is covered by DirectoryWalk, as section 14 decided and status.py already said;
+  PATH_MAX's and linger's hand partials predate SystemConfig.maxPathBytes and CInterop.Linger; the old calls that a
+  reentrant or newer one System wraps answers read as it (`same.`: gettimeofday and time as clock_gettime, usleep as
+  nanosleep, localtime and gmtime, getpwuid, getpwnam, getgrgid and getgrnam as their _r forms, mkstemp(s) as
+  mkostemp(s), strerror_r as strerror), as status.py's replacements did. The standard library's answers get entries
+  with a `swift` key (memory copies; rounding and roots), and string.h and stdio lose theirs, since section 7 put
+  those families in scope. Rejected: hand `covered` statuses, which need System declarations and hide what answers.
+- **ecosystem.py** (`6e784c6`): the report's new section *What the files that import Darwin still need* ranks, per
+  symbol, the interfaces that files importing Darwin in any form but through Apple Foundation use, by packages and
+  then sites, with coverage from the derivation's evidence for that symbol (an entry's status is its worst symbol's);
+  the standard library's answers, Dispatch and ObjectiveC names, and the packages' own C shims are set apart.
+  ECOSYSTEM.json keeps every row. Rejected: the report's existing top-30 gaps, which rank entries over every platform,
+  so Windows' dominate, and don't say which gaps a Darwin import waits on.
+
+Result, run `6e784c6e7026-4676fb13`: 756 interfaces, 567 covered, 131 gaps, 24 of them in two or more packages (259
+gaps before). The Queue above is ranked from it. No tests changed: the build is unchanged but for doc comments.
+
+## 26. C strings and character classes, provisionally: `f29fa08`
+
+The top of the Queue: string.h's C-string functions are the gap that the most packages' Darwin-importing files share
+(9 packages, 60 sites; strdup alone 7, and four of the migrations each wrote a strdup of their own), with ctype.h's
+tolower (swift-build's header maps) and isspace (Foundation's property list scanner).
+`Sources/System/Provisional/Provisional+StringH.swift` and `Provisional+CType.swift`:
+
+- `CString`, a namespace, as `Math` is for libm: `length(of:)` and `length(of:maxLength:)` (strlen, strnlen),
+  `duplicate(_:)` and `duplicate(_:maxLength:)` (strdup, strndup; `throws(Errno)`), whose copies `Memory.free`
+  frees, `compare(_:_:)` and `compare(_:_:maxLength:)` (strcmp, strncmp, returning the sign as an `Int`), and
+  `copy(_:into:)` (strlcpy, into a buffer pointer, returning the source's length). A `String` argument converts to a
+  temporary C string, as it does for the C functions. Negative lengths trap.
+- `CType`: `isSpace`, `isBlank`, `isDigit`, `isHexDigit`, `isLetter`, `isLetterOrDigit`, `isUppercase`, `isLowercase`,
+  `isPunctuation`, `isPrintable`, `isGraphic`, `isControl`, `lowercased`, `uppercased`, on `UInt8`, so C's undefined
+  behavior for a negative `char` can't arise; they follow the C library's current locale, as C's do.
+- memcpy, memmove and memset stay the standard library's (section 1), and memcmp and memchr `Memory`'s.
+- Rejected: members of `UnsafePointer<CChar>` or `UInt8`, which would sit on every pointer and byte and read as the
+  standard library's; a `String`-only duplicate, since callers also copy from C memory; `Bool` results for
+  `compare`, which serve equality but not ordering; `CCharacter` for the ctype namespace (`CType` is the header's
+  name, as `Math` is libm's role). Where glibc (before 2.38) or WASI's libc may lack strlcpy, it's strlen and a copy.
+  Not on Windows, whose C library names several of these differently.
+- strdup and strndup are mocked (a success copies for real, as mocked allocations do); the others can't fail.
+
+Tests: ProvisionalStringTests (CString: lengths, duplicates, comparisons, copies; CType: every ASCII byte's classes
+and case, and agreement with the C functions for all 256 bytes) and ProvisionalStringMockTest. XCTest 552 (4
+skipped, and testVolumeAttributes skipped), swift-testing 468 in 74 suites, all passing.
+
+Local system-next moved to `3d1e67d` (Michael's merge of coverage up to `0a3c801`); merging it back (`a87b3be`)
+changed nothing.
+
+## 27. C stdio beyond FileStream: `d522202`, `fb536a2`
+
+Queue cluster 2 (5 packages, 12 sites): swift-syntax and swift-tools-protocols write messages to the standard error
+with fputs, swift-argument-parser writes it byte by byte with putc, swift-build calls perror, and Subprocess builds
+`NAME=value` strings with snprintf.
+
+- `FileStream.write(cString:)` (fputs) writes a C string's bytes up to its null byte, for a message in C memory; a
+  Swift `String` goes through `write(_:)`. `write(byte:)` (fputc, and putc, its macro form) writes one byte. Both
+  throw the stream's error, as the fwrite forms do, and don't retry.
+- mapping.ini: perror is covered by `Errno.description` (strerror's text) written with `FileStream.write(_:)`, a
+  hand status that cites both; C's formatted output (printf, fprintf, snprintf and the like) gets an entry of its own
+  whose answer is the standard library's: Swift can't call C's variadic functions directly, and what they format is
+  what string interpolation builds.
+- Rejected: a `TextOutputStream` conformance for `print(_:to:)`, whose non-throwing `write(_:)` would clash with
+  the throwing one and drop its error; an unlabeled `write(_ byte: UInt8)`, which reads as a count at the call site;
+  a perror wrapper, which would compose the two calls that already exist.
+
+Tests: ProvisionalStdioTest's mock cases for fputs and fputc, a C string cut at its null byte and a byte in the file
+round trip, and both writes' EBADF on a read-only stream. XCTest 552 (4 skipped, and testVolumeAttributes skipped),
+swift-testing 468 in 74 suites, all passing.
+
+## 28. Sockets: `9bf8bb5`, `e4196f7`
+
+Queue cluster 3 (4 packages, 104 sites, most of them NIO's). Checked against SystemSockets, most of it was covered: the
+syscalls-4 lane named the options, structures and constants (IP_TOS through IPV6_MULTICAST_LOOP, ip_mreq and
+ipv6_mreq, in_pktinfo and in6_pktinfo, INADDR_ANY, the address-string lengths, SO_RCVTIMEO, SO_TIMESTAMP,
+CInterop.SockAddrStorage), and mapping.ini's hand partials, which cited the generic setOption, predated it.
+
+- `SocketDescriptor.ExplicitCongestionNotification` (`9bf8bb5`): an ECN codepoint, `RawRepresentable` over `UInt8`,
+  with `init(typeOfService:)` taking the low 2 bits of a type-of-service byte or traffic class (IPTOS_ECN_MASK), and
+  `notCapableTransport`, `capableTransport1`, `capableTransport0` and `congestionExperienced` (IPTOS_ECN_NOTECT, _ECT1,
+  _ECT0, _CE), with RFC 3168's values, so the Linux code needn't import netinet/ip.h. NIO maps received TOS and TCLASS
+  values to its own state with these constants. Rejected: a message-level `explicitCongestionNotification` property
+  on both message types, which `typeOfService.map(ECN.init(typeOfService:))` already is.
+- Docs (`9bf8bb5`): `Domain.vsock` names AF_VSOCK (PF_VSOCK's value, and what `SocketAddress.family` compares with;
+  rejected: a `SocketAddress.Family.vsock`, a second spelling that no API takes); `resolve` names freeaddrinfo;
+  `reverseLookup` names NI_MAXHOST and NI_MAXSERV, its buffers' sizes; `poll` names nfds_t.
+- mapping.ini (`e4196f7`): the stale hand partials go; inet_pton and inet_ntop are covered by the IPv4 and IPv6 host
+  forms together (the derivation reads each as restricted to its family, and those are the two families the calls
+  take); ioctl is covered by the requests the packages make: TIOCGWINSZ (`TerminalDescriptor.windowSize()`, for
+  swift-argument-parser and swift-tools-support-core) and NIO's vsock context ID (`SocketDescriptor.localContextID()`),
+  which also answers cluster 7.
+
+Tests: SocketIPMessagesTests' codepoints against the C constants and from type-of-service bytes; SocketVMSocketTests'
+AF_VSOCK. XCTest 552 (4 skipped, and testVolumeAttributes skipped), swift-testing 468 in 74 suites, all passing with
+PThreadTests' `setCurrentQualityOfService` skipped: at a load average near 70 (other sessions' builds) it fails alone
+too, since its background-QoS thread doesn't run within 10 s (section 4 saw the same). It isn't this lane's.
+
+## 29. C arrays for the C-values and credentials spawns: `52d8c03`, `97d00c6`
+
+A new SYSTEM-GAP marker in swift-subprocess's migration (status.sh read it as *unread*): "C-string arguments for the
+C-values spawns". `ProcessID.spawn` with `cFileActions:` and `cAttributes:`, and with `credentials:`, took the
+arguments and the environment only as `[String]`, which can't carry bytes that aren't UTF-8, so Subprocess kept its
+own `_subprocess_spawn` for them. The plain spawn already had a C-array form.
+
+- `spawn(_:arguments:environment:cFileActions:cAttributes:)`,
+  `spawn(_:arguments:environment:fileActions:attributes:credentials:)` and
+  `spawn(_:arguments:environment:cFileActions:cAttributes:credentials:fileActionDescriptors:)`, each with a C-string
+  path and null-terminated C arrays of C strings (the environment `nil` for the calling process's), as the plain
+  spawn's C-array form takes. The internals convert `[String]` once and share one core per form, so the close
+  actions of section 24 apply to the new form with System's actions too.
+- Only path-given forms, as the plain spawn's: Subprocess resolves the executable itself. Rejected: `searchingPathFor:`
+  C-array forms, which no caller needs yet; a `[[UInt8]]` form, which would copy what callers already hold as C arrays.
+- The overloads made the existing doc links ambiguous; they now name the `FilePath` forms.
+- status.py (`97d00c6`): an `ANSWERED` entry for the marker's phrase.
+
+Tests: RawSpawnTests' `testSpawningWithCArrays` and SpawnCredentialsTest's `testCArrays` run a shell that compares
+its argument and an environment variable with a lone 0xFF byte (and fails for 0xFE); `testCalls` records a C-array
+credentials spawn as the others. XCTest 554 (4 skipped, and testVolumeAttributes skipped), swift-testing 468 in 74
+suites, passing with `setCurrentQualityOfService` skipped (section 28).
+
+## 30. C scalar types and file times: `56e3f1d`, `f81f8d1`
+
+Queue clusters 4 (suseconds_t, u_int, LONG_MAX, _POSIX_ARG_MAX; 4 packages) and 5 (futimens, utimes; 4 packages).
+
+- `SystemConfig.guaranteedArgumentBytes` (`56e3f1d`, _POSIX_ARG_MAX, 4096): POSIX's least limit on a new program's
+  arguments and environment, the floor that swift-driver puts under sysconf's, next to section 3's compile-time
+  limits. Rejected: `minimumMaxArgumentBytes`, which reads as a setting; leaving callers the literal.
+- The typedefs and limits are the standard library's (`f81f8d1`): mapping.ini's [C scalar types] gains u_char,
+  u_short, u_int, u_long, suseconds_t and the integer limits (Swift's integer types and their `min` and `max`); u_long
+  and u_short leave [Winsock addresses], since the BSD headers declare them too.
+- futimens and utimensat read as partly covered because of section 13: its "with `UTIME_OMIT` for a `nil` time"
+  made the tools read setTimes' sentences as restricting both calls to that use. UTIME_OMIT now has a sentence of its
+  own. utimes, futimes and lutimes read as the timespec calls (`same.`), which setTimes covers.
+
+Tests: CompileTimeLimitsTest's `testGuaranteedArgumentBytes`, against the C constant and the system's own limit.
+XCTest 555 (4 skipped, and testVolumeAttributes skipped), swift-testing 468 in 74 suites, passing with
+`setCurrentQualityOfService` skipped (section 28).
+
+## 31. Mach, MacTypes and the kernel's process information: `a800132`, `b3dee42`, `b08bf19`
+
+The ecosystem run after section 30 (`b64ee9f1591b-d229d468`) counted 78 gaps, from 131: clusters 1 to 5 and 7 have no
+interfaces left. This section takes the Queue's clusters 6, 8 and 9.
+
+- **Mach** (`a800132`, docs; `b3dee42`, mapping): Foundation and swift-corelibs-foundation call vm_copy and
+  vm_deallocate on `mach_task_self_` with `vm_address_t` arguments and compare with KERN_SUCCESS or ERR_SUCCESS, which
+  is what `Mach.VirtualMemory`'s `copy` and `deallocate` do, throwing `Mach.KernelError` for any other code; their docs
+  now name those. swift-build reads its memory footprint with `task_info(TASK_VM_INFO)`'s `phys_footprint`, which
+  `ProcessID.resourceUsageInfo()`'s `physicalFootprint` reports: the same kernel value (a C probe read 68174784 bytes
+  both ways). mapping.ini's [task_info] cites it, covered for that flavor. swift-build's `vm_prot_t` and `USEC_PER_SEC`
+  are its own declarations, which the scan reads as Darwin's; they stay listed, with that reason.
+- **MacTypes** (`b3dee42`): OSStatus, UniChar, DarwinBoolean and Boolean are the standard library's (Int32, UInt16,
+  Bool); the lexical scan's `index` (Collection's `index(after:)`) and `Float80` get an ignore entry, and os's
+  `Logger`, Foundation's `NSDictionary` and CoreFoundation's `CFRunLoopStop` an Apple-frameworks entry.
+- **The kernel's process information** (`b08bf19`): Foundation reads the saved set-user ID, which Darwin has no call
+  for, and swift-build whether a debugger traces the process, from SystemControl's `kinfo_proc`, whose nested fields
+  a client can't reach without Darwin under MemberImportVisibility. `CInterop.KernelProcessInfo` names it, with
+  read-only Swift-named accessors: `processID`, `parentProcessID`, `processGroupID`, `realUserID`,
+  `effectiveUserID`, `savedUserID`, `realGroupID`, `savedGroupID`, `isTraced` (P_TRACED) and `commandName`. Rejected:
+  a Swift structure copying the fields, which would drop the rest of kinfo_proc; a raw flags accessor, since P_TRACED is
+  the one flag a package reads.
+
+Tests: SystemControlTest's `testProcesses` checks each accessor against the calling process. XCTest 555 (4 skipped,
+and testVolumeAttributes skipped), swift-testing 468 in 74 suites, passing with `setCurrentQualityOfService`
+skipped (section 28).
+
+## 32. pthreads: `2e3cd54`, `bd9fd0e`
+
+Queue cluster 10 (NIO and swift-corelibs-foundation).
+
+- `PThread.exit()` (pthread_exit) ends the calling thread, as Foundation's `Thread.exit()` does; its doc says what it
+  abandons (the stack's `defer` blocks and values, which leak) and that thread-specific values are still destroyed.
+  `noasync`, since a task can't end the thread it runs on.
+- `PThread.Attributes.defaultStackSize()` (pthread_attr_getstacksize on default attributes): the size a thread gets
+  when `stackSize` is `nil` (512 KiB on macOS 26.3, where a thread reports a little more), which Foundation's
+  `Thread.stackSize` reports until it's set.
+- `CInterop.PThreadMutex.initializer`, `errorCheckingInitializer` and `recursiveInitializer`, and
+  `CInterop.PThreadCondition`'s and `CInterop.PThreadReadWriteLock`'s `initializer`: the values of the C static
+  initializers, which Swift can't import. swift-corelibs-foundation builds an error-checking mutex from Darwin's
+  private `_PTHREAD_ERRORCHECK_MUTEX_SIG_init` for a lock in a CoreFoundation structure. Darwin only for now; glibc's
+  differ in the kind field of the error-checking and recursive ones.
+- mapping.ini (`bd9fd0e`): pthread_yield_np is sched_yield (`PThread.yield()`); detached creation is
+  `PThread.detach()` (PThread creates joinable threads); system contention scope is every thread's on Darwin and Linux,
+  which fail the process scope; the private `_SIG_init` constants read as the macros. Rejected: attributes for detached
+  creation and scope, which would add a second way to do the first and nothing for the second; `exit(_ value:)`,
+  since System's joins return nothing.
+
+Tests: PThreadTests' `defaultStackSize` and `exitEndsTheThread`; PThreadMutexTests' `staticInitializers` (trylock,
+EDEADLK and EPERM for error checking, relocking the recursive mutex, a condition and a read-write lock). XCTest 555 (4
+skipped, and testVolumeAttributes skipped), swift-testing 471 in 74 suites, passing with `setCurrentQualityOfService`
+skipped (section 28).

@@ -70,6 +70,9 @@ public struct MemoryMapping: ~Copyable, @unchecked Sendable {
 extension MemoryMapping {
   /// What a mapping's memory allows: reading, writing, executing,
   /// or none of them.
+  ///
+  /// The empty set allows none of them;
+  /// the corresponding C constant is `PROT_NONE`.
   @frozen
   public struct Protection: OptionSet, Hashable, Sendable {
     /// The raw C protection.
@@ -221,6 +224,9 @@ extension MemoryMapping {
   ///   - options: Options for the mapping. The default is `.private`;
   ///     with `.shared`, child processes created with `fork` share it.
   ///
+  /// Where `mmap` fails, this initializer throws its error;
+  /// the corresponding C constant is `MAP_FAILED`, which `mmap` returns then.
+  ///
   /// The corresponding C function is `mmap`, with `MAP_ANON`.
   @_alwaysEmitIntoClient
   public init(
@@ -249,6 +255,9 @@ extension MemoryMapping {
   ///     though using a page wholly past the file's end raises `SIGBUS`.
   ///   - protection: What the memory allows. The default is `.read`.
   ///   - options: Options for the mapping. The default is `.shared`.
+  ///
+  /// Where `mmap` fails, this initializer throws its error;
+  /// the corresponding C constant is `MAP_FAILED`, which `mmap` returns then.
   ///
   /// The corresponding C function is `mmap`.
   @_alwaysEmitIntoClient

@@ -36,6 +36,8 @@ public struct FileMode: RawRepresentable, Sendable, Hashable, Codable {
   /// The file's type, from the mode's file-type bits.
   ///
   /// Setting this property will mask the `newValue` with the file-type bit mask `S_IFMT`.
+  ///
+  /// The corresponding C constant is `S_IFMT`.
   @_alwaysEmitIntoClient
   public var type: FileType {
     get { FileType(rawValue: rawValue & _MODE_FILETYPE_MASK) }

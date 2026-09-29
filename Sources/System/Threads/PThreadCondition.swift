@@ -41,6 +41,8 @@ extension PThread {
   /// `Condition` can't be copied. It keeps the C condition variable
   /// at one address from its creation until its destruction,
   /// as POSIX requires.
+  /// Destroying a `Condition` destroys the C condition variable;
+  /// the corresponding C function is `pthread_cond_destroy`.
   /// Destroying a condition variable that threads are waiting on
   /// is a programming error, which this type doesn't detect.
   ///
@@ -352,6 +354,10 @@ extension PThread.Condition {
 extension PThread.Condition {
   /// How a condition variable is shared,
   /// and on platforms other than Darwin, which clock its deadlines use.
+  ///
+  /// Creating a condition variable makes C attributes from these;
+  /// the corresponding C functions are `pthread_condattr_init`
+  /// and `pthread_condattr_destroy`.
   ///
   /// The corresponding C type is `pthread_condattr_t`.
   @frozen

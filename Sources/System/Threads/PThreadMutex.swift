@@ -43,7 +43,8 @@ extension PThread {
   /// `Mutex` can't be copied. It keeps the C mutex at one address
   /// from its creation until its destruction, as POSIX requires,
   /// so moving a `Mutex` doesn't move the C mutex.
-  /// Destroying a `Mutex` destroys the C mutex.
+  /// Destroying a `Mutex` destroys the C mutex;
+  /// the corresponding C function is `pthread_mutex_destroy`.
   /// Destroying a locked mutex is a programming error,
   /// which this type doesn't detect.
   ///
@@ -401,6 +402,10 @@ extension PThread.Mutex {
   /// of the ``Kind-swift.struct/default`` kind,
   /// with no priority protocol,
   /// that's private to the process.
+  ///
+  /// Creating a mutex makes C attributes from these;
+  /// the corresponding C functions are `pthread_mutexattr_init`
+  /// and `pthread_mutexattr_destroy`.
   ///
   /// The corresponding C type is `pthread_mutexattr_t`.
   @frozen

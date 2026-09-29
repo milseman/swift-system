@@ -23,6 +23,8 @@ extension PThread {
   ///
   /// `ReadWriteLock` can't be copied. It keeps the C lock at one address
   /// from its creation until its destruction, as POSIX requires.
+  /// Destroying a `ReadWriteLock` destroys the C lock;
+  /// the corresponding C function is `pthread_rwlock_destroy`.
   /// Destroying a lock that a thread holds is a programming error,
   /// which this type doesn't detect.
   ///
@@ -320,6 +322,10 @@ extension PThread.ReadWriteLock {
 @available(System 199, *)
 extension PThread.ReadWriteLock {
   /// How a read-write lock is shared.
+  ///
+  /// Creating a read-write lock makes C attributes from these;
+  /// the corresponding C functions are `pthread_rwlockattr_init`
+  /// and `pthread_rwlockattr_destroy`.
   ///
   /// The corresponding C type is `pthread_rwlockattr_t`.
   @frozen

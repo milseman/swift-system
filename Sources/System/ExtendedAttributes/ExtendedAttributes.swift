@@ -78,6 +78,8 @@ extension FilePath {
   ///
   /// The corresponding C function is `listxattr`,
   /// or on Linux `llistxattr` for a link itself.
+  /// The corresponding C constant is `XATTR_NOFOLLOW`,
+  /// which Darwin's call takes for a link itself.
   @_alwaysEmitIntoClient
   public func extendedAttributeNames(
     followTargetSymlink: Bool = true, retryOnInterrupt: Bool = true
@@ -136,6 +138,8 @@ extension FilePath {
   ///
   /// The corresponding C function is `getxattr`,
   /// or on Linux `lgetxattr` for a link itself.
+  /// The corresponding C constant is `XATTR_NOFOLLOW`,
+  /// which Darwin's call takes for a link itself.
   @_alwaysEmitIntoClient
   public func extendedAttribute(
     _ name: String, followTargetSymlink: Bool = true, retryOnInterrupt: Bool = true
@@ -202,6 +206,8 @@ extension FilePath {
   ///
   /// The corresponding C function is `setxattr`,
   /// or on Linux `lsetxattr` for a link itself.
+  /// The corresponding C constant is `XATTR_NOFOLLOW`,
+  /// which Darwin's call takes for a link itself.
   @_alwaysEmitIntoClient
   public func setExtendedAttribute(
     _ name: String, to value: some Sequence<UInt8>,
@@ -274,6 +280,8 @@ extension FilePath {
   ///
   /// The corresponding C function is `removexattr`,
   /// or on Linux `lremovexattr` for a link itself.
+  /// The corresponding C constant is `XATTR_NOFOLLOW`,
+  /// which Darwin's call takes for a link itself.
   @_alwaysEmitIntoClient
   public func removeExtendedAttribute(
     _ name: String, followTargetSymlink: Bool = true, retryOnInterrupt: Bool = true

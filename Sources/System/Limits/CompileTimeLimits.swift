@@ -39,6 +39,17 @@ extension SystemConfig {
   @_alwaysEmitIntoClient
   public static var maxPathBytes: Int { Int(_PATH_MAX) }
 
+  /// The number of bytes of arguments and environment
+  /// that POSIX guarantees a new program can receive:
+  /// the least that the system's own limit,
+  /// ``Name/maxArgumentBytes``, can be.
+  ///
+  /// It's 4096.
+  ///
+  /// The corresponding C constant is `_POSIX_ARG_MAX`.
+  @_alwaysEmitIntoClient
+  public static var guaranteedArgumentBytes: Int { Int(__POSIX_ARG_MAX) }
+
   #if SYSTEM_PACKAGE_DARWIN
   /// The maximum number of bytes in an extended attribute's name,
   /// not counting the null terminator.

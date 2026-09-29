@@ -152,7 +152,7 @@ extension ProcessID {
   /// searching for it in the directories that `PATH` names,
   /// with other credentials.
   ///
-  /// See ``spawn(_:arguments:environment:fileActions:attributes:credentials:)``.
+  /// See ``spawn(_:arguments:environment:fileActions:attributes:credentials:)-(FilePath,_,_,_,_,_)``.
   ///
   /// The corresponding C functions are `fork`, `setgroups`, `setgid`,
   /// `setuid`, and `posix_spawnp`.
@@ -171,6 +171,45 @@ extension ProcessID {
         file, searchingPath: true, arguments: arguments, environment: environment,
         fileActions: fileActions, attributes: attributes, credentials: credentials)
     }.get()
+  }
+
+  /// Starts a child process running a program,
+  /// with arguments and an environment as C arrays, and other credentials.
+  ///
+  /// - Parameters:
+  ///   - path: The program to run, as a C string.
+  ///   - arguments: The program's arguments, as a null-terminated array
+  ///     of C strings, including the first,
+  ///     which by convention is the program's name.
+  ///   - environment: The program's environment,
+  ///     as a null-terminated array of C strings
+  ///     of the form `NAME=value`,
+  ///     or `nil` for the calling process's environment.
+  ///   - fileActions: Actions to take on the child's descriptors,
+  ///     in order, before it runs the program.
+  ///   - attributes: Options for the child.
+  ///   - credentials: The user and groups for the child to run as.
+  /// - Returns: The child's process ID.
+  ///
+  /// Use this method for arguments that aren't valid UTF-8.
+  /// See ``spawn(_:arguments:environment:fileActions:attributes:credentials:)-(FilePath,_,_,_,_,_)``.
+  ///
+  /// The corresponding C functions are `fork`, `setgroups`, `setgid`,
+  /// `setuid`, and `posix_spawn`.
+  /// - Note: Only available on Darwin.
+  @_alwaysEmitIntoClient
+  public static func spawn(
+    _ path: UnsafePointer<CChar>,
+    arguments: UnsafePointer<UnsafeMutablePointer<CChar>?>,
+    environment: UnsafePointer<UnsafeMutablePointer<CChar>?>?,
+    fileActions: [SpawnFileAction] = [],
+    attributes: SpawnAttributes = SpawnAttributes(),
+    credentials: SpawnCredentials
+  ) throws(Errno) -> ProcessID {
+    try ProcessID._spawn(
+      path, searchingPath: false, arguments: arguments, environment: environment,
+      fileActions: fileActions, attributes: attributes, credentials: credentials
+    ).get()
   }
 
   /// Starts a child process running a program,
@@ -213,7 +252,7 @@ extension ProcessID {
   /// (`POSIX_SPAWN_CLOEXEC_DEFAULT`) in `cAttributes`,
   /// which closes every descriptor that the actions don't install,
   /// even with `POSIX_SPAWN_SETEXEC`.
-  /// See ``spawn(_:arguments:environment:fileActions:attributes:credentials:)``.
+  /// See ``spawn(_:arguments:environment:fileActions:attributes:credentials:)-(FilePath,_,_,_,_,_)``.
   ///
   /// The corresponding C functions are `fork`, `setgroups`, `setgid`,
   /// `setuid`, and `posix_spawn`.
@@ -240,7 +279,7 @@ extension ProcessID {
   /// searching for it in the directories that `PATH` names,
   /// with C file actions and attributes, and other credentials.
   ///
-  /// See ``spawn(_:arguments:environment:cFileActions:cAttributes:credentials:fileActionDescriptors:)``.
+  /// See ``spawn(_:arguments:environment:cFileActions:cAttributes:credentials:fileActionDescriptors:)-(FilePath,_,_,_,_,_,_)``.
   ///
   /// The corresponding C functions are `fork`, `setgroups`, `setgid`,
   /// `setuid`, and `posix_spawnp`.
@@ -263,12 +302,87 @@ extension ProcessID {
     }.get()
   }
 
+  // Calls `body` with the arguments and the environment as the
+  // null-terminated C arrays that posix_spawn takes.
+  internal static func _withCStringArrays<R>(
+    _ arguments: [String], _ environment: [String]?,
+    _ body: (
+      UnsafePointer<UnsafeMutablePointer<CChar>?>, UnsafePointer<UnsafeMutablePointer<CChar>?>?
+    ) -> R
+  ) -> R {
+    arguments._withCStringArray { arguments in
+      let arguments = _mutableCStrings(arguments)
+      guard let environment else { return body(arguments, nil) }
+      return environment._withCStringArray { body(arguments, _mutableCStrings($0)) }
+    }
+  }
+
+  /// Starts a child process running a program,
+  /// with arguments and an environment as C arrays,
+  /// C file actions and attributes, and other credentials.
+  ///
+  /// - Parameters:
+  ///   - path: The program to run, as a C string.
+  ///   - arguments: The program's arguments, as a null-terminated array
+  ///     of C strings, including the first,
+  ///     which by convention is the program's name.
+  ///   - environment: The program's environment,
+  ///     as a null-terminated array of C strings
+  ///     of the form `NAME=value`,
+  ///     or `nil` for the calling process's environment.
+  ///   - cFileActions: The C file actions, or `nil` for none.
+  ///   - cAttributes: The C attributes, or `nil` for the defaults.
+  ///   - credentials: The user and groups for the child to run as.
+  ///   - fileActionDescriptors: The descriptors that the file actions use,
+  ///     such as the ones they duplicate or close.
+  /// - Returns: The child's process ID.
+  ///
+  /// Use this method for arguments that aren't valid UTF-8.
+  /// See ``spawn(_:arguments:environment:cFileActions:cAttributes:credentials:fileActionDescriptors:)-(FilePath,_,_,_,_,_,_)``.
+  ///
+  /// The corresponding C functions are `fork`, `setgroups`, `setgid`,
+  /// `setuid`, and `posix_spawn`.
+  /// - Note: Only available on Darwin.
+  @_alwaysEmitIntoClient
+  public static func spawn(
+    _ path: UnsafePointer<CChar>,
+    arguments: UnsafePointer<UnsafeMutablePointer<CChar>?>,
+    environment: UnsafePointer<UnsafeMutablePointer<CChar>?>?,
+    cFileActions: UnsafePointer<CInterop.SpawnFileActions>?,
+    cAttributes: UnsafePointer<CInterop.SpawnAttributes>?,
+    credentials: SpawnCredentials,
+    fileActionDescriptors: [FileDescriptor]
+  ) throws(Errno) -> ProcessID {
+    try ProcessID._spawn(
+      path, searchingPath: false, arguments: arguments, environment: environment,
+      cFileActions: cFileActions, cAttributes: cAttributes, credentials: credentials,
+      fileActionDescriptors: fileActionDescriptors
+    ).get()
+  }
+
   @usableFromInline
   internal static func _spawn(
     _ path: UnsafePointer<CChar>,
     searchingPath: Bool,
     arguments: [String],
     environment: [String]?,
+    fileActions: [SpawnFileAction],
+    attributes: SpawnAttributes,
+    credentials: SpawnCredentials
+  ) -> Result<ProcessID, Errno> {
+    _withCStringArrays(arguments, environment) { arguments, environment in
+      _spawn(
+        path, searchingPath: searchingPath, arguments: arguments, environment: environment,
+        fileActions: fileActions, attributes: attributes, credentials: credentials)
+    }
+  }
+
+  @usableFromInline
+  internal static func _spawn(
+    _ path: UnsafePointer<CChar>,
+    searchingPath: Bool,
+    arguments: UnsafePointer<UnsafeMutablePointer<CChar>?>,
+    environment: UnsafePointer<UnsafeMutablePointer<CChar>?>?,
     fileActions: [SpawnFileAction],
     attributes: SpawnAttributes,
     credentials: SpawnCredentials
@@ -295,6 +409,25 @@ extension ProcessID {
     credentials: SpawnCredentials,
     fileActionDescriptors: [FileDescriptor]
   ) -> Result<ProcessID, Errno> {
+    _withCStringArrays(arguments, environment) { arguments, environment in
+      _spawn(
+        path, searchingPath: searchingPath, arguments: arguments, environment: environment,
+        cFileActions: cFileActions, cAttributes: cAttributes, credentials: credentials,
+        fileActionDescriptors: fileActionDescriptors)
+    }
+  }
+
+  @usableFromInline
+  internal static func _spawn(
+    _ path: UnsafePointer<CChar>,
+    searchingPath: Bool,
+    arguments: UnsafePointer<UnsafeMutablePointer<CChar>?>,
+    environment: UnsafePointer<UnsafeMutablePointer<CChar>?>?,
+    cFileActions: UnsafePointer<CInterop.SpawnFileActions>?,
+    cAttributes: UnsafePointer<CInterop.SpawnAttributes>?,
+    credentials: SpawnCredentials,
+    fileActionDescriptors: [FileDescriptor]
+  ) -> Result<ProcessID, Errno> {
     // The shim sets POSIX_SPAWN_SETEXEC on the child's copy of the
     // attributes, so it needs attributes even when the caller has none.
     func withAttributes(_ body: (UnsafePointer<CInterop.SpawnAttributes>) -> CInt) -> CInt {
@@ -305,24 +438,21 @@ extension ProcessID {
       defer { _ = system_posix_spawnattr_destroy(&storage) }
       return body(&storage)
     }
-    return arguments._withCStringArray { arguments in
-      let arguments = _mutableCStrings(arguments)
-      func spawn(_ environment: UnsafePointer<UnsafeMutablePointer<CChar>?>) -> Result<ProcessID, Errno> {
-        var pid: pid_t = 0
-        return nothingOrReturnedErrno(retryOnInterrupt: false) {
-          withAttributes { attributes in
-            system_spawn_with_credentials(
-              &pid, path, searchingPath: searchingPath, cFileActions, attributes,
-              arguments, environment,
-              user: credentials.user?.rawValue, group: credentials.group?.rawValue,
-              groups: credentials.supplementaryGroups?.map(\.rawValue),
-              descriptors: fileActionDescriptors.map(\.rawValue))
-          }
-        }.map { ProcessID(rawValue: pid) }
-      }
-      guard let environment else { return _withCallingEnvironment(spawn) }
-      return environment._withCStringArray { spawn(_mutableCStrings($0)) }
+    func spawn(_ environment: UnsafePointer<UnsafeMutablePointer<CChar>?>) -> Result<ProcessID, Errno> {
+      var pid: pid_t = 0
+      return nothingOrReturnedErrno(retryOnInterrupt: false) {
+        withAttributes { attributes in
+          system_spawn_with_credentials(
+            &pid, path, searchingPath: searchingPath, cFileActions, attributes,
+            arguments, environment,
+            user: credentials.user?.rawValue, group: credentials.group?.rawValue,
+            groups: credentials.supplementaryGroups?.map(\.rawValue),
+            descriptors: fileActionDescriptors.map(\.rawValue))
+        }
+      }.map { ProcessID(rawValue: pid) }
     }
+    guard let environment else { return _withCallingEnvironment(spawn) }
+    return spawn(environment)
   }
 }
 

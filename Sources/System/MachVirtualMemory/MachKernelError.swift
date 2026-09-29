@@ -19,6 +19,9 @@ extension Mach {
   ///
   /// Mach calls return a code, which is `KERN_SUCCESS` when they succeed,
   /// rather than setting `errno`, and their codes aren't errno's.
+  /// System's Mach methods throw an error for any code but success;
+  /// the corresponding C constants are `KERN_SUCCESS`
+  /// and `ERR_SUCCESS`, its spelling as a Mach error.
   ///
   ///     do {
   ///       let region = try Mach.VirtualMemory.allocate(byteCount: 1 << 40)

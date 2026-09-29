@@ -135,6 +135,11 @@ ANSWERED = [
     # credentials, which System spawns with by forking first.
     (r"^raw posix_spawn path$", "ProcessID.spawn's C-values and credentials forms",
      "fileActionDescriptors: [FileDescriptor]", "Sources/System/SpawnCredentials/SpawnCredentials.swift"),
+    # Subprocess's spawns with C values and arguments that aren't UTF-8: the
+    # C-array forms of those spawns (REPORT.md section 29).
+    (r"^C-string arguments for the C-values spawns$", "ProcessID.spawn's C-array forms with C values",
+     "  /// C file actions and attributes, and other credentials.",
+     "Sources/System/SpawnCredentials/SpawnCredentials.swift"),
 ]
 
 
