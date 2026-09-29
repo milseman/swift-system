@@ -2,8 +2,8 @@
 
 Generated 2026-09-29 by `Utilities/adopter-coverage/status.sh`, from commits only; rerun it rather than editing this file. How each figure is made, and what it can't see, is in [How this is computed](#how-this-is-computed).
 
-- **System**: `coverage` @ `6666fbef` (Add DirectoryWalk's opening: .whenEntered, which opens a directory when the walk goes into it, after its first visit, as fts does), which contains `system-next` @ `7b0875fa` (Merge branch 'coverage' into system-next); 9 commit(s) of `coverage` aren't in `system-next`.
-- **API delta**: `main` @ `1b452c29` → `HEAD` @ `6666fbef`.
+- **System**: `coverage` @ `73ea1606` (mapping.ini: strtod and strtof read as CLocale's strtod_l and strtof_l, execv and the execl forms as execve and execvp, getdtablesize as _SC_OPEN_MAX), which contains `system-next` @ `7b0875fa` (Merge branch 'coverage' into system-next); 16 commit(s) of `coverage` aren't in `system-next`.
+- **API delta**: `main` @ `1b452c29` → `HEAD` @ `73ea1606`.
 - **Adopters** (`../adopters`, branch `migrate-darwin`, against its merge base with `main`):
   - WasmKit @ `4917e060`, base `1e9c513d`
   - indexstore-db @ `cc966b89`, base `441ead77`
@@ -12,7 +12,7 @@ Generated 2026-09-29 by `Utilities/adopter-coverage/status.sh`, from commits onl
   - swift-build @ `f4685a11`, base `f4685a11` (no commits beyond the merge base yet) (uncommitted changes in the checkout aren't counted)
   - swift-certificates @ `0df6bd14`, base `ff86b924`
   - swift-driver @ `ddb51ccd`, base `15cf6766`
-  - swift-foundation @ `763e42cd`, base `6669273a`
+  - swift-foundation @ `763e42cd`, base `6669273a` (uncommitted changes in the checkout aren't counted)
   - swift-log @ `4d6d77fe`, base `9c9acde6`
   - swift-nio @ `e1623fbf`, base `feaf4ac5`
   - swift-package-manager @ `dbe05ec1`, base `24a8a7b0`
@@ -27,13 +27,14 @@ Copied verbatim from `Utilities/api-delta/regenerate.sh` (`BASE_REF=main`, `HEAD
 
 ## Summary
 
-- **3119 added, 0 removed, 0 changed** declarations in the macOS symbol graphs.
-  - SystemPackage: +2535 (448 → 2983 public symbols).
+- **3170 added, 0 removed, 0 changed** declarations in the macOS symbol graphs.
+  - SystemPackage: +2586 (448 → 3034 public symbols).
   - SystemSockets: +584 (0 → 584 public symbols). SystemSockets is a new module; it doesn't exist on `main`.
 - Availability of the additions:
-  - System 199: 3084
+  - System 199: 3133
   - System 199 + explicit OS floor: 26
   - System 0.0.1 + explicit OS floor: 8
+  - System 1.7.0: 2
   - System 0.0.1: 1
 - The source scan finds these new public declarations, which the macOS graphs can't show:
   - 410 compiled only on other platforms;
@@ -44,7 +45,7 @@ Copied verbatim from `Utilities/api-delta/regenerate.sh` (`BASE_REF=main`, `HEAD
 - 0 public declarations hidden from the graphs were removed.
 - No public declaration is conditional on `ENABLE_MOCKING` or `DEBUG`, so a release build has the same public API as the debug graphs.
 - Cross-check with `swift-api-digester`, which dumps every declaration, implicit ones included:
-  - SystemPackage: +2843 / -0 declarations, which is the graphs' +2535 plus 303 implicit ones; explicit declarations it has that the graphs don't: `_opaque_pthread_cond_t.initializer`, `_opaque_pthread_mutex_t.errorCheckingInitializer`, `_opaque_pthread_mutex_t.initializer`, `_opaque_pthread_mutex_t.recursiveInitializer`, `_opaque_pthread_rwlock_t.initializer`; it has every graph addition; `-diagnose-sdk` reports no breaking changes.
+  - SystemPackage: +2901 / -0 declarations, which is the graphs' +2586 plus 310 implicit ones; explicit declarations it has that the graphs don't: `_opaque_pthread_cond_t.initializer`, `_opaque_pthread_mutex_t.errorCheckingInitializer`, `_opaque_pthread_mutex_t.initializer`, `_opaque_pthread_mutex_t.recursiveInitializer`, `_opaque_pthread_rwlock_t.initializer`; it has every graph addition; `-diagnose-sdk` reports no breaking changes.
   - SystemSockets: +657 / -0 declarations, which is the graphs' +584 plus 72 implicit ones; explicit declarations it has that the graphs don't: `SocketAddress._withUnsafeMutablePointer(_:)`; it has every graph addition.
 - Nothing was removed or changed: no public declaration left the graphs or the source scan. The *changed* check compares declaration text (including default arguments), availability, conformances, generic and extension constraints, and access level, and pairs symbols by path when a signature change alters the USR.
 
@@ -60,6 +61,7 @@ Each row is a top-level type, and nested types count toward it: `FilePath.Resolu
 | SystemPackage | [`CLocale`](#systempackage-clocale) | 32 | 0 | 0 | S199 ×32 |
 | SystemPackage | [`CString`](#systempackage-cstring) | 8 | 0 | 0 | S199 ×8 |
 | SystemPackage | [`CType`](#systempackage-ctype) | 15 | 0 | 0 | S199 ×15 |
+| SystemPackage | [`CallStack`](#systempackage-callstack) | 3 | 0 | 0 | S199 ×3 |
 | SystemPackage | [`ChildProcess`](#systempackage-childprocess) | 9 | 0 | 0 | S199 ×9 |
 | SystemPackage | [`ClockID`](#systempackage-clockid) | 14 | 0 | 0 | S199 ×14 |
 | SystemPackage | [`ControlCharacter`](#systempackage-controlcharacter) | 21 | 0 | 0 | S199 ×21 |
@@ -68,7 +70,7 @@ Each row is a top-level type, and nested types count toward it: `FilePath.Resolu
 | SystemPackage | [`DirectoryStream`](#systempackage-directorystream) | 15 | 0 | 0 | S199 ×15 |
 | SystemPackage | [`DirectoryWalk`](#systempackage-directorywalk) | 21 | 0 | 0 | S199 ×21 |
 | SystemPackage | [`DiskQuota`](#systempackage-diskquota) | 17 | 0 | 0 | S199 ×17 |
-| SystemPackage | [`DynamicLibrary`](#systempackage-dynamiclibrary) | 25 | 0 | 0 | S199 ×25 |
+| SystemPackage | [`DynamicLibrary`](#systempackage-dynamiclibrary) | 32 | 0 | 0 | S199 ×32 |
 | SystemPackage | [`Entropy`](#systempackage-entropy) | 7 | 0 | 0 | S199 ×7 |
 | SystemPackage | [`Errno`](#systempackage-errno) | 4 | 0 | 0 | S199 ×3, S0.0.1 ×1 |
 | SystemPackage | [`ExitStatus`](#systempackage-exitstatus) | 6 | 0 | 0 | S199 ×6 |
@@ -84,11 +86,12 @@ Each row is a top-level type, and nested types count toward it: `FilePath.Resolu
 | SystemPackage | [`FileType`](#systempackage-filetype) | 2 | 0 | 0 | S199 ×2 |
 | SystemPackage | [`GroupEntry`](#systempackage-groupentry) | 6 | 0 | 0 | S199 ×6 |
 | SystemPackage | [`GroupID`](#systempackage-groupid) | 9 | 0 | 0 | S199 ×9 |
+| SystemPackage | [`IOPolicy`](#systempackage-iopolicy) | 22 | 0 | 0 | S199 ×22 |
 | SystemPackage | [`InputFlags`](#systempackage-inputflags) | 17 | 0 | 0 | S199 ×17 |
 | SystemPackage | [`KernelEvent`](#systempackage-kernelevent) | 82 | 0 | 0 | S199 ×82 |
 | SystemPackage | [`KernelQueue`](#systempackage-kernelqueue) | 10 | 0 | 0 | S199 ×10 |
 | SystemPackage | [`LocalFlags`](#systempackage-localflags) | 20 | 0 | 0 | S199 ×20 |
-| SystemPackage | [`Mach`](#systempackage-mach) | 53 | 0 | 0 | S199 ×53 |
+| SystemPackage | [`Mach`](#systempackage-mach) | 70 | 0 | 0 | S199 ×70 |
 | SystemPackage | [`Math`](#systempackage-math) | 55 | 0 | 0 | S199 ×55 |
 | SystemPackage | [`Memory`](#systempackage-memory) | 91 | 0 | 0 | S199 ×91 |
 | SystemPackage | [`MemoryMapping`](#systempackage-memorymapping) | 36 | 0 | 0 | S199 ×36 |
@@ -111,6 +114,7 @@ Each row is a top-level type, and nested types count toward it: `FilePath.Resolu
 | SystemPackage | [`SpawnAttributes`](#systempackage-spawnattributes) | 20 | 0 | 0 | S199 ×20 |
 | SystemPackage | [`SpawnCredentials`](#systempackage-spawncredentials) | 5 | 0 | 0 | S199 ×5 |
 | SystemPackage | [`SpawnFileAction`](#systempackage-spawnfileaction) | 9 | 0 | 0 | S199 ×9 |
+| SystemPackage | [`Stat`](#systempackage-stat) | 2 | 0 | 0 | S1.7.0 ×2 |
 | SystemPackage | [`StatFS`](#systempackage-statfs) | 27 | 0 | 0 | S199 ×27 |
 | SystemPackage | [`SystemConfig`](#systempackage-systemconfig) | 72 | 0 | 0 | S199 ×72 |
 | SystemPackage | [`SystemControl`](#systempackage-systemcontrol) | 72 | 0 | 0 | S199 ×72 |
@@ -147,7 +151,7 @@ Each row is a top-level type, and nested types count toward it: `FilePath.Resolu
 | SystemSockets | [`sockaddr_storage (extends Darwin)`](#systemsockets-sockaddr-storage-extends-darwin) | 3 | 0 | 0 | S199 ×3 |
 | SystemSockets | [`sockaddr_un (extends Darwin)`](#systemsockets-sockaddr-un-extends-darwin) | 5 | 0 | 0 | S199 ×5 |
 | SystemSockets | [`sockaddr_vm (extends Darwin)`](#systemsockets-sockaddr-vm-extends-darwin) | 5 | 0 | 0 | S199 ×5 |
-| **Total** | | **3119** | **0** | **0** | |
+| **Total** | | **3170** | **0** | **0** | |
 
 # 2. Adoption
 
@@ -384,7 +388,7 @@ Verbatim, not rerun: each package's own test totals (at the start, and the lates
 
 # 3. Gaps
 
-Every `SYSTEM-GAP:` marker in the packages' sources at the commits above: 17 markers in 14 files, of which 0 are outside the packages' targets. Each marker's text is read for the C interfaces it names (see [How this is computed](#how-this-is-computed)); a marker that names none is counted under its phrase, with the Darwin names imported under it deciding its status. Status is against System at `6666fbef`:
+Every `SYSTEM-GAP:` marker in the packages' sources at the commits above: 17 markers in 14 files, of which 0 are outside the packages' targets. Each marker's text is read for the C interfaces it names (see [How this is computed](#how-this-is-computed)); a marker that names none is counted under its phrase, with the Darwin names imported under it deciding its status. Status is against System at `73ea1606`:
 
 - **missing**: System documents none of it (or only some: *k of n*).
 - **covered**: a System declaration's doc comment names it as the corresponding C interface, a CInterop alias names it, or, for `X members`, System gives `CInterop` alias of `X` Swift-named accessors. The marker is stale, or the package hasn't adopted the API yet. *Not yet in `system-next`* means only this branch has it.

@@ -14,7 +14,7 @@ Darwin; grouped here into clusters and ranked by packages, then call sites. Afte
 (System `6e784c6`, the 21 main-scheme packages that import Darwin): 756 interfaces, 567 covered, 131 gaps (24 in two
 or more packages).
 
-Next: cluster 15. Resume from the first row not marked done. Latest re-rank: run `b64ee9f1591b-d229d468` (System
+Next: rerun the ecosystem report and re-rank; then step 4, packages beyond the toolchain. Resume from the first row not marked done. Latest re-rank: run `b64ee9f1591b-d229d468` (System
 `b64ee9f`): 756 interfaces, 615 covered, 78 gaps; set apart, 19 the standard library answers, 18 other modules' names,
 26 the packages' own shims.
 
@@ -47,9 +47,9 @@ dirent, dlerror and posix_spawn_file_actions_addchdir_np were, until A1, A2 and 
 | 12 | Spawn attributes | 2 | 6 | posix_spawnattr_setpgroup, setsigdefault, setsigmask | done: docs (section 33) |
 | 13 | Mounts and quotas | 2 | 6 | getfsstat, quotactl, SUBCMDMASK, SUBCMDSHIFT, getmntinfo_r_np | done: docs, mapping (section 33) |
 | 14 | Extended attribute names | 2 | 4 | XATTR_FINDERINFO_NAME, XATTR_RESOURCEFORK_NAME | done: `ExtendedAttributeName` (section 33) |
-| 15 | CPU types | 1 | 22 | cpu_type_t, cpu_subtype_t, CPU_TYPE_*, CPU_ARCH_ABI64 (swift-build) | |
-| 16 | wait | 1 | 17 | siginfo_t, id_t, idtype_t, CLD_*, waitid (Subprocess) | check ProcessWait |
-| 17 | One-package gaps | 1 each | 1-3 each | dladdr and Dl_info, backtrace, strtod and strtof, AT_FDONLY and AT_REALDEV, sysdir's enumeration state, getiopolicy_np, ATTR_BIT_MAP_COUNT, execv, getdtablesize | |
+| 15 | CPU types | 1 | 22 | cpu_type_t, cpu_subtype_t, CPU_TYPE_*, CPU_ARCH_ABI64 (swift-build) | done: `Mach.CPUType`, `CPUSubtype` (section 36) |
+| 16 | wait | 1 | 17 | siginfo_t, id_t, idtype_t, CLD_*, waitid (Subprocess) | done: enum cases' docs read, [wait] (section 36) |
+| 17 | One-package gaps | 1 each | 1-3 each | dladdr and Dl_info, backtrace, strtod and strtof, AT_FDONLY and AT_REALDEV, sysdir's enumeration state, getiopolicy_np, ATTR_BIT_MAP_COUNT, execv, getdtablesize | done (section 36) |
 
 Not counted, with the reason: the lexical scan's false positives (`index(after:)` read as strings.h's index;
 Float80) and other modules' names it can't place (Logger, NSDictionary, CFRunLoopStop), which mapping.ini should
@@ -57,7 +57,7 @@ say; the standard library's answers (off_t, ssize_t, size_t and uintptr_t are In
 memset; round, sqrt, ceil, floor, fabs, modf); Dispatch and ObjectiveC names; the packages' own C shims
 (CNIODarwin_*, c_nio_posix_*, _subprocess_*).
 
-Done: step 0, what the tools couldn't see (section 25); clusters 1 (section 26), 2 (section 27), 3 and 7 (section 28), 4 and 5 (section 30), 6, 8 and 9 (section 31), 10 (section 32), 11 to 14 (section 33), the asks A1 to A5 (sections 34 and 35); and Subprocess's new marker, C arrays for the C-values spawns (section 29). New SYSTEM-GAP markers in `../adopters` come first: status.sh lists them.
+Done: step 0, what the tools couldn't see (section 25); clusters 1 (section 26), 2 (section 27), 3 and 7 (section 28), 4 and 5 (section 30), 6, 8 and 9 (section 31), 10 (section 32), 11 to 14 (section 33), the asks A1 to A5 (sections 34 and 35), 15 to 17 (section 36); and Subprocess's new marker, C arrays for the C-values spawns (section 29). New SYSTEM-GAP markers in `../adopters` come first: status.sh lists them.
 
 ## 1. status.sh and STATUS.md (2026-09-28)
 
@@ -854,3 +854,33 @@ Tests: DirectoryWalkVisitsTests' `openingWhenEnteredVisitsTheSame` (every order,
 `.whenEntered`, and on Darwin not with `.whenRead`), `anUnreadableDirectoryWhenEntered` (both preorder orders: the two
 visits, the directory the error's visit is in, and skipping). XCTest 556 (4 skipped, and testVolumeAttributes
 skipped), swift-testing 477 in 74 suites, passing with `setCurrentQualityOfService` skipped (section 28).
+
+## 36. CPU types, wait, and the one-package gaps: `90b1273`, `d3f786a`, `ea3c54b`, `c36731b`, `73ea160`
+
+Queue clusters 15 to 17.
+
+- **CPU types** (`90b1273`, swift-build): `Mach.CPUType` (cpu_type_t) with `any`, `x86` (CPU_TYPE_X86 and its old name
+  CPU_TYPE_I386), `x86_64`, `arm`, `arm64`, `arm64_32`, and the 64-bit ABI bit (`has64BitABI`, `with64BitABI`,
+  `without64BitABI`); `Mach.CPUSubtype` (cpu_subtype_t) with `featureFlags` and `withoutFeatureFlags`
+  (CPU_SUBTYPE_MASK). SystemControl's `cpuType` and `cpuSubtype` keep their raw values, which these take. Rejected:
+  Mach-O's header types, which are the MachO module's.
+- **wait** (`d3f786a`, `ea3c54b`, Subprocess): System's `wait(for:)` and `waitForAnyChild` are waitid, with the state
+  change decoded; the tools missed it twice. The CLD_* codes shared sentences with the W* macros ("and the C constant
+  is"), and derive.py read no enum case's doc at all, since api-delta's scan lists no case (a case has no access
+  modifier): it now reads each public enum's own cases as the enum's (37 cases, 17 names, among them the W* macros and
+  PRIO_*). mapping.ini's [wait] is covered, since waitid's forms, each read as restricted to its idtype, take every
+  idtype together.
+- **One-package gaps** (`c36731b`, `73ea160`): `Stat.Flags.realDevice` and `.descriptorOnly` (AT_REALDEV, AT_FDONLY,
+  fstatat-only, for WasmKit; rejected: members of ResolutionFlags, which the other `*at` calls take);
+  `DynamicLibrary.symbolInfo(containing:)` (dladdr, for swift-build; Darwin only, since glibc declares it only with
+  _GNU_SOURCE; the nearest symbol can be an alias, such as `__getpid`); `CallStack`, provisionally (backtrace and
+  backtrace_symbols, for swift-corelibs-foundation's call-stack properties; Darwin only, musl has neither);
+  `IOPolicy` (getiopolicy_np and setiopolicy_np with kinds and scopes, a raw kind for swift-build's private case
+  sensitivity type); SearchPaths' iterator names sysdir_search_path_enumeration_state and getattrlist's forms
+  ATTR_BIT_MAP_COUNT (Foundation); strtod and strtof read as CLocale's `_l` forms, execv as execve, getdtablesize as
+  _SC_OPEN_MAX. swift-build's `vm_prot_t` and `USEC_PER_SEC` are its own declarations, which the scan reads as
+  Darwin's.
+
+Tests: MachCPUTypeTests (constants, the ABI bit, the host's type, feature flags), SmallDarwinGapsTest (the stat
+flags against fstat, dladdr, the call stack, a thread's disk policy, mocks). XCTest 561 (4 skipped, and
+testVolumeAttributes skipped), swift-testing 481 in 75 suites, passing with `setCurrentQualityOfService` skipped.
