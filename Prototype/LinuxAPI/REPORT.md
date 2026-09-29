@@ -10,9 +10,10 @@ interface at Swift's default API level (21), and said otherwise.
 
 ## Resume here
 
-- State: inventory (section 1) and batch 1 (section 2.1) committed.
-- Next: batch 2 in the plan (section 1.5): Foundation's `POSIXErrorCode`,
-  `maxSymbolicLinks`, `maxExtendedAttributeNameBytes`.
+- State: inventory (section 1) and batches 1 and 2 (sections 2.1, 2.2)
+  committed.
+- Next: batch 3 in the plan (section 1.5): `CLocale` on glibc and musl, for
+  Foundation.
 - This lane owns `Sources/System/**`, `Sources/CSystem`, `Tests/SystemTests`
   and this report, not SystemSockets or its tests: socket API (vsock, UDP
   offload) goes to section 4, with a patch where one is written.
@@ -38,6 +39,19 @@ later; a log goes to `../linux-logs/`.
      system has no `O_TMPFILE`, the two file tests pass without checking
      anything past the open: say so if the log shows it.
    - `Utilities/linux/build.sh test`: nothing else should change.
+2. Batch 2 (`POSIXErrorCode`, `maxSymbolicLinks`,
+   `maxExtendedAttributeNameBytes`):
+   - `Utilities/linux/build.sh test -- --filter "POSIXErrorCode|CompileTimeLimits"`.
+     Expect the build to pass (`Glibc.POSIXErrorCode`, and the
+     `MAXSYMLINKS` and `XATTR_NAME_MAX` getters in `shims.c`), and 5
+     swift-testing tests (the 2 `POSIXErrorCode` tests, now built on Linux,
+     and 3 in `CompileTimeLimitsLinuxTests`) and the XCTest
+     `CompileTimeLimitsTest`'s 4 cross-platform tests to pass.
+     `extendedAttributeNames` returns early if the scratch file system has
+     no `user.` attributes; say so if it does.
+   - For the musl half, when a static-SDK build is available:
+     `swift build --swift-sdk <musl SDK>`, which takes the `XATTR_NAME_MAX`
+     fallback in `shims.c` and `Musl.POSIXErrorCode`.
 
 ## Baseline (Darwin)
 
@@ -251,6 +265,54 @@ Tests:
 - Darwin, after (`swift build && swift test`): XCTest 565 tests, 4 skipped,
   0 failures; swift-testing 498 tests in 81 suites passed (the two new
   I/O vector tests; the unnamed-file tests don't build on Darwin).
+
+### 2.2 Batch 2: `POSIXErrorCode` and two header limits (swift-foundation, TSC, indexstore-db)
+
+- `CInterop.POSIXErrorCode`, and its `init?(_: Errno)` and `errno`, widen
+  to Linux and Android, where the type is the Glibc, Musl or Android
+  overlay's `POSIXErrorCode` (the overlays each compile the standard
+  library's `POSIXError.swift`, with their C library's values). Foundation's
+  Linux branch imports Glibc, Musl or Android in `ErrorCodes+POSIX.swift`
+  for that type alone (122 references); its Darwin branch already names it
+  through System. TSC (6) and indexstore-db (1) use it too.
+- `SystemConfig.maxSymbolicLinks` (`MAXSYMLINKS`) and
+  `maxExtendedAttributeNameBytes` (`XATTR_NAME_MAX` on Linux) widen to
+  Linux and Android. Foundation's Linux branch reads `MAXSYMLINKS` for its
+  own link resolution (String+Path.swift) where its Darwin branch reads
+  `maxSymbolicLinks`. `MAXSYMLINKS` is in `<sys/param.h>`, which glibc's
+  and Bionic's modules don't include and `CSystemLinux.h` can't (it
+  includes `<signal.h>`); `XATTR_NAME_MAX` is in `<linux/limits.h>`, which
+  Musl's `<limits.h>` doesn't include. So both come from getters in
+  `shims.c`, with the kernel's 255 where Musl lacks the macro.
+
+Design calls:
+
+- `maxSymbolicLinks` returns the headers' `MAXSYMLINKS` on Linux, 20 in
+  glibc and Musl, though the kernel follows 40, so the doc says so. That's
+  the value Foundation's Linux code uses today, so migrating changes
+  nothing. Rejected: returning 40, which no Linux header names as
+  `MAXSYMLINKS` (Musl's `SYMLOOP_MAX` is 40; glibc has none, and its own
+  `realpath` uses at least 40). Bionic's value is 8, from memory of its
+  header, unchecked, so the doc doesn't say it.
+- `maxExtendedAttributeNameBytes` keeps its name and gets Linux's
+  different constant and error (`ERANGE`, not `ENAMETOOLONG`), in the doc.
+- The Android typealias is `Android.POSIXErrorCode`, from the Android
+  overlay, which compiles `POSIXError.swift` (checked in the swift
+  checkout's `stdlib/public/Platform/CMakeLists.txt`). FreeBSD and OpenBSD
+  get the type from the Glibc overlay too; they're left out, unchecked.
+
+Tests:
+
+- `ProvisionalPOSIXErrorCodeTests.swift` widens to Linux and Android (its
+  imports only).
+- `Tests/SystemTests/CompileTimeLimitsLinuxTests.swift` (Linux and Android,
+  swift-testing): 20 and 255 on glibc and Musl; a chain of
+  `maxSymbolicLinks` links and one of 40 open, and one of 41 throws
+  `ELOOP`; a 255-byte `user.` attribute name is accepted and a 256-byte one
+  throws `ERANGE` (unless the file system has no user attributes).
+  Typechecked on Darwin in a scratch copy with its condition made true.
+- Darwin, after: XCTest 565 tests, 4 skipped, 0 failures; swift-testing 498
+  tests in 81 suites passed (no new Darwin tests).
 
 ## 3. Findings
 

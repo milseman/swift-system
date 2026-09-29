@@ -58,6 +58,16 @@ uint64_t _system_get_ST_IMMUTABLE(void) { return ST_IMMUTABLE; }
 int _system_get_AT_EMPTY_PATH(void) { return AT_EMPTY_PATH; }
 int _system_get_O_TMPFILE(void) { return O_TMPFILE; }
 
+// MAXSYMLINKS, and XATTR_NAME_MAX, which Musl's <limits.h> doesn't define:
+// there it's the kernel's value, which hasn't changed.
+#include <limits.h>
+#include <sys/param.h>
+#ifndef XATTR_NAME_MAX
+#define XATTR_NAME_MAX 255
+#endif
+int _system_get_MAXSYMLINKS(void) { return MAXSYMLINKS; }
+int _system_get_XATTR_NAME_MAX(void) { return XATTR_NAME_MAX; }
+
 #include <CSystemLinux.h>
 #include <sys/ioctl.h>
 

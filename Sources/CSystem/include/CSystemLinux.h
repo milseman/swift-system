@@ -69,6 +69,13 @@ extern int csystem_renameat2(int olddirfd, const char *oldpath,
 int _system_get_AT_EMPTY_PATH(void);
 int _system_get_O_TMPFILE(void);
 
+// MAXSYMLINKS, from <sys/param.h>, which glibc's and Bionic's Swift modules
+// don't include, and which this header can't, since it includes
+// <signal.h>; and XATTR_NAME_MAX, from <linux/limits.h>, which Musl's
+// <limits.h> doesn't include. See shims.c.
+int _system_get_MAXSYMLINKS(void);
+int _system_get_XATTR_NAME_MAX(void);
+
 // The special times for futimens and utimensat, which glibc and Bionic define
 // as expressions that Swift can't import. They have these values on every
 // architecture; shims.c checks them against <sys/stat.h>.

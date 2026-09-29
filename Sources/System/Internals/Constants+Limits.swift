@@ -11,6 +11,9 @@
 
 #if !os(Windows) && !os(WASI)
 
+#if os(Linux) || os(Android)
+import CSystem
+#endif
 #if SYSTEM_PACKAGE_DARWIN
 import Darwin
 #elseif canImport(Glibc)
@@ -48,6 +51,15 @@ internal var _MAXSYMLINKS: CInt { MAXSYMLINKS }
 
 @_alwaysEmitIntoClient
 internal var _XATTR_MAXNAMELEN: CInt { XATTR_MAXNAMELEN }
+#elseif os(Linux) || os(Android)
+// MAXSYMLINKS is in <sys/param.h>, which glibc's and Bionic's Swift modules
+// don't include, and XATTR_NAME_MAX in <linux/limits.h>, which Musl's
+// <limits.h> doesn't; shims.c returns both.
+@_alwaysEmitIntoClient
+internal var _MAXSYMLINKS: CInt { _system_get_MAXSYMLINKS() }
+
+@_alwaysEmitIntoClient
+internal var _XATTR_MAXNAMELEN: CInt { _system_get_XATTR_NAME_MAX() }
 #endif
 
 #endif // !os(Windows) && !os(WASI)

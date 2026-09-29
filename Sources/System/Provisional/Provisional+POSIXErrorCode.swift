@@ -7,19 +7,32 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-// Provisional: the Darwin overlay's POSIXErrorCode.
+// Provisional: the C library overlays' POSIXErrorCode.
 //
 // POSIXErrorCode is the Darwin overlay's Swift enum of error numbers, and
 // Foundation's public API (and ABI) is made of it: POSIXError.Code is
 // POSIXErrorCode. System's Errno can't stand in for it there, so System
-// names it, for code that doesn't import Darwin. It's the overlay's type,
-// so its lasting home may be the standard library.
+// names it, for code that doesn't import Darwin. The Glibc, Musl and
+// Android overlays each declare their own, with their C library's values,
+// which Foundation's POSIXError.Code is there. It's the overlays' type, so
+// its lasting home may be the standard library.
 
 #if SYSTEM_PACKAGE_DARWIN
 import Darwin
+#elseif os(Linux) || os(Android)
+#if canImport(Glibc)
+import Glibc
+#elseif canImport(Musl)
+import Musl
+#elseif canImport(Android)
+import Android
+#endif
+#endif
 
+#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
 @available(System 199, *)
 extension CInterop {
+  #if SYSTEM_PACKAGE_DARWIN
   /// The Darwin overlay's Swift enumeration of error numbers,
   /// which Foundation's `POSIXError.Code` is.
   ///
@@ -31,13 +44,56 @@ extension CInterop {
   /// the Darwin overlay's.
   ///
   /// - Note: Provisional: the overlay's types may move to the Swift standard library.
-  /// - Note: Only available on Darwin.
+  /// - Note: Only available on Darwin, Linux, and Android.
   public typealias POSIXErrorCode = Darwin.POSIXErrorCode
+  #elseif canImport(Glibc)
+  /// The Glibc overlay's Swift enumeration of error numbers,
+  /// which Foundation's `POSIXError.Code` is.
+  ///
+  /// ``Errno`` is System's type for error numbers;
+  /// convert between them with their raw values:
+  /// `Errno(rawValue: code.rawValue)`.
+  ///
+  /// The corresponding C type is `POSIXErrorCode`,
+  /// the Glibc overlay's.
+  ///
+  /// - Note: Provisional: the overlay's types may move to the Swift standard library.
+  /// - Note: Only available on Darwin, Linux, and Android.
+  public typealias POSIXErrorCode = Glibc.POSIXErrorCode
+  #elseif canImport(Musl)
+  /// The Musl overlay's Swift enumeration of error numbers,
+  /// which Foundation's `POSIXError.Code` is.
+  ///
+  /// ``Errno`` is System's type for error numbers;
+  /// convert between them with their raw values:
+  /// `Errno(rawValue: code.rawValue)`.
+  ///
+  /// The corresponding C type is `POSIXErrorCode`,
+  /// the Musl overlay's.
+  ///
+  /// - Note: Provisional: the overlay's types may move to the Swift standard library.
+  /// - Note: Only available on Darwin, Linux, and Android.
+  public typealias POSIXErrorCode = Musl.POSIXErrorCode
+  #elseif canImport(Android)
+  /// The Android overlay's Swift enumeration of error numbers,
+  /// which Foundation's `POSIXError.Code` is.
+  ///
+  /// ``Errno`` is System's type for error numbers;
+  /// convert between them with their raw values:
+  /// `Errno(rawValue: code.rawValue)`.
+  ///
+  /// The corresponding C type is `POSIXErrorCode`,
+  /// the Android overlay's.
+  ///
+  /// - Note: Provisional: the overlay's types may move to the Swift standard library.
+  /// - Note: Only available on Darwin, Linux, and Android.
+  public typealias POSIXErrorCode = Android.POSIXErrorCode
+  #endif
 }
 
 // Under MemberImportVisibility, the enumeration's own cases, `rawValue`, and
 // `init(rawValue:)` need the module that declares them, so code that doesn't
-// import Darwin converts through Errno with these, which are System's.
+// import the overlay converts through Errno with these, which are System's.
 @available(System 199, *)
 extension CInterop.POSIXErrorCode {
   /// Creates the code for an error number,
@@ -55,4 +111,4 @@ extension CInterop.POSIXErrorCode {
   @_alwaysEmitIntoClient
   public var errno: Errno { Errno(rawValue: rawValue) }
 }
-#endif // SYSTEM_PACKAGE_DARWIN
+#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
