@@ -68,6 +68,7 @@ target_sources(SystemPackage PRIVATE
 target_sources(SystemPackage PRIVATE
   ClockTime/ClockTime.swift)
 target_sources(SystemPackage PRIVATE
+  Directories/CInterop+DirectoryEntry.swift
   Directories/DirectoryStream.swift
   Directories/DirectoryWalk.swift)
 target_sources(SystemPackage PRIVATE

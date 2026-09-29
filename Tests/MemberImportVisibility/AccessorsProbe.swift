@@ -84,7 +84,21 @@ func _accessorProbe() {
   // POSIXErrorCode, through Errno
   let code = CInterop.POSIXErrorCode(.notPermitted)
   _ = code?.errno
+
+  // kinfo_proc
+  func processInfo(_ info: CInterop.KernelProcessInfo) {
+    _ = (info.processID, info.parentProcessID, info.processGroupID)
+    _ = (info.realUserID, info.effectiveUserID, info.savedUserID)
+    _ = (info.realGroupID, info.savedGroupID, info.isTraced, info.commandName)
+  }
+  _ = processInfo
   #endif
+
+  // dirent
+  func directoryEntry(_ entry: CInterop.DirectoryEntry) {
+    _ = (entry.fileName, entry.fileType, entry.inode)
+  }
+  _ = directoryEntry
   _ = (time, interval, vector, status)
 }
 

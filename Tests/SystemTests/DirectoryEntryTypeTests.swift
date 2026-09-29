@@ -88,6 +88,38 @@ private struct DirectoryEntryTypeTests {
       }
     }
   }
+
+  /// CInterop.DirectoryEntry's accessors read a C entry as DirectoryStream
+  /// does, the dot entries included.
+  @available(System 199, *)
+  @Test func cEntryAccessors() throws {
+    try withTemporaryFilePath(basename: "cEntryAccessors") { directory in
+      try FileDescriptor.open(
+        directory.appending("file"), .writeOnly, options: .create, permissions: .ownerReadWrite
+      ).close()
+      try directory.appending("directory").makeDirectory(permissions: .ownerReadWriteExecute)
+
+      guard let stream = directory.withPlatformString({ opendir($0) }) else {
+        throw Errno(rawValue: errno)
+      }
+      defer { closedir(stream) }
+      var seen: [String: (FileType?, Inode)] = [:]
+      while let raw = readdir(stream) {
+        let entry: CInterop.DirectoryEntry = raw.pointee
+        let name = try #require(entry.fileName)
+        seen[name.string] = (entry.fileType, entry.inode)
+      }
+      #expect(seen.keys.sorted() == [".", "..", "directory", "file"])
+      for name in ["directory", "file", "."] {
+        let status = try directory.appending(name).stat(followTargetSymlink: false)
+        #expect(seen[name]?.0 == status.type, "\(name)")
+        #expect(seen[name]?.1 == status.inode, "\(name)")
+      }
+      // A zero entry has no name and no type.
+      #expect(CInterop.DirectoryEntry().fileName == nil)
+      #expect(CInterop.DirectoryEntry().fileType == nil)
+    }
+  }
 }
 
 #endif // !os(Windows) && !os(WASI)

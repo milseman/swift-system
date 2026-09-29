@@ -29,6 +29,12 @@ import Android
 #endif
 import SystemPackage
 
+func _mivProbe(_ e: CInterop.DirectoryEntry) {
+  _ = e.d_ino
+  _ = e.d_type
+  _ = e.d_name
+}
+
 func _mivProbe(_ s: CInterop.Stat) {
   _ = s.st_dev
   _ = s.st_ino
