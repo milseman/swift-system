@@ -96,14 +96,15 @@ def cell(s):
     return f"{len(s['using'])} / {len(s['benefiting'])}"
 
 
-def order_key(sort):
+def order_key(sort, get=lambda x: x["reach"]):
+    """A sort key for rows holding a rank and a summary (`get` finds it)."""
+    def sites(r):
+        return r["adoptedSites"] + r["benefitSites"]
     return {
-        "reach": lambda x: (-x["reach"]["reach"], -len(x["reach"]["using"]), -(x["reach"]["adoptedSites"]
-                                                                              + x["reach"]["benefitSites"]),
-                            x["rank"]),
-        "using": lambda x: (-len(x["reach"]["using"]), -x["reach"]["adoptedSites"], x["rank"]),
-        "benefit": lambda x: (-len(x["reach"]["benefiting"]), -x["reach"]["benefitSites"], x["rank"]),
-        "sites": lambda x: (-(x["reach"]["adoptedSites"] + x["reach"]["benefitSites"]), x["rank"]),
+        "reach": lambda x: (-get(x)["reach"], -len(get(x)["using"]), -sites(get(x)), x["rank"]),
+        "using": lambda x: (-len(get(x)["using"]), -get(x)["adoptedSites"], x["rank"]),
+        "benefit": lambda x: (-len(get(x)["benefiting"]), -get(x)["benefitSites"], x["rank"]),
+        "sites": lambda x: (-sites(get(x)), x["rank"]),
         "rank": lambda x: x["rank"],
     }[sort]
 

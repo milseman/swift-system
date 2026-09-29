@@ -146,7 +146,7 @@ def reach_section(w, adopters, cands, units, md):
             dat, bsites = "—", "—"
         w(f"| `{p['name']}` | {mig} | {res} | {sites} | {len(using)} | {dat} | {bsites} | {len(benefiting)} |")
     w("")
-    order = sorted(cands, key=reach.order_key("reach"))
+    order = sorted(cands, key=reach.order_key("reach", get=lambda x: x["adopters"]))
     shown = [x for x in order if x["adopters"]["reach"]][:25]
     w(f"### Carve-outs by reach")
     w("")
