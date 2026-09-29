@@ -36,6 +36,8 @@ public struct AddressResolutionError: Error, Hashable, Sendable {
   }
 
   /// A human-readable error message.
+  ///
+  /// The corresponding C function is `gai_strerror`.
   public var message: String {
     String(cString: system_gai_strerror(code))
   }

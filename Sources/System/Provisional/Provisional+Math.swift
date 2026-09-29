@@ -46,7 +46,9 @@ import ucrt
 /// `round`, and `trunc`, `truncatingRemainder(dividingBy:)` for `fmod`,
 /// `remainder(dividingBy:)`, `magnitude` for `fabs`,
 /// `minimum(_:_:)` and `maximum(_:_:)`, `addingProduct(_:_:)` for `fma`,
-/// and `sign`, `exponent`, and `significand`.
+/// and `sign`, `exponent`, and `significand`;
+/// for a finite, nonzero value, `frexp`'s fraction and exponent
+/// are `significand / 2` and `exponent + 1`.
 ///
 /// These functions return NaN for a value outside their domain,
 /// as C's do, rather than trap; C also sets `errno`, which they don't read.
