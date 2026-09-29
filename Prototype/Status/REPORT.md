@@ -10,9 +10,9 @@ everything here is built and tested on Darwin only.
 The work list for toolchain packages to drop `import Darwin` in every form, kept current. Source: `ecosystem.sh
 report`'s *What the files that import Darwin still need* (section 25), which counts the interfaces that library files
 importing Darwin in any form but through Apple Foundation's re-export use, per symbol, with System's coverage on
-Darwin; grouped here into clusters and ranked by packages, then call sites. Latest: run `6e784c6e7026-4676fb13`
+Darwin; grouped here into clusters and ranked by packages, then call sites. After step 0: run `6e784c6e7026-4676fb13`
 (System `6e784c6`, the 21 main-scheme packages that import Darwin): 756 interfaces, 567 covered, 131 gaps (24 in two
-or more packages); set apart, 14 the standard library answers, 18 other modules' names, 26 the packages' own shims.
+or more packages).
 
 Next: cluster 10. Resume from the first row not marked done. Latest re-rank: run `b64ee9f1591b-d229d468` (System
 `b64ee9f`): 756 interfaces, 615 covered, 78 gaps; set apart, 19 the standard library answers, 18 other modules' names,
