@@ -8,7 +8,8 @@
 */
 
 // The C library calls that System wraps provisionally (see
-// Sources/System/Provisional): C standard I/O.
+// Sources/System/Provisional): C strings, character classes, and C
+// standard I/O.
 //
 // In a mock test, a stream that fopen or fdopen "opened" is a placeholder
 // address, so every call that takes a stream is mocked too, and none of
@@ -40,6 +41,84 @@ private func _mockStreamResult(_ result: CInt) -> UnsafeMutablePointer<FILE>? {
   result == -1 ? nil : _mockStream
 }
 #endif
+
+// MARK: - string.h
+
+// strlen is system_strlen, in Exports.swift. A mocked strdup or strndup
+// records its arguments and fails if an error is forced; otherwise it
+// copies for real, so that the caller can use and free the copy, as a
+// mocked allocation does (Syscalls+Memory.swift). The others can't fail.
+
+internal func system_strnlen(_ string: UnsafePointer<CChar>, _ maxLength: Int) -> Int {
+  strnlen(string, maxLength)
+}
+
+internal func system_strdup(_ string: UnsafePointer<CChar>) -> UnsafeMutablePointer<CChar>? {
+#if ENABLE_MOCKING
+  if mockingEnabled, _mock(path: string) != 0 { return nil }
+#endif
+  return strdup(string)
+}
+
+internal func system_strndup(
+  _ string: UnsafePointer<CChar>, _ maxLength: Int
+) -> UnsafeMutablePointer<CChar>? {
+#if ENABLE_MOCKING
+  // Record the bytes strndup reads, which needn't end with a null byte.
+  if mockingEnabled {
+    let bytes = UnsafeRawBufferPointer(start: string, count: strnlen(string, maxLength))
+    if _mock(String(decoding: bytes, as: UTF8.self), maxLength) != 0 { return nil }
+  }
+#endif
+  return strndup(string, maxLength)
+}
+
+internal func system_strcmp(_ string: UnsafePointer<CChar>, _ other: UnsafePointer<CChar>) -> CInt {
+  strcmp(string, other)
+}
+
+internal func system_strncmp(
+  _ string: UnsafePointer<CChar>, _ other: UnsafePointer<CChar>, _ maxLength: Int
+) -> CInt {
+  strncmp(string, other, maxLength)
+}
+
+// glibc has strlcpy only from 2.38, and WASI's libc may not declare it, so
+// there it's strlen and a copy.
+internal func system_strlcpy(
+  _ destination: UnsafeMutablePointer<CChar>, _ source: UnsafePointer<CChar>, _ size: Int
+) -> Int {
+#if canImport(Glibc) || os(WASI)
+  let length = strlen(source)
+  if size > 0 {
+    let count = min(length, size - 1)
+    UnsafeMutableRawPointer(destination).copyMemory(from: source, byteCount: count)
+    destination[count] = 0
+  }
+  return length
+#else
+  return strlcpy(destination, source, size)
+#endif
+}
+
+// MARK: - ctype.h
+
+// None of them can fail.
+
+internal func system_isspace(_ c: CInt) -> CInt { isspace(c) }
+internal func system_isblank(_ c: CInt) -> CInt { isblank(c) }
+internal func system_isdigit(_ c: CInt) -> CInt { isdigit(c) }
+internal func system_isxdigit(_ c: CInt) -> CInt { isxdigit(c) }
+internal func system_isalpha(_ c: CInt) -> CInt { isalpha(c) }
+internal func system_isalnum(_ c: CInt) -> CInt { isalnum(c) }
+internal func system_isupper(_ c: CInt) -> CInt { isupper(c) }
+internal func system_islower(_ c: CInt) -> CInt { islower(c) }
+internal func system_ispunct(_ c: CInt) -> CInt { ispunct(c) }
+internal func system_isprint(_ c: CInt) -> CInt { isprint(c) }
+internal func system_isgraph(_ c: CInt) -> CInt { isgraph(c) }
+internal func system_iscntrl(_ c: CInt) -> CInt { iscntrl(c) }
+internal func system_tolower(_ c: CInt) -> CInt { tolower(c) }
+internal func system_toupper(_ c: CInt) -> CInt { toupper(c) }
 
 // MARK: - stdio
 

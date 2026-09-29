@@ -238,10 +238,12 @@ target_sources(SystemPackage PRIVATE
   Internals/Syscalls+Provisional.swift
   Internals/Syscalls+ProvisionalLocale.swift
   Internals/Syscalls+ProvisionalMath.swift
+  Provisional/Provisional+CType.swift
   Provisional/Provisional+Locale.swift
   Provisional/Provisional+Math.swift
   Provisional/Provisional+POSIXErrorCode.swift
-  Provisional/Provisional+Stdio.swift)
+  Provisional/Provisional+Stdio.swift
+  Provisional/Provisional+StringH.swift)
 target_sources(SystemPackage PRIVATE
   Internals/Syscalls+Pseudoterminals.swift
   Pseudoterminals/Pseudoterminal.swift)
