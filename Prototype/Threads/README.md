@@ -334,7 +334,8 @@ Out of scope for this lane. The equivalents a Windows layer would wrap:
 
 ## NIO coverage
 
-The `Utilities/nio-coverage/mapping.ini` entries this API covers, for the
+The entries of NIO's coverage mapping (then `Utilities/nio-coverage/mapping.ini`,
+now `Utilities/adopter-coverage/mapping.ini`) that this API covers, for the
 adopter-coverage lane to update:
 
 | entry | status | covering API | what's left |

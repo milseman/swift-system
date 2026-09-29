@@ -222,9 +222,10 @@ libuv, mio, and wepoll use. An `IOCompletionPort` would need:
 
 ## swift-nio's coverage
 
-`Utilities/nio-coverage/mapping.ini` lists each of NIO's event interfaces as
-missing. This API would cover them as follows; nothing in `Utilities/`
-changes here.
+NIO's coverage mapping (then `Utilities/nio-coverage/mapping.ini`, now
+`Utilities/adopter-coverage/mapping.ini`) listed each of NIO's event
+interfaces as missing. This API would cover them as follows; nothing in
+`Utilities/` changes here.
 
 | entry | would be | by |
 |---|---|---|
