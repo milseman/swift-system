@@ -87,8 +87,12 @@ def bind(lib):
     return cb
 
 
-def main():
-    store_path, root, out = sys.argv[1:4]
+def read_store(store_path, root, keep, definitions_too=True):
+    """The occurrences in a store's records for files under root that
+    `keep(usr, rel, is_c)` accepts: {rel: {"module", "references": [[line,
+    col, usr, flags]]}}, the symbols' names and kinds, their definition
+    sites, and every file under root the store has a record for (a file the
+    build compiled), whether or not anything in it was kept."""
     root = os.path.realpath(root) + os.sep
     lib = load_library()
     callback = bind(lib)
@@ -117,8 +121,8 @@ def main():
                     records[text(lib.indexstore_unit_dependency_get_name(dep))] = (path[len(root):], module)
             return True
 
-        keep = callback(on_dependency)
-        lib.indexstore_unit_reader_dependencies_apply_f(reader, None, keep)
+        keep_dep = callback(on_dependency)
+        lib.indexstore_unit_reader_dependencies_apply_f(reader, None, keep_dep)
         lib.indexstore_unit_reader_dispose(reader)
 
     files, symbols, definitions = {}, {}, {}
@@ -126,15 +130,13 @@ def main():
         reader = lib.indexstore_record_reader_create(store, record.encode(), ctypes.byref(err))
         if not reader:
             continue
-        in_sources = rel.startswith("Sources/") and not rel.startswith("Sources/Samples/")
         occurrences = []
         line, col = ctypes.c_uint(), ctypes.c_uint()
 
-        def on_occurrence(_ctx, occ):
+        def on_occurrence(_ctx, occ, rel=rel):
             sym = lib.indexstore_occurrence_get_symbol(occ)
             usr = text(lib.indexstore_symbol_get_usr(sym))
-            is_c = usr.startswith("c:")
-            if not (usr.startswith(KEEP_SWIFT) or (is_c and in_sources)):
+            if not keep(usr, rel, usr.startswith("c:")):
                 return True
             kind = lib.indexstore_symbol_get_kind(sym)
             if kind == KIND_PARAMETER:
@@ -143,14 +145,14 @@ def main():
             lib.indexstore_occurrence_get_line_col(occ, ctypes.byref(line), ctypes.byref(col))
             if usr not in symbols:
                 symbols[usr] = {"name": text(lib.indexstore_symbol_get_name(sym)), "kind": kind}
-            if roles & (ROLE_DEFINITION | ROLE_DECLARATION):
+            if definitions_too and roles & (ROLE_DEFINITION | ROLE_DECLARATION):
                 definitions.setdefault(usr, []).append([rel, line.value, col.value])
             if roles & ROLE_REFERENCE:
                 occurrences.append([line.value, col.value, usr, int(roles & (ROLE_CALL | ROLE_IMPLICIT))])
             return True
 
-        keep = callback(on_occurrence)
-        lib.indexstore_record_reader_occurrences_apply_f(reader, None, keep)
+        keep_occ = callback(on_occurrence)
+        lib.indexstore_record_reader_occurrences_apply_f(reader, None, keep_occ)
         lib.indexstore_record_reader_dispose(reader)
         entry = files.setdefault(rel, {"module": module, "references": []})
         entry["references"].extend(occurrences)
@@ -160,9 +162,20 @@ def main():
     for f in files.values():
         # A file compiled into several units (a test helper, say) repeats.
         f["references"] = sorted(set(map(tuple, f["references"])))
+    return files, symbols, definitions, len(records)
+
+
+def main():
+    store_path, root, out = sys.argv[1:4]
+
+    def keep(usr, rel, is_c):
+        in_sources = rel.startswith("Sources/") and not rel.startswith("Sources/Samples/")
+        return usr.startswith(KEEP_SWIFT) or (is_c and in_sources)
+
+    files, symbols, definitions, n_records = read_store(store_path, root, keep)
     json.dump({"files": files, "symbols": symbols, "definitions": definitions}, open(out, "w"))
     n = sum(len(f["references"]) for f in files.values())
-    print(f"index_refs: {len(records)} records, {len(files)} files, {n} references, "
+    print(f"index_refs: {n_records} records, {len(files)} files, {n} references, "
           f"{len(definitions)} defined symbols -> {out}")
 
 
