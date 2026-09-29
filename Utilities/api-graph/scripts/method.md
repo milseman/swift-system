@@ -7,25 +7,32 @@
 3. **Indexed build.** `swift build --build-tests -Xswiftc -index-store-path` builds the head export, tests and Samples included. `--skip-update` resolves swift-argument-parser from SwiftPM's local cache, so nothing is fetched. This runs at the same time as step 1.
 4. **Scans.** api-delta's `scan_sources.py` scans both exports, and `scripts/source_index.py` indexes the head export's declarations by extent and top-level block.
 5. **References.** `scripts/index_refs.py` reads the index store with the toolchain's libIndexStore.
-6. **Graph.** `scripts/build_graph.py` builds the nodes, edges and atoms, and attaches tests, samples and the implementation each declaration needs.
-   - **Adopters.** `scripts/adopters.py` finds the package clones in `API_GRAPH_ADOPTERS` and `API_GRAPH_ECOSYSTEM`. It builds each migration branch's commit against an export of the head commit, with an index store, or reuses the references it cached from an earlier build; matches what the build didn't compile lexically; attaches the diff hunk that introduced each use; and joins the packages' C interfaces, from the coverage tools' results store, with the C names in the declarations' doc comments.
-7. **Clusters.** `scripts/cluster.py` promotes shared types, forms clusters and parts, tags contingencies, and ranks the carve-outs.
-8. **Bundles.** `scripts/bundles.py` writes one bundle per cluster, ranked part and batch, with its Adopters section and `adopters.md`.
-9. **Report.** `scripts/report.py` writes this file, `api-graph.json`, and the DOT graphs. It compares with the previous run's `api-graph.json` when there is one. `scripts/reach.py` aggregates the adopters by carve-out for both, and ranks or filters a run's carve-outs by reach.
+6. **Declarations.** `scripts/build_graph.py` lists the declarations, their structural and signature edges (with each signature use's role), conformances, blocks, tests, samples and the implementation each one reaches.
+7. **C names.** `scripts/cnames.py` runs adopter-coverage's derivation on both exports: the C names each declaration wraps, and their C function families.
+8. **Adopters.** `scripts/adopters.py` finds the package clones in `API_GRAPH_ADOPTERS` and `API_GRAPH_ECOSYSTEM`. It builds each migration branch's commit against an export of the head commit, with an index store, or reuses the references it cached from an earlier build; matches what the build didn't compile lexically; attaches the diff hunk that introduced each use; and joins the packages' C interfaces, from the coverage tools' results store, with the C names.
+9. **Graph.** `scripts/snapshot.py` assembles the snapshot, with the domains (`domains.json`), files it in the store, and diffs it with the store's previous snapshot of the same head ref (`scripts/graphq.py`'s diff); `graphq.py summary` writes `GRAPH.md`.
+10. **Pitches.** `scripts/pitches.py` resolves the pitch files against the snapshot and checks them together (`PITCHES.md`), and `scripts/bundles.py` writes a bundle per pitch.
+11. **Suggestions.** `scripts/cluster.py` promotes shared types, forms clusters and parts, tags contingencies, and ranks the carve-outs; `scripts/bundles.py` writes a bundle per cluster, ranked part and batch; `scripts/report.py` writes `SUGGESTIONS.md`, `suggestions.json`, the draft pitch files and the DOT graphs, comparing with the previous run's suggestions. `scripts/units.py` is what cluster.py and pitches.py share (open-question tags, metrics, prior text), and `scripts/reach.py` aggregates adopters for any set of declarations.
+12. **Index.** `scripts/index.py` writes `API-GRAPH.md`.
 
 ### Terms
 
-- **Node**: a declaration the head commit adds or changes.
-- **Atom**: the top-level block holding a node, a type declaration or one `extension X { ... }`. A CInterop alias is an atom of its own.
-- **Vocabulary**: a type that nodes use but that isn't a node. That covers everything on the base commit, anything from another module, and new types promoted to vocabulary.
+- **Node**: in the graph, anything with an ID: a declaration (one the head commit adds, `head`; a type on the base commit, `base`; a C or standard-library type or protocol, `external`), a C name, a piece of internal code, a block, a test, a sample, a package. In the suggestions' clustering, a node means a head declaration.
+- **Link**: a typed, directed relation between two nodes; the kinds are in `Prototype/ApiGraph/REPORT.md`, section 1. A derived kind (`sameCFamily`, `sameImplementation`, `sameBlock`, `sameMark`, `couldUse`) is computed from stored links at query time.
+- **Snapshot**: the graph of one head commit, a JSON document.
+- **C function family**: C functions a doc sentence names as spellings of one call, joined with POSIX's variants of the call among the wrapped functions.
+- **Reach**: a declaration's packages: those using it on their migration branch, and those calling a C name it newly wraps.
+- **Pitch**: a hand-curated file naming a set of head declarations by rules, with a pattern.
+- **Domain**: a hand-kept group of C families by task.
+- **Atom**: the top-level block holding a declaration, a type declaration or one `extension X { ... }`. A CInterop alias is an atom of its own.
+- **Vocabulary**: in the suggestions, a type that declarations use but that isn't clustered: everything on the base commit, anything from another module, and new types promoted to vocabulary.
 - **Cluster**: a connected set of atoms once vocabulary is taken out.
 - **Part**: a piece of a cluster that could be pitched on its own, after the parts it needs.
 - **Batch**: several small clusters that only add members to one existing type in one file.
-- **Carve-out**: a cluster, part or batch, as a candidate pitch.
+- **Carve-out** (suggested): a cluster, part or batch, as a candidate pitch.
 - **Contingency**: an open design question a carve-out depends on.
-- **Adopted site**: a line of a package's migration branch (`migrate-darwin`) that uses a node, with the hunk of the migration's diff that introduced it.
-- **Would-benefit site**: a line of a package that uses a C interface a node newly wraps.
-- **Reach**: the number of packages with either kind of site in a carve-out.
+- **Adopted site**: a line of a package's migration branch (`migrate-darwin`) that uses a declaration, with the hunk of the migration's diff that introduced it.
+- **Would-benefit site**: a line of a package that uses a C interface a declaration newly wraps.
 
 ### Design decisions
 
@@ -97,6 +104,29 @@ Each decision is listed with the alternative it rejected.
 25. **Reach is a view beside the ranking, not part of its score.** The pitch order stays by effort and open questions. Reach, the number of packages that use a carve-out or would benefit from it, is a column beside it, a ranking of its own, and `reach.py`'s filters.
     *Rejected:* adding reach to the score, which would move big clusters (more declarations, so more uses) ahead of the small, question-free carve-outs the order is for.
 
+26. **The graph is its own stage, and keeps every link.** Base types (FileDescriptor, FilePath, Errno, CInterop) and external ones (the C types System extends, the protocols it conforms to) are nodes, so a link to them is a link, not a cut. Promotion and link cutting are the suggestions' rules, applied after the graph is saved.
+    *Rejected:* clustering first and reporting the clusters' edges, which hides every link the promotion cuts (all of ProcessID's dependents).
+27. **Relations that hold between many declarations at once are hubs, not pairs.** Two declarations are in one C family when they `wrap` C names of one family, reach the same internal code when they `reach` one piece, share a block when they're `inBlock` one block; those are derived at query time. A snapshot then holds each fact once, and a diff shows the fact that changed.
+    *Rejected:* storing the pairwise links, which multiplies them (the fcntl commands' accessors are ten declarations and forty-five pairs) and fills diffs with pairs that follow from one change.
+28. **Node IDs are USRs**, which change only when a declaration's signature or context does, and `scan:<module>:<path>` for a declaration no symbol graph has. Blocks are named by file, subject, MARK and ordinal, C names by name, packages by origin URL.
+    *Rejected:* graph-local numbers, which change whenever anything is added, so no diff or pitch file could name a node.
+29. **`extends` is a member added by an extension outside its host's own file**, or to a base or external type. This repository writes most members in `extension T` blocks beside `T`, which says nothing a pitch needs.
+    *Rejected:* every member declared in an extension (3270 of 3434 memberships on system-next, nearly all of them `memberOf` again).
+30. **A C function family comes from the doc sentences, joined by POSIX's naming.** Functions a sentence names with `or` are spellings of one call (`chmod`, or `lchmod` if …); `and` names another call it makes (`openat` and `fdopendir`), which doesn't join them. Among the wrapped functions, `x`, `xat`, `fx`, `lx` and `fxat` are one call's variants (mkdir and mkdirat; stat, fstat, lstat, fstatat; futimens and utimensat), except the C library's streams (`fread` isn't `read`'s).
+    *Rejected:* every name one sentence mentions, which joined open with fdopendir and readdir; the sentences alone, which split mkdir from mkdirat.
+31. **Snapshots go to a store beside the repository, one per head commit, and each run diffs with the store's previous snapshot of the same head ref.** A pitch chat's checks need the last snapshot, whatever worktree ran it.
+    *Rejected:* the output directory, which each run replaces; `.build`, which goes with the worktree.
+32. **Pitch files are hand-curated data the tool reads and never writes.** Rules name what a chat means (types without their members, the members of a type, a C family) rather than lists of IDs, so a pitch follows the code as it grows, and the check says what its rules match now and didn't before. Fix-it stubs go with the declaration they rename, and base types can only lead to their new members.
+    *Rejected:* computed pitches (the clustering), which can't express a judgment such as "these types without their members"; ID lists alone, which go stale silently.
+33. **A pitch needs another when its declarations name a type the other owns**, through a signature, a membership, a nesting, an extension or a conformance; implementation-only uses are reported apart.
+    *Rejected:* counting any link, which would make every pitch that tests with a pseudoterminal need the terminal pitch.
+34. **A pitch bundle quotes what the pitch holds.** A type pitched without its members shows its declaration's head, not its body; a member shows its extension's head too. Each adopter hunk says what else it uses, and which pitch owns it.
+    *Rejected:* whole blocks, as the suggestions' bundles quote them, which show another pitch's members.
+35. **The clustering stays, as suggestions**: a report that ranks carve-outs, says how much of each the pitch files cover, and drafts a pitch file for the leading uncovered ones, into the output.
+    *Rejected:* dropping it, which loses the candidates it finds; letting it write `Prototype/Pitches`, which would override the chats' judgment.
+36. **Domains are a hand-kept file of C families by task**, after the chapters of *Advanced Programming in the UNIX Environment*, matched by glob; a type is in its members' domains. They suggest related API the links don't connect, and nothing else depends on them.
+    *Rejected:* domains inferred from files or directories, which follow this repository's layout rather than the task (`FileOperations.swift` holds twenty families).
+
 ### Where it's wrong
 
 - **Promotion depends on file layout.** A type used across features within one directory isn't promoted, which is why Terminal is one cluster with seven parts rather than seven clusters. A type used by a single root file isn't either, so FileLock and the fcntl layer share a cluster. `config.json`'s `promote` and `demote` lists override it.
@@ -114,17 +144,23 @@ Each decision is listed with the alternative it rejected.
 - **Would-benefit sites are at the extraction's commit.** When that's the ecosystem's clone rather than the migration's merge base, line numbers differ from the branch's; the diff says whether a line survives on the branch, not whether Darwin still compiles it (a migration that adds a Darwin branch leaves the old line to the other platforms).
 - **A C name reaches every declaration that names it.** `pthread_mutex_lock` counts for `PThread.Mutex.lock()` and `withLock(_:)` alike, so a carve-out holding either gets the site.
 - **The lexical interface scan is coarse**: library Swift sources only (no C), and no scope analysis beyond the package's own declarations.
+- **C function families are what the doc sentences and POSIX's naming say.** A family a sentence calls two calls stays two (`posix_spawn` and the credential calls it makes); a derivation artifact can be a one-name family (`progress`).
+- **A pitch's prerequisites come from its declarations' links**, so a need only a doc comment or a sample shows isn't one.
+- **The related API a domain suggests is broad**: a domain is a whole chapter (files and directories is 297 declarations), so a pitch's list shows the largest families first and stops at 40.
+- **The snapshot diff compares facts, not lines**: a declaration that moved within its file isn't changed; a changed doc comment isn't either, unless its summary did.
 
 ### Outputs
 
 | Path | What |
 |---|---|
-| `API-GRAPH.md` | This report. |
-| `api-graph.json` | Clusters, parts, batches, promoted types, contingencies, the ranked carve-outs, and the run's metadata. |
-| `graph.json` | Every node (with its tests, samples, implementation and C calls), edge, atom, test and sample. |
+| `API-GRAPH.md` | The index of the reports. |
+| `GRAPH.md`, `graph.json.gz` | The graph: its summary, and the snapshot. |
+| `DIFF.md`, `diff.json` | The snapshot against the store's previous one. |
+| `PITCHES.md`, `pitches.json`, `pitches/<id>/` | The pitch files' checks, and a bundle per pitch. |
+| `SUGGESTIONS.md` | This report. |
+| `suggestions.json`, `suggestions/<id>/`, `suggestions/drafts/` | The suggestions' data, bundles, and draft pitch files. |
 | `clusters.dot`, `atoms.dot` | The cluster map and the atom graph, for Graphviz (`dot -Tsvg`). |
-| `bundles/<id>/` | One per carve-out: `bundle.md`, `bundle.json`, `sources.md`, `tests.md`, `samples.md`. `bundles/index.json` lists them in rank order. |
 | `adopters.json` | The packages, their builds, every adopted and would-benefit site, the hunks, and each node's C names. |
-| `bundles/<id>/adopters.md` | Every adopted and would-benefit site of the carve-out, and every hunk in full. |
+| `pitches/<id>/adopters.md`, `suggestions/<id>/adopters.md` | Every adopted and would-benefit site of a pitch or suggestion, and every hunk in full. |
 | `api-delta/` | The api-delta report and JSON this run used. |
 | `logs/` | Build and tool logs, and `meta.json`. |
