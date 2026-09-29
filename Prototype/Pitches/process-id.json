@@ -1,0 +1,12 @@
+{
+  "id": "process-id",
+  "title": "ProcessID, the process-ID vocabulary type",
+  "pattern": "vocabulary-type",
+  "status": "draft",
+  "include": [
+    {"types": ["ProcessID"], "members": false},
+    {"paths": ["ProcessID.rawValue", "ProcessID.init(rawValue:)", "ProcessID.init(_:)", "ProcessID.current",
+               "ProcessID.parent"]}
+  ],
+  "notes": "An example of the pattern: a type many pitches name (terminal job control, F_SETOWN, file locks, libproc, spawning), with only the members they all need; spawning, waiting and libproc's queries go to pitches of their own."
+}

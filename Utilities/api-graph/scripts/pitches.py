@@ -323,6 +323,10 @@ def find_cycles(succ):
     return out
 
 
+def plural(n, one, many=None):
+    return f"{n} {one if n == 1 else (many or one + 's')}"
+
+
 def pattern_report(R, r, owner):
     """Whether the pitch's declarations fit its pattern: [(ok, text)]."""
     nodes = R.nodes
@@ -339,7 +343,7 @@ def pattern_report(R, r, owner):
     pat = r["pattern"]
     if pat == "types-without-members":
         own_members = {x for x in members if host[x] in types}
-        out.append((not own_members, f"{len(types)} types, {len(own_members)} of their members"
+        out.append((not own_members, f"{plural(len(types), 'type')}, {len(own_members)} of their members"
                     + (": " + ", ".join(f"`{nodes[x]['path']}`" for x in sorted(own_members)[:6]) if own_members else "")))
     elif pat == "members-of-pitched-type":
         hosts = collections.Counter(host.get(x) for x in api)
@@ -354,14 +358,14 @@ def pattern_report(R, r, owner):
             elif h in R.head and not owners:
                 bad.append(f"no other pitch owns `{nodes[h]['path']}`")
         out.append((not bad, f"{len(api)} members of " + ", ".join(
-            f"`{nodes[h]['path']}`" for h in hosts if h) + (": " + "; ".join(bad) if bad else "")))
+            f"`{p_}`" for p_ in sorted(nodes[h]["path"] for h in hosts if h)) + (": " + "; ".join(bad) if bad else "")))
     elif pat == "self-contained-type":
         missing = []
         for t in types:
             for m in R.members(t, nested=True):
                 if m in R.head and m not in mine and nodes[m].get("hiddenClass") != "unavailable":
                     missing.append(m)
-        out.append((not missing, f"{len(types)} types with {len(members)} members"
+        out.append((not missing, f"{plural(len(types), 'type')} with {plural(len(members), 'member')}"
                     + (f"; {len(missing)} of their members aren't in it: " + ", ".join(
                         f"`{nodes[x]['path']}`" for x in sorted(missing, key=lambda x: nodes[x]['path'])[:6])
                        if missing else "")))
@@ -382,7 +386,8 @@ def pattern_report(R, r, owner):
             for ln in R.g.inc[t]:
                 if ln["kind"] == "usesInSignature":
                     users |= {o for o in owner.get(ln["from"], []) if o != r["id"]}
-        out.append((bool(types), f"{len(types)} types, which {len(users)} other pitches name"))
+        out.append((bool(types), f"{plural(len(types), 'type')}, which {plural(len(users), 'other pitch', 'other pitches')} "
+                                 "name"))
     elif pat == "constants":
         kinds = collections.Counter(nodes[x].get("symbolKind") for x in api)
         out.append((not types, ", ".join(f"{v} {k}" for k, v in kinds.most_common())))
@@ -440,7 +445,7 @@ def report_md(result, doc, previous_path=None):
                          + (", listed in `requires`" if o in r["requires"] else ", not in `requires`")
                          + "): " + "; ".join(f"`{e['declaration']}` {e['link']} `{e['type']}`" for e in evs[:3]) + ".")
         if r["unownedTypes"]:
-            L.append(f"- `{pid}` names {len(r['unownedTypes'])} new types no pitch owns yet: "
+            L.append(f"- `{pid}` names {plural(len(r['unownedTypes']), 'new type')} no pitch owns yet: "
                      + ", ".join(f"`{k}`" for k in list(r["unownedTypes"])[:12])
                      + (", …" if len(r["unownedTypes"]) > 12 else "") + ".")
         if r["unneededRequires"]:

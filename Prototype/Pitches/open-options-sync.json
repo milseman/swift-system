@@ -1,0 +1,10 @@
+{
+  "id": "open-options-sync",
+  "title": "Synchronized-I/O open options: O_SYNC and O_DSYNC",
+  "pattern": "constants",
+  "status": "draft",
+  "include": [
+    {"paths": ["FileDescriptor.OpenOptions.sync", "FileDescriptor.OpenOptions.dataSync"]}
+  ],
+  "notes": "An example of the pattern: new constants on an existing type, with the fix-it stubs that rename their C spellings."
+}
