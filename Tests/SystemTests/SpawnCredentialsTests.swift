@@ -176,6 +176,25 @@ final class SpawnCredentialsTest: XCTestCase {
       }, [])
   }
 
+  /// Arguments and an environment as C arrays, whose bytes needn't be UTF-8,
+  /// with System's file actions and with C values.
+  func testCArrays() throws {
+    let arguments: [[UInt8]] = [Array("sh".utf8), Array("-c".utf8), checksTheByte, Array("sh".utf8), [0xff]]
+    let child = try withCStringArray(arguments) { arguments in
+      try withCStringArray([Array("BYTE=".utf8) + [0xff]]) { environment in
+        try ProcessID.spawn(
+          "/bin/sh", arguments: arguments, environment: environment, credentials: ownCredentials)
+      }
+    }
+    XCTAssertEqual(try child.wait(), .exited(0))
+    let other = try withCStringArray(arguments) { arguments in
+      try ProcessID.spawn(
+        "/bin/sh", arguments: arguments, environment: nil, cFileActions: nil, cAttributes: nil,
+        credentials: ownCredentials, fileActionDescriptors: [])
+    }
+    XCTAssertEqual(try other.wait(), .exited(0))
+  }
+
   func testSearchingThePath() throws {
     let child = try ProcessID.spawn(
       searchingPathFor: "sh", arguments: ["sh", "-c", "exit 5"], credentials: SpawnCredentials())
@@ -260,6 +279,9 @@ final class SpawnCredentialsTest: XCTestCase {
       XCTAssertThrowsError(
         try ProcessID.spawn("/bin/true", arguments: ["true"], credentials: SpawnCredentials())
       ) { XCTAssertEqual($0 as? Errno, .notPermitted) }
+      _ = try withCStringArray([Array("true".utf8)]) {
+        try ProcessID.spawn("/bin/true", arguments: $0, environment: nil, credentials: SpawnCredentials())
+      }
 
       var calls: [(String, [AnyHashable])] = []
       while let entry = mocking.trace.dequeue() { calls.append((entry.name, entry.arguments)) }
@@ -269,12 +291,13 @@ final class SpawnCredentialsTest: XCTestCase {
       let none: AnyHashable = Optional<UInt32>.none
       let noGroups: AnyHashable = Optional<[UInt32]>.none
       XCTAssertEqual(
-        calls.map(\.0), ["fcntl"] + Array(repeating: "spawn_with_credentials", count: 3))
+        calls.map(\.0), ["fcntl"] + Array(repeating: "spawn_with_credentials", count: 4))
       XCTAssertEqual(calls.map(\.1), [
         [CInt(5), F_GETFD],
         ["/bin/true", false, Optional(user.rawValue), Optional(group.rawValue), Optional([UInt32(12)]),
          [CInt(5), CInt(6)]],
         ["true", true, none, none, noGroups, [CInt]()],
+        ["/bin/true", false, none, none, noGroups, [CInt]()],
         ["/bin/true", false, none, none, noGroups, [CInt]()],
       ] as [[AnyHashable]])
     }

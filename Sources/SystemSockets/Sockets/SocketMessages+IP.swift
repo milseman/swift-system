@@ -84,6 +84,69 @@ extension SocketDescriptor {
   }
 }
 
+// MARK: - Explicit Congestion Notification
+
+@available(System 199, *)
+extension SocketDescriptor {
+  /// An explicit congestion notification (ECN) codepoint:
+  /// the low 2 bits of an IPv4 datagram's type-of-service byte,
+  /// or of an IPv6 datagram's traffic class.
+  ///
+  /// A received datagram's codepoint is in the ancillary message
+  /// that ``setReceivesTypeOfService(_:)`` or
+  /// ``setReceivesTrafficClass(_:)`` asks for:
+  ///
+  ///     typealias ECN = SocketDescriptor.ExplicitCongestionNotification
+  ///     if let byte = message.typeOfService,
+  ///        ECN(typeOfService: byte) == .congestionExperienced {
+  ///       // Slow down.
+  ///     }
+  ///
+  /// To send one, pass a codepoint's ``rawValue``
+  /// as the type of service or traffic class.
+  /// The values are RFC 3168's, which every platform's C constants have.
+  @frozen
+  public struct ExplicitCongestionNotification: RawRepresentable, Hashable, Sendable {
+    /// The codepoint, from 0 through 3.
+    @_alwaysEmitIntoClient
+    public var rawValue: UInt8
+
+    /// Creates a codepoint from its value, from 0 through 3.
+    @_alwaysEmitIntoClient
+    public init(rawValue: UInt8) { self.rawValue = rawValue }
+
+    /// Reads the codepoint from a type-of-service byte or a traffic class.
+    ///
+    /// The corresponding C constant is `IPTOS_ECN_MASK`.
+    @_alwaysEmitIntoClient
+    public init(typeOfService: UInt8) { self.rawValue = typeOfService & 0b11 }
+
+    /// The transport isn't ECN-capable (Not-ECT).
+    ///
+    /// The corresponding C constant is `IPTOS_ECN_NOTECT`.
+    @_alwaysEmitIntoClient
+    public static var notCapableTransport: Self { Self(rawValue: 0b00) }
+
+    /// The transport is ECN-capable, with the ECT(1) codepoint.
+    ///
+    /// The corresponding C constant is `IPTOS_ECN_ECT1`.
+    @_alwaysEmitIntoClient
+    public static var capableTransport1: Self { Self(rawValue: 0b01) }
+
+    /// The transport is ECN-capable, with the ECT(0) codepoint.
+    ///
+    /// The corresponding C constant is `IPTOS_ECN_ECT0`.
+    @_alwaysEmitIntoClient
+    public static var capableTransport0: Self { Self(rawValue: 0b10) }
+
+    /// A router on the path experienced congestion (CE).
+    ///
+    /// The corresponding C constant is `IPTOS_ECN_CE`.
+    @_alwaysEmitIntoClient
+    public static var congestionExperienced: Self { Self(rawValue: 0b11) }
+  }
+}
+
 // MARK: - Decoding Received Messages
 
 /// The IP-level messages that System reads, by their levels, types, and

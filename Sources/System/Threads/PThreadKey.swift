@@ -25,7 +25,8 @@ extension PThread {
   /// such as the main thread when `main` returns.
   ///
   /// `Key` can't be copied. Destroying a `Key` deletes the C key,
-  /// and destroys the calling thread's value.
+  /// and destroys the calling thread's value;
+  /// the corresponding C function is `pthread_key_delete`.
   /// POSIX doesn't destroy the values of the other threads
   /// when a key is deleted, so they leak.
   /// A key that lasts as long as the process,

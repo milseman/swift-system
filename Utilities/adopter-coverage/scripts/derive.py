@@ -49,11 +49,14 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import check  # noqa: E402
 
 HEAD = re.compile(r"The corresponding C (function|constant|type|error|field|property|macro|global variable|"
-                  r"structure|struct|enumeration|enum|union|flag|option)s?\s+(is|are)\b", re.I)
+                  r"variable|structure|struct|enumeration|enum|union|flag|option)s?\s+(is|are)\b", re.I)
 KIND = {"function": "function", "constant": "constant", "type": "type", "error": "error", "field": "field",
-        "property": "field", "macro": "macro", "global variable": "variable", "structure": "type",
-        "struct": "type", "enumeration": "type", "enum": "type", "union": "type", "flag": "constant",
-        "option": "constant"}
+        "property": "field", "macro": "macro", "global variable": "variable", "variable": "variable",
+        "structure": "type", "struct": "type", "enumeration": "type", "enum": "type", "union": "type",
+        "flag": "constant", "option": "constant"}
+# A DocC symbol link, ``Zone/utc``: never a C name, and its doubled backticks
+# would pair with a C name's.
+DOCC_LINK = re.compile(r"``[^`]*``")
 NAME = re.compile(r"`([^`]+)`")
 CONDITION = re.compile(r"\b(if|when|unless|whether|is|are|which|returns?|equals?)\b", re.I)
 ARGUMENT = re.compile(r"\b(with|at|for|using|via|in)\b", re.I)
@@ -104,6 +107,7 @@ def parse(kind_word, body):
     """[(name, parent, cKind, role)] for one sentence's body (the text after
     `is`/`are`), and whether its subject is restricted."""
     kind = KIND[kind_word]
+    body = DOCC_LINK.sub(lambda m: m.group(0).strip("`"), body)
     found = []
     pos, prev_role, restricted = 0, None, False
     for m in NAME.finditer(body):

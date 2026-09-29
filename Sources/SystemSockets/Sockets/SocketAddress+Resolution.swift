@@ -176,7 +176,9 @@ extension SocketAddress {
   /// - Returns: An array of resolved addresses.
   /// - Throws: `AddressResolutionError` if resolution fails.
   ///
-  /// The corresponding C function is `getaddrinfo`.
+  /// This method copies the C library's list of results, and frees it.
+  ///
+  /// The corresponding C functions are `getaddrinfo` and `freeaddrinfo`.
   public static func resolve(
     hostname: String? = nil,
     service: String? = nil,
@@ -301,6 +303,10 @@ extension SocketAddress {
   /// - Parameter flags: Flags controlling the resolution.
   /// - Returns: The hostname and service.
   /// - Throws: `AddressResolutionError` if resolution fails.
+  ///
+  /// The names can be as long as the C library's limits,
+  /// the sizes of the buffers this method passes;
+  /// the corresponding C constants are `NI_MAXHOST` and `NI_MAXSERV`.
   ///
   /// The corresponding C function is `getnameinfo`.
   public func reverseLookup(

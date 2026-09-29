@@ -34,11 +34,16 @@ extension PThread {
   ///     attributes.stackSize = 1 << 20
   ///     let worker = try PThread(attributes: attributes) { work() }
   ///
+  /// Creating a thread makes C attributes from these;
+  /// the corresponding C functions are `pthread_attr_init`
+  /// and `pthread_attr_destroy`.
+  ///
   /// The corresponding C type is `pthread_attr_t`.
   @frozen
   public struct Attributes: Hashable, Sendable {
     /// The size of the new thread's stack, in bytes,
-    /// or `nil` for the system's default.
+    /// or `nil` for the system's default,
+    /// which ``defaultStackSize()`` returns.
     ///
     /// The size must be at least `PTHREAD_STACK_MIN`,
     /// and on Darwin a multiple of the page size;
@@ -97,6 +102,34 @@ extension PThread {
 
 @available(System 199, *)
 extension PThread.Attributes {
+  /// Returns the size of the stack, in bytes,
+  /// that a new thread gets when ``stackSize`` is `nil`.
+  ///
+  /// The main thread's stack is another size, which the process's
+  /// ``ResourceLimit/Resource/stackSize`` limits.
+  ///
+  /// The corresponding C function is `pthread_attr_getstacksize`.
+  @_alwaysEmitIntoClient
+  public static func defaultStackSize() throws(Errno) -> Int {
+    try _defaultStackSize().get()
+  }
+
+  @usableFromInline
+  internal static func _defaultStackSize() -> Result<Int, Errno> {
+    var attributes = _pthreadAttrZero
+    return withUnsafeMutablePointer(to: &attributes) { attributes in
+      if let error = _pthreadError(system_pthread_attr_init(attributes)) {
+        return .failure(error)
+      }
+      defer { _ = system_pthread_attr_destroy(attributes) }
+      var size = 0
+      if let error = _pthreadError(system_pthread_attr_getstacksize(attributes, &size)) {
+        return .failure(error)
+      }
+      return .success(size)
+    }
+  }
+
   // Calls `body` with the C attributes, or with nil if every option is the
   // default, so that pthread_create applies its own defaults.
   internal func _withUnsafeAttributes<R>(

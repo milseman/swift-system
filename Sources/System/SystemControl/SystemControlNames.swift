@@ -24,12 +24,14 @@ extension SystemControl.Name where Value == Int32 {
   /// ``physicalProcessorCount``, and ``maxPhysicalProcessorCount``.
   ///
   /// The corresponding variable is `hw.ncpu`.
+  /// The corresponding C constants are `CTL_HW` and `HW_NCPU`.
   @_alwaysEmitIntoClient
   public static var processorCount: Self { Self("hw.ncpu") }
 
   /// The number of processors that are available now.
   ///
   /// The corresponding variable is `hw.activecpu`.
+  /// The corresponding C constants are `CTL_HW` and `HW_AVAILCPU`.
   @_alwaysEmitIntoClient
   public static var activeProcessorCount: Self { Self("hw.activecpu") }
 
@@ -357,6 +359,7 @@ extension SystemControl.Name where Value == kinfo_proc {
   ///
   /// The corresponding variable is `kern.proc.pid`,
   /// with the process ID as the identifier's last component.
+  /// The corresponding C constants are `CTL_KERN`, `KERN_PROC`, and `KERN_PROC_PID`.
   @_alwaysEmitIntoClient
   public static func process(_ id: ProcessID) -> Self {
     Self(identifier: [_CTL_KERN, _KERN_PROC, _KERN_PROC_PID, id.rawValue])
@@ -368,6 +371,7 @@ extension SystemControl.Name where Value == [kinfo_proc] {
   /// The kernel's information about every process.
   ///
   /// The corresponding variable is `kern.proc.all`.
+  /// The corresponding C constants are `CTL_KERN`, `KERN_PROC`, and `KERN_PROC_ALL`.
   @_alwaysEmitIntoClient
   public static var allProcesses: Self {
     Self(identifier: [_CTL_KERN, _KERN_PROC, _KERN_PROC_ALL])
@@ -377,6 +381,7 @@ extension SystemControl.Name where Value == [kinfo_proc] {
   ///
   /// The corresponding variable is `kern.proc.pgrp`,
   /// with the group's ID as the identifier's last component.
+  /// The corresponding C constants are `CTL_KERN`, `KERN_PROC`, and `KERN_PROC_PGRP`.
   @_alwaysEmitIntoClient
   public static func processes(inGroup group: ProcessID) -> Self {
     Self(identifier: [_CTL_KERN, _KERN_PROC, _KERN_PROC_PGRP, group.rawValue])
@@ -387,6 +392,7 @@ extension SystemControl.Name where Value == [kinfo_proc] {
   ///
   /// The corresponding variable is `kern.proc.uid`,
   /// with the user's ID as the identifier's last component.
+  /// The corresponding C constants are `CTL_KERN`, `KERN_PROC`, and `KERN_PROC_UID`.
   @_alwaysEmitIntoClient
   public static func processes(ofUser user: UserID) -> Self {
     Self(identifier: [_CTL_KERN, _KERN_PROC, _KERN_PROC_UID, CInt(bitPattern: user.rawValue)])
@@ -397,6 +403,7 @@ extension SystemControl.Name where Value == [kinfo_proc] {
   ///
   /// The corresponding variable is `kern.proc.ruid`,
   /// with the user's ID as the identifier's last component.
+  /// The corresponding C constants are `CTL_KERN`, `KERN_PROC`, and `KERN_PROC_RUID`.
   @_alwaysEmitIntoClient
   public static func processes(ofRealUser user: UserID) -> Self {
     Self(identifier: [_CTL_KERN, _KERN_PROC, _KERN_PROC_RUID, CInt(bitPattern: user.rawValue)])
@@ -415,6 +422,7 @@ extension SystemControl.Name where Value == [UInt8] {
   ///
   /// The corresponding variable is `kern.procargs2`,
   /// with the process ID as the identifier's last component.
+  /// The corresponding C constants are `CTL_KERN` and `KERN_PROCARGS2`.
   @_alwaysEmitIntoClient
   public static func processArguments(_ id: ProcessID) -> Self {
     Self(identifier: [_CTL_KERN, _KERN_PROCARGS2, id.rawValue])

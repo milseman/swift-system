@@ -29,7 +29,7 @@ extension FileType {
   /// The corresponding C field is `d_type`.
   /// The corresponding C constants are `DT_REG`, `DT_DIR`, `DT_LNK`,
   /// `DT_FIFO`, `DT_SOCK`, `DT_CHR`, `DT_BLK`, and on Darwin and FreeBSD
-  /// `DT_WHT`.
+  /// `DT_WHT`; and `DT_UNKNOWN`, for which it returns `nil`.
   public init?(directoryEntryType: UInt8) {
     self.init(_directoryEntryType: directoryEntryType)
   }

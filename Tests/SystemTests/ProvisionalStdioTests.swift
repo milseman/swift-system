@@ -65,6 +65,12 @@ final class ProvisionalStdioTest: XCTestCase {
       MockTestCase(name: "fwrite", .noInterrupt, address, 5) { _ in
         try stream.write("hello")
       },
+      MockTestCase(name: "fputs", .noInterrupt, address, "a C string") { _ in
+        try stream.write(cString: "a C string")
+      },
+      MockTestCase(name: "fputc", .noInterrupt, address, CInt(0x41)) { _ in
+        try stream.write(byte: 0x41)
+      },
       MockTestCase(name: "fileno", .noInterrupt, address) { _ in
         _ = try stream.fileDescriptor()
       },
@@ -86,7 +92,10 @@ final class ProvisionalStdioTest: XCTestCase {
       let path = dir.appending("file")
       let output = try FileStream.open(path, mode: "w")
       try "hello, ".utf8.withContiguousStorageIfAvailable { try output.write(UnsafeRawBufferPointer($0)) }
-      try output.write("world")
+      try output.write("wor")
+      // A C string stops at its null byte.
+      try [CChar(0x6c), 0, 0x78].withUnsafeBufferPointer { try output.write(cString: $0.baseAddress!) }
+      try output.write(byte: UInt8(ascii: "d"))
       try output.close()
 
       let input = try FileStream.open(path, mode: "r")
@@ -165,6 +174,13 @@ final class ProvisionalStdioTest: XCTestCase {
       XCTAssertTrue(input.hasError)
       input.clearError()
       XCTAssertFalse(input.hasError)
+      // fputs and fputc report the same error.
+      XCTAssertThrowsError(try input.write(cString: "x")) {
+        XCTAssertEqual($0 as? Errno, .badFileDescriptor)
+      }
+      XCTAssertThrowsError(try input.write(byte: 0x78)) {
+        XCTAssertEqual($0 as? Errno, .badFileDescriptor)
+      }
     }
   }
 

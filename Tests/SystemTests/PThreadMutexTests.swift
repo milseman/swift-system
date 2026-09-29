@@ -290,6 +290,51 @@ private struct PThreadMutexTests {
     try counter.mutex.withLock {}
   }
   #endif
+
+  #if SYSTEM_PACKAGE_DARWIN
+  /// The static initializers make C objects that work without an init call,
+  /// of the kinds they name.
+  @available(System 199, *)
+  @Test func staticInitializers() {
+    let mutex = UnsafeMutablePointer<CInterop.PThreadMutex>.allocate(capacity: 1)
+    defer { mutex.deallocate() }
+    mutex.initialize(to: .initializer)
+    #expect(pthread_mutex_trylock(mutex) == 0)
+    #expect(pthread_mutex_trylock(mutex) == EBUSY)
+    #expect(pthread_mutex_unlock(mutex) == 0)
+    #expect(pthread_mutex_destroy(mutex) == 0)
+
+    mutex.initialize(to: .errorCheckingInitializer)
+    #expect(pthread_mutex_lock(mutex) == 0)
+    #expect(pthread_mutex_lock(mutex) == EDEADLK)
+    #expect(pthread_mutex_unlock(mutex) == 0)
+    #expect(pthread_mutex_unlock(mutex) == EPERM)
+    #expect(pthread_mutex_destroy(mutex) == 0)
+
+    mutex.initialize(to: .recursiveInitializer)
+    #expect(pthread_mutex_lock(mutex) == 0)
+    #expect(pthread_mutex_lock(mutex) == 0)
+    #expect(pthread_mutex_unlock(mutex) == 0)
+    #expect(pthread_mutex_unlock(mutex) == 0)
+    #expect(pthread_mutex_destroy(mutex) == 0)
+
+    let condition = UnsafeMutablePointer<CInterop.PThreadCondition>.allocate(capacity: 1)
+    defer { condition.deallocate() }
+    condition.initialize(to: .initializer)
+    #expect(pthread_cond_signal(condition) == 0)
+    #expect(pthread_cond_destroy(condition) == 0)
+
+    let lock = UnsafeMutablePointer<CInterop.PThreadReadWriteLock>.allocate(capacity: 1)
+    defer { lock.deallocate() }
+    lock.initialize(to: .initializer)
+    #expect(pthread_rwlock_rdlock(lock) == 0)
+    #expect(pthread_rwlock_rdlock(lock) == 0)
+    #expect(pthread_rwlock_trywrlock(lock) == EBUSY)
+    #expect(pthread_rwlock_unlock(lock) == 0)
+    #expect(pthread_rwlock_unlock(lock) == 0)
+    #expect(pthread_rwlock_destroy(lock) == 0)
+  }
+  #endif
 }
 
 #endif // !os(Windows) && !os(WASI)

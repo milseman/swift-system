@@ -199,6 +199,8 @@ extension NetworkInterface {
   ///
   /// An entry, and the spans of its addresses, can't outlive the list.
   /// The list is a snapshot, which interfaces that change don't update.
+  /// Destroying the list frees it;
+  /// the corresponding C function is `freeifaddrs`.
   ///
   /// The corresponding C function is `getifaddrs`.
   @frozen
@@ -232,6 +234,8 @@ extension NetworkInterface {
 extension NetworkInterface.Addresses {
   /// One address of a network interface, in an ``NetworkInterface/Addresses``
   /// list, which it can't outlive.
+  ///
+  /// The corresponding C type is `struct ifaddrs`.
   @frozen
   public struct Entry: ~Escapable {
     @usableFromInline

@@ -24,6 +24,7 @@ private struct SocketVMSocketTests {
   @available(System 199, *)
   @Test func theDomainAndConstants() {
     #expect(SocketDescriptor.Domain.vsock.rawValue == PF_VSOCK)
+    #expect(SocketDescriptor.Domain.vsock.rawValue == AF_VSOCK)
     #expect(SocketDescriptor.Domain.vsock.description == "vsock")
     #expect(VMSocketAddress.ContextID.any.rawValue == UInt32.max)
     #expect(VMSocketAddress.ContextID.hypervisor == 0)

@@ -322,12 +322,13 @@ extension BrokenDownTime {
   /// which happens only for times billions of years away,
   /// this initializer throws ``Errno/overflow``.
   ///
-  /// The corresponding C functions are `gmtime_r`, for ``Zone/utc``,
-  /// and `localtime_r`, for ``Zone/local``.
+  /// It calls `gmtime_r` for ``Zone/utc`` and `localtime_r` for ``Zone/local``.
   /// For ``Zone/local``, it calls `tzset` first,
   /// so that it uses the `TZ` environment variable's current value
   /// on every platform, as `mktime` does;
   /// glibc's `localtime_r` otherwise reads it only once.
+  ///
+  /// The corresponding C functions are `gmtime_r` and `localtime_r`.
   @_alwaysEmitIntoClient
   public init(secondsSinceEpoch seconds: Int, in zone: Zone) throws(Errno) {
     self = try Self._breakDown(seconds, zone).get()
@@ -373,8 +374,9 @@ extension BrokenDownTime {
   /// for ``Zone/utc``, this method computes such a time itself,
   /// and for ``Zone/local``, it throws ``Errno/overflow``.
   ///
-  /// The corresponding C functions are `timegm`, for ``Zone/utc``,
-  /// and `mktime`, for ``Zone/local``.
+  /// It calls `timegm` for ``Zone/utc`` and `mktime` for ``Zone/local``.
+  ///
+  /// The corresponding C functions are `timegm` and `mktime`.
   @_alwaysEmitIntoClient
   public func secondsSinceEpoch(in zone: Zone) throws(Errno) -> Int {
     try _secondsSinceEpoch(zone).get()
@@ -399,8 +401,9 @@ extension BrokenDownTime {
   /// and like ``secondsSinceEpoch(in:)``, it throws it on Darwin
   /// for local times before 1900.
   ///
-  /// The corresponding C functions are `timegm`, for ``Zone/utc``,
-  /// and `mktime`, for ``Zone/local``.
+  /// It calls `timegm` for ``Zone/utc`` and `mktime` for ``Zone/local``.
+  ///
+  /// The corresponding C functions are `timegm` and `mktime`.
   @_alwaysEmitIntoClient
   public func normalized(in zone: Zone) throws(Errno) -> BrokenDownTime {
     try _normalized(zone).get()
