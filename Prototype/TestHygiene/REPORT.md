@@ -134,3 +134,155 @@ one loaded run, without failing. A standalone probe took 38 s and then 253 s for
 first `sysctl(KERN_PROC_ALL)` size query of its process, with no ENOMEM retries, and
 1 ms for each later one: the time is in the kernel's first answer to a new process,
 not in `SystemControl`'s retry loop.
+
+## 3. Fixes
+
+Commits `5b29c65`, `ac6bdd1`, `a83fffe`, and the one that adds `Tests/TESTING.md`.
+Each fix makes the outcome depend on an event, an invariant, or isolation instead of
+on timing. Where a check had to get weaker to be deterministic, the entry says so.
+
+### 3a. Scheduling
+
+- `setCurrentQualityOfService`: a `pthread_override_qos_class_start_np` override keeps
+  the thread at the default class until it's joined. `pthread_get_qos_class_np`
+  reports the class the thread asked for, not overrides, so the check is unchanged.
+  Before: failed 8 of 10 loaded runs, after 10 s each. After: 8 of 8 runs of the test
+  alone under 10 loaders passed, in 1 ms, and every full run since.
+
+### 3b. Sampled values
+
+- `testVolumeAttributes`: compares with statfs only what the volume doesn't change
+  (size, I/O block size, type name), and checks the space values of one call against
+  each other: available ≤ free ≤ size, whole blocks, used ≤ size, a full disk allowed.
+  It requests `.volumeSize` and `.volumeFreeSpace` too. **Weaker**: available space is
+  no longer checked for equality with statfs's; its position in the buffer is still
+  checked by the values around it. Before: 3 of 10 loaded runs. After: none.
+- `LibProcTest.testLists`: both lists must hold the processes that live through both
+  calls (this one, its parent, launchd, and a child it keeps running), instead of 90%
+  overlap. **Weaker**: other processes aren't compared.
+
+### 3c. Timing
+
+- Kernel queue: a one-shot timer's `data` is at least 1, not exactly 1 (Darwin counts
+  the intervals that passed before the event was read); the repeating timer waits for
+  the queue to become readable before sleeping 10 ms and counting; the full span's
+  poll gets a timeout of twice the hang guard and must return within the guard.
+- `MachTimeTests.testInstants`: the `SuspendingClock` interval starts first and ends
+  last, so it contains the Mach interval whatever the delays.
+- `ProcessTimerTests`: 100,000 s timers must read within the hang guard of that; the
+  expired one-shot timer waits for its SIGALRM handler to run; `setAlarm`'s rounding
+  is checked against bounds computed from a clock read around the two calls, so a
+  delay under 0.4 s (always, unloaded) still pins it to one value.
+- `SignalInterruptTests` and `WriteAllInterruptTests`: one signal at a time, each
+  after the handler ran; a call that isn't retried is signaled until it returns,
+  which it can do only by being interrupted. **Weaker for the retried call**: after
+  three handled signals the test unblocks it, without knowing whether any of them
+  reached the call rather than the code before it; the result it checks is the same
+  either way.
+- Running children: `spawnWaitingChild()` (sh reading a pipe that only the test
+  process holds) replaces `sleep 10` and `sleep 30`; the two deinit tests use a
+  `sleep` of twice the hang guard and require the deinit to finish within the guard.
+- `StatTests.times`, `SocketIPMessagesTests`: timestamps lie between clock readings
+  made around the operation, instead of within 4 s or 60 s of one.
+- `acceptSetsExactlyTheOptions`: polls the listener until it's readable, which it is
+  once the connection is queued, instead of retrying EAGAIN for 2 s.
+- Linux only, not yet run: the timerfd test reads back a timer set far off, then sets
+  a short one; the io_uring test waits for the cancelled poll's completion instead of
+  retrying 100 times; the TCP test waits for `bytesAcknowledged` to reach 1000.
+
+### 3d. Hang guards
+
+`hangGuardSeconds` (300, in `HangGuard.swift` in both test targets) bounds every wait
+for something that should happen at once: `Latch.wait()` (was 10 s), pseudoterminal
+reads (5 s), polls and kqueue waits (5 to 30 s), io_uring completions (1 s), and the
+XCTest expectation, semaphore and lock waits (10 s).
+
+### 3e. Isolation
+
+- The malloc zone tests are one `.serialized` suite, check which zone holds a block
+  (`Memory.Zone(containing:)`) instead of counting blocks, and read every zone's
+  statistics only in an exit test. `reallocateFreeingOnFailureFreesTheBlock` moved
+  into that suite.
+- `MachVirtualMemoryTests`: deallocating twice (`deallocatingTwice`) and copying to
+  and from a deallocated page are exit tests.
+- `settingAChildsPriority` is an XCTest test (`ProcessPriorityChildTests`), so that
+  its child can't hold swift-testing's other tests' descriptors.
+- Before: the memory suites alone, 20 runs under 10 loaders: 2 SIGSEGV crashes and 2
+  failures. After: 20 of 20 passed.
+
+### 3f. Loaded runs after the fixes
+
+| Round | Loaders | Load average | Runs passed |
+|---|---|---|---|
+| `stress.sh -n 5 -l 10`, at `a83fffe` | 10 | 85 to 125 | 10 of 10 |
+| `stress.sh -n 5 -l 20`, with `FileLockTests`' last two guards | 20 | 80 to 146 | 10 of 10 |
+
+Each serial run: XCTest 557 tests with the 4 skips below, 0 failures; swift-testing
+473 tests in 74 suites, passed. Each `--parallel` run: 557 of 557 XCTest tests ran,
+and swift-testing passed. swift-testing's run takes 3 to 4 s instead of 6.5 s, now
+that the QoS test doesn't wait for a starved thread.
+
+The 4 skips are by design and don't depend on load: `dup3` and `pipe2` need Darwin 27
+(3 tests), and `testControllingTerminal` needs a controlling terminal, which commands
+run by Claude Code don't have.
+
+The lane close block no longer needs `--skip testVolumeAttributes`.
+
+## 4. Rules
+
+`Tests/TESTING.md`: what a test may and may not depend on, for the lanes that add
+tests. In short: wait for events, with `hangGuardSeconds` only against hangs; bound
+elapsed time from below; bracket clocks; compare invariants, not samples; keep
+process-wide state, freed resources and child processes out of swift-testing tests;
+name shared things uniquely; restore everything.
+
+## 5. Remaining risks
+
+- **Linux is unverified.** The Linux-only edits in 3c, the glibc branch of the alarm
+  rounding (glibc and the Linux kernel round to the nearest second, not up, which
+  `setAlarm`'s documentation doesn't say), and `LinuxProcessTests`' waiting child
+  compile only on Linux. The `container` service isn't running
+  (`container system start` fails inside Claude Code's sandbox), so nothing Linux has
+  been built here.
+- A step of the realtime clock (as when NTP corrects it) can still fail the checks
+  that compare it across calls: `PThreadConditionTests.deadlinePasses`,
+  `ClockTests.realtimeIsTheTimeSinceTheEpoch`, the brackets in `StatTests.times` and
+  `SocketIPMessagesTests`. Load can't.
+- Absence checks prove less on a busy machine, but can't fail: `testStartSuspended`,
+  `testWaitingLock`'s first wait, the terminal's partial line.
+- `StatTests.times` expects the temporary directory's access time unchanged; a
+  process that reads the directory meanwhile would change it. Not seen.
+- `MemoryMappingTests.protectionAdviceAndResidency` expects just-written pages
+  resident; heavy memory pressure could evict one first. Not seen.
+- `SharedMemoryTests` names include the process ID; a crashed run's leftovers would
+  trip a later process with the same ID.
+- `ProcessCredentialsTests.aUsersGroups` compares two answers from the directory
+  service.
+- `LibProcTest.testLists` and `SystemControlTest.testProcesses` can take a minute
+  under load: the first `KERN_PROC_ALL` size query of a process took 38 s and 253 s
+  in a probe. Nothing times out, so they pass slowly.
+
+### Findings outside `Tests/`, not changed
+
+- `Memory.Zone.statisticsForAllZones()` and `mstats()` (`MemoryZone.swift:397,419`)
+  crash if another thread destroys a zone meanwhile: libmalloc reads every zone
+  without the lock that `malloc_destroy_zone` takes. Their documentation could say
+  so.
+- `ProcessTimer.setAlarm`'s documentation (`ProcessTimer.swift:256`) says the seconds
+  left are rounded up; on glibc they're rounded to the nearest second. Unverified
+  until the Linux build runs.
+
+## 6. Where to resume
+
+Done: steps 1 to 5 of the lane's brief on Darwin (inventory, loaded reproduction,
+fixes, `Tests/TESTING.md`, loaded runs passing). Open:
+
+1. **Linux.** With the container service started from a Terminal
+   (`container system start`), run `Utilities/linux/build.sh test` and then the
+   Linux suite under load. Check the edits in 3c marked Linux, `LinuxProcessTests`,
+   and `ProcessTimerTests.roundedAlarmSeconds`' glibc branch; if glibc does round to
+   the nearest second, report the `setAlarm` documentation to its owner.
+2. **New tests from other lanes.** When local system-next moves, merge it, and read
+   the new test files against `Tests/TESTING.md` (a grep for `sleep`, `timeout:`,
+   `seconds:`, `spawn`, `statistics`, `deallocate` and process-wide setters finds
+   most hazards), then rerun `stress.sh`.

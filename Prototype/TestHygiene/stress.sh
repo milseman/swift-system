@@ -60,7 +60,7 @@ echo "Started $loaders loaders; logs in $dir"
 # The lines that name a failure: XCTest's assertions and failed cases,
 # swift-testing's issues and failed tests, and crashes.
 failures() {
-  grep -E "error: |: failed|' failed|✘|[Ff]atal error|Exited with|signal code|Test crashed" "$1" \
+  grep -a -E "error: |: failed|' failed|✘|[Ff]atal error|Exited with|signal code|Test crashed" "$1" \
     | grep -v -E "^✘ Test run with|with [0-9]+ failures? \(0 unexpected\)" | sort -u
 }
 
@@ -78,7 +78,9 @@ for ((n = 1; n <= runs; n++)); do
     load=$(sysctl -n vm.loadavg 2>/dev/null)
     {
       echo "== $mode run $n: exit $status, ${elapsed}s, load $load"
-      grep -E "Executed [0-9]+ tests?, with|Test run with [0-9]+ tests?" "$log" | tail -2
+      # XCTest's totals; with --parallel, the count of tests it ran.
+      grep -a -E "Executed [0-9]+ tests?, with|Test run with [0-9]+ tests?" "$log" | tail -2
+      grep -a -o -E "^\[[0-9]+/[0-9]+\] Testing" "$log" | tail -1
       failures "$log"
     } | tee -a "$summary"
   done

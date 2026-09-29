@@ -374,9 +374,9 @@ final class FileLockTest: XCTestCase {
       XCTAssertFalse(try b.lock(.read, byteRange: 5..<6, timeout: .zero))
       XCTAssertFalse(try b.lock(.read, byteRange: 5..<6, timeout: .seconds(-1)))
       // Bytes that aren't locked don't wait.
-      XCTAssertTrue(try b.lock(.write, byteRange: 10..., timeout: .seconds(10)))
+      XCTAssertTrue(try b.lock(.write, byteRange: 10..., timeout: .seconds(hangGuardSeconds)))
       try a.unlock()
-      XCTAssertTrue(try b.lock(.write, timeout: .seconds(10)))
+      XCTAssertTrue(try b.lock(.write, timeout: .seconds(hangGuardSeconds)))
     }
   }
   #endif // SYSTEM_PACKAGE_DARWIN
