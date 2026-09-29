@@ -19,6 +19,9 @@ import Testing
 
 import Darwin
 
+// A test that deallocates memory and then uses its addresses does it in a
+// process of its own: swift-testing runs tests in parallel, and another
+// thread can be given those addresses as soon as they're free.
 @Suite("Mach virtual memory")
 private struct MachVirtualMemoryTests {
   typealias VM = Mach.VirtualMemory
@@ -36,8 +39,16 @@ private struct MachVirtualMemoryTests {
     #expect(page.allSatisfy { $0 == 0 })
     page.storeBytes(of: 0xFF, toByteOffset: pageSize - 1, as: UInt8.self)
     try VM.deallocate(region)
-    // Deallocating again skips the pages, which aren't allocated.
-    try VM.deallocate(region)
+  }
+
+  /// Deallocating again skips the pages, which aren't allocated.
+  @available(System 199, *)
+  @Test func deallocatingTwice() async {
+    await #expect(processExitsWith: .success) {
+      let region = try VM.allocate(byteCount: 100)
+      try VM.deallocate(region)
+      try VM.deallocate(region)
+    }
   }
 
   @available(System 199, *)
@@ -100,29 +111,35 @@ private struct MachVirtualMemoryTests {
   }
 
   @available(System 199, *)
-  @Test func copyingToOrFromUnallocatedMemory() throws {
-    let region = try VM.allocate(byteCount: 2 * pageSize)
-    defer { try? VM.deallocate(region) }
-    let first = UnsafeRawBufferPointer(rebasing: region[..<pageSize])
+  @Test func copyingToOrFromUnallocatedMemory() async {
+    await #expect(processExitsWith: .success) {
+      /// Whether `copy` fails because an address isn't valid for it.
+      func isInvalid(_ copy: () throws -> Void) -> Bool {
+        do {
+          try copy()
+          return false
+        } catch {
+          return (error as? Mach.KernelError) == .invalidAddress
+        }
+      }
+      let pageSize = Int(getpagesize())
+      let region = try VM.allocate(byteCount: 2 * pageSize)
+      let first = UnsafeRawBufferPointer(rebasing: region[..<pageSize])
 
-    // Deallocating part of a page deallocates all of it.
-    try VM.deallocate(UnsafeMutableRawBufferPointer(rebasing: region[1..<11]))
-    #expect(throws: Mach.KernelError.invalidAddress) {
-      try VM.copy(from: first, to: region.baseAddress! + pageSize)
-    }
-    #expect(throws: Mach.KernelError.invalidAddress) {
-      try VM.copy(
-        from: UnsafeRawBufferPointer(rebasing: region[pageSize...]),
-        to: region.baseAddress!)
-    }
+      // Deallocating part of a page deallocates all of it.
+      try VM.deallocate(UnsafeMutableRawBufferPointer(rebasing: region[1..<11]))
+      guard isInvalid({ try VM.copy(from: first, to: region.baseAddress! + pageSize) }) else { exit(1) }
+      guard isInvalid({
+        try VM.copy(
+          from: UnsafeRawBufferPointer(rebasing: region[pageSize...]),
+          to: region.baseAddress!)
+      }) else { exit(2) }
 
-    // A read-only destination is an invalid address too.
-    let second = region.baseAddress! + pageSize
-    #expect(mprotect(second, pageSize, PROT_READ) == 0)
-    let other = try VM.allocate(byteCount: pageSize)
-    defer { try? VM.deallocate(other) }
-    #expect(throws: Mach.KernelError.invalidAddress) {
-      try VM.copy(from: UnsafeRawBufferPointer(other), to: second)
+      // A read-only destination is an invalid address too.
+      let second = region.baseAddress! + pageSize
+      guard mprotect(second, pageSize, PROT_READ) == 0 else { exit(3) }
+      let other = try VM.allocate(byteCount: pageSize)
+      guard isInvalid({ try VM.copy(from: UnsafeRawBufferPointer(other), to: second) }) else { exit(4) }
     }
   }
 
