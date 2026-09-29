@@ -14,17 +14,17 @@ Darwin; grouped here into clusters and ranked by packages, then call sites. Late
 (System `6e784c6`, the 21 main-scheme packages that import Darwin): 756 interfaces, 567 covered, 131 gaps (24 in two
 or more packages); set apart, 14 the standard library answers, 18 other modules' names, 26 the packages' own shims.
 
-Next: cluster 3. Resume from the first row not marked done.
+Next: cluster 4. Resume from the first row not marked done.
 
 | # | Cluster | Packages | Sites | Interfaces | Plan |
 |---|---|---:|---:|---|---|
 | 1 | string.h and ctype.h | 9 | 60 | strdup (7 packages), strlen, strnlen, strncmp, strlcpy, tolower, isspace | done: `CString` and `CType` (section 26) |
 | 2 | C stdio beyond FileStream | 5 | 12 | fputs, perror, putc, snprintf | done: FileStream's write(cString:) and write(byte:), mapping (section 27) |
-| 3 | Sockets | 4 | 104 | sockaddr_storage (NIO 34), inet_pton (partial), freeaddrinfo, INADDR_ANY and the address-string lengths, NI_MAXHOST, NIO's multicast and packet-info options, nfds_t, AF_VSOCK | check each against SystemSockets |
+| 3 | Sockets | 4 | 104 | sockaddr_storage (NIO 34), inet_pton (partial), freeaddrinfo, INADDR_ANY and the address-string lengths, NI_MAXHOST, NIO's multicast and packet-info options, nfds_t, AF_VSOCK | done: ExplicitCongestionNotification, docs, mapping (section 28) |
 | 4 | C scalar types | 4 | 7 | suseconds_t, u_int, LONG_MAX, _POSIX_ARG_MAX | `swift` answers where the standard library has them |
 | 5 | File times | 4 | 5 | futimens, utimes | check setTimes' docs |
 | 6 | Mach | 3 | 24 | mach_task_self_, KERN_SUCCESS, ERR_SUCCESS, vm_address_t, vm_prot_t, integer_t, mach_msg_type_number_t, task_info with TASK_VM_INFO and task_vm_info, USEC_PER_SEC | task information, the Mach names |
-| 7 | ioctl | 3 | 3 | ioctl (terminal size, vsock CID) | check the requests |
+| 7 | ioctl | 3 | 3 | ioctl (terminal size, vsock CID) | done: both requests are System's (section 28) |
 | 8 | MacTypes | 2 | 12 | OSStatus, DarwinBoolean (UniChar there is CoreFoundation's) | |
 | 9 | sysctl process information | 2 | 9 | kinfo_proc's fields, P_TRACED, extern_proc | accessors |
 | 10 | pthreads | 2 | 8 | pthread_attr_getstacksize, setdetachstate, setscope, PTHREAD_CREATE_DETACHED, PTHREAD_SCOPE_SYSTEM, pthread_exit, pthread_yield_np, the error-checking initializer | |
@@ -42,7 +42,7 @@ say; the standard library's answers (off_t, ssize_t, size_t and uintptr_t are In
 memset; round, sqrt, ceil, floor, fabs, modf); Dispatch and ObjectiveC names; the packages' own C shims
 (CNIODarwin_*, c_nio_posix_*, _subprocess_*).
 
-Done: step 0, what the tools couldn't see (section 25); clusters 1 (section 26) and 2 (section 27).
+Done: step 0, what the tools couldn't see (section 25); clusters 1 (section 26), 2 (section 27), 3 and 7 (section 28).
 
 ## 1. status.sh and STATUS.md (2026-09-28)
 
@@ -633,3 +633,30 @@ with fputs, swift-argument-parser writes it byte by byte with putc, swift-build 
 Tests: ProvisionalStdioTest's mock cases for fputs and fputc, a C string cut at its null byte and a byte in the file
 round trip, and both writes' EBADF on a read-only stream. XCTest 552 (4 skipped, and testVolumeAttributes skipped),
 swift-testing 468 in 74 suites, all passing.
+
+## 28. Sockets: `9bf8bb5`, `e4196f7`
+
+Queue cluster 3 (4 packages, 104 sites, most of them NIO's). Checked against SystemSockets, most of it was covered: the
+syscalls-4 lane named the options, structures and constants (IP_TOS through IPV6_MULTICAST_LOOP, ip_mreq and
+ipv6_mreq, in_pktinfo and in6_pktinfo, INADDR_ANY, the address-string lengths, SO_RCVTIMEO, SO_TIMESTAMP,
+CInterop.SockAddrStorage), and mapping.ini's hand partials, which cited the generic setOption, predated it.
+
+- `SocketDescriptor.ExplicitCongestionNotification` (`9bf8bb5`): an ECN codepoint, `RawRepresentable` over `UInt8`,
+  with `init(typeOfService:)` taking the low 2 bits of a type-of-service byte or traffic class (IPTOS_ECN_MASK), and
+  `notCapableTransport`, `capableTransport1`, `capableTransport0` and `congestionExperienced` (IPTOS_ECN_NOTECT, _ECT1,
+  _ECT0, _CE), with RFC 3168's values, so the Linux code needn't import netinet/ip.h. NIO maps received TOS and TCLASS
+  values to its own state with these constants. Rejected: a message-level `explicitCongestionNotification` property
+  on both message types, which `typeOfService.map(ECN.init(typeOfService:))` already is.
+- Docs (`9bf8bb5`): `Domain.vsock` names AF_VSOCK (PF_VSOCK's value, and what `SocketAddress.family` compares with;
+  rejected: a `SocketAddress.Family.vsock`, a second spelling that no API takes); `resolve` names freeaddrinfo;
+  `reverseLookup` names NI_MAXHOST and NI_MAXSERV, its buffers' sizes; `poll` names nfds_t.
+- mapping.ini (`e4196f7`): the stale hand partials go; inet_pton and inet_ntop are covered by the IPv4 and IPv6 host
+  forms together (the derivation reads each as restricted to its family, and those are the two families the calls
+  take); ioctl is covered by the requests the packages make: TIOCGWINSZ (`TerminalDescriptor.windowSize()`, for
+  swift-argument-parser and swift-tools-support-core) and NIO's vsock context ID (`SocketDescriptor.localContextID()`),
+  which also answers cluster 7.
+
+Tests: SocketIPMessagesTests' codepoints against the C constants and from type-of-service bytes; SocketVMSocketTests'
+AF_VSOCK. XCTest 552 (4 skipped, and testVolumeAttributes skipped), swift-testing 468 in 74 suites, all passing with
+PThreadTests' `setCurrentQualityOfService` skipped: at a load average near 70 (other sessions' builds) it fails alone
+too, since its background-QoS thread doesn't run within 10 s (section 4 saw the same). It isn't this lane's.
