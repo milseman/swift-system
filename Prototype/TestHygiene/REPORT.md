@@ -96,8 +96,11 @@ A short guard fails a test on a busy machine even though nothing is wrong.
 - Kept: temporary files from `withTemporaryFilePath`, a unique directory under
   `$TMPDIR`; `CInteropAccessorsTests.swift:81` and `SocketSendFileTests.swift:39` use
   `/tmp` with the process ID or `mkstemp`.
-- Sockets bind to port 0 or use socket pairs. No fixed port or socket path is bound.
-- `TerminalJobControlTests.swift:65` hands the controlling terminal's foreground group back and forth, which briefly affects the terminal's other jobs; it skips without a terminal, as under Claude Code.
+- Kept: sockets bind to port 0 or use socket pairs; no fixed port or socket path is
+  bound.
+- Kept: `TerminalJobControlTests.swift:65` hands the controlling terminal's foreground
+  group back and forth, which briefly affects the terminal's other jobs; it skips
+  without a terminal, as under Claude Code.
 
 ### 1g. Interruption and EAGAIN races
 
@@ -145,7 +148,7 @@ not in `SystemControl`'s retry loop.
 
 ## 3. Fixes
 
-Commits `5b29c65`, `ac6bdd1`, `a83fffe`, `4da9cc1`, and the one that adds `abi-check.sh`.
+Commits `5b29c65`, `ac6bdd1`, `a83fffe`, `4da9cc1`, `98d1562`, `80f3d1c`.
 Each fix makes the outcome depend on an event, an invariant, or isolation instead of
 on timing. Where a check had to get weaker to be deterministic, the entry says so.
 
@@ -200,21 +203,21 @@ on timing. Where a check had to get weaker to be deterministic, the entry says s
   a short one; the io_uring test waits for the cancelled poll's completion instead of
   retrying 100 times; the TCP test waits for `bytesAcknowledged` to reach 1000.
 
-### 3c'. Shared names
+### 3d. Shared names
 
 - `IORingTests`' file lives in a directory from `makeUniqueDirectory()` under the
   temporary directory, and the cleanup removes both (Linux, not yet run).
 - `SharedMemoryTests` removes any object of its name before creating one; only a
   dead process with the same ID can have made it.
 
-### 3d. Hang guards
+### 3e. Hang guards
 
 `hangGuardSeconds` (300, in `HangGuard.swift` in both test targets) bounds every wait
 for something that should happen at once: `Latch.wait()` (was 10 s), pseudoterminal
 reads (5 s), polls and kqueue waits (5 to 30 s), io_uring completions (1 s), and the
 XCTest expectation, semaphore and lock waits (10 s).
 
-### 3e. Isolation
+### 3f. Isolation
 
 - The malloc zone tests are one `.serialized` suite, check which zone holds a block
   (`Memory.Zone(containing:)`) instead of counting blocks, and read every zone's
@@ -227,12 +230,13 @@ XCTest expectation, semaphore and lock waits (10 s).
 - Before: the memory suites alone, 20 runs under 10 loaders: 2 SIGSEGV crashes and 2
   failures. After: 20 of 20 passed.
 
-### 3f. Loaded runs after the fixes
+### 3g. Loaded runs after the fixes
 
 | Round | Loaders | Load average | Runs passed |
 |---|---|---|---|
 | `stress.sh -n 5 -l 10`, at `a83fffe` | 10 | 85 to 125 | 10 of 10 |
 | `stress.sh -n 5 -l 20`, with `FileLockTests`' last two guards | 20 | 80 to 146 | 10 of 10 |
+| `stress.sh -n 5 -l 16`, at `80f3d1c` | 16 | 108 to 201 | 10 of 10 |
 
 Each serial run: XCTest 557 tests with the 4 skips below, 0 failures; swift-testing
 473 tests in 74 suites, passed. Each `--parallel` run: 557 of 557 XCTest tests ran,
@@ -264,9 +268,9 @@ name shared things uniquely; restore everything.
 - **Linux is unverified.** The Linux-only edits in 3c, the glibc branch of the alarm
   rounding (glibc and the Linux kernel round to the nearest second, not up, which
   `setAlarm`'s documentation doesn't say), and `LinuxProcessTests`' waiting child
-  compile only on Linux. The `container` service isn't running
-  (`container system start` fails inside Claude Code's sandbox), so nothing Linux has
-  been built here.
+  compile only on Linux. The `container` service isn't running, and
+  `container system start` fails from Claude Code, inside its sandbox and out ("XPC
+  connection error: Connection invalid"), so nothing Linux has been built here.
 - A step of the realtime clock (as when NTP corrects it) can still fail the checks
   that compare it across calls: `PThreadConditionTests.deadlinePasses`,
   `ClockTests.realtimeIsTheTimeSinceTheEpoch`, the brackets in `StatTests.times` and
@@ -277,8 +281,6 @@ name shared things uniquely; restore everything.
   process that reads the directory meanwhile would change it. Not seen.
 - `MemoryMappingTests.protectionAdviceAndResidency` expects just-written pages
   resident; heavy memory pressure could evict one first. Not seen.
-- `SharedMemoryTests` names include the process ID; a crashed run's leftovers would
-  trip a later process with the same ID.
 - `ProcessCredentialsTests.aUsersGroups` and `UserDatabaseTest`'s entry tests compare
   two answers from the directory service.
 - `LibProcTest.testLists` and `SystemControlTest.testProcesses` can take a minute

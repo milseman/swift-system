@@ -78,9 +78,11 @@ for ((n = 1; n <= runs; n++)); do
     load=$(sysctl -n vm.loadavg 2>/dev/null)
     {
       echo "== $mode run $n: exit $status, ${elapsed}s, load $load"
-      # XCTest's totals; with --parallel, the count of tests it ran.
-      grep -a -E "Executed [0-9]+ tests?, with|Test run with [0-9]+ tests?" "$log" | tail -2
+      # XCTest's totals (with --parallel, how many tests it ran), then
+      # swift-testing's.
+      grep -a -E "Executed [0-9]+ tests?, with" "$log" | tail -1
       grep -a -o -E "^\[[0-9]+/[0-9]+\] Testing" "$log" | tail -1
+      grep -a -E "Test run with [0-9]+ tests?" "$log" | tail -1
       failures "$log"
     } | tee -a "$summary"
   done
