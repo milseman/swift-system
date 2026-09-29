@@ -1,15 +1,22 @@
 #!/usr/bin/env python3
-"""Write API-GRAPH.md, the graph exports, and the comparison with a previous run.
+"""Write SUGGESTIONS.md, the automatic clustering's report, and its exports.
 
-  API-GRAPH.md        the map: summary, pitch order, clusters, contingencies,
+The clustering proposes carve-outs; it never overrides the hand-curated
+pitch files (pitches.py checks those). With --pitches, the report says how
+much of each suggestion pitch files already cover, and drafts a pitch file
+for the leading suggestions none covers (suggestions/drafts/<id>.json, to
+copy into Prototype/Pitches by hand).
+
+  SUGGESTIONS.md      the map: summary, suggested order, clusters, contingencies,
                       shared vocabulary, a cluster map, where the tool is
                       wrong, changes since the previous run, and the method
-  api-graph.json      clusters.json plus the run's metadata
+  suggestions.json    clusters.json plus the run's metadata
   clusters.dot        clusters and their prerequisites, for Graphviz
   atoms.dot           the atom graph (top-level blocks), colored by cluster
 
 Usage: report.py --graph graph.json --clusters clusters.json --meta meta.json
-                 --out DIR [--previous old-api-graph.json]
+                 --out DIR [--previous old-suggestions.json] [--adopters adopters.json]
+                 [--pitches pitches.json]
 """
 
 import argparse
@@ -17,6 +24,10 @@ import collections
 import json
 import os
 import re
+import sys
+
+sys.dont_write_bytecode = True
+import reach  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PLATFORMS = ["Darwin", "Linux", "Musl", "Android", "FreeBSD", "OpenBSD", "WASI", "Windows"]
@@ -94,6 +105,195 @@ def compare(prev, cur):
     return added, removed, rows, matched
 
 
+def pitch_coverage(pj, units, nodes):
+    """For each suggested unit: how many of its declarations pitch files
+    cover, and which pitches."""
+    owner = collections.defaultdict(list)
+    for pid, r in pj["pitches"].items():
+        for x in r["nodes"]:
+            owner[x].append(pid)
+    out = {}
+    for uid, u in units.items():
+        api = [n for n in u["nodes"] if nodes[n]["hiddenClass"] != "unavailable"]
+        by = collections.Counter(o for n in api for o in owner.get(n, []))
+        out[uid] = {"covered": sum(1 for n in api if n in owner), "of": len(api), "pitches": dict(by.most_common())}
+    return out
+
+
+def pitched_cell(p):
+    if not p["covered"]:
+        return "—"
+    return f"{p['covered']}/{p['of']}: " + ", ".join(f"`{k}`" for k in p["pitches"])
+
+
+def draft_pitch(uid, u, nodes, edges):
+    """A pitch file for a suggested carve-out: its root types with members
+    where it holds all of them, and the rest by path."""
+    mine = [n for n in u["nodes"] if nodes[n]["hiddenClass"] != "unavailable"]
+    mset = set(mine)
+    members = collections.defaultdict(set)
+    parent = {}
+    for e in edges:
+        if e["kind"] in ("memberOf", "nestedIn") and e["from"] in nodes:
+            members[e["to"]].add(e["from"])
+            parent[e["from"]] = e["to"]
+
+    def closure(t):
+        out = set()
+        for m in members.get(t, ()):
+            if nodes[m]["hiddenClass"] == "unavailable":
+                continue
+            out.add(m)
+            out |= closure(m)
+        return out
+    types = [n for n in mine if nodes[n]["isType"]]
+    roots = [t for t in types if parent.get(t) not in mset]
+    whole, partial, covered = [], [], set()
+    for t in sorted(roots, key=lambda t: nodes[t]["path"]):
+        c = closure(t)
+        if c <= mset:
+            whole.append(nodes[t]["path"])
+            covered |= c | {t}
+        else:
+            partial.append(nodes[t]["path"])
+            covered.add(t)
+    rest = sorted(nodes[n]["path"] for n in mine if n not in covered)
+    include = []
+    if whole:
+        include.append({"types": whole, "members": True, "nested": True})
+    if partial:
+        include.append({"types": partial, "members": False})
+    if rest:
+        include.append({"paths": rest})
+    kinds = {nodes[n]["kind"] for n in mine}
+    # A guess, for the editor to correct: new types make it a type's pitch
+    # (the check then lists any members it leaves out), and members only a
+    # family's or a set of constants.
+    pattern = ("types-without-members" if partial and not whole and not rest else
+               "self-contained-type" if whole or partial else
+               "constants" if kinds <= {"swift.property", "swift.type.property", "swift.enum.case"} else
+               "function-family")
+    return {"id": uid, "title": u["name"], "pattern": pattern, "status": "draft", "include": include,
+            "notes": f"Drafted from the suggested {u['kind']} `{uid}` (SUGGESTIONS.md): {u.get('reason') or ''}. "
+                     "Edit the rules; the tool never writes Prototype/Pitches."}
+
+
+def drafts_section(w, cands, units, nodes, edges, pitched, drafts_dir, md, limit=15):
+    """## Candidate pitches: the leading suggestions no pitch file covers yet,
+    each with a draft file."""
+    os.makedirs(drafts_dir, exist_ok=True)
+    free = [x for x in cands if pitched[x["id"]]["covered"] == 0]
+    part = [x for x in cands if 0 < pitched[x["id"]]["covered"] < pitched[x["id"]]["of"]]
+    w("## Candidate pitches")
+    w("")
+    w(f"{len(cands) - len(free) - len(part)} suggestions are fully covered by pitch files, {len(part)} partly, "
+      f"and {len(free)} not at all. The first {min(limit, len(free))} uncovered ones, in the suggested order, "
+      "each with a draft pitch file in `suggestions/drafts/` to copy into `Prototype/Pitches` and edit:")
+    w("")
+    for x in free[:limit]:
+        d = draft_pitch(x["id"], units[x["id"]], nodes, edges)
+        json.dump(d, open(os.path.join(drafts_dir, x["id"] + ".json"), "w"), indent=2)
+        w(f"- **`{x['id']}`** (rank {x['rank']}, {x['kind']}, {x['declarations']} declarations): {md(units[x['id']]['name'])}; "
+          f"draft pattern `{d['pattern']}`: [`suggestions/drafts/{x['id']}.json`](suggestions/drafts/{x['id']}.json).")
+    for x in free[limit:]:
+        json.dump(draft_pitch(x["id"], units[x["id"]], nodes, edges),
+                  open(os.path.join(drafts_dir, x["id"] + ".json"), "w"), indent=2)
+    if part:
+        w("")
+        w("Partly covered: " + ", ".join(f"`{x['id']}` ({pitched_cell(pitched[x['id']])})" for x in part[:20])
+          + (", …" if len(part) > 20 else "") + ".")
+    w("")
+
+
+def reach_section(w, adopters, cands, units, md):
+    """## Adopter reach: the packages, the carve-outs by reach, and each
+    package's carve-outs."""
+    am = adopters["meta"]
+    branch = am["branch"]
+    pk = adopters["packages"]
+    name = {p["key"]: p["name"] for p in pk}
+
+    def names(keys):
+        return ", ".join(name.get(k, k) for k in keys)
+    w("## Adopter reach")
+    w("")
+    w(f"Which packages use each carve-out's declarations on their `{branch}` branch (*using*), and which call "
+      "C interfaces it newly wraps (*would benefit*). A carve-out's reach is the number of packages that do "
+      "either. Adopted sites are the migration's uses, precise where the compiler's index of a build of the "
+      "branch against this head resolved them and lexical elsewhere; would-benefit sites are the coverage "
+      "tools' extraction of each package joined with the C names in the declarations' doc comments, less the "
+      "names the base commit already covers. Each carve-out's bundle lists its sites and quotes the hunks "
+      "that introduced them.")
+    w("")
+    w("To rank or filter by reach, run `Utilities/api-graph/scripts/reach.py` on this output: `--package "
+      "swift-nio`, `--min 3`, `--kind part`, `--sort using|benefit|sites|rank`, `--json`.")
+    w("")
+    w("### The packages")
+    w("")
+    w(f"Found in `{am['adopters']}` and `{am['ecosystem']}`; a clone of a new package in either is picked up "
+      "by the next run.")
+    w("")
+    w(f"| Package | `{branch}` | Resolution | Adopted sites | Carve-outs using | Interface data | "
+      "Would-benefit sites | Carve-outs it would benefit from |")
+    w("|---|---|---|---:|---:|---|---:|---:|")
+    for p in pk:
+        ad, be = p["adopted"], p["benefit"]
+        using = [x for x in cands if p["key"] in x["adopters"]["using"]]
+        benefiting = [x for x in cands if p["key"] in x["adopters"]["benefiting"]]
+        if ad:
+            b = ad["build"] or {}
+            mig = f"`{ad['commit'][:10]}`, {ad['commits']} commit{'s' if ad['commits'] != 1 else ''}"
+            res = {"index": "index", "partial index": "partial index", "lexical": "lexical"}[ad["resolution"]]
+            if b.get("status") not in ("indexed",) and b.get("reason"):
+                res += f" ({md(b['reason'][:90])})"
+            sites = f"{ad['sites']['precise'] + ad['sites']['lexical']} ({ad['sites']['precise']} precise)"
+        else:
+            mig = (p.get("adoptersClone") or {}).get("note", "—")
+            res, sites = "—", "—"
+        if be:
+            dat = (f"{be['role']} `{be['commit'][:10]}`: "
+                   + ("coverage extraction" + (" (lexical)" if be["extraction"] == "lexical" else "")
+                      if be["source"] == "coverage" else "lexical scan"))
+            bsites = str(be["sites"])
+        else:
+            dat, bsites = "—", "—"
+        w(f"| `{p['name']}` | {mig} | {res} | {sites} | {len(using)} | {dat} | {bsites} | {len(benefiting)} |")
+    w("")
+    order = sorted(cands, key=reach.order_key("reach", get=lambda x: x["adopters"]))
+    shown = [x for x in order if x["adopters"]["reach"]][:25]
+    w(f"### Carve-outs by reach")
+    w("")
+    w(f"The {len(shown)} with the widest reach; `reach.py` lists all of them. Pitch rank is the order above.")
+    w("")
+    w("| | Carve-out | Kind | Pitch rank | Decls | Reach | Using | Would benefit | Sites (adopted / would benefit) |")
+    w("|---:|---|---|---:|---:|---:|---|---|---|")
+    for k, x in enumerate(shown, 1):
+        r = x["adopters"]
+        w(f"| {k} | [`{x['id']}`](suggestions/{x['id']}/bundle.md) | {x['kind']} | {x['rank']} | {x['declarations']} | "
+          f"{r['reach']} | {names(r['using']) or '—'} | {names(r['benefiting']) or '—'} | "
+          f"{r['adoptedSites']} / {r['benefitSites']} |")
+    w("")
+    w("### By package")
+    w("")
+    for p in pk:
+        using = sorted((x for x in cands if p["key"] in x["adopters"]["using"]),
+                       key=lambda x: -x["adopters"]["byPackage"][p["key"]]["adopted"])
+        ben = sorted((x for x in cands if p["key"] in x["adopters"]["benefiting"]),
+                     key=lambda x: -x["adopters"]["byPackage"][p["key"]]["benefit"])
+        if not using and not ben:
+            continue
+        w(f"- **`{p['name']}`**"
+          + (f" uses {len(using)}: " + ", ".join(f"`{x['id']}` ({x['adopters']['byPackage'][p['key']]['adopted']})"
+                                                for x in using[:12]) + (", …" if len(using) > 12 else "")
+             if using else "")
+          + ("; it " if using and ben else " ")
+          + (f"would benefit from {len(ben)}: " + ", ".join(
+              f"`{x['id']}` ({x['adopters']['byPackage'][p['key']]['benefit']})" for x in ben[:8])
+             + (", …" if len(ben) > 8 else "") if ben else "")
+          + ".")
+    w("")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--graph", required=True)
@@ -101,6 +301,8 @@ def main():
     ap.add_argument("--meta", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--previous")
+    ap.add_argument("--adopters", help="adopters.json, from adopters.py")
+    ap.add_argument("--pitches", help="pitches.json, from pitches.py: what the pitch files already cover")
     a = ap.parse_args()
 
     g = load(a.graph)
@@ -118,21 +320,39 @@ def main():
         units[b["id"]] = b
     cands = cl["candidates"]
 
+    adopters = load(a.adopters) if a.adopters and os.path.exists(a.adopters) else None
+    if adopters:
+        # Every unit's reach, kept in suggestions.json for reach.py.
+        for u in list(units.values()) + [x for c in clusters for x in c["parts"]]:
+            if "adopters" not in u:
+                u["adopters"] = reach.summary(reach.aggregate(
+                    adopters, [n for n in u["nodes"] if nodes[n]["hiddenClass"] != "unavailable"]))
+        for x in cands:
+            x["adopters"] = units[x["id"]]["adopters"]
     doc = dict(cl, meta=meta)
-    json.dump(doc, open(os.path.join(a.out, "api-graph.json"), "w"), indent=1)
+    if adopters:
+        doc["adopterPackages"] = [{k: v for k, v in p.items()} for p in adopters["packages"]]
+        doc["adopterMeta"] = adopters["meta"]
+    pitched = pitch_coverage(load(a.pitches), units, nodes) if a.pitches and os.path.exists(a.pitches) else None
+    if pitched:
+        for x in cands:
+            x["pitched"] = pitched[x["id"]]
+    json.dump(doc, open(os.path.join(a.out, "suggestions.json"), "w"), indent=1)
 
     L = []
     w = L.append
-    w(f"# API graph: `{meta['baseRef']}` → `{meta['headRef']}`")
+    w(f"# Suggested carve-outs: `{meta['baseRef']}` → `{meta['headRef']}`")
     w("")
     for side in ("base", "head"):
         w(f"- {side.capitalize()}: `{meta[side + 'Ref']}` @ `{meta[side + 'Commit']}` — {md(meta.get(side + 'Subject', ''))}")
     w("")
-    w(f"Generated {meta['date']} on {meta['host']} with {meta['swift']}. This is a map for carving the API "
-      f"`{meta['headRef']}` adds into small pitches: which declarations belong together, what each group "
-      "depends on, which open design questions it waits on, and which could go first. Every carve-out has a "
-      "bundle in `bundles/` for a pitch-writing session. [How this was generated](#how-this-was-generated) "
-      "records each design decision and the alternative it rejected.")
+    w(f"Generated {meta['date']} on {meta['host']} with {meta['swift']}. The automatic clustering's proposals "
+      f"for carving the API `{meta['headRef']}` adds into small pitches: which declarations belong together, "
+      "what each group depends on, which open design questions it waits on, and which could go first. These "
+      "are suggestions only: the pitches are the hand-curated files in `Prototype/Pitches` (checked in "
+      "`PITCHES.md`), and the promotion and link-cutting rules below apply here, not to the graph "
+      "(`GRAPH.md`). Every suggestion has a bundle in `suggestions/`. [How this was generated]"
+      "(#how-this-was-generated) records each design decision and the alternative it rejected.")
     w("")
 
     # ------------------------------------------------------------ summary
@@ -178,10 +398,22 @@ def main():
     w("- **Off Darwin**: " + ", ".join(f"{v} cluster{'s' if v != 1 else ''} {k}" for k, v in verified.most_common())
       + ". Nothing in this checkout builds for Linux, Windows or WASI, so a platform a declaration's `#if` "
       "allows is only claimed unless `evidence.json` records a check.")
+    if adopters:
+        am = adopters["meta"]
+        mig = [p for p in adopters["packages"] if p["adopted"]]
+        dat = [p for p in adopters["packages"] if p["benefit"]]
+        used = [x for x in cands if x["adopters"]["using"]]
+        ben = [x for x in cands if x["adopters"]["benefiting"]]
+        n_used = len({s["node"] for s in adopters["adoptedSites"] if not s["qualifier"]})
+        w(f"- **Adopters**: {len(mig)} packages have a migration on `{am['branch']}`, and together use "
+          f"{n_used} of the new declarations, in {len(used)} of the {len(cands)} carve-outs; "
+          f"{sum(1 for p in mig if p['adopted']['resolution'] == 'index')} of them were resolved by the index of "
+          f"a build against this head. {len(dat)} packages have C interface data, and {len(ben)} carve-outs wrap "
+          "C interfaces that some of them call. See [Adopter reach](#adopter-reach).")
     w("")
 
     # ------------------------------------------------------------ pitch order
-    w("## Pitch order")
+    w("## Suggested order")
     w("")
     w("Carve-outs easiest first: clusters, the parts of clusters over "
       f"{cl['config']['partsForClustersOver']} declarations, and batches of small wrapper clusters in place "
@@ -193,24 +425,40 @@ def main():
     w("")
     for x in cands[:TOP]:
         u = units[x["id"]]
-        w(f"{x['rank']}. **`{x['id']}`** — {md(u['name'])} ({x['kind']}, score {x['score']}). {md(x['reason'])}.")
+        extra = ""
+        if adopters:
+            r = x["adopters"]
+            pname = {p["key"]: p["name"] for p in adopters["packages"]}
+            extra = (f" Adopters: {len(r['using'])} using it"
+                     + (f" ({', '.join(pname.get(k, k) for k in r['using'])})" if r["using"] else "")
+                     + f", {len(r['benefiting'])} would benefit.")
+        w(f"{x['rank']}. **`{x['id']}`** — {md(u['name'])} ({x['kind']}, score {x['score']}). {md(x['reason'])}."
+          + extra)
     w("")
     w("### All of them")
     w("")
-    w("| # | Carve-out | Kind | Decls | Open questions | Needs | Platforms | Score |")
-    w("|---:|---|---|---:|---|---|---|---:|")
+    acol = (" Adopters |" if adopters else "") + (" Pitched |" if pitched else "")
+    w("| # | Carve-out | Kind | Decls | Open questions | Needs | Platforms |" + acol + " Score |")
+    w("|---:|---|---|---:|---|---|---|" + ("---:|" if adopters else "") + ("---|" if pitched else "") + "---:|")
     for x in cands:
         u = units[x["id"]]
         opens = [conts[k]["title"] for k in u["direct"]] + [
             conts[k]["title"] + {"api": " (inh.)", "implementation": " (impl.)", "nesting": " (nesting)"}[v["through"]]
             for k, v in u["inherited"].items()]
         needs = list(u["allPrerequisites"]) + [k + " (impl.)" for k in u.get("implPrerequisites", {})]
-        w(f"| {x['rank']} | [`{x['id']}`](bundles/{x['id']}/bundle.md) | {x['kind']} | {x['declarations']} | "
+        w(f"| {x['rank']} | [`{x['id']}`](suggestions/{x['id']}/bundle.md) | {x['kind']} | {x['declarations']} | "
           f"{md(', '.join(opens)) or '—'} | {md(', '.join(needs)) or '—'} | {plat(u['metrics']['platforms'])} | "
-          f"{x['score']} |")
+          + (f"{reach.cell(x['adopters'])} | " if adopters else "")
+          + (f"{pitched_cell(x['pitched'])} | " if pitched else "") + f"{x['score']} |")
     w("")
-    w("Platforms: " + ", ".join(f"{v} {k}" for k, v in SHORT.items()) + ".")
+    w("Platforms: " + ", ".join(f"{v} {k}" for k, v in SHORT.items()) + "."
+      + (" Adopters: packages using the carve-out on their migration branch / packages that would benefit "
+         "(see [Adopter reach](#adopter-reach))." if adopters else ""))
     w("")
+    if pitched:
+        drafts_section(w, cands, units, nodes, edges, pitched, os.path.join(a.out, "suggestions", "drafts"), md)
+    if adopters:
+        reach_section(w, adopters, cands, units, md)
 
     # ------------------------------------------------------------ clusters
     w("## Clusters")
@@ -219,8 +467,9 @@ def main():
       "commit are vocabulary, and so are new types promoted to it; an edge into a promoted type becomes a "
       "prerequisite instead. Sizes count declarations, not fix-it stubs.")
     w("")
-    w("| Cluster | Decls | Types | Stubs | Parts | Files | Platforms | Off Darwin | Docs | Tests | Open (direct) | Inherited | Needs |")
-    w("|---|---:|---:|---:|---:|---:|---|---|---:|---:|---|---|---|")
+    w("| Cluster | Decls | Types | Stubs | Parts | Files | Platforms | Off Darwin | Docs | Tests | Open (direct) | "
+      "Inherited | Needs |" + (" Adopters |" if adopters else ""))
+    w("|---|---:|---:|---:|---:|---:|---|---|---:|---:|---|---|---|" + ("---:|" if adopters else ""))
     for c in sorted(clusters, key=lambda c: -c["metrics"]["declarations"]):
         m = c["metrics"]
         off = ("—" if m["platforms"] == ["Darwin"] else "not compiled here" if not m["darwin"] else
@@ -228,11 +477,12 @@ def main():
                if m["verifiedOffDarwin"] else "unverified")
         inh = ", ".join(f"{conts[k]['title']} ({v['through']}, via {v['via']})" for k, v in c["inherited"].items())
         needs = ", ".join(list(c["allPrerequisites"]) + [k + " (impl.)" for k in c.get("implPrerequisites", {})])
-        w(f"| [`{c['id']}`](bundles/{c['id']}/bundle.md) | {m['declarations']} | {m['types']} | {m['stubs']} | "
+        w(f"| [`{c['id']}`](suggestions/{c['id']}/bundle.md) | {m['declarations']} | {m['types']} | {m['stubs']} | "
           f"{len(c['parts'])} | {len(m['files'])} | {plat(m['platforms'])} | {off} | "
           f"{round(100 * m['documented'] / max(1, m['declarations']))}% | "
           f"{round(100 * m['tested'] / max(1, m['declarations']))}% | "
-          f"{md(', '.join(conts[k]['title'] for k in c['direct'])) or '—'} | {md(inh) or '—'} | {md(needs) or '—'} |")
+          f"{md(', '.join(conts[k]['title'] for k in c['direct'])) or '—'} | {md(inh) or '—'} | {md(needs) or '—'} |"
+          + (f" {reach.cell(c['adopters'])} |" if adopters else ""))
     w("")
     multi = [c for c in clusters if c["parts"]]
     if multi:
@@ -428,7 +678,7 @@ def main():
     w("")
     w(open(os.path.join(HERE, "method.md")).read().strip())
     w("")
-    open(os.path.join(a.out, "API-GRAPH.md"), "w").write("\n".join(L) + "\n")
+    open(os.path.join(a.out, "SUGGESTIONS.md"), "w").write("\n".join(L) + "\n")
 
     # ------------------------------------------------------------ DOT
     D = ["digraph clusters {", "  rankdir=LR; node [shape=box, fontname=Helvetica, fontsize=10];"]
@@ -461,7 +711,7 @@ def main():
             A.append(f'  "{s_}" -> "{t_}";')
     A.append("}")
     open(os.path.join(a.out, "atoms.dot"), "w").write("\n".join(A) + "\n")
-    print(f"report: wrote {os.path.join(a.out, 'API-GRAPH.md')}, api-graph.json, clusters.dot, atoms.dot")
+    print(f"report: wrote {os.path.join(a.out, 'SUGGESTIONS.md')}, suggestions.json, clusters.dot, atoms.dot")
 
 
 if __name__ == "__main__":

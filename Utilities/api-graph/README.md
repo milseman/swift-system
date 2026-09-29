@@ -1,22 +1,22 @@
 # api-graph
 
-`regenerate.sh` maps the public API that one commit adds over another, by default what `system-next` adds over `main`, into pieces that small pitches can carve out. It builds a graph of the added declarations, and from it:
+`regenerate.sh` builds the **graph** of the public API that one commit adds over another, by default what `system-next` adds over `main`: every new declaration, the base and external types they build on, typed links between them (membership, nesting, extension, conformance, signature use, the C functions they wrap, shared implementation, blocks, tests, samples), and each declaration's adopter reach: which packages already use it on their migration branch, with file, line and the hunk that introduced the use, and which call the C interface it covers. The graph is the product, saved as a snapshot per commit, with diffs and a query command.
 
-- the graph's clusters;
-- the parts of each cluster that could be pitched separately;
-- the open design questions (contingencies) each depends on;
-- a ranking of carve-outs, easiest first, that never puts one ahead of something it needs;
-- a bundle per carve-out, input for an AI pitch-writing session.
+On top of it:
 
-It's built on `Utilities/api-delta`: it runs api-delta for the same two commits, and imports its source scanner and diff parser.
+- **Pitches** are hand-curated files, `Prototype/Pitches/<id>.json`, each naming a set of the graph's declarations by rules. The tool checks them together (coverage, overlaps, prerequisites, pattern fit, what changed since the last snapshot) and writes a bundle per pitch for a pitch-writing session, with real adopter examples.
+- **Suggestions**: the automatic clustering this tool started with proposes carve-outs, ranks them, and drafts pitch files for the leading ones no pitch covers. It never overrides the pitch files.
+- **Domains**: a hand-kept grouping of C families by task, after *Advanced Programming in the UNIX Environment*, suggests related API the links don't connect.
+
+The graph's schema and the pitch file format are in `Prototype/ApiGraph/REPORT.md`, sections 1 and 2. The tool is built on `Utilities/api-delta` (it runs api-delta, and imports its scanner and diff parser) and on `Utilities/adopter-coverage` (it imports its C-name derivation and package files, read-only).
 
 ## Running it
 
 ```sh
 Utilities/api-graph/regenerate.sh                                     # main vs system-next
 BASE_REF=main HEAD_REF=HEAD Utilities/api-graph/regenerate.sh         # main vs your HEAD
-BASE_REF=main HEAD_REF=posix-more Utilities/api-graph/regenerate.sh   # the map after a lane merges
-open .build/api-graph/API-GRAPH.md
+BASE_REF=main HEAD_REF=posix-more Utilities/api-graph/regenerate.sh   # the graph after a lane merges
+open .build/api-graph/API-GRAPH.md                                    # the index
 ```
 
 | Variable | Default | |
@@ -24,75 +24,102 @@ open .build/api-graph/API-GRAPH.md
 | `BASE_REF` | `main` | The commit to compare against. |
 | `HEAD_REF` | `system-next` | The commit to map. |
 | `API_GRAPH_OUT` | `.build/api-graph` | The output. Each successful run replaces it. |
-| `API_GRAPH_WORK` | `.build/api-graph-work` | Scratch: both exports, api-delta's run, and the indexed build, about 900 MB. The next run deletes it. |
+| `API_GRAPH_WORK` | `.build/api-graph-work` | Scratch: both exports, api-delta's run, and the indexed build, about 1.3 GB, and one adopter's build at a time, up to 6 GB (SwiftPM's). It's deleted when the run succeeds, and by the next run when it doesn't. |
+| `API_GRAPH_KEEP_WORK` | unset | `1` keeps the scratch directory after a successful run. |
+| `API_GRAPH_SNAPSHOTS` | `../api-graph-snapshots` | The snapshot store: one graph per head commit, and an index. It sits beside the repository, so it outlives worktrees. Set it empty to keep only the output's copy. |
+| `API_GRAPH_SNAPSHOT_PREVIOUS` | the store's previous snapshot of the same head ref | A snapshot to diff with, and to check the pitches' changes against. |
+| `API_GRAPH_PITCHES` | `Prototype/Pitches` | The pitch files, read from the working tree, since pitch chats edit them between commits. |
 | `API_GRAPH_DELTA` | (run api-delta) | An existing api-delta output directory for the same two commits, to use instead of running api-delta. |
 | `API_GRAPH_DRAFTS` | `../win32-drafts` | Draft proposals searched for prior text, beside the repository if present. Set it empty to skip. |
-| `API_GRAPH_PREVIOUS` | the output's `api-graph.json` | A previous run to compare with. |
+| `API_GRAPH_PREVIOUS` | the output's `suggestions.json` | A previous run's suggestions to compare the clustering with. |
+| `API_GRAPH_ADOPTERS` | `../adopters` | Clones of packages migrated onto System, each on a branch. |
+| `API_GRAPH_ECOSYSTEM` | `../ecosystem` | Clones of packages that might be. Set this and `API_GRAPH_ADOPTERS` empty to skip the adopters step. |
+| `API_GRAPH_COVERAGE_RESULTS` | `../coverage-results` | The coverage tools' results store, for the packages' C interfaces. |
+| `API_GRAPH_ADOPTER_BRANCH` | `migrate-darwin` | The migration branch. |
+| `API_GRAPH_ADOPTER_BUILDS` | `build` | `build` builds a migration whose index isn't cached; `reuse` takes any cached index of its commit and builds nothing; `none` matches lexically only. |
+| `API_GRAPH_CACHE` | `.build/api-graph-cache` | The migrations' cached index references, a few MB. Deleting it costs a rebuild. |
+| `API_GRAPH_MIN_FREE_GB` | `15` | No adopter build starts with less free disk than this; the package is then matched lexically. |
 
-Refs resolve as in api-delta: in the worktree you run the script from, so `HEAD` is that worktree's. Only commits count, since each one is exported with `git archive`. Nothing tracked is modified, and the script deletes only directories it created.
+Refs resolve as in api-delta: in the worktree you run the script from, so `HEAD` is that worktree's. System's commits are exported with `git archive`, and the adopters' with `git archive` and `git show`, never from a working tree; only the pitch files are read from the working tree. Nothing tracked is modified, and the script deletes only directories it created.
 
 ## What it produces
 
 In `API_GRAPH_OUT`:
 
-- `API-GRAPH.md`, the map:
-  - a summary;
-  - the pitch order, with the top 15 and their reasons;
-  - the clusters and their parts;
-  - the open questions, with what settling each would free;
-  - the shared vocabulary;
-  - a cluster map;
-  - this run's uncertain spots;
-  - changes since the previous run;
-  - "How this was generated" (`scripts/method.md`), which records each design decision with the alternative it rejected, and where the tool is wrong.
-- `bundles/<id>/`, one per cluster, ranked part and batch:
-  - `bundle.md`, the brief: size, platforms, what's been checked off Darwin, the open questions it depends on and why, what it needs, its declarations with their C counterparts, the source ranges (the API's blocks and the new internal code they reach), tests, samples, prior text (proposals, prototype write-ups, Win32 drafts, and the full messages of the commits that wrote the code), and the house format of `Proposals/`;
-  - `bundle.json`, the same data, machine-readable;
-  - `sources.md`, `tests.md` and `samples.md`, which quote the code.
+- `API-GRAPH.md`: the index, one line per report.
+- **The graph**:
+  - `graph.json.gz`, the snapshot: nodes, links and the adopters' hunks (schema: `Prototype/ApiGraph/REPORT.md`, section 1), also filed in the snapshot store;
+  - `GRAPH.md`: counts by node and link kind, the declarations the most packages use and could use, the packages, the domains, and how to query it;
+  - `DIFF.md` and `diff.json`: nodes and links added, removed and changed since the store's previous snapshot of the same head ref.
+- **The pitches**:
+  - `PITCHES.md` and `pitches.json`: every pitch file resolved and checked;
+  - `pitches/<id>/`, a bundle per pitch file: `bundle.md` (the brief, including the pitch file's rules and what they matched, open questions, prerequisites, declarations, source ranges, tests, samples, adopter examples with the hunks that introduced them, related API by domain, prior text and commit messages), `bundle.json`, `sources.md`, `tests.md`, `samples.md` and `adopters.md`.
+- **The suggestions**:
+  - `SUGGESTIONS.md` and `suggestions.json`: the clustering's carve-outs (clusters, parts, batches), their open questions, a suggested order, how much of each the pitch files already cover, candidate pitches, adopter reach, and "How this was generated" (`scripts/method.md`, every design decision with the alternative it rejected, and where the tool is wrong);
+  - `suggestions/<id>/`, a bundle per suggested carve-out, and `suggestions/drafts/<id>.json`, a draft pitch file for every suggestion no pitch covers yet;
+  - `clusters.dot` and `atoms.dot`, for Graphviz.
+- `adopters.json`: the packages, their builds, and every adopted and would-benefit site; `api-delta/`, the api-delta report this run used; `logs/`.
 
-  `bundles/index.json` lists them in rank order. A bundle isn't a pitch.
-- `api-graph.json`: clusters, parts, batches, promoted types, contingencies and the ranking. `graph.json` has every node, edge, atom, test and sample.
-- `clusters.dot` and `atoms.dot`, for Graphviz: `dot -Tsvg .build/api-graph/clusters.dot > clusters.svg`.
-- `api-delta/`, the api-delta report this run used, and `logs/`.
+## Querying the graph
 
-To start a pitch, give a session a carve-out's `bundle.md`, with `sources.md` and `tests.md` if it needs the code. For a big cluster, start from one of its parts; the cluster's bundle lists them.
+```sh
+python3 Utilities/api-graph/scripts/graphq.py show 'PThread.Mutex.lock()'        # a node and its links, by kind
+python3 Utilities/api-graph/scripts/graphq.py type ProcessID --members --sites   # a type, its members, their reach
+python3 Utilities/api-graph/scripts/graphq.py neighbors KernelQueue --kind memberOf,usesInSignature --depth 2
+python3 Utilities/api-graph/scripts/graphq.py family chmod                       # chmod, fchmod, lchmod, fchmodat
+python3 Utilities/api-graph/scripts/graphq.py cname getpid                       # who wraps getpid; who calls it
+python3 Utilities/api-graph/scripts/graphq.py package swift-nio                  # what swift-nio uses, and could
+python3 Utilities/api-graph/scripts/graphq.py domain signals                     # a domain's declarations
+python3 Utilities/api-graph/scripts/graphq.py diff OLD_COMMIT NEW_COMMIT         # two snapshots from the store
+```
 
-## How the map changes as lanes merge
+`--snapshot` picks a snapshot file or a commit the store has one of; the default is the last run's. `--json` prints any answer as JSON. The derived link kinds (`sameCFamily`, `sameImplementation`, `sameBlock`, `sameMark`, `couldUse`) are computed at query time.
 
-Each run compares itself with the previous run's `api-graph.json`, which is in the output directory until the run replaces it. The report's "Changes since the previous run" lists:
+## Pitch files
 
-- new clusters, and clusters that are gone (merged into others, or removed);
-- clusters that gained or lost declarations;
-- clusters that now depend on an open question, or no longer do;
-- moves of five or more places in the ranking, and moves into or out of the top 15.
+A pitch chat edits `Prototype/Pitches/<id>.json`, reruns `regenerate.sh`, and reads `PITCHES.md` and `pitches/<id>/bundle.md`. The format, the rules (IDs, paths, types with or without their members, the members of a type, a C function family, C names, a regular expression; any narrowed by file or MARK) and the patterns are in `Prototype/ApiGraph/REPORT.md`, section 2. The examples there, one per pattern, are real files in `Prototype/Pitches`. The tool never writes pitch files; `suggestions/drafts/` holds drafts to copy.
 
-Clusters are matched by id, and failing that by the declarations they share, so a renamed cluster isn't reported as a new one.
+## Adopters
 
-To see what a lane will change before it merges, map its branch: `HEAD_REF=<lane>`. To compare two such runs, point `API_GRAPH_OUT` at separate directories and `API_GRAPH_PREVIOUS` at the other one's `api-graph.json`.
+For each declaration, and so for each pitch and suggestion:
 
-What moves the map:
+- **Adopted**: where a package's migration branch (`migrate-darwin`) uses the declaration, file and line, with the hunk of the migration's diff (against the branch's merge base with the package's `main`) that introduced each use. A site is `precise` when the compiler's index resolved it: the tool exports the branch's commit, points its swift-system dependency at an export of the head commit, and builds it with an index store as the coverage tools build that package. Files the build doesn't compile (tests), lines in `#if` branches Darwin doesn't take, and packages that don't build are matched by name, `lexical`.
+- **Could use**: where a package calls a C interface the declaration newly wraps, from the coverage tools' extraction (`interfaces.json.gz` in their results store) joined with the C names in the declarations' doc comments. C names the base commit already covers don't count.
 
-- **New API joins an existing cluster, or makes a new one.** If it names an existing new type, it joins that type's cluster. If it uses a type from several other places, that type gets promoted to shared vocabulary and becomes a cluster of its own; this is how ProcessID became vocabulary.
-- **Contingencies follow the code.** When a lane adds an owned type, a Span signature, or API that compiles on Windows, the clusters involved gain the question, and so does everything that needs them.
-- **When a question is settled, edit `contingencies.json`.** Remove its entry, or narrow its rules. The clusters that depended on it only (the report's "Would free" column) move up.
+**To add a package, clone it into `../ecosystem`, or, with a migration branch, into `../adopters`.** The next run picks it up. A clone's identity is its origin URL, so a package cloned in both is one package. A migration is built as the coverage tools' package file for it says (`Utilities/adopter-coverage/packages/`), or with a plain `swift build` when there's none. Its C interfaces are the coverage tools' extraction of its commit when their store has one, and a lexical scan of its library sources until then; `Utilities/adopter-coverage/ecosystem.sh survey` and `run` produce the extraction.
+
+`scripts/reach.py` ranks or filters the suggestions by reach: `--package swift-nio`, `--min 3`, `--kind part`, `--sort using|benefit|sites|rank`, `--json`.
+
+## How the graph changes as lanes merge
+
+Each run files a snapshot of the head commit, and `DIFF.md` compares it with the store's previous snapshot of the same head ref: declarations added and removed, declarations whose signature, availability, platforms or reach changed, and links added, removed and changed. `PITCHES.md` says, for each pitch, which declarations its rules match now and didn't, which they no longer match, and which it includes changed.
+
+To see what a lane will change before it merges, map its branch: `HEAD_REF=<lane>`, and diff the two snapshots with `graphq.py diff`.
+
+The suggestions move too, and `SUGGESTIONS.md` compares its clusters with the previous run's:
+
+- **New API joins an existing cluster, or makes a new one.** If it names an existing new type, it joins that type's cluster. If it uses a type from several other places, that type gets promoted to shared vocabulary and becomes a cluster of its own; this is how ProcessID became vocabulary. (Promotion and link cutting apply to the suggestions only, not to the graph.)
+- **Contingencies follow the code.** When a lane adds an owned type, a Span signature, or API that compiles on Windows, the declarations involved gain the question, and so does everything that needs them.
+- **When a question is settled, edit `contingencies.json`.** Remove its entry, or narrow its rules.
 - **When a lane builds or runs code off Darwin, add it to `evidence.json`.** Otherwise every platform other than Darwin stays "unverified".
-- **When the processes lane lands an owned child process, the reaping question (item 28) starts matching.** Its rules are already there.
 
 ## Tuning
 
-- `config.json`: the promotion threshold, types to promote or never promote, the size above which a cluster's parts are ranked too, and the ranking weights.
+- `domains.json`: the domains, each a list of C families or C names as shell globs. `GRAPH.md` lists the families no domain names.
 - `contingencies.json`: the open questions, their decision numbers, and their rules. Each rule is one of the kinds its comment lists, with a weight, and `inherit: false` for platform facts.
 - `evidence.json`: what's been checked on which platform, and how.
+- `config.json`: the suggestions' promotion threshold, types to promote or never promote, the size above which a cluster's parts are ranked too, and the ranking weights.
 
 Each is read at run time; nothing else needs editing.
 
 ## Run time
 
-About 65 seconds on an M1 Max with Swift 6.2, and up to twice that while other builds compete for the CPU. Most of it is api-delta's run (about 45 seconds) at the same time as the indexed build of the head commit with tests and Samples (about 45 seconds). The graph, clusters, bundles and report take about 8 seconds.
+About four minutes on an M1 Max with Swift 6.2 when every adopter index is cached, and up to twice that while other builds compete for the CPU: api-delta's run and the indexed build of the head commit (about 45 seconds each, at the same time), the adopters step (one to three minutes: 58 packages' interface data, some of it scanned lexically), and the snapshot, pitches, suggestions and bundles (about 40 seconds). A migration whose index isn't cached is built: 20 seconds to 5 minutes each (swift-foundation's and SwiftPM's are the longest), about 25 minutes for all 15.
 
 ## Requirements
 
 - macOS with Xcode's toolchain: `swift`, `xcrun`, and `libIndexStore.dylib`, which the index reader finds next to the toolchain's `swiftc`. The package needs Swift 6.1 or later; the tool was written and checked with Swift 6.2.
 - `python3`. The scripts use only the standard library, ctypes included. The macOS system Python 3.9 works.
-- No network. `--skip-update` resolves swift-argument-parser from SwiftPM's local cache. When the cache doesn't have it, Samples are left out of the build, as api-delta leaves them out, and samples are matched by name.
+- No network for System's side. `--skip-update` resolves swift-argument-parser from SwiftPM's local cache. When the cache doesn't have it, Samples are left out of the build, as api-delta leaves them out, and samples are matched by name. An adopter's build resolves its dependencies as `swift build` does, from SwiftPM's cache or the network.
+- For swift-foundation's migration, a swift.org toolchain in `~/Library/Developer/Toolchains` (its package file says it needs a newer compiler than Swift 6.2); `FOUNDATION_SWIFT_EXEC` names another `swiftc`, as for the coverage tools.
 - `--disable-sandbox`, for the reason api-delta's README gives.

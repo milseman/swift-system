@@ -65,6 +65,74 @@ def load(path):
     return json.load(open(path))
 
 
+CALLABLE_KINDS = {"swift.func", "swift.method", "swift.type.method", "swift.init", "swift.subscript",
+                  "swift.type.subscript", "swift.enum.case", "swift.func.op", "swift.macro"}
+
+
+def fragment_roles(frags, kind):
+    """The role of each typeIdentifier fragment of a declaration: where in
+    the signature it's named. `parameter` (or `payload`, for an enum case's
+    associated values), `return` (after the top-level `->`), `throws` (in a
+    top-level `throws(...)`), `generic` (a constraint, in `<...>` before the
+    parameters or a `where` clause), `aliased` (a typealias's target), and
+    `type` for the rest: a property's or subscript's type, an inheritance."""
+    roles = {}
+    depth = angle = 0
+    params_open = params_closed = arrow = where = eq = throws_next = in_throws = False
+    for i, fr in enumerate(frags):
+        k, sp = fr.get("kind"), fr.get("spelling", "")
+        if k == "typeIdentifier":
+            if where:
+                r = "generic"
+            elif in_throws:
+                r = "throws"
+            elif arrow:
+                r = "return"
+            elif angle > 0 and not params_open:
+                r = "generic"
+            elif params_open and not params_closed:
+                r = "payload" if kind == "swift.enum.case" else "parameter"
+            elif kind == "swift.typealias" and eq:
+                r = "aliased"
+            else:
+                r = "type"
+            roles[i] = r
+            continue
+        if k == "keyword":
+            if sp in ("throws", "rethrows") and depth == 0:
+                throws_next = sp == "throws"
+            elif sp == "where":
+                where = True
+            continue
+        prev = ""
+        for ch in sp:
+            if ch == "(":
+                if throws_next and depth == 0 and params_closed:
+                    in_throws = True
+                elif depth == 0 and not params_open and not arrow and kind in CALLABLE_KINDS:
+                    params_open = True
+                depth += 1
+            elif ch == ")":
+                depth -= 1
+                if depth == 0 and in_throws:
+                    in_throws = False
+                elif depth == 0 and params_open and not params_closed:
+                    params_closed = True
+            elif ch == "<":
+                angle += 1
+            elif ch == ">" and prev == "-":
+                if depth == 0 and kind in CALLABLE_KINDS:
+                    arrow = True
+            elif ch == ">":
+                angle -= 1
+            elif ch == "=" and depth == 0 and angle == 0:
+                eq = True
+            if not ch.isspace() and ch != "(":
+                throws_next = False
+            prev = ch
+    return roles
+
+
 def c_names(doc):
     """C names from "The corresponding C ... is `x`" lines: lower-case
     functions and upper-case constants, not the Swift parameters or literals
@@ -313,8 +381,14 @@ def main():
     edges = []
     seen_edges = set()
 
-    def edge(src, dst, kind, spelling=None):
-        if src == dst or (src, dst, kind) in seen_edges:
+    edge_at = {}
+
+    def edge(src, dst, kind, spelling=None, role=None):
+        if src == dst:
+            return
+        if (src, dst, kind) in seen_edges:
+            if role and role not in edge_at[(src, dst, kind)].setdefault("roles", []):
+                edge_at[(src, dst, kind)]["roles"].append(role)
             return
         seen_edges.add((src, dst, kind))
         if dst not in nodes:
@@ -324,8 +398,13 @@ def main():
                                        "why": "base" if dst[5:] in base_paths else "platform-only"}
             else:
                 vocab(dst, spelling or dst)
-        edges.append({"from": src, "to": dst, "kind": kind})
+        e = {"from": src, "to": dst, "kind": kind}
+        if role:
+            e["roles"] = [role]
+        edges.append(e)
+        edge_at[(src, dst, kind)] = e
 
+    conformances = []
     for nid, n in nodes.items():
         if n["source"] == "graph":
             s = head.symbols.get(nid, {})
@@ -339,6 +418,7 @@ def main():
             # its parent (`CInterop.Termios`) has no USR on its last
             # component, so the qualified name is looked up.
             frags = s.get("declarationFragments", [])
+            roles = fragment_roles(frags, s.get("kind", {}).get("identifier", ""))
             chain, k = [], 0
             while k < len(frags):
                 fr = frags[k]
@@ -351,12 +431,13 @@ def main():
                     qualified = ".".join(sp for sp, _ in chain)
                     t = chain[-1][1] or type_by_path.get(qualified)
                     if t and t != nid:
-                        edge(nid, t, "references", qualified)
+                        edge(nid, t, "references", qualified, role=roles.get(k))
                     chain = []
                 k += 1
             for tgt, fb in head.conforms.get(nid, ()):
                 if tgt in nodes:
                     edge(nid, tgt, "conformsTo", fb)
+                conformances.append({"from": nid, "to": tgt, "name": fb.replace("Swift.", "")})
         else:
             scopes = n["parentPath"].split(".") if n["parentPath"] else []
             if scopes:
@@ -385,6 +466,8 @@ def main():
         blk = info["blocks"][d["block"]] if d["block"] is not None else None
         if blk is None:
             continue
+        n["block"] = {"file": rel, "index": blk["id"], "kind": blk["kind"], "subject": blk["subject"],
+                      "mark": blk["mark"], "start": blk["start"], "end": blk["end"], "line": blk["line"]}
         if blk["subject"] in namespaces and blk["kind"] == "extension":
             key = "loose:" + nid
             atoms[key] = {"id": key, "loose": True, "file": rel, "kind": "member", "subject": blk["subject"],
@@ -632,9 +715,12 @@ def main():
         n.setdefault("cCalls", [])
         n.setdefault("implUses", [])
 
+    blocks = {rel: [{k: b[k] for k in ("id", "kind", "subject", "mark", "start", "end", "line")}
+                    for b in info.get("blocks") or []]
+              for rel, info in sindex.items() if rel.startswith("Sources/")}
     json.dump({
         "nodes": nodes, "edges": edges, "atoms": atoms, "vocabulary": vocabulary,
-        "tests": tests, "samples": samples,
+        "tests": tests, "samples": samples, "conformances": conformances, "blocks": blocks,
         "meta": {"namespaces": sorted(namespaces), "basePaths": len(base_paths), "baseSymbols": len(base_usrs)},
     }, open(a.out, "w"), indent=0)
     kinds = collections.Counter(e["kind"] for e in edges)

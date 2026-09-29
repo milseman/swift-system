@@ -1,0 +1,11 @@
+{
+  "id": "kernel-queue",
+  "title": "KernelQueue and KernelEvent (kqueue)",
+  "pattern": "self-contained-type",
+  "status": "draft",
+  "include": [
+    {"types": ["KernelQueue", "KernelEvent"], "members": true, "nested": true},
+    {"membersOf": "kevent"}
+  ],
+  "notes": "An example of the pattern: an owner type with its members and nested types, the event type it registers and polls, and the Swift names System gives kevent's fields."
+}
