@@ -9,24 +9,32 @@
 
 // The C library's locale calls, which System wraps provisionally
 // (Provisional+Locale.swift). The <xlocale.h> calls come from CSystem's
-// Darwin header, since the Darwin module doesn't export them.
+// Darwin header, since the Darwin module doesn't export them. On Linux,
+// glibc and Musl declare strtod_l and strtof_l only with _GNU_SOURCE, so
+// they're CSystem shims.
 //
 // In a mock test, a locale that newlocale "created" is a placeholder
 // address, so freelocale is mocked too, and neither touches it.
 
-#if SYSTEM_PACKAGE_DARWIN
+#if SYSTEM_PACKAGE_DARWIN || os(Linux)
 import CSystem
+#if SYSTEM_PACKAGE_DARWIN
 import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif canImport(Musl)
+import Musl
+#endif
 
 #if ENABLE_MOCKING
 // What a mocked newlocale returns: an address no locale is at.
-internal var _mockLocale: OpaquePointer { OpaquePointer(bitPattern: 0x10C0)! }
+internal var _mockLocale: locale_t { locale_t(bitPattern: 0x10C0)! }
 #endif
 
 // newlocale
 internal func system_newlocale(
-  _ mask: CInt, _ name: UnsafePointer<CChar>, _ base: OpaquePointer?
-) -> OpaquePointer? {
+  _ mask: CInt, _ name: UnsafePointer<CChar>, _ base: locale_t?
+) -> locale_t? {
 #if ENABLE_MOCKING
   if mockingEnabled {
     return _mock(mask, String(cString: name), base.map { Int(bitPattern: $0) } ?? 0) == -1 ? nil : _mockLocale
@@ -36,7 +44,7 @@ internal func system_newlocale(
 }
 
 // freelocale
-internal func system_freelocale(_ locale: OpaquePointer) {
+internal func system_freelocale(_ locale: locale_t) {
 #if ENABLE_MOCKING
   if mockingEnabled {
     _ = _mock(Int(bitPattern: locale))
@@ -45,6 +53,25 @@ internal func system_freelocale(_ locale: OpaquePointer) {
 #endif
   freelocale(locale)
 }
+
+#if os(Linux)
+// Linux has no LC_C_LOCALE, and glibc's *_l calls take neither a null
+// locale nor LC_GLOBAL_LOCALE. So for the POSIX locale (nil), these calls
+// pass one that newlocale makes once, which nothing frees; and for the
+// global locale, they call the functions without a locale, which follow the
+// calling thread's locale: the global one, unless the thread set its own
+// with uselocale.
+nonisolated(unsafe) internal let _posixLocale: locale_t = {
+  guard let locale = newlocale(_LC_ALL_MASK, "C", nil) else {
+    fatalError("newlocale couldn't create the POSIX locale: \(Errno.current)")
+  }
+  return locale
+}()
+
+internal func _isGlobalLocale(_ locale: locale_t?) -> Bool {
+  locale.map { Int(bitPattern: $0) == -1 } ?? false
+}
+#endif
 
 // The calls that don't report errors through errno have no mock hooks.
 
@@ -59,25 +86,40 @@ internal func system_setlocale(
 internal func system_strtod_l(
   _ string: UnsafePointer<CChar>,
   _ end: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?,
-  _ locale: OpaquePointer?
+  _ locale: locale_t?
 ) -> Double {
+#if SYSTEM_PACKAGE_DARWIN
   strtod_l(string, end, locale)
+#else
+  if _isGlobalLocale(locale) { return strtod(string, end) }
+  return csystem_strtod_l(string, end, UnsafeMutableRawPointer(locale ?? _posixLocale))
+#endif
 }
 
 // strtof_l
 internal func system_strtof_l(
   _ string: UnsafePointer<CChar>,
   _ end: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?,
-  _ locale: OpaquePointer?
+  _ locale: locale_t?
 ) -> Float {
+#if SYSTEM_PACKAGE_DARWIN
   strtof_l(string, end, locale)
+#else
+  if _isGlobalLocale(locale) { return strtof(string, end) }
+  return csystem_strtof_l(string, end, UnsafeMutableRawPointer(locale ?? _posixLocale))
+#endif
 }
 
 // strncasecmp_l
 internal func system_strncasecmp_l(
-  _ a: UnsafePointer<CChar>, _ b: UnsafePointer<CChar>, _ count: Int, _ locale: OpaquePointer?
+  _ a: UnsafePointer<CChar>, _ b: UnsafePointer<CChar>, _ count: Int, _ locale: locale_t?
 ) -> CInt {
+#if SYSTEM_PACKAGE_DARWIN
   strncasecmp_l(a, b, count, locale)
+#else
+  if _isGlobalLocale(locale) { return strncasecmp(a, b, count) }
+  return strncasecmp_l(a, b, count, locale ?? _posixLocale)
+#endif
 }
 
-#endif // SYSTEM_PACKAGE_DARWIN
+#endif // SYSTEM_PACKAGE_DARWIN || os(Linux)

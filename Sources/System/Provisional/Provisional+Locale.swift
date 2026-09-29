@@ -17,12 +17,20 @@
 // number parsing does, or that sets the process's C locale, as its tests
 // do, can do so without importing the C library.
 //
-// Darwin only for now: glibc has these calls too, but some only with
-// _GNU_SOURCE, and Linux is paused.
+// On Darwin and Linux (glibc and Musl), which have these calls, though
+// Linux declares strtod_l and strtof_l only with _GNU_SOURCE, and has no
+// LC_C_LOCALE (see Syscalls+ProvisionalLocale.swift). Not on Android:
+// Bionic has strtod_l and strtof_l only from API level 26.
 
-#if SYSTEM_PACKAGE_DARWIN
+#if SYSTEM_PACKAGE_DARWIN || os(Linux)
 import CSystem
+#if SYSTEM_PACKAGE_DARWIN
 import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif canImport(Musl)
+import Musl
+#endif
 
 @available(System 199, *)
 extension CInterop {
@@ -31,7 +39,7 @@ extension CInterop {
   /// The corresponding C type is `locale_t`.
   ///
   /// - Note: Provisional: C locales may move to the Swift standard library.
-  /// - Note: Only available on Darwin.
+  /// - Note: Only available on Darwin and Linux.
   public typealias Locale = locale_t
 }
 
@@ -52,7 +60,7 @@ extension CInterop {
 /// The ``posix`` and ``global`` locales aren't created, and aren't freed.
 ///
 /// - Note: Provisional: C locales may move to the Swift standard library.
-/// - Note: Only available on Darwin.
+/// - Note: Only available on Darwin and Linux.
 @frozen
 @available(System 199, *)
 public struct CLocale: RawRepresentable, Hashable, @unchecked Sendable {
@@ -165,10 +173,17 @@ extension CLocale {
 
     /// Every category.
     ///
+    /// On Linux it includes the categories that glibc adds,
+    /// such as `LC_PAPER`, which have no ``Categories`` of their own.
+    ///
     /// The corresponding C constant is `LC_ALL_MASK`.
     @_alwaysEmitIntoClient
     public static var all: Categories {
+      #if SYSTEM_PACKAGE_DARWIN
       [.collation, .characterTypes, .messages, .monetary, .numeric, .time]
+      #else
+      Categories(rawValue: _LC_ALL_MASK)
+      #endif
     }
   }
 }
@@ -180,15 +195,24 @@ extension CLocale {
   /// The POSIX locale, also named "C",
   /// whose rules are the same everywhere, whatever the user's settings.
   ///
+  /// On Linux, which has no `LC_C_LOCALE`,
+  /// its calls pass a POSIX locale that `newlocale` creates once.
+  ///
   /// The corresponding C constant is `LC_C_LOCALE`.
   @_alwaysEmitIntoClient
   public static var posix: CLocale { CLocale(rawValue: nil) }
 
   /// The process's global locale, which ``setGlobal(_:for:)`` changes.
   ///
+  /// On Linux, whose `*_l` calls don't take `LC_GLOBAL_LOCALE`,
+  /// its calls are the ones without a locale argument,
+  /// such as `strtod` for ``parseDouble(_:)``,
+  /// which follow the calling thread's locale:
+  /// the global one, unless the thread set its own with `uselocale`.
+  ///
   /// The corresponding C constant is `LC_GLOBAL_LOCALE`.
   @_alwaysEmitIntoClient
-  public static var global: CLocale { CLocale(rawValue: OpaquePointer(bitPattern: -1)) }
+  public static var global: CLocale { CLocale(rawValue: CInterop.Locale(bitPattern: -1)) }
 
   /// Creates a locale from the named locale's rules
   /// for some categories, and another locale's for the rest.
@@ -371,4 +395,4 @@ extension CLocale {
   }
 }
 
-#endif // SYSTEM_PACKAGE_DARWIN
+#endif // SYSTEM_PACKAGE_DARWIN || os(Linux)

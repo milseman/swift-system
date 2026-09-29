@@ -228,6 +228,17 @@ extern int csystem_sendmmsg(int fd, void *msgvec, unsigned int vlen, int flags);
 extern int csystem_recvmmsg(int fd, void *msgvec, unsigned int vlen, int flags, void *timeout);
 #endif // __linux__
 
+#if defined(__linux__) && !defined(__ANDROID__)
+// strtod_l and strtof_l, which glibc and Musl declare only with _GNU_SOURCE,
+// and LC_ALL_MASK, which glibc defines as an OR of its twelve categories'
+// masks, which Swift can't import; see shims.c. `locale` is a locale_t,
+// untyped so that this header needn't include <locale.h> (see the top of
+// this file).
+extern double csystem_strtod_l(const char *string, char **end, void *locale);
+extern float csystem_strtof_l(const char *string, char **end, void *locale);
+int _system_get_LC_ALL_MASK(void);
+#endif // defined(__linux__) && !defined(__ANDROID__)
+
 #if defined(__linux__) && defined(__GLIBC__)
 // glibc's allocator extensions, which it declares in <malloc.h>, which its
 // Swift module doesn't include. <malloc.h> includes <stdio.h>, and so FILE,

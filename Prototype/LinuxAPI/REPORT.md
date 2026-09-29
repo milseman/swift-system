@@ -10,10 +10,10 @@ interface at Swift's default API level (21), and said otherwise.
 
 ## Resume here
 
-- State: inventory (section 1) and batches 1 and 2 (sections 2.1, 2.2)
+- State: inventory (section 1) and batches 1 to 3 (sections 2.1 to 2.3)
   committed.
-- Next: batch 3 in the plan (section 1.5): `CLocale` on glibc and musl, for
-  Foundation.
+- Next: batch 4 in the plan (section 1.5): `currentExecutable()` and the
+  time zone paths on Linux, for Foundation.
 - This lane owns `Sources/System/**`, `Sources/CSystem`, `Tests/SystemTests`
   and this report, not SystemSockets or its tests: socket API (vsock, UDP
   offload) goes to section 4, with a patch where one is written.
@@ -52,6 +52,18 @@ later; a log goes to `../linux-logs/`.
    - For the musl half, when a static-SDK build is available:
      `swift build --swift-sdk <musl SDK>`, which takes the `XATTR_NAME_MAX`
      fallback in `shims.c` and `Musl.POSIXErrorCode`.
+3. Batch 3 (`CLocale` on glibc and musl):
+   - `Utilities/linux/build.sh test -- --filter "ProvisionalLocale"`. Expect
+     the build to pass (`csystem_strtod_l`, `csystem_strtof_l` and the
+     `LC_ALL_MASK` getter in `shims.c`; `LC_*_MASK`, which are
+     `(1 << __LC_*)` in glibc, importing into Swift), and 6 XCTest tests in
+     `ProvisionalLocaleLinuxTest` to pass, or 4 and 2 skipped where
+     `fr_FR.UTF-8` isn't installed, as in the plain swift images. If the
+     masks don't import, the build fails in `Constants+Provisional.swift`:
+     say so, and they become getters.
+   - To run the French checks: `Utilities/linux/build.sh shell`, then
+     `apt-get update && apt-get install -y locales && locale-gen fr_FR.UTF-8`
+     and the same `swift test` command in the container.
 
 ## Baseline (Darwin)
 
@@ -313,6 +325,66 @@ Tests:
   Typechecked on Darwin in a scratch copy with its condition made true.
 - Darwin, after: XCTest 565 tests, 4 skipped, 0 failures; swift-testing 498
   tests in 81 suites passed (no new Darwin tests).
+
+### 2.3 Batch 3: `CLocale` on glibc and musl (swift-foundation)
+
+Foundation's `Platform.swift` parses and compares text in the POSIX locale:
+on Darwin through `CLocale.posix`'s `parseDouble`, `parseFloat` and
+`compareIgnoringCase`; on Linux with its own `newlocale(LC_ALL_MASK, "C", 0)`
+(through its `_stringshims_LC_ALL_MASK`) and `strtod_l`, `strtof_l` and
+`strncasecmp_l`, visible there because its package defines `_GNU_SOURCE`
+for the Swift target. `CLocale` and `CInterop.Locale` widen to Linux, so it
+can do the same there.
+
+- The calls: `newlocale`, `freelocale`, `setlocale` and `strncasecmp_l` are
+  in glibc's and Musl's modules; `strtod_l` and `strtof_l` need
+  `_GNU_SOURCE`, so they're `csystem_strtod_l` and `csystem_strtof_l`, which
+  take the locale as `void *`.
+- The categories and masks are the C library's (glibc and Musl share
+  `LC_CTYPE` 0 through `LC_MESSAGES` 5 and `LC_ALL` 6, unlike Darwin).
+  `Categories.all` is `LC_ALL_MASK` on Linux, from a getter: glibc's is an
+  OR of twelve masks (0x1fbf, with its six extra categories), Musl's
+  0x7fffffff. On Darwin it stays the OR of the six, which is Darwin's
+  `LC_ALL_MASK`.
+- `posix` stays `CLocale(rawValue: nil)`, as on Darwin, where the null
+  locale is `LC_C_LOCALE`. Linux has no such constant, and glibc's `*_l`
+  calls crash on a null locale, so the wrappers pass a POSIX locale that
+  `newlocale` makes once, in a `nonisolated(unsafe)` global that nothing
+  frees. Rejected: a non-nil `posix` on Linux, which would make `free()`
+  able to free the shared locale, and `rawValue`'s meaning differ by
+  platform.
+- `global` is `LC_GLOBAL_LOCALE`, `(locale_t)-1` everywhere, now spelled
+  `CInterop.Locale(bitPattern: -1)`, since glibc's `locale_t` is a typed
+  pointer, not an `OpaquePointer`. POSIX leaves `LC_GLOBAL_LOCALE` undefined
+  for the `*_l` calls, and glibc's crash on it, so on Linux the wrappers
+  call `strtod`, `strtof` and `strncasecmp` for it, which follow the calling
+  thread's locale: the global one unless the thread called `uselocale`,
+  which System doesn't wrap. The doc says so. Open: `duplocale(LC_GLOBAL_LOCALE)`
+  per call, exact but an allocation each time.
+- Android stays out: Bionic has `strtod_l` and `strtof_l` from API level 26
+  (from memory), and Swift's default is 21. A shim that fails below 26, as
+  `csystem_pthread_getname_np` does, would do; Foundation's Android branch
+  is the same as its Linux one.
+
+Tests:
+
+- `Tests/SystemTests/ProvisionalLocaleLinuxTests.swift` (Linux, XCTest,
+  since it sets the global locale): the mock test with Linux's
+  `LC_ALL_MASK`; the categories' Linux values; parsing and comparing in the
+  POSIX locale (the Darwin test's cases) and comparing in the global one;
+  `C.UTF-8`, which glibc 2.35 and Musl build in; and on glibc, where
+  `fr_FR.UTF-8` is installed (it isn't in the plain images: `XCTSkip`
+  otherwise), a comma decimal separator in a named, a numeric-only and the
+  global locale, while the POSIX locale's doesn't change. Musl's numbers
+  don't follow the locale, and it accepts any locale name, so those checks
+  are glibc's.
+- Typechecked on Darwin in a scratch copy, with the Linux branches of
+  `Syscalls+ProvisionalLocale.swift` and the test made true and the shims
+  stubbed. That checks Musl's shape (`locale_t` an `OpaquePointer`), not
+  glibc's typed pointer.
+- Darwin, after: XCTest 565 tests, 4 skipped, 0 failures; swift-testing 498
+  tests in 81 suites passed (Darwin's `ProvisionalLocaleTest` unchanged:
+  its mock locale and `global` are now spelled through `locale_t`).
 
 ## 3. Findings
 

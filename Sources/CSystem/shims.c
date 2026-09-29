@@ -592,6 +592,25 @@ extern int csystem_recvmmsg(int fd, void *msgvec, unsigned int vlen, int flags, 
 }
 #endif // __linux__
 
+// MARK: - Locales
+
+#if defined(__linux__) && !defined(__ANDROID__)
+#include <locale.h>
+#include <stdlib.h>
+
+// With _GNU_SOURCE, which this file defines on Linux, <stdlib.h> declares
+// strtod_l and strtof_l.
+extern double csystem_strtod_l(const char *string, char **end, void *locale) {
+  return strtod_l(string, end, (locale_t)locale);
+}
+
+extern float csystem_strtof_l(const char *string, char **end, void *locale) {
+  return strtof_l(string, end, (locale_t)locale);
+}
+
+int _system_get_LC_ALL_MASK(void) { return LC_ALL_MASK; }
+#endif // defined(__linux__) && !defined(__ANDROID__)
+
 // MARK: - The allocator
 
 #if defined(__linux__) && defined(__GLIBC__)
