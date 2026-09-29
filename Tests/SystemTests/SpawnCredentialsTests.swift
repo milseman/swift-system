@@ -60,6 +60,122 @@ final class SpawnCredentialsTest: XCTestCase {
     XCTAssertEqual(output, "\(getuid())\n\(getgid())\nhello\n")
   }
 
+  /// The names of the descriptors that are open in a shell that `spawn`
+  /// starts, whose standard output it connects to `writer`, the write end of
+  /// a close-on-exec pipe, which is checked as `writer`.
+  private func descriptorsOpen(
+    among descriptors: KeyValuePairs<String, FileDescriptor>,
+    _ spawn: (_ arguments: [String], _ writer: FileDescriptor) throws -> ProcessID
+  ) throws -> [String] {
+    let (reader, writer) = try FileDescriptor.pipe()
+    defer { try? reader.close() }
+    try reader.setDescriptorFlags(.closeOnExec)
+    try writer.setDescriptorFlags(.closeOnExec)
+    let named = Array(descriptors) + [(key: "writer", value: writer)]
+    let script = named.map {
+      "if [ -e /dev/fd/\($0.value.rawValue) ]; then echo \($0.key); fi"
+    }.joined(separator: "; ")
+    let child: ProcessID
+    do {
+      child = try spawn(["sh", "-c", script], writer)
+    } catch {
+      try? writer.close()
+      throw error
+    }
+    try writer.close()
+    let output = try readAll(reader)
+    XCTAssertEqual(try child.wait(), .exited(0))
+    return output.split(separator: "\n").map(String.init)
+  }
+
+  /// The child clears close-on-exec on the descriptors that the file actions
+  /// use, and the program still gets the descriptors that a spawn without
+  /// credentials gives it.
+  func testTheProgramGetsTheDescriptorsASpawnWould() throws {
+    func open(_ path: FilePath, closeOnExec: Bool = true) throws -> FileDescriptor {
+      let descriptor = try FileDescriptor.open(path, .readOnly)
+      if closeOnExec { try descriptor.setDescriptorFlags(.closeOnExec) }
+      return descriptor
+    }
+    let directory = try open("/")
+    let same = try open("/dev/null")
+    let inherited = try open("/dev/null")
+    let closed = try open("/dev/null")
+    let replaced = try open("/dev/null")
+    let plain = try open("/dev/null", closeOnExec: false)
+    defer {
+      for descriptor in [directory, same, inherited, closed, replaced, plain] {
+        try? descriptor.close()
+      }
+    }
+    let descriptors: KeyValuePairs = [
+      "directory": directory, "same": same, "inherited": inherited, "closed": closed,
+      "replaced": replaced, "plain": plain,
+    ]
+    // Close-on-exec but `plain`. A close-on-exec descriptor that the actions
+    // use only as a source is closed when the program starts: the pipe's
+    // write end, a duplicate's source, and a working directory; so is one
+    // duplicated onto itself, which on Darwin keeps its flag.
+    func actions(_ writer: FileDescriptor) -> [SpawnFileAction] {
+      [
+        .duplicate(writer, as: .standardOutput),
+        .setWorkingDirectory(directory),
+        .duplicate(same, as: same),
+        .inherit(inherited),
+        .close(closed),
+        .duplicate(replaced, as: .standardInput),
+        .duplicate(plain, as: replaced),
+      ]
+    }
+    let expected = ["inherited", "replaced", "plain"]
+    XCTAssertEqual(
+      try descriptorsOpen(among: descriptors) { arguments, writer in
+        try ProcessID.spawn("/bin/sh", arguments: arguments, fileActions: actions(writer))
+      }, expected)
+    XCTAssertEqual(
+      try descriptorsOpen(among: descriptors) { arguments, writer in
+        try ProcessID.spawn(
+          "/bin/sh", arguments: arguments, fileActions: actions(writer),
+          credentials: ownCredentials)
+      }, expected)
+
+    // A pipe's close-on-exec write end as the standard output, the
+    // commonest case, alone.
+    XCTAssertEqual(
+      try descriptorsOpen(among: [:]) { arguments, writer in
+        try ProcessID.spawn(
+          "/bin/sh", arguments: arguments, fileActions: [.duplicate(writer, as: .standardOutput)],
+          credentials: SpawnCredentials())
+      }, [])
+  }
+
+  /// C file actions can't be read, so a close-on-exec descriptor among
+  /// `fileActionDescriptors` stays open in the program unless the actions
+  /// close it, or the attributes close what the actions don't install.
+  func testCValuesKeepTheDescriptorsTheyUse() throws {
+    func spawn(
+      _ arguments: [String], _ writer: FileDescriptor, closing: Bool,
+      attributes: SpawnAttributes = SpawnAttributes()
+    ) throws -> ProcessID {
+      let actions: [SpawnFileAction] =
+        [.duplicate(writer, as: .standardOutput)] + (closing ? [.close(writer)] : [])
+      return try SpawnFileAction.withCFileActions(actions) { fileActions in
+        try attributes.withCAttributes { cAttributes in
+          try ProcessID.spawn(
+            "/bin/sh", arguments: arguments, cFileActions: &fileActions,
+            cAttributes: &cAttributes, credentials: SpawnCredentials(),
+            fileActionDescriptors: [writer])
+        }
+      }
+    }
+    XCTAssertEqual(try descriptorsOpen(among: [:]) { try spawn($0, $1, closing: false) }, ["writer"])
+    XCTAssertEqual(try descriptorsOpen(among: [:]) { try spawn($0, $1, closing: true) }, [])
+    XCTAssertEqual(
+      try descriptorsOpen(among: [:]) {
+        try spawn($0, $1, closing: false, attributes: SpawnAttributes(flags: .closeOnExecByDefault))
+      }, [])
+  }
+
   func testSearchingThePath() throws {
     let child = try ProcessID.spawn(
       searchingPathFor: "sh", arguments: ["sh", "-c", "exit 5"], credentials: SpawnCredentials())
@@ -147,11 +263,15 @@ final class SpawnCredentialsTest: XCTestCase {
 
       var calls: [(String, [AnyHashable])] = []
       while let entry = mocking.trace.dequeue() { calls.append((entry.name, entry.arguments)) }
-      // The mock records the optional credentials as optionals.
+      // The mock records the optional credentials as optionals. First, the
+      // parent reads the flags of 5, a duplicate's source (the mock's are
+      // clear, so no close is added), but not of 6, which an action closes.
       let none: AnyHashable = Optional<UInt32>.none
       let noGroups: AnyHashable = Optional<[UInt32]>.none
-      XCTAssertEqual(calls.map(\.0), Array(repeating: "spawn_with_credentials", count: 3))
+      XCTAssertEqual(
+        calls.map(\.0), ["fcntl"] + Array(repeating: "spawn_with_credentials", count: 3))
       XCTAssertEqual(calls.map(\.1), [
+        [CInt(5), F_GETFD],
         ["/bin/true", false, Optional(user.rawValue), Optional(group.rawValue), Optional([UInt32(12)]),
          [CInt(5), CInt(6)]],
         ["true", true, none, none, noGroups, [CInt]()],

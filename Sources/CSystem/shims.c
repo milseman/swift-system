@@ -668,7 +668,13 @@ extern void csystem_explicit_bzero(void *start, size_t count) {
 #include <unistd.h>
 
 // A pipe whose ends are close-on-exec: atomically where pipe2 exists, and
-// otherwise at once, which a fork on another thread in between can miss.
+// otherwise in a second step; the macOS 26 SDK has no other way to make a
+// pipe or a socket pair close-on-exec at once (no SOCK_CLOEXEC). A program
+// that another thread starts between the two steps (with fork and exec, or
+// posix_spawn) inherits both ends, and then the parent's read in
+// csystem_spawn_with_credentials, which ends when every write end has
+// closed, waits until that program exits or closes its copy, even after the
+// child's program has started.
 static int csystem_pipe_cloexec(int fds[2]) {
   #if defined(HAVE_PIPE2_DUP3)
   if (__builtin_available(macOS 27, iOS 27, tvOS 27, watchOS 27, visionOS 27, *))
@@ -761,7 +767,8 @@ extern int csystem_spawn_with_credentials(
     close(fds[0]);
     return fork_error;
   }
-  // The write end closes when the program runs, or when the child exits.
+  // The write end closes when the program runs, or when the child exits,
+  // unless another program inherited it (see csystem_pipe_cloexec).
   int error = 0;
   ssize_t count;
   do {

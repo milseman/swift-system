@@ -5,6 +5,55 @@ writes `STATUS.md` here) and adds the System API that adopters still mark as mis
 one step: what was done, the design calls with the alternative each rejected, and the checks. Linux is paused:
 everything here is built and tested on Darwin only.
 
+## Queue
+
+The work list for toolchain packages to drop `import Darwin` in every form, kept current. Source: the ecosystem run
+`05d4974d68bb-8ed49538` (System `05d4974`, the 21 main-scheme packages that import Darwin, at the scheme's refs;
+`ecosystem.sh run` then `report`). Counted: the interfaces that library files importing Darwin use, in any form
+but through Apple Foundation's re-export (`darwin.interfacesByClass` in each package's `interfaces.json.gz`: direct
+imports, the packages' own re-exports, other modules' and the SDK's), not covered on Darwin: 756 interfaces, 259 not
+covered. Grouped into clusters, ranked by packages, then call sites. Checking each against System's sources shows
+many aren't gaps: the tools can't see API that doesn't name them in the standard sentence, or mapping.ini holds a
+status that predates the lanes. So step 0 is to make the tools see what System covers; the ranks are then redone.
+
+Next: step 0, then the clusters from the re-ranked list.
+
+| # | Cluster | Packages | Sites | Interfaces | Plan |
+|---|---|---:|---:|---|---|
+| 0 | What the tools can't see | | | stdout, stderr (`The corresponding C variable` isn't read); localtime_r (a DocC link breaks the sentence); S_IFMT and S_I* bits, pthread destroy calls, DT_UNKNOWN, XATTR_NOFOLLOW (undocumented); PATH_MAX, linger (stale partials); fts (answered by DirectoryWalk, section 14); localtime, gettimeofday, time, getpwuid, getgrgid, mkstemp(s) (replaced by the reentrant or newer call System wraps) | derive.py fixes, doc sentences, mapping.ini |
+| 1 | string.h and ctype.h | 10 | 93 | strdup (7 packages; four migrations each wrote their own), strlen, strnlen, strncmp, strerror_r, strlcpy, tolower, isspace; memset, memcpy, memmove | Provisional+StringH; the mem* three are the standard library's (section 1) |
+| 2 | C stdio beyond FileStream | 10 | 30 | stderr, stdout, fputs, putc, perror, snprintf | stderr/stdout in step 0; fputs, putc, perror on FileStream |
+| 3 | C scalar types | 6 | 60 | off_t (NIO 26), ssize_t, size_t, suseconds_t, u_int, uintptr_t, LONG_MAX, _POSIX_ARG_MAX, u_short | CInterop aliases where Swift has no spelling |
+| 4 | File mode bits | 6 | 34 | S_IFMT, S_IRWXU/G/O, S_IWGRP, S_IWOTH, S_ISVTX | step 0 (FilePermissions, FileMode name none) |
+| 5 | pthreads | 5 | 31 | destroy calls (step 0); pthread_attr_getstacksize, setdetachstate, setscope, pthread_exit, pthread_yield_np, the error-checking initializer | the rest |
+| 6 | Time of day | 5 | 8 | time, gettimeofday, localtime, gmtime_r | step 0 |
+| 7 | PATH_MAX | 4 | 13 | PATH_MAX | step 0 (covered since section 3) |
+| 8 | Sockets | 3 | 140 | sockaddr_storage (NIO 34), ifaddrs, inet_pton, freeaddrinfo, AF_UNIX, INADDR_ANY, multicast and packet-info options, nfds_t, NI_MAXHOST | check each; mostly NIO's |
+| 9 | fts | 3 | 108 | fts_* and FTS_* | step 0 |
+| 10 | libm | 3 | 39 | round, sqrt, ceil, floor, fabs, modf | the standard library's; record it |
+| 11 | Mach | 3 | 24 | mach_task_self_, KERN_SUCCESS, ERR_SUCCESS, vm_address_t, vm_prot_t, integer_t, mach_msg_type_number_t, task_info with TASK_VM_INFO, USEC_PER_SEC | check each |
+| 12 | Directory entry types | 3 | 4 | DT_UNKNOWN | step 0 |
+| 13 | ioctl | 3 | 3 | ioctl (terminal size, vsock CID) | check the requests |
+| 14 | sysctl names | 2 | 22 | kinfo_proc, CTL_KERN, KERN_PROC, KERN_PROC_PID, CTL_HW, HW_NCPU, HW_AVAILCPU, P_TRACED, extern_proc | check SystemControl |
+| 15 | MacTypes | 2 | 12 | OSStatus, DarwinBoolean (UniChar there is CoreFoundation's) | |
+| 16 | Extended attributes | 2 | 9 | XATTR_NOFOLLOW (step 0), XATTR_FINDERINFO_NAME, XATTR_RESOURCEFORK_NAME | |
+| 17 | Signals | 2 | 7 | signal, SIG_ERR, SIG_UNBLOCK, sigprocmask, NSIG | check the processes lane's API |
+| 18 | Spawn attributes | 2 | 6 | posix_spawnattr_setpgroup, setsigdefault, setsigmask (partial) | check |
+| 19 | Mounts and quotas | 2 | 6 | getfsstat, quotactl (partial), SUBCMDMASK, SUBCMDSHIFT, getmntinfo_r_np | |
+| 20 | flock | 2 | 4 | LOCK_EX, LOCK_SH, LOCK_NB | |
+| 21 | File times | 2 | 5 | utimes, futimens (partial) | |
+| 22 | mmap constants | 2 | 3 | MAP_FAILED, PROT_NONE | |
+| 23 | CPU types | 1 | 22 | cpu_type_t, cpu_subtype_t, CPU_TYPE_*, CPU_ARCH_ABI64 (swift-build) | |
+| 24 | wait | 1 | 17 | siginfo_t, id_t, idtype_t, CLD_*, waitid (Subprocess) | check ProcessWait |
+| 25 | One-package gaps | 1 each | 1-3 each | dladdr and Dl_info, AT_EACCESS/AT_FDONLY/AT_REALDEV, backtrace, getiopolicy_np, strtod and strtof, sysdir's enumeration state, execv, getdtablesize, ATTR_BIT_MAP_COUNT, _NSGetEnviron, abort | |
+
+Not counted, with the reason: Dispatch (its own module; 3 packages, 200 sites), ObjectiveC, CoreFoundation, os and
+Foundation names (ObjCBool, NSObject, objc_getClass, Logger, NSDictionary, CFRunLoopStop, UniChar), the packages'
+own C shims (CNIODarwin_*, c_nio_posix_*, _subprocess_*), and false positives of the lexical scan (`index(after:)`
+read as strings.h's index, Float80).
+
+Done: none yet.
+
 ## 1. status.sh and STATUS.md (2026-09-28)
 
 `Utilities/adopter-coverage/status.sh` regenerates `STATUS.md` from commits: api-delta's Summary and *By
@@ -477,3 +526,33 @@ places (FileTimes.swift, FilePathOperations.swift, Syscalls.swift's UserID and G
 Where the branch stands: every interface that the adopters' 51 markers name is covered (76 of 76), 12 DocC
 diagnostics remain (none in this branch's files; the processes lane's ambiguous spawn links are two of them), and
 local system-next is still `e8762dd`.
+
+## 24. Spawning with other credentials: two fixes from review: `06c9245`
+
+- **Close-on-exec sources.** The child clears close-on-exec on every descriptor that the file actions use (section
+  22), so one used only as a source stayed open in the program, where a spawn's exec closes it. Found on macOS
+  26.3 with a C probe (fork, then posix_spawn with SETEXEC): a close-on-exec pipe end duplicated as the standard
+  output, a working directory's descriptor, and a descriptor duplicated onto itself (Darwin's adddup2 keeps its
+  flag then) all stayed open; POSIX_SPAWN_CLOEXEC_DEFAULT still closes what the actions don't install; a close
+  action on a descriptor that isn't open fails the spawn with EBADF, so closes can't be added blindly. For
+  System's file actions, the parent now appends a close action for each descriptor that the actions use as a
+  source, that has close-on-exec set, and that no action closes, replaces or inherits. Rejected: adding the
+  closes in the child (adding to C file actions allocates, which the forked child of a threaded process
+  mustn't); always setting CLOEXEC_DEFAULT, as Subprocess does, which also closes the descriptors without
+  close-on-exec that a spawn passes on; following each descriptor's state action by action (an action that
+  closes, replaces or inherits one settles it whatever comes after, so a set does). The C-values forms can't read
+  their actions, so their doc says what the caller must do: a close action after each descriptor's last use, or
+  CLOEXEC_DEFAULT.
+- **The error pipe's window.** Where pipe2 is missing (macOS 26, or a build with an older SDK), the pipe becomes
+  close-on-exec in a second step; a program that another thread starts in between inherits it, and the parent's
+  read, which ends when every write end has closed, waits until that program exits or closes it. Nothing in the
+  macOS 26 SDK makes a pipe or a socket pair close-on-exec at once (no SOCK_CLOEXEC), so the shim's comment and
+  the spawn doc state the window and its consequence. Rejected: watching the child with a kqueue (EVFILT_PROC,
+  NOTE_EXEC and NOTE_EXIT), which no inherited descriptor can delay, but which misses an exec that comes before
+  the registration unless the child waits for the parent: a second channel and a round trip in every spawn, for
+  a window that pipe2 closes from macOS 27.
+
+Tests: SpawnCredentialsTest's `testTheProgramGetsTheDescriptorsASpawnWould` (a shell reports which of seven
+descriptors are open, spawned with and without credentials; before the fix three more were open with them) and
+`testCValuesKeepTheDescriptorsTheyUse`; `testCalls` now expects the parent's F_GETFD. XCTest 551 (4 skipped, and
+testVolumeAttributes skipped), swift-testing 461 in 72 suites, all passing.
