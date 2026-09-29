@@ -177,7 +177,8 @@ touch "$STAGE/.api-graph-out"
 
 DRAFTS="${API_GRAPH_DRAFTS-$(dirname "$REPO")/win32-drafts}"
 if [ -n "$DRAFTS" ] && [ ! -d "$DRAFTS" ]; then DRAFTS=""; fi
-PREVIOUS="${API_GRAPH_PREVIOUS:-$OUT/api-graph.json}"
+PREVIOUS="${API_GRAPH_PREVIOUS:-$OUT/suggestions.json}"
+if [ -z "${API_GRAPH_PREVIOUS:-}" ] && [ ! -f "$PREVIOUS" ]; then PREVIOUS="$OUT/api-graph.json"; fi
 ADOPTERS="${API_GRAPH_ADOPTERS-$(dirname "$REPO")/adopters}"
 ECOSYSTEM="${API_GRAPH_ECOSYSTEM-$(dirname "$REPO")/ecosystem}"
 COVERAGE_RESULTS="${API_GRAPH_COVERAGE_RESULTS-$(dirname "$REPO")/coverage-results}"
@@ -331,19 +332,23 @@ if [ -n "$DRAFTS" ]; then clusters+=(--drafts "$DRAFTS"); fi
 python3 "$S/cluster.py" "${clusters[@]}"
 log "bundles"
 bundles=(--graph "$WORK/graph.json" --clusters "$WORK/clusters.json" --root "$WORK/head/src"
-  --repo "$REPO" --base "$BASE_COMMIT" --head "$HEAD_COMMIT" --out "$STAGE/bundles")
+  --repo "$REPO" --base "$BASE_COMMIT" --head "$HEAD_COMMIT" --out "$STAGE/suggestions")
 if [ -f "$WORK/adopters.json" ]; then bundles+=(--adopters "$WORK/adopters.json"); fi
 python3 "$S/bundles.py" "${bundles[@]}"
 log "report"
 report=(--graph "$WORK/graph.json" --clusters "$WORK/clusters.json" --meta "$WORK/meta.json" --out "$STAGE")
 if [ -f "$WORK/previous.json" ]; then report+=(--previous "$WORK/previous.json"); fi
 if [ -f "$WORK/adopters.json" ]; then report+=(--adopters "$WORK/adopters.json"); fi
+report+=(--pitches "$STAGE/pitches.json")
 python3 "$S/report.py" "${report[@]}"
 
 if [ -f "$WORK/adopters.json" ]; then cp "$WORK/adopters.json" "$STAGE/"; fi
 mkdir -p "$STAGE/api-delta" "$STAGE/logs"
 cp "$DELTA/API-DELTA.md" "$DELTA/api-delta.json" "$STAGE/api-delta/"
 cp "$WORK/meta.json" "$WORK/logs/"*.log "$STAGE/logs/"
+
+# The index: what each report is.
+python3 "$S/index.py" "$STAGE"
 
 log "replacing $OUT"
 check_out
@@ -355,4 +360,4 @@ if [ "${API_GRAPH_KEEP_WORK:-}" != 1 ]; then
   rm -rf "${WORK:?}"
 fi
 
-log "done: $OUT/API-GRAPH.md"
+log "done: $OUT/API-GRAPH.md (GRAPH.md, PITCHES.md, SUGGESTIONS.md)"

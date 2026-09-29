@@ -77,7 +77,7 @@ def aggregate(adopters, node_ids):
 
 
 def summary(agg):
-    """The compact form api-graph.json and the tables keep."""
+    """The compact form suggestions.json and the tables keep."""
     return {"reach": agg["reach"], "using": agg["using"], "benefiting": agg["benefiting"],
             "adoptedSites": agg.get("adoptedSites", 0), "benefitSites": agg.get("benefitSites", 0),
             "byPackage": {k: {"adopted": len(v["adopted"]),
@@ -120,9 +120,9 @@ def main():
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--json", action="store_true")
     a = ap.parse_args()
-    doc = load(os.path.join(a.dir, "api-graph.json"))
+    doc = load(os.path.join(a.dir, "suggestions.json")) or load(os.path.join(a.dir, "api-graph.json"))
     if not doc:
-        raise SystemExit(f"reach: no api-graph.json in {a.dir}")
+        raise SystemExit(f"reach: no suggestions.json in {a.dir}")
     kinds = set(x for x in a.kind.split(",") if x)
     pname = {p["key"]: p["name"] for p in doc.get("adopterPackages", [])}
     if a.package and a.package not in pname:

@@ -29,8 +29,10 @@ import json
 import os
 import re
 import subprocess
+import sys
 
-import reach
+sys.dont_write_bytecode = True
+import reach  # noqa: E402
 
 PLATFORMS = ["Darwin", "Linux", "Musl", "Android", "FreeBSD", "OpenBSD", "WASI", "Windows"]
 MAX_TESTS_MD = 60          # test functions quoted in tests.md
