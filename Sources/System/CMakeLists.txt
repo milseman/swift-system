@@ -66,6 +66,8 @@ target_sources(SystemPackage PRIVATE
   BrokenDownTime/BrokenDownTime.swift
   Internals/Syscalls+BrokenDownTime.swift)
 target_sources(SystemPackage PRIVATE
+  ClockTime/ClockTime.swift)
+target_sources(SystemPackage PRIVATE
   Directories/DirectoryStream.swift
   Directories/DirectoryWalk.swift)
 target_sources(SystemPackage PRIVATE
@@ -201,14 +203,12 @@ target_sources(SystemPackage PRIVATE
 target_sources(SystemPackage PRIVATE
   NetworkInterfaces/NetworkInterface.swift)
 target_sources(SystemPackage PRIVATE
+  Internals/Constants+Passphrase.swift
+  Passphrase/ReadPassphrase.swift)
+target_sources(SystemPackage PRIVATE
   PathsAndFiles/FilePath+Resolution.swift
   PathsAndFiles/ProcessDefaults.swift
   PathsAndFiles/UniqueFiles.swift)
-target_sources(SystemPackage PRIVATE
-  Internals/Constants+Provisional.swift
-  Internals/Syscalls+Provisional.swift
-  Provisional/Provisional+POSIXErrorCode.swift
-  Provisional/Provisional+Stdio.swift)
 target_sources(SystemPackage PRIVATE
   Internals/Syscalls+ProcessCredentials.swift
   ProcessCredentials/ProcessCredentials.swift)
@@ -234,8 +234,24 @@ target_sources(SystemPackage PRIVATE
   Processes/SignalSet.swift
   Processes/Spawn.swift)
 target_sources(SystemPackage PRIVATE
+  Internals/Constants+Provisional.swift
+  Internals/Syscalls+Provisional.swift
+  Internals/Syscalls+ProvisionalLocale.swift
+  Internals/Syscalls+ProvisionalMath.swift
+  Provisional/Provisional+Locale.swift
+  Provisional/Provisional+Math.swift
+  Provisional/Provisional+POSIXErrorCode.swift
+  Provisional/Provisional+Stdio.swift)
+target_sources(SystemPackage PRIVATE
   Internals/Syscalls+Pseudoterminals.swift
   Pseudoterminals/Pseudoterminal.swift)
+target_sources(SystemPackage PRIVATE
+  RandomGenerator/RandomGenerator.swift)
+target_sources(SystemPackage PRIVATE
+  RawSpawn/RawSpawn.swift)
+target_sources(SystemPackage PRIVATE
+  Internals/Syscalls+RootAndSync.swift
+  RootAndSync/RootAndSync.swift)
 target_sources(SystemPackage PRIVATE
   Internals/Constants+SearchPaths.swift
   Internals/Syscalls+SearchPaths.swift
@@ -249,6 +265,13 @@ target_sources(SystemPackage PRIVATE
   SharedMemory/NamedSemaphore.swift
   SharedMemory/SharedMemory.swift)
 target_sources(SystemPackage PRIVATE
+  SignalMessages/SignalMessage.swift)
+target_sources(SystemPackage PRIVATE
+  Internals/Syscalls+SpawnCredentials.swift
+  SpawnCredentials/SpawnCredentials.swift)
+target_sources(SystemPackage PRIVATE
+  SynchronizedIO/SynchronizedIO.swift)
+target_sources(SystemPackage PRIVATE
   Internals/Constants+SystemControl.swift
   Internals/Syscalls+SystemControl.swift
   SystemControl/SystemControl.swift
@@ -260,6 +283,10 @@ target_sources(SystemPackage PRIVATE
   Internals/Syscalls+SystemPaths.swift
   SystemPaths/ConfigurationStrings.swift
   SystemPaths/MakePath.swift)
+target_sources(SystemPackage PRIVATE
+  Internals/Syscalls+SmallGaps.swift
+  TemporaryFiles/UniqueFilesWithPermissions.swift
+  TemporaryFiles/UniqueFilesWithSuffix.swift)
 target_sources(SystemPackage PRIVATE
   Terminal/BaudRate.swift
   Terminal/ControlCharacters.swift
@@ -288,10 +315,20 @@ target_sources(SystemPackage PRIVATE
   Time/ClockID.swift
   Time/Sleep.swift)
 target_sources(SystemPackage PRIVATE
+  TimeZoneFiles/TimeZoneFiles.swift)
+target_sources(SystemPackage PRIVATE
   Internals/Constants+TimersAndPriority.swift
   Internals/Syscalls+TimersAndPriority.swift
   TimersAndPriority/ProcessPriority.swift
   TimersAndPriority/ProcessTimer.swift)
+target_sources(SystemPackage PRIVATE
+  Internals/Constants+TypedAllocation.swift
+  Internals/Syscalls+TypedAllocation.swift
+  TypedAllocation/TypeDescriptor.swift
+  TypedAllocation/TypedAllocation.swift)
+target_sources(SystemPackage PRIVATE
+  Internals/Syscalls+UnfairLockAndRandom.swift
+  UnfairLock/UnfairLock.swift)
 target_sources(SystemPackage PRIVATE
   VectoredIO/VectoredIO.swift)
 target_link_libraries(SystemPackage PUBLIC

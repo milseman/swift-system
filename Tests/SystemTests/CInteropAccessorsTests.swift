@@ -69,6 +69,31 @@ private struct CInteropAccessorsTests {
     #expect(timespec(Duration.seconds(2)).tv_sec == 2)
   }
 
+  #if !os(WASI)
+  /// The markers that futimens and utimensat read.
+  @available(System 199, *)
+  @Test func fileTimeMarkers() throws {
+    #expect(CInterop.TimeSpec.fileTimeNow.tv_nsec == UTIME_NOW)
+    #expect(CInterop.TimeSpec.fileTimeUnchanged.tv_nsec == UTIME_OMIT)
+    #expect(CInterop.TimeSpec.fileTimeNow.tv_sec == 0)
+    // This file doesn't import SystemPackage for testing, so it makes its
+    // own scratch file.
+    let path = FilePath("/tmp/system-fileTimeMarkers-\(ProcessID.current.rawValue)")
+    let fd = try FileDescriptor.open(path, .writeOnly, options: .create, permissions: .ownerReadWrite)
+    defer {
+      try? fd.close()
+      try? path.unlink()
+    }
+    let old = CInterop.TimeSpec(seconds: 1_000_000, nanoseconds: 0)
+    try fd.setTimes(access: old, modification: old)
+    var times = [CInterop.TimeSpec.fileTimeUnchanged, .fileTimeNow]
+    #expect(futimens(fd.rawValue, &times) == 0)
+    let status = try fd.stat()
+    #expect(status.st_atim.tv_sec == 1_000_000)
+    #expect(status.st_mtim.tv_sec > 1_000_000)
+  }
+  #endif
+
   @available(System 199, *)
   @Test func timeValAccessors() {
     var time = CInterop.TimeVal(seconds: 3, microseconds: 4)

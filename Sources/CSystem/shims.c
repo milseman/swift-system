@@ -79,6 +79,15 @@ int _system_ioctl_TIOCSWINSZ(int fd, const struct winsize *ws) {
   return ioctl(fd, TIOCSWINSZ, ws);
 }
 
+#include <stdlib.h>
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+char *csystem_mktemp(char *path) {
+  return mktemp(path);
+}
+#pragma clang diagnostic pop
+
 #endif
 
 #if defined(_WIN32)
@@ -647,3 +656,126 @@ extern void csystem_explicit_bzero(void *start, size_t count) {
   __asm__ __volatile__("" : : "r"(start) : "memory");
 }
 #endif // __ANDROID__
+
+// MARK: - Spawning with other credentials
+
+#if defined(__APPLE__)
+#include <fcntl.h>
+#include <pthread.h>
+#include <signal.h>
+#include <spawn.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+// A pipe whose ends are close-on-exec: atomically where pipe2 exists, and
+// otherwise at once, which a fork on another thread in between can miss.
+static int csystem_pipe_cloexec(int fds[2]) {
+  #if defined(HAVE_PIPE2_DUP3)
+  if (__builtin_available(macOS 27, iOS 27, tvOS 27, watchOS 27, visionOS 27, *))
+    return pipe2(fds, O_CLOEXEC);
+  #endif
+  if (pipe(fds) != 0) return -1;
+  if (fcntl(fds[0], F_SETFD, FD_CLOEXEC) == -1 || fcntl(fds[1], F_SETFD, FD_CLOEXEC) == -1) {
+    int error = errno;
+    close(fds[0]);
+    close(fds[1]);
+    errno = error;
+    return -1;
+  }
+  return 0;
+}
+
+// In the child, which may call only async-signal-safe functions: reports
+// an error number to the parent, and exits.
+static void csystem_report_child_error(int fd, int error) {
+  while (write(fd, &error, sizeof(error)) == -1 && errno == EINTR) {}
+  _exit(127);
+}
+
+extern int csystem_spawn_with_credentials(
+    int *pid, const char *path, int search_path,
+    const void *file_actions, const void *attributes,
+    char *const arguments[], char *const environment[],
+    const unsigned int *user, const unsigned int *group,
+    int group_count, const unsigned int *groups,
+    int descriptor_count, const int *descriptors) {
+  int fds[2];
+  if (csystem_pipe_cloexec(fds) != 0) return errno;
+
+  // The child runs none of the parent's signal handlers: every signal is
+  // blocked across the fork, and the child resets its handlers before it
+  // unblocks them for the program.
+  sigset_t all, old;
+  sigfillset(&all);
+  pthread_sigmask(SIG_SETMASK, &all, &old);
+  pid_t child = fork();
+  if (child == 0) {
+    close(fds[0]);
+    for (int sig = 1; sig < NSIG; sig++) {
+      struct sigaction action;
+      if (sigaction(sig, NULL, &action) == 0
+          && action.sa_handler != SIG_DFL && action.sa_handler != SIG_IGN) {
+        action.sa_handler = SIG_DFL;
+        action.sa_flags = 0;
+        sigemptyset(&action.sa_mask);
+        (void)sigaction(sig, &action, NULL);
+      }
+    }
+    // The groups before the user: once the user isn't root, they can't change.
+    if (group_count >= 0 && setgroups(group_count, (const gid_t *)groups) != 0)
+      csystem_report_child_error(fds[1], errno);
+    if (group != NULL && setgid((gid_t)*group) != 0)
+      csystem_report_child_error(fds[1], errno);
+    if (user != NULL && setuid((uid_t)*user) != 0)
+      csystem_report_child_error(fds[1], errno);
+    // With POSIX_SPAWN_SETEXEC, Darwin closes close-on-exec descriptors
+    // before it applies the file actions, which would then fail with EBADF.
+    for (int i = 0; i < descriptor_count; i++) {
+      int flags = fcntl(descriptors[i], F_GETFD);
+      if (flags == -1 || ((flags & FD_CLOEXEC) != 0
+          && fcntl(descriptors[i], F_SETFD, flags & ~FD_CLOEXEC) == -1))
+        csystem_report_child_error(fds[1], errno);
+    }
+    // The attributes are the child's copy, so the parent's keep their flags.
+    posix_spawnattr_t *spawn_attributes = (posix_spawnattr_t *)attributes;
+    short flags = 0;
+    int error = posix_spawnattr_getflags(spawn_attributes, &flags);
+    if (error == 0)
+      error = posix_spawnattr_setflags(spawn_attributes, flags | POSIX_SPAWN_SETEXEC);
+    if (error == 0) {
+      pthread_sigmask(SIG_SETMASK, &old, NULL);
+      const posix_spawn_file_actions_t *actions = file_actions;
+      pid_t unused;
+      error = search_path
+        ? posix_spawnp(&unused, path, actions, spawn_attributes, arguments, environment)
+        : posix_spawn(&unused, path, actions, spawn_attributes, arguments, environment);
+      // With POSIX_SPAWN_SETEXEC, posix_spawn returns only when it fails.
+      if (error == 0) error = ENOEXEC;
+    }
+    csystem_report_child_error(fds[1], error);
+  }
+  int fork_error = errno;
+  pthread_sigmask(SIG_SETMASK, &old, NULL);
+  close(fds[1]);
+  if (child == -1) {
+    close(fds[0]);
+    return fork_error;
+  }
+  // The write end closes when the program runs, or when the child exits.
+  int error = 0;
+  ssize_t count;
+  do {
+    count = read(fds[0], &error, sizeof(error));
+  } while (count == -1 && errno == EINTR);
+  int read_error = errno;
+  close(fds[0]);
+  if (count == 0) {
+    *pid = child;
+    return 0;
+  }
+  if (count != (ssize_t)sizeof(error)) error = count == -1 ? read_error : EIO;
+  // The child has exited: reap it.
+  while (waitpid(child, NULL, 0) == -1 && errno == EINTR) {}
+  return error;
+}
+#endif // defined(__APPLE__)

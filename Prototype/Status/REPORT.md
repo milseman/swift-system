@@ -225,3 +225,255 @@ Tests: ProvisionalPOSIXErrorCodeTests, and the MemberImportVisibility probe. XCT
 suites. One full run failed AttributeListTests' `testVolumeAttributes`, which compares a volume's free space from
 getattrlist with statfs's a moment later; it fails alone too, two runs in three, while other sessions write to
 the disk. It isn't this lane's.
+
+## 10. Shared memory and named semaphores: `be36a44`
+
+The posix-darwin lane's unstarted cluster 7.
+
+- `FileDescriptor.openSharedMemory(named:_:options:permissions:)` and `removeSharedMemory(named:)` (shm_open,
+  shm_unlink) reuse FileDescriptor's AccessMode and OpenOptions and, like `open`, trap for `.create` without
+  permissions. shm_open is variadic, so CSystem's `csystem_shm_open` passes the mode. Rejected: a SharedMemory
+  owner type; the result is a descriptor, which mapping and `resize(to:)` already take.
+- `NamedSemaphore`, a handle over `sem_t *` (`CInterop.Semaphore`), with its own OpenOptions (create,
+  exclusiveCreate), `open(named:options:permissions:value:)`, `close()`, `remove(named:)`,
+  `wait(retryOnInterrupt:)`, `tryWait()` (false for EAGAIN), `post()` and `maxValue`. Rejected: `signal()`,
+  DispatchSemaphore's word, which reads as System's `Signal`; an owner closing in its deinit (item 54);
+  `sem_init`/`sem_getvalue`, which Darwin lacks (ENOSYS).
+- Not on Android (no shm_open or sem_open in bionic); Linux code unbuilt.
+
+Found on macOS 26.3: shm names over 31 bytes fail ENAMETOOLONG; O_TRUNC fails EINVAL; a second ftruncate fails
+EINVAL; read/write fail ENXIO; the descriptor is close-on-exec; mappings outlive the name. Reopening a
+semaphore's name gives another handle on the same count; sem_post at SEM_VALUE_MAX (32,767) doesn't fail; a
+larger initial value fails EINVAL.
+
+Tests: SharedMemoryTest. XCTest 506 (4 skipped), swift-testing 443, all passing.
+
+## 11. os_unfair_lock and arc4random: `83b795d`
+
+The posix-darwin lane's unstarted cluster 8.
+
+- `UnfairLock` (Darwin): a noncopyable lock keeping its `os_unfair_lock` at one heap address, as `PThread.Mutex`
+  does its mutex: `lock()`, `tryLock()`, `unlock()` (noasync), `withLock(_:)`, `assertOwned()`, `assertNotOwned()`,
+  `init(unsafeAddress:)` for a lock in C memory, and from macOS 15 `lock(options: .adaptiveSpin)`
+  (`os_unfair_lock_lock_with_flags`; Swift can't import the flag, so its value is spelled out). Nothing throws.
+  Its doc sends value protection to `Synchronization.Mutex` (this lock on Darwin, from macOS 15), pthread kinds,
+  process sharing and conditions to `PThread.Mutex`, and notes that `os`'s `OSAllocatedUnfairLock` re-exports
+  Darwin. Rejected: a generic lock over a value (Mutex's job); the name `OSUnfairLock`.
+- `Entropy.generate()`, `generate(below:)`, `generate(into:)` (arc4random, arc4random_uniform, arc4random_buf),
+  on Darwin, FreeBSD, OpenBSD and Android, next to Entropy's throwing getentropy calls. Rejected: a
+  `RandomNumberGenerator` type, which `SystemRandomNumberGenerator` already is over the same generator.
+
+Found on macOS 26.3: misusing an unfair lock ends the process with SIGKILL, not a trap; the owner's `tryLock()`
+returns false.
+
+Tests: UnfairLockTests, RandomGeneratorTests. XCTest 506, swift-testing 452 in 69 suites, all passing.
+
+## 12. chroot and sync: `87f36ab`
+
+The posix-darwin lane's unstarted cluster 9; truncating a path was already `FilePath.resize(to:)`.
+
+- `FilePath.setRootDirectory(_:retryOnInterrupt:)` (chroot), for a FilePath and a C string, after
+  `setCurrentWorkingDirectory` (chdir), retrying on EINTR as path calls do. Its doc: the root is inherited,
+  needs privileges (EPERM), and leaves the working directory alone.
+- `FileDescriptor.synchronizeAllFileSystems()` (sync), the system-wide `synchronize()`, noting that it can
+  return before the writes finish, as Darwin's does; it can't fail. Rejected: a namespace for one call; syncfs,
+  Linux-only, until Linux resumes.
+
+That ends the early list: posix-darwin's clusters 6 to 9 are done. Tests: RootAndSyncTest. XCTest 509,
+swift-testing 452, all passing.
+
+## 13. UTIME markers and the xattr name limit: `1be2f2b`
+
+NIO's file system module imported Darwin for UTIME_NOW and UTIME_OMIT (the values its public
+`FileInfo.Timespec.now`/`.omit` expose) and XATTR_MAXNAMELEN (quoted in its errors).
+
+- `CInterop.TimeSpec.fileTimeNow` and `.fileTimeUnchanged`: the timespecs whose nanoseconds are UTIME_NOW and
+  UTIME_OMIT, for code that passes futimens/utimensat their C structures. Rejected: `.now`/`.omit` (read as a
+  timestamp and a verb) and bare Int constants.
+- `SystemConfig.maxExtendedAttributeNameBytes` (Darwin's XATTR_MAXNAMELEN, 127), with the other compile-time
+  limits; Linux's XATTR_NAME_MAX lives in a kernel header the Glibc module lacks.
+- `setTimes`' doc comments now name UTIME_OMIT for a nil time, which the API already passed: UTIME_OMIT was
+  covered but invisible to name matching (section 1's example).
+
+Tests: the markers through futimens, and 127- and 128-byte attribute names. XCTest 510, swift-testing 453.
+
+## 14. fts, answered by DirectoryWalk: `c37d638`
+
+Foundation's marker is specific: its copy and link keep fts for "each directory's preorder and postorder visits
+in one walk (to create it, then to copy its metadata), the root as an entry, and an unreadable directory
+(FTS_D, then FTS_DNR) told apart from an entry that can't be stat'ed (FTS_NS)". The Directories lane chose a
+walker of System's own over fts (Prototype/Directories/README.md), so this extends DirectoryWalk rather than
+wrapping fts, which would reverse that decision.
+
+- `DirectoryWalk.Order.preorderAndPostorder` visits each directory before and after its contents;
+  `Entry.isPostorderVisit` marks the second visit (and every directory's visit in a postorder walk). An
+  unopenable directory is visited once, with its error; `skipDescendants()` also skips the second visit.
+  Rejected: fts's balancing of a skipped directory's visits, which makes callers read past an extra entry.
+- The other two needs were there: the caller has the root's path (the walk visits its entries); an unreadable
+  directory is an entry with `type == .directory` and an error, an unstat-able one has no type.
+- status.py gains `ANSWERED`: fts names count as covered by DirectoryWalk once its two-visit order is in the
+  sources, since no *corresponding C* sentence could truthfully name fts.
+
+Tests: DirectoryWalkVisitsTests. XCTest 510, swift-testing 457 in 70 suites (one full run hit the known
+`acceptSetsExactlyTheOptions` EAGAIN flake; the rerun passed).
+
+## 15. libm, provisionally: `9166bd5`
+
+Foundation's calendar astronomy (sin, cos, pow) and a test utility (pow, log).
+`Sources/System/Provisional/Provisional+Math.swift`: a `Math` namespace of 54 static functions, each for Double
+(`sin`) and Float (`sinf`): the trigonometric, hyperbolic, exponential, logarithmic, power (pow, cbrt, hypot),
+error and gamma functions. The namespace's doc lists what the standard library already has (squareRoot,
+rounded, the remainders, magnitude, minimum/maximum, addingProduct, sign/exponent/significand), which isn't
+repeated. Rejected: members of Double and Float, which swift-numerics' RealModule extends with the same names (a
+file importing both would be ambiguous); generics over BinaryFloatingPoint, which libm isn't.
+
+Tests: ProvisionalMathTests. XCTest 510, swift-testing 460 in 71 suites (one full run hit the known accept
+flake; the rerun passed).
+
+## 16. C locales, provisionally: `63f97d8`
+
+Foundation parses and compares in the POSIX locale (strtod_l, strtof_l, strncasecmp_l, locale_t), and its tests
+set the global locale (setlocale, LC_ALL). `Sources/System/Provisional/Provisional+Locale.swift`, Darwin only:
+
+- `CInterop.Locale` (locale_t) and `CLocale`, a handle over `locale_t?`: `.posix` (LC_C_LOCALE) and `.global`
+  (LC_GLOBAL_LOCALE); `named(_:categories:base:)` (newlocale) and `free()`; `Category` and `Categories` (the
+  LC_*_MASKs, with `.all` for LC_ALL_MASK, which Swift can't import); `globalName(for:)` and `setGlobal(_:for:)`
+  (setlocale); `parseDouble`, `parseFloat` (value and bytes taken) and `compareIgnoringCase(_:_:maxByteCount:)`.
+  Rejected: the name `Locale` (Foundation's); a Swift `String` API, which Foundation's C-string callers don't
+  want.
+- Found: in the macOS 26 SDK these calls sit in explicit submodules of `_DarwinFoundation2`/`_DarwinFoundation3`
+  that `import Darwin` leaves out, so CSystem's Darwin header includes `<locale.h>` and the `<xlocale.h>`
+  headers.
+
+Tests: ProvisionalLocaleTest. XCTest 515, swift-testing 460. One full run failed the malloc lane's
+`reallocateFreeingOnFailureFreesTheBlock` (a zone's block count, under parallel tests); it passed alone three
+times and in the rerun. It isn't this lane's.
+
+## 17. posix_spawn's raw attributes and file actions: `32ec619`
+
+swift-subprocess keeps raw posix_spawn to hand `posix_spawnattr_t`/`posix_spawn_file_actions_t` to its public
+`preSpawnProcessConfigurator`, and to pass them to its own `_subprocess_spawn` (which forks first, for other
+credentials). `Sources/System/RawSpawn/RawSpawn.swift`:
+
+- `CInterop.SpawnAttributes`/`SpawnFileActions`: what posix_spawn takes a pointer to (`posix_spawnattr_t?` on
+  Darwin and the BSDs, where it's a pointer, the structure elsewhere), so an `inout` of it matches Subprocess's
+  public signature on Darwin.
+- `SpawnAttributes.withCAttributes(_:)` and `SpawnFileAction.withCFileActions(_:_:)` build the C values from
+  System's types and let a closure change and pass them; `ProcessID.spawn(...cFileActions:cAttributes:)` (and
+  `searchingPathFor:`) spawns with them. The internal builders now pass mutable pointers.
+- Rejected: a spawn that calls a configurator mid-way (serves only the first need); public setters for the
+  SETSIGMASK/SETSIGDEF/SETPGROUP flags that System's properties imply, which the closure can set.
+
+Status: 17 of the marker's 18 names are now documented; the 18th, `posix_spawnattr_getflags` (a test's), isn't
+wrapped, and the closure can call it. Tests: RawSpawnTests. XCTest 519, swift-testing 460, all passing.
+
+## 18. tzfile.h's paths: `68c6bec`
+
+Foundation reads TZDIR and TZDEFAULT through `_FoundationCShims`, since no Darwin module declares `<tzfile.h>`.
+CSystem's Darwin header now includes it; `FilePath.timeZoneDirectory` (TZDIR, `/var/db/timezone/zoneinfo`) and
+`FilePath.defaultTimeZoneFile` (TZDEFAULT, `/etc/localtime`), Darwin only. Rejected: counting them as the C
+library's (they're paths the system keeps).
+
+Also fixed: SocketOpenOptionsTests' `acceptSetsExactlyTheOptions` (syscalls-4's) accepted on a nonblocking
+listener right after `connect()` and failed with EAGAIN when the connection hadn't queued yet, in four recent
+full runs at a load average near 65; it now retries EAGAIN for up to two seconds (with a catch-all: pattern
+catches of `Errno.wouldBlock` in loops have crashed the compiler).
+
+Tests: TimeZoneFilesTests. XCTest 519, swift-testing 461 in 72 suites, all passing.
+
+## 19. One-file gaps: `d0031c5`
+
+- `FilePath.makeUniqueFile(suffixLength:...)` (mkostemps, Darwin and the BSDs) for TSC's mkstemps, and on Darwin
+  `makeUniqueFile(relativeTo:suffixLength:...)` (mkostempsat_np) for Foundation's temporary file relative to a
+  directory; the mode stays 0600 and the doc points to `setPermissions`. Rejected: a `permissions:` parameter,
+  which mkostempsat_np doesn't take (it would be a second call anyway).
+- `OpenOptions`/`StatusFlags` `.sync` and `.dataSync` (O_SYNC, O_DSYNC) on Darwin, for WasmKit.
+- `ClockID.currentTimeSpec()`: clock_gettime's timespec, without `currentTime()`'s macOS-13 `Duration`, for
+  swift-driver's pre-13 time of day (status.py counts gettimeofday as clock_gettime's).
+- `CInterop.Time` (time_t, swift-certificates' tests); `Signal.message` (strsignal, swift-driver), which I put
+  on Signal rather than in Provisional+StringH though string.h declares it, since it's about signals.
+- `DynamicLibrary.LoaderError.message`'s doc names dlerror (TSC).
+
+Tests: SmallGapsTest. XCTest 525, swift-testing 461, all passing.
+
+## 20. Typed allocation: `a795ce4`
+
+First, local system-next moved to `e8762dd`, Michael's merge of coverage up to `be36a44`; merging it back
+(`824a929`) changed nothing. The RawSpawn doc link that DocC found ambiguous between spawn's FilePath and
+C-string overloads now names `-(FilePath,_,_,_,_)` (`53286c2`); the same link in the processes lane's
+`Spawn.swift` and `ChildProcess.swift` is left to that lane.
+
+Foundation's Data allocates with libmalloc's typed calls, describing its buffers as generic data.
+
+- `Memory.TypeDescriptor`: the `malloc_type_id_t`, with Swift-named properties for the version 0 descriptor's
+  fields, read and set through the C union: `layout` (an option set for `layout_semantics`), `kind`,
+  `callSiteFlags`, `typeHash` (C's `hash`) and a read-only `version`.
+- `Memory` and `Memory.Zone`: `allocate(byteCount:type:)`, `allocateZeroed(byteCount:type:)` and
+  `(count:stride:type:)`, `allocate(byteCount:alignment:type:)`, `allocatePageAligned(byteCount:type:)` and
+  `reallocate(_:byteCount:type:)`, with the untyped methods' rules. macOS 14 and its peers, 64-bit only.
+- Rejected: a CInterop alias of the union with accessors (its own `hash`, `summary` and `type_id` would sit beside
+  them, and the allocations would take a C union); wrapping `malloc_type_free`, which C compilers never call for
+  `free` and `Memory.free` covers.
+- status.py: `ANSWERED` counts the union's members as answered by `Memory.TypeDescriptor`, and now applies to
+  `X members` too, which returned before reaching it.
+
+Status: 72 of 76 interfaces covered; missing are posix_spawn's 18th name, `mktemp` and `readpassphrase`.
+Tests: TypedAllocationTest. XCTest 532 (4 skipped), swift-testing 461 in 72 suites, all passing.
+
+## 21. The last three names: `34aa3c3`
+
+- `TerminalDescriptor.readPassphrase(prompt:into:options:)` (readpassphrase, SwiftPM's registry login) reads into
+  the caller's buffer, so it can be cleared with `Memory.secureZero`; `readPassphrase(prompt:maxByteCount:options:)`
+  returns a String and clears its own buffer. `PassphraseOptions` for the RPP_* flags. No `retryOnInterrupt`:
+  readpassphrase restores the terminal and runs the handler of a SIGINT or the like, and if that returns, EINTR
+  means the user asked to stop; retrying, the convention's default, would prompt again.
+- `FilePath.makeUniqueFile(options:permissions:retryOnInterrupt:)` and `(relativeTo:...)`, for Foundation's
+  temporary file with a chosen mode relative to a directory: mktemp makes the name, open or openat creates the
+  file with O_EXCL, and a taken name is tried again (up to 100 times), as mkstemp does inside; the permissions
+  pass through the creation mask, which mkostemp's 0600 and a later fchmod don't. Relative to a directory, mktemp
+  makes only the last component, since it checks names against the working directory. mktemp goes through a
+  CSystem shim, since the SDK deprecates it. Darwin only: glibc's and OpenBSD's linkers warn at every link of a
+  program that calls mktemp. Rejected: `makeUniqueName()` for mktemp alone; looping forever, as Foundation does.
+- `SpawnAttributes.Flags(of:)` and `store(in:)` (posix_spawnattr_getflags, setflags) read and replace C
+  attributes' flags, as Subprocess's configurator test does to add POSIX_SPAWN_SETSID.
+
+Status: 75 of 76 interfaces covered, none missing; the one left is *unread*: Subprocess's "raw posix_spawn path"
+marker, whose other half is spawning with other credentials (section 22). Tests: ReadPassphraseTest,
+UniqueFilesWithPermissionsTest, RawSpawnTests. XCTest 544 (4 skipped), swift-testing 461, all passing.
+
+## 22. Spawning with other credentials: `042d0cf`
+
+The other half of Subprocess's raw posix_spawn path marker: running a child as another user or group, which
+posix_spawn can't do, and which Subprocess does in a C shim of its own by forking first.
+
+- `SpawnCredentials` (user, group, supplementaryGroups, each `nil` for the caller's) and `ProcessID.spawn(...,
+  credentials:)`, with System's file actions and attributes or with C values (`cFileActions:`, `cAttributes:`,
+  `fileActionDescriptors:`), and `searchingPathFor:` forms. Darwin only, the one platform with
+  POSIX_SPAWN_SETEXEC.
+- A CSystem shim forks, so that the child runs only async-signal-safe C: signals are blocked across the fork and
+  the child resets its handlers; setgroups, setgid, setuid, in that order; close-on-exec is cleared on the
+  descriptors the file actions use, since with SETEXEC Darwin closes close-on-exec descriptors before applying
+  the actions (checked with a C probe: the dup2 fails with EBADF until the flag is cleared); SETEXEC goes on the
+  child's copy of the attributes, so the caller's keep their flags; a failure comes back through a close-on-exec
+  pipe and the child is reaped.
+- Rejected: a credentials property on SpawnAttributes (the C attributes can't hold it, and it would hide the
+  fork); separate `user:`/`group:` parameters, whose defaults would make calls ambiguous with spawn; forking in
+  Swift, which can't promise the child calls only async-signal-safe functions.
+- status.py (`ae3049a`): an `ANSWERED` entry can now speak for a phrase marker that names no C interface; the
+  raw posix_spawn path is answered by these forms and section 17's.
+
+Status: all 76 interfaces covered. Tests: SpawnCredentialsTest. XCTest 550 (4 skipped), swift-testing 461, all
+passing.
+
+## 23. Explicit availability: `02390d5`
+
+A clean run of the explicit-availability check (`-require-explicit-availability=warn`, CLAUDE.md's command) flagged
+section 18's `_TZDIR` and `_TZDEFAULT`, which as `@usableFromInline` were ABI without an `@available`; they're now
+`@_alwaysEmitIntoClient`, as Constants.swift's constants are. The check now warns only in Syscalls.swift's termios
+wrappers and in posix-darwin's `system_exit` and `system__exit` (Syscalls+ProcessExit.swift), left to their
+owners. None of this branch's other additions draw a warning, and the ABI-stable build fails only in its known
+places (FileTimes.swift, FilePathOperations.swift, Syscalls.swift's UserID and GroupID wrappers).
+
+Where the branch stands: every interface that the adopters' 51 markers name is covered (76 of 76), 12 DocC
+diagnostics remain (none in this branch's files; the processes lane's ambiguous spawn links are two of them), and
+local system-next is still `e8762dd`.

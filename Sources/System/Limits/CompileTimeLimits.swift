@@ -40,6 +40,17 @@ extension SystemConfig {
   public static var maxPathBytes: Int { Int(_PATH_MAX) }
 
   #if SYSTEM_PACKAGE_DARWIN
+  /// The maximum number of bytes in an extended attribute's name,
+  /// not counting the null terminator.
+  ///
+  /// A longer name throws ``Errno/fileNameTooLong``.
+  ///
+  /// The corresponding C constant is `XATTR_MAXNAMELEN`.
+  ///
+  /// - Note: Only available on Darwin.
+  @_alwaysEmitIntoClient
+  public static var maxExtendedAttributeNameBytes: Int { Int(_XATTR_MAXNAMELEN) }
+
   /// The maximum number of symbolic links that resolving one path follows.
   ///
   /// Every link counts, in any component of the path.

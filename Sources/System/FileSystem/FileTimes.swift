@@ -56,7 +56,8 @@ extension FileDescriptor {
   /// To set either time to the current time,
   /// call ``setTimesToNow(access:modification:retryOnInterrupt:)``.
   ///
-  /// The corresponding C function is `futimens`.
+  /// The corresponding C function is `futimens`,
+  /// with `UTIME_OMIT` for a `nil` time.
   @available(macOS 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *)
   @_alwaysEmitIntoClient
   public func setTimes(
@@ -138,7 +139,8 @@ extension FilePath {
   /// To set either time to the current time, call
   /// ``setTimesToNow(access:modification:followTargetSymlink:retryOnInterrupt:)``.
   ///
-  /// The corresponding C function is `utimensat`.
+  /// The corresponding C function is `utimensat`,
+  /// with `UTIME_OMIT` for a `nil` time.
   @available(macOS 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *)
   @_alwaysEmitIntoClient
   public func setTimes(
@@ -172,7 +174,8 @@ extension FilePath {
   ///     The default is `true`.
   ///     Pass `false` to try only once and throw an error upon interruption.
   ///
-  /// The corresponding C function is `utimensat`.
+  /// The corresponding C function is `utimensat`,
+  /// with `UTIME_OMIT` for a `nil` time.
   @available(macOS 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *)
   @_alwaysEmitIntoClient
   public static func setTimes(
@@ -209,7 +212,8 @@ extension FilePath {
   /// If this path is absolute (starts with a forward slash), then `fd` is ignored.
   /// If this path is relative, it is resolved against the directory given by `fd`.
   ///
-  /// The corresponding C function is `utimensat`.
+  /// The corresponding C function is `utimensat`,
+  /// with `UTIME_OMIT` for a `nil` time.
   @available(macOS 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *)
   @_alwaysEmitIntoClient
   public func setTimes(
@@ -247,7 +251,8 @@ extension FilePath {
   /// If `path` is absolute (starts with a forward slash), then `fd` is ignored.
   /// If `path` is relative, it is resolved against the directory given by `fd`.
   ///
-  /// The corresponding C function is `utimensat`.
+  /// The corresponding C function is `utimensat`,
+  /// with `UTIME_OMIT` for a `nil` time.
   @available(macOS 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *)
   @_alwaysEmitIntoClient
   public static func setTimes(

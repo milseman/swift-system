@@ -593,12 +593,12 @@ internal func _mutableCStrings(
 
 @available(System 199, *)
 extension SpawnFileAction {
-  // Calls `body` with the C file actions, or reports the first action that
-  // fails to add.
+  // Calls `body` with the C file actions, which it can change (see
+  // withCFileActions(_:_:)), or reports the first action that fails to add.
   @usableFromInline
   internal static func _withUnsafeFileActions<R>(
     _ actions: [SpawnFileAction],
-    _ body: (UnsafePointer<_SpawnFileActionsStorage>) -> Result<R, Errno>
+    _ body: (UnsafeMutablePointer<_SpawnFileActionsStorage>) -> Result<R, Errno>
   ) -> Result<R, Errno> {
     var storage = _spawnFileActionsZero
     let initialized = system_posix_spawn_file_actions_init(&storage)
@@ -645,12 +645,12 @@ extension SpawnFileAction {
 
 @available(System 199, *)
 extension SpawnAttributes {
-  // Calls `body` with the C attributes, or reports the first attribute that
-  // fails to set.
+  // Calls `body` with the C attributes, which it can change (see
+  // withCAttributes(_:)), or reports the first attribute that fails to set.
   @usableFromInline
   internal func _withUnsafeAttributes<R>(
     extraFlags: CShort,
-    _ body: (UnsafePointer<_SpawnAttributesStorage>) -> Result<R, Errno>
+    _ body: (UnsafeMutablePointer<_SpawnAttributesStorage>) -> Result<R, Errno>
   ) -> Result<R, Errno> {
     var storage = _spawnAttributesZero
     let initialized = system_posix_spawnattr_init(&storage)

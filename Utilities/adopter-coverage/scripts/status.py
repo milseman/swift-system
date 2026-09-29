@@ -114,8 +114,28 @@ TICKED = re.compile(r"`(?:struct |union |enum )?([A-Za-z_][A-Za-z0-9_]*)`")
 EQUIVALENTS = {
     "usleep": ("nanosleep",), "sleep": ("nanosleep",),
     "localtime": ("localtime_r",), "gmtime": ("gmtime_r",),
-    "mkstemp": ("mkostemp",), "time": ("clock_gettime",),
+    "mkstemp": ("mkostemp",), "mkstemps": ("mkostemps",), "time": ("clock_gettime",),
+    "gettimeofday": ("clock_gettime",),
 }
+
+
+# Families that System answers with a design of its own rather than a wrapper
+# of the C interface, so that matching names can't see them: (the names, the
+# System API that answers them, a witness in System's sources that the answer
+# has what the adopters' markers ask for, where the decision is recorded).
+ANSWERED = [
+    (r"^(fts_\w+|FTS\w*)$", "DirectoryWalk", "case preorderAndPostorder",
+     "Prototype/Directories/README.md"),
+    # The C union's fields are the identifier's bits; TypeDescriptor is the
+    # identifier, with Swift-named properties for the fields.
+    (r"^malloc_type_descriptor_v0_t members$", "Memory.TypeDescriptor", "public var callSiteFlags",
+     "Sources/System/TypedAllocation/TypeDescriptor.swift"),
+    # A marker that names no C interface: Subprocess's raw posix_spawn path,
+    # for the C values its configurator gets (RawSpawn.swift) and for other
+    # credentials, which System spawns with by forking first.
+    (r"^raw posix_spawn path$", "ProcessID.spawn's C-values and credentials forms",
+     "fileActionDescriptors: [FileDescriptor]", "Sources/System/SpawnCredentials/SpawnCredentials.swift"),
+]
 
 
 class SystemNames:
@@ -152,6 +172,13 @@ class SystemNames:
                 self.aliases[m.group(1)].add(m.group(2))
         self.alias_targets = {t for ts in self.aliases.values() for t in ts}
 
+        self.answered = []
+        for pattern, api, witness, _ in ANSWERED:
+            found = subprocess.run(["git", "-C", repo, "grep", "-q", "-F", "-e", witness, commit, "--",
+                                    *SYSTEM_SOURCES]).returncode == 0
+            if found:
+                self.answered.append((pattern, api))
+
         self.accessor_structs = set()
         out = git(repo, "grep", "-h", "-I", "-E", "-e", r"^[[:space:]]*extension[[:space:]]+CInterop\.", commit, "--",
                   *SYSTEM_SOURCES, ok=(0, 1))
@@ -166,6 +193,9 @@ class SystemNames:
 
     def covers(self, name):
         """(covered, how) for a gap interface's name."""
+        for pattern, api in self.answered:
+            if re.search(pattern, name):
+                return True, f"by {api}"
         if name.endswith(" members"):
             struct = name[:-len(" members")]
             return struct in self.accessor_structs, "Swift-named accessors" if struct in self.accessor_structs else ""
@@ -1124,6 +1154,11 @@ def main():
     def status(iface, g):
         names = sorted(g["names"])
         if not names:
+            # Only an ANSWERED entry can speak for a phrase.
+            answered, how = sys_head.covers(iface)
+            if answered and how.startswith("by "):
+                late = not sys_next.covers(iface)[0]
+                return "covered", how + (f"; not yet in `{a.system_next}`" if late else "")
             return "unread", ""
         covered = [n for n in names if sys_head.covers(n)[0]]
         if len(covered) == len(names):
@@ -1164,7 +1199,8 @@ def main():
       "alias names it, or, for `X members`, System gives `CInterop` alias of `X` Swift-named accessors. The "
       "marker is stale, or the package hasn't adopted the API yet." +
       (f" *Not yet in `{a.system_next}`* means only this branch has it." if sys_next is not sys_head else ""))
-    w("- **unread**: the marker names no C interface and nothing is imported under it; read the marker.")
+    w("- **unread**: the marker names no C interface, nothing is imported under it, and no `ANSWERED` entry "
+      "speaks for it; read the marker.")
     w("")
     counts = collections.Counter(r[4] for r in rows)
     w("A family marked *(provisional)* is a C-library layer above the OS (math, stdio, locales, string.h and "
@@ -1274,18 +1310,21 @@ api-delta's last run, and a few seconds when they haven't.
   A wildcard (`IP_*`, `DT_*`) becomes the names imported under the marker that match it. A marker whose head
   names nothing (`posix_spawn's raw attributes and file actions`) is counted under its phrase, and the scoped
   Darwin imports right under it (the file's own list of what the gap costs) decide its status; with none, it
-  is *unread*. Rejected: recognizing names by an SDK vocabulary alone, since the explanations are English
+  is *unread*, unless an `ANSWERED` entry matches its phrase. Rejected: recognizing names by an SDK vocabulary alone, since the explanations are English
   and `time`, `free`, `sleep` and `remove` are C functions; and taking the imports as the interfaces
   everywhere, since `import struct Darwin.msghdr` is there for msghdr's fields, not for the name CInterop
   already has.
 - **Covered** means System's library modules (`Sources/System`, `Sources/SystemSockets`, not the samples) name
-  the interface in a doc comment's *The corresponding C … is* sentence, or a public typealias targets it, or,
-  for `X members`, an `extension CInterop.<alias of X>` exists. A few interfaces count as covered by the
-  replacement System wraps instead (`EQUIVALENTS` in `scripts/status.py`: usleep and sleep by nanosleep,
-  localtime and gmtime by their `_r` forms, mkstemp by mkostemp, time by clock_gettime), and the table says
-  so. This sees what System documents, not whether the API fits the adopter's use: a partial wrapper counts
-  as covered, and an API whose doc comments don't name the C interface (a `nil` that means `UTIME_OMIT`)
-  counts as missing.
+  the interface in a doc comment's *The corresponding C … is* sentence, or a public typealias targets it, or, for
+  `X members`, an `extension CInterop.<alias of X>` exists. A few interfaces count as covered by the replacement
+  System wraps instead (`EQUIVALENTS` in `scripts/status.py`: usleep and sleep by nanosleep, localtime and gmtime
+  by their `_r` forms, mkstemp and mkstemps by mkostemp(s), time and gettimeofday by clock_gettime), and the table
+  says so. A family that System answers with a design of its own, rather than a wrapper, counts as covered once a
+  witness in System's sources shows the answer has what the markers ask for (`ANSWERED`: fts is DirectoryWalk, with
+  its two-visit order, `malloc_type_descriptor_v0_t`'s members are `Memory.TypeDescriptor`'s properties, and
+  Subprocess's raw posix_spawn path, a marker that names no C interface, is `ProcessID.spawn`'s C-values and
+  credentials forms). This sees what System documents, not whether the API fits the adopter's use: a partial
+  wrapper counts as covered, and an API whose doc comments don't name the C interface counts as missing.
 - **Provisional families** (libm, C stdio, locale and xlocale, string.h and ctype.h, numeric conversion) are a
   fixed list in `scripts/status.py`, matched by name or by the name's SDK module in adopter-coverage's stored
   vocabulary when there is one. They're C-library layers above the OS that System wraps provisionally, in

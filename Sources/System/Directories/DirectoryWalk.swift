@@ -115,13 +115,25 @@ extension DirectoryWalk {
   public enum Order: Sendable, Hashable {
     /// Visit each directory before its contents.
     ///
-    /// Only a preorder walk can skip a directory's contents,
+    /// Only a walk that visits directories before their contents
+    /// can skip a directory's contents,
     /// with ``DirectoryWalk/skipDescendants()``.
     case preorder
 
     /// Visit each directory after its contents,
     /// as removing a tree or adding up its sizes requires.
     case postorder
+
+    /// Visit each directory twice: before its contents,
+    /// and again after them,
+    /// as copying a tree requires,
+    /// to create each directory and then to set its metadata.
+    ///
+    /// The second visit's entry has ``Entry/isPostorderVisit``.
+    /// A directory the walk can't open is visited once, with its error,
+    /// and so is one whose contents ``DirectoryWalk/skipDescendants()`` skips.
+    /// This is `fts`'s pair of visits, `FTS_D` and `FTS_DP`.
+    case preorderAndPostorder
   }
 
   /// Opens a directory to walk the tree under it.
@@ -228,18 +240,24 @@ extension DirectoryWalk {
     /// to find its type, when its directory doesn't record the type.
     public var error: Errno?
 
+    /// Whether this is a directory's visit after its contents:
+    /// the only visit in a ``Order/postorder`` walk,
+    /// and the second in a ``Order/preorderAndPostorder`` one.
+    public var isPostorderVisit: Bool
+
     // The path of the directory that contains the entry.
     @usableFromInline
     internal var _parentPath: FilePath
 
     internal init(
       name: FilePath.Component, type: FileType?, depth: Int,
-      error: Errno?, parentPath: FilePath
+      error: Errno?, parentPath: FilePath, isPostorderVisit: Bool = false
     ) {
       self.name = name
       self.type = type
       self.depth = depth
       self.error = error
+      self.isPostorderVisit = isPostorderVisit
       self._parentPath = parentPath
     }
 
@@ -298,10 +316,10 @@ extension DirectoryWalk {
         // walk drops that error.
         let finished = _levels.removeLast()
         _ = system_closedir(finished.dir)
-        if _order == .postorder, let name = finished.name, let parent = _levels.last {
+        if _order != .preorder, let name = finished.name, let parent = _levels.last {
           return .success(Entry(
             name: name, type: .directory, depth: _levels.count,
-            error: nil, parentPath: parent.path))
+            error: nil, parentPath: parent.path, isPostorderVisit: true))
         }
 
       case .success(let raw?):
@@ -373,6 +391,8 @@ extension DirectoryWalk {
   /// After a preorder walk visits a directory,
   /// call this method before calling `next()` again
   /// to go on to the directory's next sibling instead of its contents.
+  /// A ``Order/preorderAndPostorder`` walk then skips the directory's
+  /// second visit too.
   /// If the walk isn't about to visit the contents of a directory,
   /// such as after visiting a file, or in a postorder walk,
   /// this method does nothing.

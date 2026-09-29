@@ -8,11 +8,14 @@
 */
 
 // The C library constants that System's provisional API uses (see
-// Sources/System/Provisional): stdio's buffering modes.
+// Sources/System/Provisional): stdio's buffering modes and standard streams,
+// and on Darwin the locale categories, which come from CSystem's Darwin
+// header (see Syscalls+ProvisionalLocale.swift).
 
 #if !os(Windows)
 
 #if SYSTEM_PACKAGE_DARWIN
+import CSystem
 import Darwin
 #elseif canImport(Glibc)
 import Glibc
@@ -64,3 +67,45 @@ internal var _stderr: UnsafeMutablePointer<FILE> {
 }
 
 #endif // !os(Windows)
+
+// The locale categories and their masks, for Provisional+Locale.swift.
+#if SYSTEM_PACKAGE_DARWIN
+@_alwaysEmitIntoClient
+internal var _LC_ALL: CInt { LC_ALL }
+
+@_alwaysEmitIntoClient
+internal var _LC_COLLATE: CInt { LC_COLLATE }
+
+@_alwaysEmitIntoClient
+internal var _LC_CTYPE: CInt { LC_CTYPE }
+
+@_alwaysEmitIntoClient
+internal var _LC_MESSAGES: CInt { LC_MESSAGES }
+
+@_alwaysEmitIntoClient
+internal var _LC_MONETARY: CInt { LC_MONETARY }
+
+@_alwaysEmitIntoClient
+internal var _LC_NUMERIC: CInt { LC_NUMERIC }
+
+@_alwaysEmitIntoClient
+internal var _LC_TIME: CInt { LC_TIME }
+
+@_alwaysEmitIntoClient
+internal var _LC_COLLATE_MASK: CInt { LC_COLLATE_MASK }
+
+@_alwaysEmitIntoClient
+internal var _LC_CTYPE_MASK: CInt { LC_CTYPE_MASK }
+
+@_alwaysEmitIntoClient
+internal var _LC_MESSAGES_MASK: CInt { LC_MESSAGES_MASK }
+
+@_alwaysEmitIntoClient
+internal var _LC_MONETARY_MASK: CInt { LC_MONETARY_MASK }
+
+@_alwaysEmitIntoClient
+internal var _LC_NUMERIC_MASK: CInt { LC_NUMERIC_MASK }
+
+@_alwaysEmitIntoClient
+internal var _LC_TIME_MASK: CInt { LC_TIME_MASK }
+#endif // SYSTEM_PACKAGE_DARWIN

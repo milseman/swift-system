@@ -106,6 +106,38 @@ extension CInterop.TimeSpec {
   }
 }
 
+#if !os(WASI)
+@available(System 199, *)
+extension CInterop.TimeSpec {
+  /// The time that sets a file's time to the current time,
+  /// in the C calls that set file times, `futimens` and `utimensat`.
+  ///
+  /// ``FileDescriptor/setTimesToNow(access:modification:retryOnInterrupt:)``
+  /// passes it; this is for code that passes the C structures itself.
+  ///
+  /// The corresponding C constant is `UTIME_NOW`,
+  /// which is its nanoseconds.
+  @_alwaysEmitIntoClient
+  public static var fileTimeNow: CInterop.TimeSpec {
+    CInterop.TimeSpec(seconds: 0, nanoseconds: _UTIME_NOW)
+  }
+
+  /// The time that leaves a file's time unchanged,
+  /// in the C calls that set file times, `futimens` and `utimensat`.
+  ///
+  /// ``FileDescriptor/setTimes(access:modification:retryOnInterrupt:)``
+  /// passes it for a `nil` time;
+  /// this is for code that passes the C structures itself.
+  ///
+  /// The corresponding C constant is `UTIME_OMIT`,
+  /// which is its nanoseconds.
+  @_alwaysEmitIntoClient
+  public static var fileTimeUnchanged: CInterop.TimeSpec {
+    CInterop.TimeSpec(seconds: 0, nanoseconds: _UTIME_OMIT)
+  }
+}
+#endif // !os(WASI)
+
 // MARK: - timeval
 
 @available(System 199, *)
