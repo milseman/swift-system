@@ -162,6 +162,33 @@ final class RawSpawnTests: XCTestCase {
     XCTAssertEqual(try other.wait(), .exited(1))
   }
 
+  /// Actions added to C file actions that other code built,
+  /// as a pre-spawn configurator does.
+  func testAddingActionsToCFileActions() throws {
+    let (reader, writer) = try FileDescriptor.pipe()
+    defer { try? reader.close() }
+    let child = try SpawnFileAction.withCFileActions([]) { fileActions in
+      try SpawnFileAction.setWorkingDirectory("/usr").add(to: &fileActions)
+      try SpawnFileAction.duplicate(writer, as: .standardOutput).add(to: &fileActions)
+      try SpawnFileAction.close(writer).add(to: &fileActions)
+      return try ProcessID.spawn(
+        "/bin/pwd", arguments: ["pwd"], cFileActions: &fileActions, cAttributes: nil)
+    }
+    try writer.close()
+    XCTAssertEqual(try child.wait(), .exited(0))
+    let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 64, alignment: 1)
+    defer { buffer.deallocate() }
+    let count = try reader.read(into: buffer)
+    XCTAssertEqual(String(decoding: buffer[..<count], as: UTF8.self), "/usr\n")
+
+    // An action that the system rejects throws its error.
+    XCTAssertThrowsError(
+      try SpawnFileAction.withCFileActions([]) { fileActions in
+        try SpawnFileAction.close(FileDescriptor(rawValue: -1)).add(to: &fileActions)
+      }
+    ) { XCTAssertEqual($0 as? Errno, .badFileDescriptor) }
+  }
+
   func testSpawningWithoutCValues() throws {
     let child = try ProcessID.spawn(
       searchingPathFor: "sh", arguments: ["sh", "-c", "exit 4"], cFileActions: nil, cAttributes: nil)
