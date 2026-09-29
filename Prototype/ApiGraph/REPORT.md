@@ -170,14 +170,21 @@ The check, over every pitch file at once:
 Build order (from the 2026-09-29 direction): graph, adopter reach, pitch files
 and checks, bundles, suggestions, domains.
 
-- **Done before the new direction** (milestone 1, section 4): the adopters
-  step (`scripts/adopters.py`) and per-carve-out Adopters sections, commits
-  `a33404f`..`b10b6c1`.
-- **Next**: the graph snapshot (`scripts/snapshot.py`) with the node and link
-  kinds above, the store and diffs, and `scripts/graphq.py`.
+| Step | State | Where |
+|---|---|---|
+| Graph | done: snapshot, store, diff, queries | `scripts/snapshot.py`, `scripts/graphq.py`; build_graph.py records signature roles, conformances and blocks; `scripts/cnames.py` the C names and families (`3a31998`, `188cd6c`) |
+| Adopter reach | done: `usedBy` and `calls` links, each declaration's reach | `scripts/adopters.py` (milestone 1), folded into the snapshot |
+| Pitch files and checks | done: format, resolver, checks, five examples | `scripts/pitches.py`, `Prototype/Pitches/` (`9791564`) |
+| Bundles | next: per-pitch bundles with adopter examples | bundles.py, generalized to any set of nodes |
+| Suggestions | to do: today's clustering as a report proposing pitches | cluster.py, report.py |
+| Domains | to do: C families by domain | a hand-kept data file |
+
+On system-next `7b0875f`: 9835 nodes, 37892 links; 58 packages (the
+ecosystem gained 21 clones during the session, picked up with no change).
 
 To resume: read this section, then run `Utilities/api-graph/regenerate.sh`
-(about 4 minutes when every adopter index is cached).
+(about 5 minutes when every adopter index is cached) and read the output's
+`GRAPH.md` and `PITCHES.md`; `scripts/graphq.py --help` for queries.
 
 ## 4. Milestone 1: adopters for every carve-out (done)
 
