@@ -824,8 +824,8 @@ Michael's asks A1 to A4, ahead of the ranked clusters. A3, C-string arguments fo
 Tests: DirectoryEntryTypeTests' `cEntryAccessors` (readdir's entries against Stat, the dot entries, a zero entry),
 DynamicLibraryTests' `takingThePendingError`, RawSpawnTests' `testAddingActionsToCFileActions` (/bin/pwd with a
 working directory, a duplicate and a close added to empty C file actions; an invalid close throws EBADF). XCTest
-556, swift-testing 474 in 74 suites, passing with `setCurrentQualityOfService` skipped. STATUS.md after these: all
-50 of the markers' interfaces covered again.
+556, swift-testing 474 in 74 suites, passing with `setCurrentQualityOfService` skipped. STATUS.md after these: every
+interface the markers name is covered again (48 of 48, as the adopters remove markers).
 
 ## 35. DirectoryWalk's opening option, and section 14's corrections: `6666fbe`
 
