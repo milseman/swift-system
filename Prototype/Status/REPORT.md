@@ -14,19 +14,21 @@ Darwin; grouped here into clusters and ranked by packages, then call sites. Late
 (System `6e784c6`, the 21 main-scheme packages that import Darwin): 756 interfaces, 567 covered, 131 gaps (24 in two
 or more packages); set apart, 14 the standard library answers, 18 other modules' names, 26 the packages' own shims.
 
-Next: cluster 6. Resume from the first row not marked done.
+Next: cluster 10. Resume from the first row not marked done. Latest re-rank: run `b64ee9f1591b-d229d468` (System
+`b64ee9f`): 756 interfaces, 615 covered, 78 gaps; set apart, 19 the standard library answers, 18 other modules' names,
+26 the packages' own shims.
 
 | # | Cluster | Packages | Sites | Interfaces | Plan |
 |---|---|---:|---:|---|---|
 | 1 | string.h and ctype.h | 9 | 60 | strdup (7 packages), strlen, strnlen, strncmp, strlcpy, tolower, isspace | done: `CString` and `CType` (section 26) |
 | 2 | C stdio beyond FileStream | 5 | 12 | fputs, perror, putc, snprintf | done: FileStream's write(cString:) and write(byte:), mapping (section 27) |
-| 3 | Sockets | 4 | 104 | sockaddr_storage (NIO 34), inet_pton (partial), freeaddrinfo, INADDR_ANY and the address-string lengths, NI_MAXHOST, NIO's multicast and packet-info options, nfds_t, AF_VSOCK | done: ExplicitCongestionNotification, docs, mapping (section 28) |
+| 3 | Sockets | 4 | 104 | sockaddr_storage, inet_pton, freeaddrinfo, INADDR_ANY, NI_MAXHOST, NIO's options, nfds_t, AF_VSOCK | done: ExplicitCongestionNotification, docs, mapping (section 28) |
 | 4 | C scalar types | 4 | 7 | suseconds_t, u_int, LONG_MAX, _POSIX_ARG_MAX | done: `guaranteedArgumentBytes`, `swift` answers (section 30) |
 | 5 | File times | 4 | 5 | futimens, utimes | done: setTimes' sentences, `same.` (section 30) |
-| 6 | Mach | 3 | 24 | mach_task_self_, KERN_SUCCESS, ERR_SUCCESS, vm_address_t, vm_prot_t, integer_t, mach_msg_type_number_t, task_info with TASK_VM_INFO and task_vm_info, USEC_PER_SEC | task information, the Mach names |
+| 6 | Mach | 3 | 24 | mach_task_self_, KERN_SUCCESS, ERR_SUCCESS, vm_address_t, task_info with TASK_VM_INFO | done: docs, [task_info] (section 31); swift-build's own vm_prot_t and USEC_PER_SEC stay listed |
 | 7 | ioctl | 3 | 3 | ioctl (terminal size, vsock CID) | done: both requests are System's (section 28) |
-| 8 | MacTypes | 2 | 12 | OSStatus, DarwinBoolean (UniChar there is CoreFoundation's) | |
-| 9 | sysctl process information | 2 | 9 | kinfo_proc's fields, P_TRACED, extern_proc | accessors |
+| 8 | MacTypes | 2 | 12 | OSStatus, UniChar, DarwinBoolean | done: `swift` answers (section 31) |
+| 9 | sysctl process information | 2 | 9 | kinfo_proc's fields, P_TRACED, extern_proc | done: `CInterop.KernelProcessInfo` (section 31) |
 | 10 | pthreads | 2 | 8 | pthread_attr_getstacksize, setdetachstate, setscope, PTHREAD_CREATE_DETACHED, PTHREAD_SCOPE_SYSTEM, pthread_exit, pthread_yield_np, the error-checking initializer | |
 | 11 | Signals | 2 | 7 | signal, SIG_ERR, SIG_UNBLOCK, sigprocmask, NSIG | check the processes lane's API |
 | 12 | Spawn attributes | 2 | 6 | posix_spawnattr_setpgroup, setsigdefault, setsigmask | check SpawnAttributes' docs |
@@ -42,7 +44,7 @@ say; the standard library's answers (off_t, ssize_t, size_t and uintptr_t are In
 memset; round, sqrt, ceil, floor, fabs, modf); Dispatch and ObjectiveC names; the packages' own C shims
 (CNIODarwin_*, c_nio_posix_*, _subprocess_*).
 
-Done: step 0, what the tools couldn't see (section 25); clusters 1 (section 26), 2 (section 27), 3 and 7 (section 28), 4 and 5 (section 30); and Subprocess's new marker, C arrays for the C-values spawns (section 29). New SYSTEM-GAP markers in `../adopters` come first: status.sh lists them.
+Done: step 0, what the tools couldn't see (section 25); clusters 1 (section 26), 2 (section 27), 3 and 7 (section 28), 4 and 5 (section 30), 6, 8 and 9 (section 31); and Subprocess's new marker, C arrays for the C-values spawns (section 29). New SYSTEM-GAP markers in `../adopters` come first: status.sh lists them.
 
 ## 1. status.sh and STATUS.md (2026-09-28)
 
@@ -701,3 +703,30 @@ Queue clusters 4 (suseconds_t, u_int, LONG_MAX, _POSIX_ARG_MAX; 4 packages) and 
 Tests: CompileTimeLimitsTest's `testGuaranteedArgumentBytes`, against the C constant and the system's own limit.
 XCTest 555 (4 skipped, and testVolumeAttributes skipped), swift-testing 468 in 74 suites, passing with
 `setCurrentQualityOfService` skipped (section 28).
+
+## 31. Mach, MacTypes and the kernel's process information: `a800132`, `b3dee42`, `b08bf19`
+
+The ecosystem run after section 30 (`b64ee9f1591b-d229d468`) counted 78 gaps, from 131: clusters 1 to 5 and 7 have no
+interfaces left. This section takes the Queue's clusters 6, 8 and 9.
+
+- **Mach** (`a800132`, docs; `b3dee42`, mapping): Foundation and swift-corelibs-foundation call vm_copy and
+  vm_deallocate on `mach_task_self_` with `vm_address_t` arguments and compare with KERN_SUCCESS or ERR_SUCCESS, which
+  is what `Mach.VirtualMemory`'s `copy` and `deallocate` do, throwing `Mach.KernelError` for any other code; their docs
+  now name those. swift-build reads its memory footprint with `task_info(TASK_VM_INFO)`'s `phys_footprint`, which
+  `ProcessID.resourceUsageInfo()`'s `physicalFootprint` reports: the same kernel value (a C probe read 68174784 bytes
+  both ways). mapping.ini's [task_info] cites it, covered for that flavor. swift-build's `vm_prot_t` and `USEC_PER_SEC`
+  are its own declarations, which the scan reads as Darwin's; they stay listed, with that reason.
+- **MacTypes** (`b3dee42`): OSStatus, UniChar, DarwinBoolean and Boolean are the standard library's (Int32, UInt16,
+  Bool); the lexical scan's `index` (Collection's `index(after:)`) and `Float80` get an ignore entry, and os's
+  `Logger`, Foundation's `NSDictionary` and CoreFoundation's `CFRunLoopStop` an Apple-frameworks entry.
+- **The kernel's process information** (`b08bf19`): Foundation reads the saved set-user ID, which Darwin has no call
+  for, and swift-build whether a debugger traces the process, from SystemControl's `kinfo_proc`, whose nested fields
+  a client can't reach without Darwin under MemberImportVisibility. `CInterop.KernelProcessInfo` names it, with
+  read-only Swift-named accessors: `processID`, `parentProcessID`, `processGroupID`, `realUserID`,
+  `effectiveUserID`, `savedUserID`, `realGroupID`, `savedGroupID`, `isTraced` (P_TRACED) and `commandName`. Rejected:
+  a Swift structure copying the fields, which would drop the rest of kinfo_proc; a raw flags accessor, since P_TRACED is
+  the one flag a package reads.
+
+Tests: SystemControlTest's `testProcesses` checks each accessor against the calling process. XCTest 555 (4 skipped,
+and testVolumeAttributes skipped), swift-testing 468 in 74 suites, passing with `setCurrentQualityOfService`
+skipped (section 28).
