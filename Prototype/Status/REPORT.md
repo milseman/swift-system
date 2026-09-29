@@ -14,15 +14,15 @@ Darwin; grouped here into clusters and ranked by packages, then call sites. Late
 (System `6e784c6`, the 21 main-scheme packages that import Darwin): 756 interfaces, 567 covered, 131 gaps (24 in two
 or more packages); set apart, 14 the standard library answers, 18 other modules' names, 26 the packages' own shims.
 
-Next: cluster 4. Resume from the first row not marked done.
+Next: cluster 6. Resume from the first row not marked done.
 
 | # | Cluster | Packages | Sites | Interfaces | Plan |
 |---|---|---:|---:|---|---|
 | 1 | string.h and ctype.h | 9 | 60 | strdup (7 packages), strlen, strnlen, strncmp, strlcpy, tolower, isspace | done: `CString` and `CType` (section 26) |
 | 2 | C stdio beyond FileStream | 5 | 12 | fputs, perror, putc, snprintf | done: FileStream's write(cString:) and write(byte:), mapping (section 27) |
 | 3 | Sockets | 4 | 104 | sockaddr_storage (NIO 34), inet_pton (partial), freeaddrinfo, INADDR_ANY and the address-string lengths, NI_MAXHOST, NIO's multicast and packet-info options, nfds_t, AF_VSOCK | done: ExplicitCongestionNotification, docs, mapping (section 28) |
-| 4 | C scalar types | 4 | 7 | suseconds_t, u_int, LONG_MAX, _POSIX_ARG_MAX | `swift` answers where the standard library has them |
-| 5 | File times | 4 | 5 | futimens, utimes | check setTimes' docs |
+| 4 | C scalar types | 4 | 7 | suseconds_t, u_int, LONG_MAX, _POSIX_ARG_MAX | done: `guaranteedArgumentBytes`, `swift` answers (section 30) |
+| 5 | File times | 4 | 5 | futimens, utimes | done: setTimes' sentences, `same.` (section 30) |
 | 6 | Mach | 3 | 24 | mach_task_self_, KERN_SUCCESS, ERR_SUCCESS, vm_address_t, vm_prot_t, integer_t, mach_msg_type_number_t, task_info with TASK_VM_INFO and task_vm_info, USEC_PER_SEC | task information, the Mach names |
 | 7 | ioctl | 3 | 3 | ioctl (terminal size, vsock CID) | done: both requests are System's (section 28) |
 | 8 | MacTypes | 2 | 12 | OSStatus, DarwinBoolean (UniChar there is CoreFoundation's) | |
@@ -42,7 +42,7 @@ say; the standard library's answers (off_t, ssize_t, size_t and uintptr_t are In
 memset; round, sqrt, ceil, floor, fabs, modf); Dispatch and ObjectiveC names; the packages' own C shims
 (CNIODarwin_*, c_nio_posix_*, _subprocess_*).
 
-Done: step 0, what the tools couldn't see (section 25); clusters 1 (section 26), 2 (section 27), 3 and 7 (section 28); and Subprocess's new marker, C arrays for the C-values spawns (section 29). New SYSTEM-GAP markers in `../adopters` come first: status.sh lists them.
+Done: step 0, what the tools couldn't see (section 25); clusters 1 (section 26), 2 (section 27), 3 and 7 (section 28), 4 and 5 (section 30); and Subprocess's new marker, C arrays for the C-values spawns (section 29). New SYSTEM-GAP markers in `../adopters` come first: status.sh lists them.
 
 ## 1. status.sh and STATUS.md (2026-09-28)
 
@@ -683,3 +683,21 @@ Tests: RawSpawnTests' `testSpawningWithCArrays` and SpawnCredentialsTest's `test
 its argument and an environment variable with a lone 0xFF byte (and fails for 0xFE); `testCalls` records a C-array
 credentials spawn as the others. XCTest 554 (4 skipped, and testVolumeAttributes skipped), swift-testing 468 in 74
 suites, passing with `setCurrentQualityOfService` skipped (section 28).
+
+## 30. C scalar types and file times: `56e3f1d`, `f81f8d1`
+
+Queue clusters 4 (suseconds_t, u_int, LONG_MAX, _POSIX_ARG_MAX; 4 packages) and 5 (futimens, utimes; 4 packages).
+
+- `SystemConfig.guaranteedArgumentBytes` (`56e3f1d`, _POSIX_ARG_MAX, 4096): POSIX's least limit on a new program's
+  arguments and environment, the floor that swift-driver puts under sysconf's, next to section 3's compile-time
+  limits. Rejected: `minimumMaxArgumentBytes`, which reads as a setting; leaving callers the literal.
+- The typedefs and limits are the standard library's (`f81f8d1`): mapping.ini's [C scalar types] gains u_char,
+  u_short, u_int, u_long, suseconds_t and the integer limits (Swift's integer types and their `min` and `max`); u_long
+  and u_short leave [Winsock addresses], since the BSD headers declare them too.
+- futimens and utimensat read as partly covered because of section 13: its "with `UTIME_OMIT` for a `nil` time"
+  made the tools read setTimes' sentences as restricting both calls to that use. UTIME_OMIT now has a sentence of its
+  own. utimes, futimes and lutimes read as the timespec calls (`same.`), which setTimes covers.
+
+Tests: CompileTimeLimitsTest's `testGuaranteedArgumentBytes`, against the C constant and the system's own limit.
+XCTest 555 (4 skipped, and testVolumeAttributes skipped), swift-testing 468 in 74 suites, passing with
+`setCurrentQualityOfService` skipped (section 28).
