@@ -33,6 +33,9 @@
 #   API_GRAPH_MIN_FREE_GB  don't start an adopter build with less free disk
 #                        than this (default 15)
 #   API_GRAPH_KEEP_WORK  1 keeps the scratch directory after a successful run
+#   API_GRAPH_SNAPSHOTS  the graph snapshots' store, one per commit (default
+#                        ../api-graph-snapshots beside the repository); set it
+#                        empty to keep only the output's copy
 #
 # Refs resolve as in api-delta: in the git worktree of the current directory
 # if it belongs to this repository, else in the worktree holding this script.
@@ -112,6 +115,27 @@ check_dir() {
   fi
 }
 
+# A store that outlives worktrees: it may sit in another repository's work
+# tree (the directory holding this one's worktrees can be one), so long as
+# it holds no tracked files; inside this repository, it has to be ignored.
+check_store() {
+  local name="$1" dir="$2" keep probe
+  [ "$dir" != / ] || fail "refusing $name=/"
+  for keep in "$REPO" "$(cd "$HOME" && pwd -P)" "$TOOL"; do
+    case "$keep/" in "$dir"/*) fail "refusing $name=$dir: it holds $keep" ;; esac
+  done
+  probe="$dir"
+  while [ ! -d "$probe" ]; do probe="$(dirname "$probe")"; done
+  if [ "$(git -C "$probe" rev-parse --is-inside-git-dir 2>/dev/null)" = true ]; then
+    fail "refusing $name=$dir: it's inside a git directory"
+  fi
+  case "$dir/" in "$REPO"/*) check_dir "$name" "$dir" ;; esac
+  if [ "$(git -C "$probe" rev-parse --is-inside-work-tree 2>/dev/null)" = true ] \
+      && [ -n "$(git -C "$probe" ls-files -- "$dir" 2>/dev/null)" ]; then
+    fail "refusing $name=$dir: it holds tracked files"
+  fi
+}
+
 check_out() {
   if [ -e "$OUT" ] && [ ! -f "$OUT/.api-graph-out" ]; then
     fail "refusing API_GRAPH_OUT=$OUT: it exists and isn't api-graph output"
@@ -155,6 +179,11 @@ if [ -n "$ADOPTERS" ] && [ ! -d "$ADOPTERS" ]; then ADOPTERS=""; fi
 if [ -n "$ECOSYSTEM" ] && [ ! -d "$ECOSYSTEM" ]; then ECOSYSTEM=""; fi
 if [ -n "$COVERAGE_RESULTS" ] && [ ! -d "$COVERAGE_RESULTS" ]; then COVERAGE_RESULTS=""; fi
 CACHE="$(abspath "${API_GRAPH_CACHE:-$REPO/.build/api-graph-cache}")"
+SNAPSHOTS="${API_GRAPH_SNAPSHOTS-$(dirname "$REPO")/api-graph-snapshots}"
+if [ -n "$SNAPSHOTS" ]; then
+  SNAPSHOTS="$(abspath "$SNAPSHOTS")"
+  check_store API_GRAPH_SNAPSHOTS "$SNAPSHOTS"
+fi
 check_dir API_GRAPH_CACHE "$CACHE"
 for d in "$OUT" "$WORK"; do
   case "$CACHE/" in "$d"/*) fail "refusing API_GRAPH_CACHE=$CACHE: each run replaces $d" ;; esac
@@ -252,11 +281,15 @@ graph=(--delta-dir "$DELTA" --head-scan "$WORK/head/scan.json" --base-scan "$WOR
   --root "$WORK/head/src" --out "$WORK/graph.json")
 if [ "$SAMPLES" = lexical ]; then graph+=(--lexical-samples); fi
 python3 "$S/build_graph.py" "${graph[@]}"
+log "C names"
+python3 "$S/cnames.py" --graph "$WORK/graph.json" --head-src "$WORK/head/src" --base-src "$WORK/base/src" \
+  --head-scan "$WORK/head/scan.json" --base-scan "$WORK/base/scan.json" --out "$WORK/cnames.json"
 if [ -n "$ADOPTERS$ECOSYSTEM" ]; then
   log "adopters (${ADOPTERS:-no adopters}; ${ECOSYSTEM:-no ecosystem}; log in $WORK/logs/adopters.log)"
   adopters=(--graph "$WORK/graph.json" --repo "$REPO" --head "$HEAD_COMMIT"
     --head-src "$WORK/head/src" --base-src "$WORK/base/src" --head-scan "$WORK/head/scan.json"
-    --base-scan "$WORK/base/scan.json" --work "$WORK" --cache "$CACHE" --out "$WORK/adopters.json"
+    --base-scan "$WORK/base/scan.json" --cnames "$WORK/cnames.json" --work "$WORK" --cache "$CACHE"
+    --out "$WORK/adopters.json"
     --branch "${API_GRAPH_ADOPTER_BRANCH:-migrate-darwin}" --builds "${API_GRAPH_ADOPTER_BUILDS:-build}"
     --min-free-gb "${API_GRAPH_MIN_FREE_GB:-15}")
   if [ -n "$ADOPTERS" ]; then adopters+=(--adopters "$ADOPTERS"); fi
@@ -264,6 +297,14 @@ if [ -n "$ADOPTERS$ECOSYSTEM" ]; then
   if [ -n "$COVERAGE_RESULTS" ]; then adopters+=(--coverage-results "$COVERAGE_RESULTS"); fi
   python3 "$S/adopters.py" "${adopters[@]}" 2>&1 | tee "$WORK/logs/adopters.log"
 fi
+log "graph snapshot"
+snapshot=(--graph "$WORK/graph.json" --cnames "$WORK/cnames.json" --delta-dir "$DELTA" --meta "$WORK/meta.json"
+  --out "$STAGE/graph.json.gz" --diff-out "$STAGE")
+if [ -f "$WORK/adopters.json" ]; then snapshot+=(--adopters "$WORK/adopters.json"); fi
+if [ -n "$SNAPSHOTS" ]; then snapshot+=(--store "$SNAPSHOTS"); fi
+if [ -n "${API_GRAPH_SNAPSHOT_PREVIOUS:-}" ]; then snapshot+=(--previous "$API_GRAPH_SNAPSHOT_PREVIOUS"); fi
+python3 "$S/snapshot.py" "${snapshot[@]}"
+python3 "$S/graphq.py" --snapshot "$STAGE/graph.json.gz" summary --diff "$STAGE/DIFF.md" --out "$STAGE/GRAPH.md"
 log "clusters"
 clusters=(--graph "$WORK/graph.json" --config "$TOOL/config.json" --contingencies "$TOOL/contingencies.json"
   --evidence "$TOOL/evidence.json" --root "$WORK/head/src" --out "$WORK/clusters.json")
@@ -280,7 +321,6 @@ if [ -f "$WORK/previous.json" ]; then report+=(--previous "$WORK/previous.json")
 if [ -f "$WORK/adopters.json" ]; then report+=(--adopters "$WORK/adopters.json"); fi
 python3 "$S/report.py" "${report[@]}"
 
-cp "$WORK/graph.json" "$STAGE/"
 if [ -f "$WORK/adopters.json" ]; then cp "$WORK/adopters.json" "$STAGE/"; fi
 mkdir -p "$STAGE/api-delta" "$STAGE/logs"
 cp "$DELTA/API-DELTA.md" "$DELTA/api-delta.json" "$STAGE/api-delta/"
