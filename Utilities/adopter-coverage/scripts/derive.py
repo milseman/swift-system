@@ -229,8 +229,35 @@ def implementation(root, scan):
     return {n: sorted(ps, key=check.PLATFORMS.index) for n, ps in sorted(used.items()) if n not in declared}
 
 
+CASE = re.compile(r"^\s*(?:indirect\s+)?case\s+`?[A-Za-z_]")
+
+
+def enum_cases(lines, code, decl_line):
+    """The 1-based lines of the cases declared directly in the enum whose
+    declaration is at `decl_line`: api-delta's scan lists no enum case, since
+    a case has no access modifier, so their doc comments are read here, from
+    the enum's body in `code` (comments and strings blanked)."""
+    depth, started, out = 0, False, []
+    for n in range(decl_line - 1, len(code)):
+        line = code[n]
+        if started and depth == 1 and CASE.match(line):
+            out.append(n + 1)
+        for ch in line:
+            if ch == "{":
+                depth += 1
+                started = True
+            elif ch == "}":
+                depth -= 1
+        if started and depth == 0:
+            break
+    return out
+
+
 def derive(root, scan):
     api = check.SystemAPI(scan)
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "api-delta", "scripts"))
+    import scan_sources as ss
+    blanked = {}
     files = {}
     mentions = []
     stats = collections.Counter()
@@ -251,6 +278,14 @@ def derive(root, scan):
                "unavailableOn": e["unavailableOn"]}
         doc = doc_comment(files[d["file"]], d["line"])
         said = sentences(doc)
+        if d["kw"] == "enum":
+            # The enum's cases, whose docs name the C constants they stand for,
+            # count as the enum's declaration.
+            if d["file"] not in blanked:
+                blanked[d["file"]] = ss.strip_comments_and_strings("\n".join(files[d["file"]]))[0].split("\n")
+            for case_line in enum_cases(files[d["file"]], blanked[d["file"]], d["line"]):
+                said += sentences(doc_comment(files[d["file"]], case_line))
+                stats["enum cases"] += 1
         if said:
             stats["documented"] += 1
         for kind_word, _verb, text, body in said:
