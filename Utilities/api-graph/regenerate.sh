@@ -18,6 +18,21 @@
 #                        set it empty to skip
 #   API_GRAPH_PREVIOUS   an api-graph.json to compare with (default: the one
 #                        in API_GRAPH_OUT, from the previous run)
+#   API_GRAPH_ADOPTERS   clones of packages migrated onto System on a branch
+#                        (default ../adopters beside the repository)
+#   API_GRAPH_ECOSYSTEM  clones of packages that might be (default ../ecosystem);
+#                        set both empty to skip the adopters step
+#   API_GRAPH_COVERAGE_RESULTS  the coverage tools' results store, for the
+#                        packages' C interfaces (default ../coverage-results)
+#   API_GRAPH_ADOPTER_BRANCH    the migration branch (default migrate-darwin)
+#   API_GRAPH_ADOPTER_BUILDS    build (default): build a migration whose index
+#                        isn't cached; reuse: any cached index of the commit,
+#                        no builds; none: lexical only
+#   API_GRAPH_CACHE      the adopters' cached indexes (default
+#                        .build/api-graph-cache)
+#   API_GRAPH_MIN_FREE_GB  don't start an adopter build with less free disk
+#                        than this (default 15)
+#   API_GRAPH_KEEP_WORK  1 keeps the scratch directory after a successful run
 #
 # Refs resolve as in api-delta: in the git worktree of the current directory
 # if it belongs to this repository, else in the worktree holding this script.
@@ -133,6 +148,17 @@ touch "$STAGE/.api-graph-out"
 DRAFTS="${API_GRAPH_DRAFTS-$(dirname "$REPO")/win32-drafts}"
 if [ -n "$DRAFTS" ] && [ ! -d "$DRAFTS" ]; then DRAFTS=""; fi
 PREVIOUS="${API_GRAPH_PREVIOUS:-$OUT/api-graph.json}"
+ADOPTERS="${API_GRAPH_ADOPTERS-$(dirname "$REPO")/adopters}"
+ECOSYSTEM="${API_GRAPH_ECOSYSTEM-$(dirname "$REPO")/ecosystem}"
+COVERAGE_RESULTS="${API_GRAPH_COVERAGE_RESULTS-$(dirname "$REPO")/coverage-results}"
+if [ -n "$ADOPTERS" ] && [ ! -d "$ADOPTERS" ]; then ADOPTERS=""; fi
+if [ -n "$ECOSYSTEM" ] && [ ! -d "$ECOSYSTEM" ]; then ECOSYSTEM=""; fi
+if [ -n "$COVERAGE_RESULTS" ] && [ ! -d "$COVERAGE_RESULTS" ]; then COVERAGE_RESULTS=""; fi
+CACHE="$(abspath "${API_GRAPH_CACHE:-$REPO/.build/api-graph-cache}")"
+check_dir API_GRAPH_CACHE "$CACHE"
+for d in "$OUT" "$WORK"; do
+  case "$CACHE/" in "$d"/*) fail "refusing API_GRAPH_CACHE=$CACHE: each run replaces $d" ;; esac
+done
 if [ -f "$PREVIOUS" ]; then cp "$PREVIOUS" "$WORK/previous.json"; fi
 
 printf 'base: %s @ %s\nhead: %s @ %s\nrepository: %s\noutput: %s\nscratch: %s\n' \
@@ -226,20 +252,36 @@ graph=(--delta-dir "$DELTA" --head-scan "$WORK/head/scan.json" --base-scan "$WOR
   --root "$WORK/head/src" --out "$WORK/graph.json")
 if [ "$SAMPLES" = lexical ]; then graph+=(--lexical-samples); fi
 python3 "$S/build_graph.py" "${graph[@]}"
+if [ -n "$ADOPTERS$ECOSYSTEM" ]; then
+  log "adopters (${ADOPTERS:-no adopters}; ${ECOSYSTEM:-no ecosystem}; log in $WORK/logs/adopters.log)"
+  adopters=(--graph "$WORK/graph.json" --repo "$REPO" --head "$HEAD_COMMIT"
+    --head-src "$WORK/head/src" --base-src "$WORK/base/src" --head-scan "$WORK/head/scan.json"
+    --base-scan "$WORK/base/scan.json" --work "$WORK" --cache "$CACHE" --out "$WORK/adopters.json"
+    --branch "${API_GRAPH_ADOPTER_BRANCH:-migrate-darwin}" --builds "${API_GRAPH_ADOPTER_BUILDS:-build}"
+    --min-free-gb "${API_GRAPH_MIN_FREE_GB:-15}")
+  if [ -n "$ADOPTERS" ]; then adopters+=(--adopters "$ADOPTERS"); fi
+  if [ -n "$ECOSYSTEM" ]; then adopters+=(--ecosystem "$ECOSYSTEM"); fi
+  if [ -n "$COVERAGE_RESULTS" ]; then adopters+=(--coverage-results "$COVERAGE_RESULTS"); fi
+  python3 "$S/adopters.py" "${adopters[@]}" 2>&1 | tee "$WORK/logs/adopters.log"
+fi
 log "clusters"
 clusters=(--graph "$WORK/graph.json" --config "$TOOL/config.json" --contingencies "$TOOL/contingencies.json"
   --evidence "$TOOL/evidence.json" --root "$WORK/head/src" --out "$WORK/clusters.json")
 if [ -n "$DRAFTS" ]; then clusters+=(--drafts "$DRAFTS"); fi
 python3 "$S/cluster.py" "${clusters[@]}"
 log "bundles"
-python3 "$S/bundles.py" --graph "$WORK/graph.json" --clusters "$WORK/clusters.json" --root "$WORK/head/src" \
-  --repo "$REPO" --base "$BASE_COMMIT" --head "$HEAD_COMMIT" --out "$STAGE/bundles"
+bundles=(--graph "$WORK/graph.json" --clusters "$WORK/clusters.json" --root "$WORK/head/src"
+  --repo "$REPO" --base "$BASE_COMMIT" --head "$HEAD_COMMIT" --out "$STAGE/bundles")
+if [ -f "$WORK/adopters.json" ]; then bundles+=(--adopters "$WORK/adopters.json"); fi
+python3 "$S/bundles.py" "${bundles[@]}"
 log "report"
 report=(--graph "$WORK/graph.json" --clusters "$WORK/clusters.json" --meta "$WORK/meta.json" --out "$STAGE")
 if [ -f "$WORK/previous.json" ]; then report+=(--previous "$WORK/previous.json"); fi
+if [ -f "$WORK/adopters.json" ]; then report+=(--adopters "$WORK/adopters.json"); fi
 python3 "$S/report.py" "${report[@]}"
 
 cp "$WORK/graph.json" "$STAGE/"
+if [ -f "$WORK/adopters.json" ]; then cp "$WORK/adopters.json" "$STAGE/"; fi
 mkdir -p "$STAGE/api-delta" "$STAGE/logs"
 cp "$DELTA/API-DELTA.md" "$DELTA/api-delta.json" "$STAGE/api-delta/"
 cp "$WORK/meta.json" "$WORK/logs/"*.log "$STAGE/logs/"
@@ -249,5 +291,9 @@ check_out
 rm -rf "${OUT:?}"
 mkdir -p "$(dirname "$OUT")"
 mv "$STAGE" "$OUT"
+
+if [ "${API_GRAPH_KEEP_WORK:-}" != 1 ]; then
+  rm -rf "${WORK:?}"
+fi
 
 log "done: $OUT/API-GRAPH.md"
