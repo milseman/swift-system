@@ -169,8 +169,21 @@ def adopters_data(agg, adopters, nodes, nids):
             "cNames": {k: sorted(v) for k, v in names.items()}, "packages": pkgs}
 
 
-def adopters_md(w, data, adopters, full=False):
-    """The Adopters section of bundle.md, or (full) all of adopters.md."""
+def also_uses(adopters, hunk_id, mine, owners, nodes):
+    """The other new declarations a hunk uses, by the pitch that owns each
+    ("no pitch" for none), for a pitch bundle's adopter examples."""
+    by = collections.defaultdict(set)
+    for s in adopters["adoptedSites"]:
+        if s["hunk"] == hunk_id and not s["qualifier"] and s["node"] not in mine:
+            for o in owners.get(s["node"]) or ["no pitch yet"]:
+                by[o].add(nodes[s["node"]]["path"] if s["node"] in nodes else s["node"])
+    return by
+
+
+def adopters_md(w, data, adopters, full=False, owners=None, mine=None, nodes=None):
+    """The Adopters section of bundle.md, or (full) all of adopters.md. With
+    owners (a pitch bundle's), each hunk says what else it uses, and which
+    pitch has it."""
     meta = adopters["meta"]
     branch = meta["branch"]
     info = {p["key"]: p for p in adopters["packages"]}
@@ -259,6 +272,15 @@ def adopters_md(w, data, adopters, full=False):
                         w(line)
                     w("```")
                     w("")
+                    if owners is not None:
+                        others = also_uses(adopters, h["id"], mine, owners, nodes)
+                        if others:
+                            w("This hunk also uses " + "; ".join(
+                                f"{', '.join('`' + x + '`' for x in sorted(v)[:6])}"
+                                + (f" and {len(v) - 6} more" if len(v) > 6 else "")
+                                + (f" (pitch `{o}`)" if o != "no pitch yet" else " (no pitch yet)")
+                                for o, v in sorted(others.items())) + ".")
+                            w("")
         elif ad:
             w(f"**Adopted** on `{ad['branch']}` only by name: {ad['qualifiers']} sites name one of its types to "
               "qualify a nested type from another carve-out.")
@@ -294,7 +316,8 @@ def adopters_md(w, data, adopters, full=False):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--graph", required=True)
-    ap.add_argument("--clusters", required=True)
+    ap.add_argument("--clusters", help="cluster.py's clusters.json: a bundle per cluster, ranked part and batch")
+    ap.add_argument("--units", help="pitches.py's units: a bundle per pitch file")
     ap.add_argument("--root", required=True)
     ap.add_argument("--repo", required=True)
     ap.add_argument("--base", required=True)
@@ -305,7 +328,9 @@ def main():
     a = ap.parse_args()
 
     g = load(a.graph)
-    cl = load(a.clusters)
+    if bool(a.clusters) == bool(a.units):
+        raise SystemExit("bundles: pass --clusters or --units")
+    cl = load(a.clusters) if a.clusters else load(a.units)
     nodes, atoms, tests, samples = g["nodes"], g["atoms"], g["tests"], g["samples"]
     conts = {c["id"]: c for c in cl["contingencies"]}
     src = Source(a.root)
@@ -313,12 +338,19 @@ def main():
     os.makedirs(a.out, exist_ok=True)
 
     units = {}
-    for c in cl["clusters"]:
-        units[c["id"]] = c
-        for p in c["parts"]:
-            units[p["id"]] = p
-    for b in cl["batches"]:
-        units[b["id"]] = b
+    owners = {}
+    if a.units:
+        for u in cl["units"]:
+            units[u["id"]] = u
+        owners = cl.get("owners", {})
+        cl.setdefault("candidates", [])
+    else:
+        for c in cl["clusters"]:
+            units[c["id"]] = c
+            for p in c["parts"]:
+                units[p["id"]] = p
+        for b in cl["batches"]:
+            units[b["id"]] = b
     ranked = {x["id"]: x for x in cl["candidates"]}
 
     def rank_of(uid):
@@ -387,7 +419,7 @@ def main():
         os.makedirs(d, exist_ok=True)
 
         # --------------------------------------------------------- ranges
-        api_ranges = []
+        api_ranges = [tuple(r) for r in u.get("ranges", [])]
         for x in u["atoms"]:
             at = atoms[x]
             label = (f"{at['kind']} {at['subject']}" if not at["loose"] else nodes[at["nodes"][0]]["path"])
@@ -481,6 +513,9 @@ def main():
             "vocabulary": u.get("vocabulary", {}),
             "houseFormat": house,
         }
+        if u["kind"] == "pitch":
+            data["pitch"] = {k: u.get(k) for k in ("file", "pattern", "status", "notes", "rules", "problems",
+                                                   "patternReport", "requires", "unownedTypes")}
         if adopters:
             agg = reach.aggregate(adopters, [n for n in nids if nodes[n]["hiddenClass"] != "unavailable"])
             data["adopters"] = adopters_data(agg, adopters, nodes, nids)
@@ -489,13 +524,20 @@ def main():
         # --------------------------------------------------------- bundle.md
         L = []
         w = L.append
-        kind_text = {"cluster": "cluster", "part": f"part of cluster `{u.get('cluster')}`",
-                     "batch": "batch of small clusters"}[u["kind"]]
-        w(f"# Carve-out bundle: {u['name']}")
-        w("")
-        w(f"`{uid}`, a {kind_text}" + (f", ranked {data['rank']} of {len(cl['candidates'])}" if data["rank"] else "")
-          + (f" (in batch `{u['batch']}`)" if u.get("batch") else "") + ".")
-        w("")
+        if u["kind"] == "pitch":
+            w(f"# Pitch bundle: {u['name']}")
+            w("")
+            w(f"`{uid}`, a hand-curated pitch (`{u['file']}`): pattern `{u['pattern']}`, status {u['status']}.")
+            w("")
+        else:
+            kind_text = {"cluster": "cluster", "part": f"part of cluster `{u.get('cluster')}`",
+                         "batch": "batch of small clusters"}[u["kind"]]
+            w(f"# Carve-out bundle: {u['name']}")
+            w("")
+            w(f"`{uid}`, a suggested {kind_text}" + (f", ranked {data['rank']} of {len(cl['candidates'])}"
+                                                     if data["rank"] else "")
+              + (f" (in batch `{u['batch']}`)" if u.get("batch") else "") + ".")
+            w("")
         w("This is input for writing a pitch, not a pitch. It was generated by `Utilities/api-graph` from "
           f"`{a.head[:10]}` against `{a.base[:10]}`. The open questions below are open: don't settle them in the "
           "pitch, and don't present a current default as a decision.")
@@ -537,6 +579,29 @@ def main():
             w("**Members of this batch**, each a cluster with its own bundle: "
               + ", ".join(f"`{x}`" for x in u["members"]) + ".")
             w("")
+        if u["kind"] == "pitch":
+            w("## The pitch file")
+            w("")
+            if u.get("notes"):
+                w(u["notes"])
+                w("")
+            w("Its rules, and what each matched in this run's graph (fix-it stubs follow what they rename):")
+            w("")
+            for r in u["rules"]:
+                w(f"- {r['part']} `{json.dumps(r['rule'])}`: {r['matches']} declarations"
+                  + ("; " + "; ".join(r["problems"]) if r["problems"] else ""))
+            w("")
+            fits = "; ".join(("" if ok else "**doesn't fit**: ") + txt for ok, txt in u.get("patternReport", []))
+            if fits:
+                w(f"Pattern `{u['pattern']}`: {fits}.")
+                w("")
+            if u.get("problems"):
+                w("Problems: " + "; ".join(u["problems"]) + ".")
+                w("")
+            if u.get("unownedTypes"):
+                w("New types its declarations name that no pitch owns yet: "
+                  + ", ".join(f"`{k}`" for k in u["unownedTypes"]) + ".")
+                w("")
 
         w("## Open questions it depends on")
         w("")
@@ -720,10 +785,11 @@ def main():
             w(f"`samples.md` quotes the first {min(MAX_SAMPLES_MD, len(sample_recs))}.")
         w("")
 
+        pitch_view = dict(owners=owners, mine=set(nids), nodes=nodes) if u["kind"] == "pitch" else {}
         if adopters:
             w("## Adopters")
             w("")
-            adopters_md(w, data["adopters"], adopters)
+            adopters_md(w, data["adopters"], adopters, **pitch_view)
         w("## Prior text")
         w("")
         if prior:
@@ -783,7 +849,7 @@ def main():
         open(os.path.join(d, "samples.md"), "w").write("\n".join(P) + "\n")
         if adopters:
             D = [f"# Adopters: {u['name']}", ""]
-            adopters_md(D.append, data["adopters"], adopters, full=True)
+            adopters_md(D.append, data["adopters"], adopters, full=True, **pitch_view)
             open(os.path.join(d, "adopters.md"), "w").write("\n".join(D) + "\n")
         index.append({"id": uid, "kind": u["kind"], "name": u["name"], "rank": data["rank"],
                       "declarations": m["declarations"], "path": os.path.join(uid, "bundle.md")})

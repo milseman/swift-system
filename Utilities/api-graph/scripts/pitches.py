@@ -492,6 +492,103 @@ def report_md(result, doc, previous_path=None):
     return "\n".join(L) + "\n"
 
 
+def header_end(src_root, rel, line, cache):
+    """The line that opens a declaration's body: its first `{` at or after
+    the keyword's line."""
+    if rel not in cache:
+        path = os.path.join(src_root, rel)
+        cache[rel] = open(path, encoding="utf-8", errors="replace").read().split("\n") if os.path.exists(path) else []
+    lines = cache[rel]
+    for k in range(line - 1, min(len(lines), line + 12)):
+        if "{" in lines[k]:
+            return k + 1
+    return line
+
+
+def bundle_units(result, pitches, graph, snapshot, conts, evidence, drafts, src_root):
+    """Each pitch as a unit bundles.py writes a bundle for: its declarations,
+    the source ranges that hold them (a type pitched without its members
+    shows only its declaration's head; a member, its extension's head too),
+    metrics, open questions (its own, and those of the types it needs from
+    other pitches or from no pitch), prerequisites and dependents."""
+    import units as U
+    gn = graph["nodes"]
+    node_tags = U.tag_nodes(gn, graph["edges"], graph["vocabulary"], conts, drafts)
+    verified = U.load_verified(evidence, src_root)
+    prior = U.Prior(src_root, drafts)
+    R = result["pitches"]
+    owner = collections.defaultdict(list)
+    for pid, r in R.items():
+        for x in r["nodes"]:
+            owner[x].append(pid)
+    dependents = collections.defaultdict(set)
+    for pid, r in R.items():
+        for o in r["needs"]:
+            dependents[o].add(pid)
+    by_id = {p["id"]: p for p in pitches}
+    cache = {}
+    units_out = []
+    for pid, r in sorted(R.items()):
+        nids = [x for x in r["nodes"] if x in gn]
+        mine = set(nids)
+        ranges = []
+        heads = set()
+        for x in nids:
+            n = gn[x]
+            if not n.get("file"):
+                continue
+            members_in = any(m in mine for m in members_of(snapshot, x))
+            if n["isType"] and not members_in and n["kind"] != "swift.typealias":
+                ranges.append([n["file"], n["start"], header_end(src_root, n["file"], n["line"], cache),
+                               f"{n['path']} (its declaration)"])
+            else:
+                ranges.append([n["file"], n["start"], n["end"], n["path"]])
+            b = n.get("block")
+            if b and b["kind"] == "extension" and (b["file"], b["start"]) not in heads and b["line"] < n["start"]:
+                heads.add((b["file"], b["start"]))
+                ranges.append([b["file"], b["start"], b["line"], f"extension {b['subject']} (its head)"])
+        direct = U.direct_tags(node_tags, nids)
+        inherited = {}
+        for o, evs in r["needs"].items():
+            for x in R[o]["nodes"]:
+                for cid_, w, ev, inh in node_tags.get(x, ()):
+                    if inh and cid_ not in direct and cid_ not in inherited:
+                        inherited[cid_] = {"via": f"{gn[x]['path']} (pitch {o})", "through": "api", "weight": w,
+                                           "namespaceOnly": False}
+        path_id = {gn[x]["path"]: x for x in gn}
+        for tpath in r["unownedTypes"]:
+            t = path_id.get(tpath)
+            for cid_, w, ev, inh in node_tags.get(t, ()) if t else ():
+                if inh and cid_ not in direct and cid_ not in inherited:
+                    inherited[cid_] = {"via": f"{tpath} (no pitch owns it)", "through": "api", "weight": w,
+                                       "namespaceOnly": False}
+        prereq = {o: {"kinds": sorted({e["link"] for e in evs}), "types": sorted({e["type"] for e in evs}),
+                      "edges": [[e["declaration"], e["type"], e["link"]] for e in evs], "namespaceOnly": False}
+                  for o, evs in r["needs"].items()}
+        impl = collections.defaultdict(list)
+        for x in nids:
+            for used in gn[x].get("implUses", ()):
+                for o in owner.get(used, []):
+                    if o != pid and o not in prereq and len(impl[o]) < 6:
+                        impl[o].append([gn[x]["path"], gn[used]["path"]])
+        p = by_id[pid]
+        units_out.append({
+            "id": pid, "kind": "pitch", "name": r["title"] or pid, "pattern": r["pattern"], "status": r["status"],
+            "file": r["file"], "notes": p.get("notes"), "rules": r["rules"], "problems": r["problems"],
+            "patternReport": r["patternReport"], "requires": r["requires"], "unownedTypes": r["unownedTypes"],
+            "nodes": nids, "atoms": [], "ranges": ranges,
+            "metrics": U.metrics(gn, graph["tests"], verified, nids), "prior": prior.matches(gn, nids),
+            "direct": direct, "inherited": inherited, "prerequisites": prereq, "allPrerequisites": prereq,
+            "implPrerequisites": dict(impl), "dependents": sorted(dependents.get(pid, ())), "parts": [],
+            "reason": None,
+        })
+    return {"units": units_out, "owners": {k: v for k, v in owner.items()}, "gists": prior.gists}
+
+
+def members_of(snapshot_graph, tid):
+    return [ln["from"] for ln in snapshot_graph.inc[tid] if ln["kind"] == "memberOf"]
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--snapshot", required=True)
@@ -499,6 +596,12 @@ def main():
     ap.add_argument("--previous")
     ap.add_argument("--out")
     ap.add_argument("--show", help="print one pitch's declarations")
+    ap.add_argument("--units-out", help="write the pitches as bundle units (needs --graph and --root)")
+    ap.add_argument("--graph", help="build_graph.py's graph.json")
+    ap.add_argument("--root", help="the head commit's export")
+    ap.add_argument("--contingencies")
+    ap.add_argument("--evidence")
+    ap.add_argument("--drafts")
     a = ap.parse_args()
     doc = graphq.load(a.snapshot)
     pitches, file_problems = load_pitches(a.pitches)
@@ -513,6 +616,14 @@ def main():
         os.makedirs(a.out, exist_ok=True)
         json.dump(result, open(os.path.join(a.out, "pitches.json"), "w"), indent=1)
         open(os.path.join(a.out, "PITCHES.md"), "w").write(report_md(result, doc))
+    if a.units_out:
+        graph = graphq.load(a.graph)
+        conts = json.load(open(a.contingencies))["contingencies"] if a.contingencies else []
+        evidence = json.load(open(a.evidence))["sources"] if a.evidence else []
+        drafts = a.drafts if a.drafts and os.path.isdir(a.drafts) else None
+        units_doc = bundle_units(result, pitches, graph, graphq.Graph(doc), conts, evidence, drafts, a.root)
+        units_doc["contingencies"] = conts
+        json.dump(units_doc, open(a.units_out, "w"), indent=1)
     t = result["totals"]
     n_probs = sum(len(r["problems"]) for r in result["pitches"].values()) + len(result["fileProblems"])
     print(f"pitches: {len(pitches)} pitch files cover {t['covered']} of {t['declarations']} declarations; "

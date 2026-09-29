@@ -313,9 +313,17 @@ python3 "$S/snapshot.py" "${snapshot[@]}"
 python3 "$S/graphq.py" --snapshot "$STAGE/graph.json.gz" summary --diff "$STAGE/DIFF.md" --out "$STAGE/GRAPH.md"
 PITCHES="${API_GRAPH_PITCHES:-$REPO/Prototype/Pitches}"
 log "pitch files ($PITCHES)"
-pitches=(--snapshot "$STAGE/graph.json.gz" --pitches "$PITCHES" --out "$STAGE")
+pitches=(--snapshot "$STAGE/graph.json.gz" --pitches "$PITCHES" --out "$STAGE" --units-out "$WORK/pitch-units.json"
+  --graph "$WORK/graph.json" --root "$WORK/head/src" --contingencies "$TOOL/contingencies.json"
+  --evidence "$TOOL/evidence.json")
+if [ -n "$DRAFTS" ]; then pitches+=(--drafts "$DRAFTS"); fi
 if [ -f "$WORK/previous-snapshot.json.gz" ]; then pitches+=(--previous "$WORK/previous-snapshot.json.gz"); fi
 python3 "$S/pitches.py" "${pitches[@]}"
+log "pitch bundles"
+pbundles=(--graph "$WORK/graph.json" --units "$WORK/pitch-units.json" --root "$WORK/head/src"
+  --repo "$REPO" --base "$BASE_COMMIT" --head "$HEAD_COMMIT" --out "$STAGE/pitches")
+if [ -f "$WORK/adopters.json" ]; then pbundles+=(--adopters "$WORK/adopters.json"); fi
+python3 "$S/bundles.py" "${pbundles[@]}"
 log "clusters"
 clusters=(--graph "$WORK/graph.json" --config "$TOOL/config.json" --contingencies "$TOOL/contingencies.json"
   --evidence "$TOOL/evidence.json" --root "$WORK/head/src" --out "$WORK/clusters.json")
