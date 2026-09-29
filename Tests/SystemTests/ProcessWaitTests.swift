@@ -172,13 +172,13 @@ final class ChildProcessTests: XCTestCase {
   // A deinit that waited for the child to end instead of ending it would
   // take twice the hang guard.
   func testDestroyingARunningChildEndsAndReapsIt() throws {
-    let start = time(nil)
+    let start = monotonicNanoseconds()
     let id: ProcessID
     do {
       let child = ChildProcess(taking: try spawnLongSleep())
       id = child.id
     }
-    XCTAssertLessThan(time(nil) - start, hangGuardSeconds)
+    XCTAssertLessThan(monotonicNanoseconds() - start, hangGuardSeconds * 1_000_000_000)
     XCTAssertThrowsError(try id.tryWait()) {
       XCTAssertEqual($0 as? Errno, .noChildProcess)
     }
@@ -199,14 +199,14 @@ final class ChildProcessTests: XCTestCase {
 
   func testDestroyingAChildEndsItWhenAnErrorEndsTheScope() throws {
     struct Stop: Error {}
-    let start = time(nil)
+    let start = monotonicNanoseconds()
     var id: ProcessID?
     do {
       let child = ChildProcess(taking: try spawnLongSleep())
       id = child.id
       throw Stop()
     } catch is Stop {}
-    XCTAssertLessThan(time(nil) - start, hangGuardSeconds)
+    XCTAssertLessThan(monotonicNanoseconds() - start, hangGuardSeconds * 1_000_000_000)
     XCTAssertThrowsError(try id!.tryWait()) {
       XCTAssertEqual($0 as? Errno, .noChildProcess)
     }

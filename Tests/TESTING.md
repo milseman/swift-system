@@ -18,6 +18,8 @@ the failures behind them.
 - A value that falls as time passes, such as a timer's time left, may have fallen by
   the hang guard. Rounding it is checked against bounds from clock readings made
   around the calls.
+- Measure elapsed time with a monotonic clock (`ContinuousClock`, or
+  `monotonicNanoseconds()`), not the realtime clock, which the system can step.
 - Compare two clocks by bracketing: start the outer interval first and end it last.
 - A child that must still be running comes from `spawnWaitingChild()`, which runs
   until it's signaled. Not `sleep 10`.
