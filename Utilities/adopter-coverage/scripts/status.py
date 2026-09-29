@@ -382,6 +382,9 @@ ACRONYMS = {"API", "ABI", "VM", "NIO", "IP", "TCP", "UDP", "UTC", "IO", "OS", "C
             "BSD", "ICU", "UUID", "URL", "CPU", "ID", "NOT", "AND", "OR", "TODO"}
 # Words that name a family of interfaces rather than one.
 FAMILY_WORDS = {"libm", "xlocale", "fts", "sysdir", "vsock", "libmalloc", "libc"}
+# Formats and SDK modules that markers name before a C name, as they name a
+# header: `MacTypes OSStatus`, `Mach-O load_command`.
+QUALIFIERS = {"MacTypes", "Mach-O", "MachO"}
 # Nouns that qualify a name without naming another: `IPV6_* socket options`,
 # `POSIXErrorCode's cases`, `copyfile(3) flags`.
 GENERIC = {"cases", "case", "values", "value", "fields", "field", "members", "member", "flags", "flag", "options",
@@ -528,7 +531,9 @@ def parse_item(item, members=False):
         got = from_groups(miv=True)
         return with_phrase(got, None), core if not got else None, "phrase" if got else "prose", False
     one = clean_word(words[0])
-    if len(words) == 1 and is_c(one):
+    # A plural generic noun alone names none: `constants (FAT_CIGAM, LC_MAIN)`
+    # is a phrase with a list.
+    if len(words) == 1 and is_c(one) and not (one in GENERIC and one.endswith("s")):
         if one in FAMILY_WORDS:
             return with_phrase(from_groups(), one), one, "name", False
         names = [(one + suffix, None)]
@@ -554,8 +559,8 @@ def parse_item(item, members=False):
             return [(owner, None), (clean_word(owned[0]), None)], None, "name", False
         got = from_groups()
         return with_phrase(got, core), core, "phrase" if got else "prose", False
-    # string.h memcmp, sysexits.h EX_USAGE
-    if len(words) == 2 and re.match(r"^[\w/]+\.h$", words[0]) and is_c(words[1]):
+    # string.h memcmp, sysexits.h EX_USAGE, MacTypes OSStatus
+    if len(words) == 2 and (re.match(r"^[\w/]+\.h$", words[0]) or words[0] in QUALIFIERS) and is_c(words[1]):
         return [(clean_word(words[1]) + suffix, words[0])], None, "name", False
     # timespec members, IPV6_* socket options, copyfile(3) flags, the sockaddr family
     if is_c(one) and len(words) > 1 and all(w in GENERIC for w in words[1:]):
@@ -612,9 +617,13 @@ def file_markers(text):
             continue
         body = m.group(1)
         j = i + 1
-        while j < len(lines) and j - i <= 8 and incomplete(body):
+        while j < len(lines) and j - i <= 8:
             cm = COMMENT.match(lines[j])
             if not cm or not cm.group(1) or "SYSTEM-GAP" in lines[j] or "MIGRATE-DARWIN" in lines[j]:
+                break
+            # A parenthesized list on the next line continues the last item
+            # (`and constants` / `(FAT_CIGAM, LC_MAIN)`).
+            if not incomplete(body) and not cm.group(1).startswith("("):
                 break
             body += " " + cm.group(1)
             j += 1
