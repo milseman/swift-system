@@ -245,8 +245,11 @@ private struct StatTests {
       let dirCreationTime0 = dirStat.st_birthtim
       #endif
 
-      var startUpperBound = start
-      startUpperBound.tv_sec += 5
+      // The directory was made between the clock reading before it and
+      // this one.
+      var startUpperBound = timespec()
+      try #require(clock_gettime(CLOCK_REALTIME, &startUpperBound) == 0, "\(Errno.current)")
+      startUpperBound.tv_sec += 1 // As much wiggle room
       #expect(dirAccessTime0 >= start)
       #expect(dirAccessTime0 < startUpperBound)
       #expect(dirModificationTime0 >= start)

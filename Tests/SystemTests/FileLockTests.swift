@@ -348,7 +348,7 @@ final class FileLockTest: XCTestCase {
       // The other open file waits while the lock is in the way.
       XCTAssertEqual(locked.wait(timeout: .now() + .milliseconds(100)), .timedOut)
       try a.unlock()
-      XCTAssertEqual(locked.wait(timeout: .now() + .seconds(10)), .success)
+      XCTAssertEqual(locked.wait(timeout: .now() + .seconds(hangGuardSeconds)), .success)
       XCTAssertEqual(try result?.get(), true)
       XCTAssertFalse(try a.lock(.read))
     }

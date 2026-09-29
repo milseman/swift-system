@@ -10,6 +10,7 @@
 #if !os(Windows) && !os(WASI)
 
 import Testing
+import XCTest
 
 #if SYSTEM_PACKAGE
 @testable import SystemPackage
@@ -28,7 +29,8 @@ import Android
 #endif
 
 // A process can't lower its nice value again without privilege, so these
-// tests change only a child's: one they start, or an exit test's.
+// tests change only a child's: one they start, or an exit test's. The one
+// that starts a child is an XCTest test (see ProcessTestSupport.swift).
 @Suite("Process priority")
 private struct ProcessPriorityTests {
   @available(System 199, *)
@@ -48,31 +50,6 @@ private struct ProcessPriorityTests {
     #expect(throws: Errno.noSuchProcess) { try ProcessPriority.current(for: missing) }
     #expect(throws: Errno.noSuchProcess) { try ProcessPriority.setCurrent(1, for: missing) }
   }
-
-  #if !os(watchOS) && !os(tvOS) && !os(Android)
-  @available(System 199, *)
-  @Test func settingAChildsPriority() throws {
-    let child = try ProcessID.spawn("/bin/sleep", arguments: ["sleep", "30"])
-    defer {
-      try? child.sendSignal(.kill)
-      _ = try? child.wait()
-    }
-    let before = try ProcessPriority.current(for: .process(child))
-    try ProcessPriority.setCurrent(before + 5, for: .process(child))
-    #expect(try ProcessPriority.current(for: .process(child)) == before + 5)
-
-    // Past the limit, the system clamps it.
-    try ProcessPriority.setCurrent(1000, for: .process(child))
-    #expect([19, 20].contains(try ProcessPriority.current(for: .process(child))))
-
-    // Lowering it again takes privilege.
-    if getuid() != 0 {
-      #expect(throws: Errno.permissionDenied) {
-        try ProcessPriority.setCurrent(before, for: .process(child))
-      }
-    }
-  }
-  #endif
 
   @available(System 199, *)
   @Test func adjustingTheCallersPriority() async {
@@ -94,5 +71,34 @@ private struct ProcessPriorityTests {
     }
   }
 }
+
+#if !os(watchOS) && !os(tvOS) && !os(Android)
+@available(System 199, *)
+final class ProcessPriorityChildTests: XCTestCase {
+  func testSettingAChildsPriority() throws {
+    let child = try spawnWaitingChild()
+    defer {
+      try? child.sendSignal(.kill)
+      _ = try? child.wait()
+    }
+    // Raised, by less if the tests run niced near the limit.
+    let before = try ProcessPriority.current(for: .process(child))
+    let raised = min(before + 5, 19)
+    try ProcessPriority.setCurrent(raised, for: .process(child))
+    XCTAssertEqual(try ProcessPriority.current(for: .process(child)), raised)
+
+    // Past the limit, the system clamps it.
+    try ProcessPriority.setCurrent(1000, for: .process(child))
+    XCTAssertTrue([19, 20].contains(try ProcessPriority.current(for: .process(child))))
+
+    // Lowering it again takes privilege.
+    if getuid() != 0 {
+      XCTAssertThrowsError(try ProcessPriority.setCurrent(before, for: .process(child))) {
+        XCTAssertEqual($0 as? Errno, .permissionDenied)
+      }
+    }
+  }
+}
+#endif
 
 #endif // !os(Windows) && !os(WASI)

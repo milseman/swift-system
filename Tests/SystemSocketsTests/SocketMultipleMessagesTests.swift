@@ -201,7 +201,7 @@ private struct SocketMultipleMessagesTests {
     func receive(_ count: Int, from socket: SocketDescriptor) throws -> [(bytes: [UInt8], sender: SocketAddress)] {
       var messages: [(bytes: [UInt8], sender: SocketAddress)] = []
       while messages.count < count {
-        _ = try socket.fileDescriptor.poll(for: .readable, timeout: .seconds(5))
+        _ = try socket.fileDescriptor.poll(for: .readable, timeout: .seconds(hangGuardSeconds))
         let received = try socket.receiveMessages(into: buffers.prefix(count - messages.count))
         #expect(!received.isEmpty)
         if received.isEmpty { break }

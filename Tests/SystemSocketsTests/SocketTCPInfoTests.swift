@@ -88,7 +88,14 @@ private struct SocketTCPInfoTests {
     #expect(info.retransmitTimeout >= .zero)
     #expect(try server.tcpConnectionInfo().bytesReceived >= 1000)
     #else
-    let info = try client.tcpInfo()
+    // The server's acknowledgment of the bytes can still be on its way.
+    var info = try client.tcpInfo()
+    var guardLeft = hangGuardSeconds * 1_000
+    while (info.bytesAcknowledged ?? .max) < 1000 && guardLeft > 0 {
+      usleep(1_000)
+      guardLeft -= 1
+      info = try client.tcpInfo()
+    }
     #expect(info.sendMaximumSegmentSize > 0)
     #expect(info.sendCongestionWindow > 0)
     #expect(info.retransmitTimeout > .zero)

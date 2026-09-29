@@ -343,7 +343,7 @@ final class IORingTests: XCTestCase {
 
         // Consume the completion from the poll operation
         let completion = try ring.blockingConsumeCompletion(
-            timeout: .seconds(1)
+            timeout: .seconds(hangGuardSeconds)
         )
         XCTAssertEqual(completion.context, pollInContext)
         let readable = Int32(IORing.Request.PollEvents.readable.rawValue)
@@ -382,7 +382,7 @@ final class IORingTests: XCTestCase {
 
         // Consume the completion from the poll operation
         let completionOut = try ring.blockingConsumeCompletion(
-            timeout: .seconds(1)
+            timeout: .seconds(hangGuardSeconds)
         )
         XCTAssertEqual(completionOut.context, pollOutContext)
         let writable = Int32(IORing.Request.PollEvents.writable.rawValue)
@@ -438,7 +438,7 @@ final class IORingTests: XCTestCase {
         XCTAssert(enqueued)
 
         try writeByte()
-        let first = try ring.blockingConsumeCompletion(timeout: .seconds(1))
+        let first = try ring.blockingConsumeCompletion(timeout: .seconds(hangGuardSeconds))
         // Kernels before 5.13 reject IORING_POLL_ADD_MULTI
         try XCTSkipIf(
             first.result == -EINVAL,
@@ -456,7 +456,7 @@ final class IORingTests: XCTestCase {
 
         try writeByte()
         // This written byte will only be reported by a re-armed poll.
-        let second = try ring.blockingConsumeCompletion(timeout: .seconds(1))
+        let second = try ring.blockingConsumeCompletion(timeout: .seconds(hangGuardSeconds))
         XCTAssertEqual(second.context, context)
         XCTAssertNotEqual(
             second.result & readable, 0, "expected POLLIN in the result mask"
@@ -473,10 +473,13 @@ final class IORingTests: XCTestCase {
         var terminal: (result: Int32, flags: IORing.Completion.Flags)? = nil
         var observed: [(context: UInt64, result: Int32, flags: UInt32)] = []
         // The cancel posts a completion of its own under a different context,
-        // and the two may land a moment apart, so retry briefly rather than
-        // draining exactly once.
-        for _ in 0..<100 where terminal == nil {
-            while let completion = ring.tryConsumeCompletion() {
+        // and the two may land apart, so this waits for completions until
+        // the poll's own arrives. (A catch-all ends the wait, since the
+        // compiler can crash on a pattern catch.)
+        waiting: while terminal == nil {
+            do {
+                let completion = try ring.blockingConsumeCompletion(
+                    timeout: .seconds(hangGuardSeconds))
                 observed.append(
                     (
                         completion.context,
@@ -487,8 +490,9 @@ final class IORingTests: XCTestCase {
                 if completion.context == context {
                     terminal = (completion.result, completion.flags)
                 }
+            } catch {
+                break waiting
             }
-            if terminal == nil { usleep(1000) }
         }
         XCTAssertNotNil(
             terminal,
@@ -531,7 +535,7 @@ final class IORingTests: XCTestCase {
         try writeFD.close()
         writeEndClosed = true
 
-        let dt = Duration.seconds(1)
+        let dt = Duration.seconds(hangGuardSeconds)
         let completion = try ring.blockingConsumeCompletion(timeout: dt)
 
         for event in IORing.Request.PollEvents.Event.allCases {
@@ -577,7 +581,7 @@ final class IORingTests: XCTestCase {
         try readFD.close()
         readEndClosed = true
 
-        let dt = Duration.seconds(1)
+        let dt = Duration.seconds(hangGuardSeconds)
         let completion = try ring.blockingConsumeCompletion(timeout: dt)
         XCTAssertEqual(completion.context, 98)
 

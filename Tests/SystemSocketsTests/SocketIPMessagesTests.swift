@@ -152,16 +152,18 @@ private struct SocketIPMessagesTests {
     defer { try? sender.close() }
     // The type of service from the socket's option.
     try sender.setTypeOfService(0x02)
+    let sent = time(nil)
     _ = try [UInt8(1)].withUnsafeBytes { try sender.send($0, to: address) }
     let first = try receive(from: receiver)
+    let received = time(nil)
     #expect(first.bytes == [1])
     #expect(first.messages.compactMap(\.typeOfService) == [0x02])
     let info = try #require(first.messages.compactMap(\.ipv4PacketInfo).first)
     #expect(info.destination == .loopback)
     #expect(info.interfaceIndex == loopbackIndex)
+    // It arrived between the clock readings around sending and receiving it.
     let arrival = try #require(first.messages.compactMap(\.timestamp).first)
-    let now = Duration.seconds(time(nil))
-    #expect(arrival > now - .seconds(60) && arrival < now + .seconds(60))
+    #expect(arrival >= .seconds(sent) && arrival < .seconds(received + 1))
 
     // The type of service from an ancillary message.
     var outgoing = AncillaryMessageBuffer()

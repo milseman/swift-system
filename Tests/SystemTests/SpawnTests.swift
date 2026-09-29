@@ -151,9 +151,7 @@ final class SpawnTests: XCTestCase {
   }
 
   func testNewProcessGroup() throws {
-    let leader = try ProcessID.spawn(
-      "/bin/sleep", arguments: ["sleep", "10"],
-      attributes: SpawnAttributes(processGroup: .new))
+    let leader = try spawnWaitingChild(attributes: SpawnAttributes(processGroup: .new))
     defer {
       try? leader.sendSignal(.kill)
       _ = try? leader.wait()
@@ -161,9 +159,7 @@ final class SpawnTests: XCTestCase {
     XCTAssertEqual(try leader.processGroup(), leader)
     XCTAssertNotEqual(try leader.processGroup(), ProcessID.currentProcessGroup)
 
-    let member = try ProcessID.spawn(
-      "/bin/sleep", arguments: ["sleep", "10"],
-      attributes: SpawnAttributes(processGroup: .existing(leader)))
+    let member = try spawnWaitingChild(attributes: SpawnAttributes(processGroup: .existing(leader)))
     defer {
       try? member.sendSignal(.kill)
       _ = try? member.wait()
@@ -177,7 +173,7 @@ final class SpawnTests: XCTestCase {
   }
 
   func testTheChildStaysInTheParentsGroupByDefault() throws {
-    let child = try ProcessID.spawn("/bin/sleep", arguments: ["sleep", "10"])
+    let child = try spawnWaitingChild()
     defer {
       try? child.sendSignal(.kill)
       _ = try? child.wait()
@@ -190,9 +186,7 @@ final class SpawnTests: XCTestCase {
   func testNewSession() throws {
     let child: ProcessID
     do {
-      child = try ProcessID.spawn(
-        "/bin/sleep", arguments: ["sleep", "10"],
-        attributes: SpawnAttributes(flags: .createSession))
+      child = try spawnWaitingChild(attributes: SpawnAttributes(flags: .createSession))
     } catch Errno.invalidArgument {
       throw XCTSkip("This C library has no POSIX_SPAWN_SETSID")
     }

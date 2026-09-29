@@ -46,7 +46,7 @@ final class LinuxProcessTests: XCTestCase {
       guard error == .noFunction else { throw error }
       throw XCTSkip("This kernel has no pidfd_open")
     }
-    let child = try ChildProcess.spawn("/bin/sleep", arguments: ["sleep", "10"])
+    let child = ChildProcess(taking: try spawnWaitingChild())
     let descriptor = try child.openDescriptor()
     XCTAssertEqual(descriptor.processID, child.id)
     try descriptor.sendSignal(nil)

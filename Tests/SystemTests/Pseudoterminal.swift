@@ -127,9 +127,10 @@ private func pathFromBuffer(
 ///
 /// A pseudoterminal passes data between its ends asynchronously on some
 /// platforms, so a test waits for the data it expects rather than
-/// reading only what has already arrived.
+/// reading only what has already arrived. The timeout only guards against
+/// a hang.
 internal func readBytes(
-  from fd: FileDescriptor, count: Int, timeout: CInt = 5_000
+  from fd: FileDescriptor, count: Int, timeout: CInt = CInt(hangGuardSeconds * 1_000)
 ) throws -> [UInt8] {
   var bytes: [UInt8] = []
   while bytes.count < count {

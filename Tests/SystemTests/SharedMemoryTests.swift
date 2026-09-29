@@ -187,7 +187,7 @@ final class SharedMemoryTest: XCTestCase {
     }
     poster.start()
     try semaphore.wait()
-    wait(for: [posted], timeout: 10)
+    wait(for: [posted], timeout: TimeInterval(hangGuardSeconds))
   }
 }
 
