@@ -14,7 +14,7 @@ Darwin; grouped here into clusters and ranked by packages, then call sites. Afte
 (System `6e784c6`, the 21 main-scheme packages that import Darwin): 756 interfaces, 567 covered, 131 gaps (24 in two
 or more packages).
 
-Next: cluster 10. Resume from the first row not marked done. Latest re-rank: run `b64ee9f1591b-d229d468` (System
+Next: cluster 11. Resume from the first row not marked done. Latest re-rank: run `b64ee9f1591b-d229d468` (System
 `b64ee9f`): 756 interfaces, 615 covered, 78 gaps; set apart, 19 the standard library answers, 18 other modules' names,
 26 the packages' own shims.
 
@@ -29,7 +29,7 @@ Next: cluster 10. Resume from the first row not marked done. Latest re-rank: run
 | 7 | ioctl | 3 | 3 | ioctl (terminal size, vsock CID) | done: both requests are System's (section 28) |
 | 8 | MacTypes | 2 | 12 | OSStatus, UniChar, DarwinBoolean | done: `swift` answers (section 31) |
 | 9 | sysctl process information | 2 | 9 | kinfo_proc's fields, P_TRACED, extern_proc | done: `CInterop.KernelProcessInfo` (section 31) |
-| 10 | pthreads | 2 | 8 | pthread_attr_getstacksize, setdetachstate, setscope, PTHREAD_CREATE_DETACHED, PTHREAD_SCOPE_SYSTEM, pthread_exit, pthread_yield_np, the error-checking initializer | |
+| 10 | pthreads | 2 | 8 | pthread_attr_getstacksize, setdetachstate, setscope, PTHREAD_CREATE_DETACHED, PTHREAD_SCOPE_SYSTEM, pthread_exit, pthread_yield_np, the error-checking initializer | done: exit(), defaultStackSize(), static initializers, mapping (section 32) |
 | 11 | Signals | 2 | 7 | signal, SIG_ERR, SIG_UNBLOCK, sigprocmask, NSIG | check the processes lane's API |
 | 12 | Spawn attributes | 2 | 6 | posix_spawnattr_setpgroup, setsigdefault, setsigmask | check SpawnAttributes' docs |
 | 13 | Mounts and quotas | 2 | 6 | getfsstat, quotactl, SUBCMDMASK, SUBCMDSHIFT, getmntinfo_r_np | |
@@ -44,7 +44,7 @@ say; the standard library's answers (off_t, ssize_t, size_t and uintptr_t are In
 memset; round, sqrt, ceil, floor, fabs, modf); Dispatch and ObjectiveC names; the packages' own C shims
 (CNIODarwin_*, c_nio_posix_*, _subprocess_*).
 
-Done: step 0, what the tools couldn't see (section 25); clusters 1 (section 26), 2 (section 27), 3 and 7 (section 28), 4 and 5 (section 30), 6, 8 and 9 (section 31); and Subprocess's new marker, C arrays for the C-values spawns (section 29). New SYSTEM-GAP markers in `../adopters` come first: status.sh lists them.
+Done: step 0, what the tools couldn't see (section 25); clusters 1 (section 26), 2 (section 27), 3 and 7 (section 28), 4 and 5 (section 30), 6, 8 and 9 (section 31), 10 (section 32); and Subprocess's new marker, C arrays for the C-values spawns (section 29). New SYSTEM-GAP markers in `../adopters` come first: status.sh lists them.
 
 ## 1. status.sh and STATUS.md (2026-09-28)
 
@@ -729,4 +729,30 @@ interfaces left. This section takes the Queue's clusters 6, 8 and 9.
 
 Tests: SystemControlTest's `testProcesses` checks each accessor against the calling process. XCTest 555 (4 skipped,
 and testVolumeAttributes skipped), swift-testing 468 in 74 suites, passing with `setCurrentQualityOfService`
+skipped (section 28).
+
+## 32. pthreads: `2e3cd54`, `bd9fd0e`
+
+Queue cluster 10 (NIO and swift-corelibs-foundation).
+
+- `PThread.exit()` (pthread_exit) ends the calling thread, as Foundation's `Thread.exit()` does; its doc says what it
+  abandons (the stack's `defer` blocks and values, which leak) and that thread-specific values are still destroyed.
+  `noasync`, since a task can't end the thread it runs on.
+- `PThread.Attributes.defaultStackSize()` (pthread_attr_getstacksize on default attributes): the size a thread gets
+  when `stackSize` is `nil` (512 KiB on macOS 26.3, where a thread reports a little more), which Foundation's
+  `Thread.stackSize` reports until it's set.
+- `CInterop.PThreadMutex.initializer`, `errorCheckingInitializer` and `recursiveInitializer`, and
+  `CInterop.PThreadCondition`'s and `CInterop.PThreadReadWriteLock`'s `initializer`: the values of the C static
+  initializers, which Swift can't import. swift-corelibs-foundation builds an error-checking mutex from Darwin's
+  private `_PTHREAD_ERRORCHECK_MUTEX_SIG_init` for a lock in a CoreFoundation structure. Darwin only for now; glibc's
+  differ in the kind field of the error-checking and recursive ones.
+- mapping.ini (`bd9fd0e`): pthread_yield_np is sched_yield (`PThread.yield()`); detached creation is
+  `PThread.detach()` (PThread creates joinable threads); system contention scope is every thread's on Darwin and Linux,
+  which fail the process scope; the private `_SIG_init` constants read as the macros. Rejected: attributes for detached
+  creation and scope, which would add a second way to do the first and nothing for the second; `exit(_ value:)`,
+  since System's joins return nothing.
+
+Tests: PThreadTests' `defaultStackSize` and `exitEndsTheThread`; PThreadMutexTests' `staticInitializers` (trylock,
+EDEADLK and EPERM for error checking, relocking the recursive mutex, a condition and a read-write lock). XCTest 555 (4
+skipped, and testVolumeAttributes skipped), swift-testing 471 in 74 suites, passing with `setCurrentQualityOfService`
 skipped (section 28).

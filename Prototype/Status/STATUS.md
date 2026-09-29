@@ -2,8 +2,8 @@
 
 Generated 2026-09-29 by `Utilities/adopter-coverage/status.sh`, from commits only; rerun it rather than editing this file. How each figure is made, and what it can't see, is in [How this is computed](#how-this-is-computed).
 
-- **System**: `coverage` @ `b08bf197` (Add CInterop.KernelProcessInfo (kinfo_proc) with Swift-named accessors: process, parent and group IDs, real, effective and saved user and group IDs, isTraced (P_TRACED) and commandName), which contains `system-next` @ `3d1e67d7` (Merge branch 'coverage' into system-next); 23 commit(s) of `coverage` aren't in `system-next`.
-- **API delta**: `main` @ `1b452c29` → `HEAD` @ `b08bf197`.
+- **System**: `coverage` @ `bd9fd0eb` (mapping.ini: pthread_yield_np is sched_yield; detached threads are PThread.detach(); system contention scope is every thread's; the private _SIG_init constants read as the static initializers), which contains `system-next` @ `3d1e67d7` (Merge branch 'coverage' into system-next); 27 commit(s) of `coverage` aren't in `system-next`.
+- **API delta**: `main` @ `1b452c29` → `HEAD` @ `bd9fd0eb`.
 - **Adopters** (`../adopters`, branch `migrate-darwin`, against its merge base with `main`):
   - WasmKit @ `4917e060`, base `1e9c513d`
   - indexstore-db @ `cc966b89`, base `441ead77`
@@ -12,7 +12,7 @@ Generated 2026-09-29 by `Utilities/adopter-coverage/status.sh`, from commits onl
   - swift-build @ `f4685a11`, base `f4685a11` (no commits beyond the merge base yet) (uncommitted changes in the checkout aren't counted)
   - swift-certificates @ `0df6bd14`, base `ff86b924`
   - swift-driver @ `ddb51ccd`, base `15cf6766`
-  - swift-foundation @ `67848ebe`, base `6669273a` (uncommitted changes in the checkout aren't counted)
+  - swift-foundation @ `fa0dede8`, base `6669273a` (uncommitted changes in the checkout aren't counted)
   - swift-log @ `4d6d77fe`, base `9c9acde6`
   - swift-nio @ `e1623fbf`, base `feaf4ac5`
   - swift-package-manager @ `dbe05ec1`, base `24a8a7b0`
@@ -27,11 +27,11 @@ Copied verbatim from `Utilities/api-delta/regenerate.sh` (`BASE_REF=main`, `HEAD
 
 ## Summary
 
-- **3105 added, 0 removed, 0 changed** declarations in the macOS symbol graphs.
-  - SystemPackage: +2521 (448 → 2969 public symbols).
+- **3107 added, 0 removed, 0 changed** declarations in the macOS symbol graphs.
+  - SystemPackage: +2523 (448 → 2971 public symbols).
   - SystemSockets: +584 (0 → 584 public symbols). SystemSockets is a new module; it doesn't exist on `main`.
 - Availability of the additions:
-  - System 199: 3070
+  - System 199: 3072
   - System 199 + explicit OS floor: 26
   - System 0.0.1 + explicit OS floor: 8
   - System 0.0.1: 1
@@ -39,11 +39,12 @@ Copied verbatim from `Utilities/api-delta/regenerate.sh` (`BASE_REF=main`, `HEAD
   - 410 compiled only on other platforms;
   - 237 new `@available(*, unavailable, renamed:)` stubs;
   - 1 new underscored public declaration(s).
+  - 5 declarations the scan couldn't classify; see the list below.
   - 27 added, removed or changed graph symbols the scan didn't find (enum case: 26, no source location: 1). Enum cases have no `public` keyword, and synthesized members have no location; any others are scanner misses. Their platforms show as `?`.
 - 0 public declarations hidden from the graphs were removed.
 - No public declaration is conditional on `ENABLE_MOCKING` or `DEBUG`, so a release build has the same public API as the debug graphs.
 - Cross-check with `swift-api-digester`, which dumps every declaration, implicit ones included:
-  - SystemPackage: +2821 / -0 declarations, which is the graphs' +2521 plus 300 implicit ones; it has every graph addition; `-diagnose-sdk` reports no breaking changes.
+  - SystemPackage: +2828 / -0 declarations, which is the graphs' +2523 plus 300 implicit ones; explicit declarations it has that the graphs don't: `_opaque_pthread_cond_t.initializer`, `_opaque_pthread_mutex_t.errorCheckingInitializer`, `_opaque_pthread_mutex_t.initializer`, `_opaque_pthread_mutex_t.recursiveInitializer`, `_opaque_pthread_rwlock_t.initializer`; it has every graph addition; `-diagnose-sdk` reports no breaking changes.
   - SystemSockets: +657 / -0 declarations, which is the graphs' +584 plus 72 implicit ones; explicit declarations it has that the graphs don't: `SocketAddress._withUnsafeMutablePointer(_:)`; it has every graph addition.
 - Nothing was removed or changed: no public declaration left the graphs or the source scan. The *changed* check compares declaration text (including default arguments), availability, conformances, generic and extension constraints, and access level, and pairs symbols by path when a signature change alters the USR.
 
@@ -96,7 +97,7 @@ Each row is a top-level type, and nested types count toward it: `FilePath.Resolu
 | SystemPackage | [`OutputFlags`](#systempackage-outputflags) | 34 | 0 | 0 | S199 ×34 |
 | SystemPackage | [`OwnedFD`](#systempackage-ownedfd) | 30 | 0 | 0 | S199 ×30 |
 | SystemPackage | [`POSIXErrorCode (extends _DarwinFoundation1)`](#systempackage-posixerrorcode-extends-darwinfoundation1) | 2 | 0 | 0 | S199 ×2 |
-| SystemPackage | [`PThread`](#systempackage-pthread) | 123 | 0 | 0 | S199 ×123 |
+| SystemPackage | [`PThread`](#systempackage-pthread) | 125 | 0 | 0 | S199 ×125 |
 | SystemPackage | [`ProcessEnvironment`](#systempackage-processenvironment) | 7 | 0 | 0 | S199 ×7 |
 | SystemPackage | [`ProcessID`](#systempackage-processid) | 218 | 0 | 0 | S199 ×218 |
 | SystemPackage | [`ProcessPriority`](#systempackage-processpriority) | 8 | 0 | 0 | S199 ×8 |
@@ -144,7 +145,7 @@ Each row is a top-level type, and nested types count toward it: `FilePath.Resolu
 | SystemSockets | [`sockaddr_storage (extends Darwin)`](#systemsockets-sockaddr-storage-extends-darwin) | 3 | 0 | 0 | S199 ×3 |
 | SystemSockets | [`sockaddr_un (extends Darwin)`](#systemsockets-sockaddr-un-extends-darwin) | 5 | 0 | 0 | S199 ×5 |
 | SystemSockets | [`sockaddr_vm (extends Darwin)`](#systemsockets-sockaddr-vm-extends-darwin) | 5 | 0 | 0 | S199 ×5 |
-| **Total** | | **3105** | **0** | **0** | |
+| **Total** | | **3107** | **0** | **0** | |
 
 # 2. Adoption
 
@@ -159,7 +160,7 @@ Swift files of each package's own targets (from its manifest; not nested package
 | swift-build | 1057 | 2 | 1 | 0 | 0 | — | 0 (0) |
 | swift-certificates | 133 | 2 → 0 | 0 | 0 → 1 | 0 | 3 → 0 | 0 (0) → 1 (1) |
 | swift-driver | 195 | 11 → 0 | 1 → 0 | 0 | 0 | — | 0 (0) |
-| swift-foundation | 431 | 33 → 0 | 1 → 0 | 0 → 5 | 3 | 7 → 2 | 0 (0) → 9 (7) |
+| swift-foundation | 431 | 33 → 0 | 1 → 0 | 0 → 4 | 3 | 7 → 2 | 0 (0) → 7 (6) |
 | swift-log | 30 | 5 → 0 | 0 | 0 → 2 | 0 | 1 → 0 | 0 (0) → 3 (2) |
 | swift-nio | 479 | 41 → 0 | 3 → 0 | 0 | 0 | — | 0 (0) |
 | swift-package-manager | 883 | 3 → 0 | 2 → 0 | 0 | 0 | — | 0 (0) |
@@ -167,7 +168,7 @@ Swift files of each package's own targets (from its manifest; not nested package
 | swift-syntax | 586 | 2 → 0 | 0 | 0 → 2 | 0 | 3 → 0 | 0 (0) → 3 (2) |
 | swift-tools-protocols | 232 | 2 → 0 | 0 | 0 | 0 | — | 0 (0) |
 | swift-tools-support-core | 124 | 0 | 1 → 0 | 0 → 2 | 0 | 14 → 5 | 0 (0) → 2 (2) |
-| **All** | 4904 | 136 → 2 | 10 → 1 | 0 → 15 | 3 | | 0 (0) → 22 (18) |
+| **All** | 4904 | 136 → 2 | 10 → 1 | 0 → 14 | 3 | | 0 (0) → 20 (17) |
 
 Files whose imports aren't narrow yet: swift-build: `Sources/SWBUtil/Architecture.swift` (whole module), swift-build: `Sources/SWBUtil/MachO.swift` (whole module), swift-build: `Sources/SWBLibc/libc.swift` (submodule).
 
@@ -260,20 +261,20 @@ Verbatim, not rerun: each package's own test totals (at the start, and the lates
 
 **swift-foundation**
 
-- MIGRATION.md, tests (lines 124, 126, 153):
+- MIGRATION.md, tests (lines 124, 126, 154):
 
   ```text
   | Step | Result |
   | Baseline | 1701 tests in 128 suites passed (34 skipped) |
-  | fts for copy and link (DirectoryWalk tried, then kept fts; the tried build also passed) | 1701 tests in 128 suites passed |
+  | Typed allocation (`Memory.TypeDescriptor`) | 1701 tests in 128 suites passed |
   ```
 
-- MIGRATION.md, re-exports (lines 59, 61, 85):
+- MIGRATION.md, re-exports (lines 59, 61, 86):
 
   ```text
   | | FoundationEssentials: whole module | scoped only (SYSTEM-GAP) | through a re-export | FoundationInternationalization | Tests |
   | At start (`21c6d01f`) | 25 | 0 | 7 | 1 | 8 |
-  | After fts for copy and link (tried; kept) | 0 | 5 | 2 | 0 | 0 |
+  | After typed allocation (`Memory.TypeDescriptor`) | 0 | 4 | 2 | 0 | 0 |
   ```
 
 - REPORT.md, tests (lines 14, 172):
@@ -381,7 +382,7 @@ Verbatim, not rerun: each package's own test totals (at the start, and the lates
 
 # 3. Gaps
 
-Every `SYSTEM-GAP:` marker in the packages' sources at the commits above: 22 markers in 18 files, of which 0 are outside the packages' targets. Each marker's text is read for the C interfaces it names (see [How this is computed](#how-this-is-computed)); a marker that names none is counted under its phrase, with the Darwin names imported under it deciding its status. Status is against System at `b08bf197`:
+Every `SYSTEM-GAP:` marker in the packages' sources at the commits above: 20 markers in 17 files, of which 0 are outside the packages' targets. Each marker's text is read for the C interfaces it names (see [How this is computed](#how-this-is-computed)); a marker that names none is counted under its phrase, with the Darwin names imported under it deciding its status. Status is against System at `bd9fd0eb`:
 
 - **missing**: System documents none of it (or only some: *k of n*).
 - **covered**: a System declaration's doc comment names it as the corresponding C interface, a CInterop alias names it, or, for `X members`, System gives `CInterop` alias of `X` Swift-named accessors. The marker is stale, or the package hasn't adopted the API yet. *Not yet in `system-next`* means only this branch has it.
@@ -389,7 +390,7 @@ Every `SYSTEM-GAP:` marker in the packages' sources at the commits above: 22 mar
 
 A family marked *(provisional)* is a C-library layer above the OS (math, stdio, locales, string.h and ctype.h) that System wraps provisionally, in `Sources/System/Provisional/`, since it may move to the standard library; it counts like everything else.
 
-Interfaces: 56 covered, 56 in all.
+Interfaces: 51 covered, 51 in all.
 
 | # | Interface | Status | Files | Packages | Family |
 |---:|---|---|---:|---|---|
@@ -434,21 +435,16 @@ Interfaces: 56 covered, 56 in all.
 | 39 | `fwrite` | covered (doc comment) | 1 | swift-log | C stdio streams |
 | 40 | `gmtime_r` | covered (doc comment) | 1 | swift-certificates | calendar time |
 | 41 | `localtime` | covered (as `localtime_r`) | 1 | swift-log | calendar time |
-| 42 | `malloc_type_calloc` | covered (doc comment) | 1 | swift-foundation | libmalloc |
-| 43 | `malloc_type_descriptor_v0_t` | covered (doc comment) | 1 | swift-foundation | libmalloc |
-| 44 | `malloc_type_descriptor_v0_t members` | covered (by Memory.TypeDescriptor) | 1 | swift-foundation | C struct members (MemberImportVisibility) |
-| 45 | `malloc_type_malloc` | covered (doc comment) | 1 | swift-foundation | libmalloc |
-| 46 | `malloc_type_realloc` | covered (doc comment) | 1 | swift-foundation | libmalloc |
-| 47 | `mktemp` | covered (doc comment) | 1 | swift-foundation | temporary files |
-| 48 | `POSIXErrorCode` | covered (doc comment) | 1 | swift-foundation | POSIXErrorCode |
-| 49 | readlinkat into a caller's buffer (System's readSymbolicLink returns a FilePath, which dro | covered (doc comment) | 1 | WasmKit | readlinkat into a caller's buffer (System's readSymbolicLink returns a FilePath, which dro |
-| 50 | `setvbuf` | covered (doc comment) | 1 | swift-log | C stdio streams |
-| 51 | `stdout` | covered (doc comment) | 1 | swift-log | C stdio streams |
-| 52 | `strftime` | covered (doc comment) | 1 | swift-log | calendar time |
-| 53 | `time` | covered (as `clock_gettime`) | 1 | swift-log | calendar time |
-| 54 | `time_t` | covered (doc comment) | 1 | swift-certificates | calendar time |
-| 55 | `tm` | covered (doc comment) | 1 | swift-certificates | calendar time |
-| 56 | `TZDEFAULT` | covered (doc comment) | 1 | swift-foundation | tzfile.h |
+| 42 | `mktemp` | covered (doc comment) | 1 | swift-foundation | temporary files |
+| 43 | `POSIXErrorCode` | covered (doc comment) | 1 | swift-foundation | POSIXErrorCode |
+| 44 | readlinkat into a caller's buffer (System's readSymbolicLink returns a FilePath, which dro | covered (doc comment) | 1 | WasmKit | readlinkat into a caller's buffer (System's readSymbolicLink returns a FilePath, which dro |
+| 45 | `setvbuf` | covered (doc comment) | 1 | swift-log | C stdio streams |
+| 46 | `stdout` | covered (doc comment) | 1 | swift-log | C stdio streams |
+| 47 | `strftime` | covered (doc comment) | 1 | swift-log | calendar time |
+| 48 | `time` | covered (as `clock_gettime`) | 1 | swift-log | calendar time |
+| 49 | `time_t` | covered (doc comment) | 1 | swift-certificates | calendar time |
+| 50 | `tm` | covered (doc comment) | 1 | swift-certificates | calendar time |
+| 51 | `TZDEFAULT` | covered (doc comment) | 1 | swift-foundation | tzfile.h |
 
 ## Missing, by family
 
@@ -506,11 +502,6 @@ The missing interfaces above, grouped, largest first: the order to fill them in.
 - `fwrite` (covered): swift-log: `Tests/LoggingTests/StreamLogHandlerTest.swift:22`
 - `gmtime_r` (covered): swift-certificates: `Tests/X509Tests/TimeTests.swift:19`
 - `localtime` (covered): swift-log: `Sources/Logging/Handlers/StreamLogHandler.swift:23`
-- `malloc_type_calloc` (covered): swift-foundation: `Sources/FoundationEssentials/Data/Representations/DataStorage.swift:16`
-- `malloc_type_descriptor_v0_t` (covered): swift-foundation: `Sources/FoundationEssentials/Data/Representations/DataStorage.swift:17`
-- `malloc_type_descriptor_v0_t members` (covered): swift-foundation: `Sources/FoundationEssentials/Data/Representations/DataStorage.swift:17`
-- `malloc_type_malloc` (covered): swift-foundation: `Sources/FoundationEssentials/Data/Representations/DataStorage.swift:16`
-- `malloc_type_realloc` (covered): swift-foundation: `Sources/FoundationEssentials/Data/Representations/DataStorage.swift:16`
 - `mktemp` (covered): swift-foundation: `Sources/FoundationEssentials/Data/Data+Writing.swift:26`
 - `POSIXErrorCode` (covered): swift-foundation: `Sources/FoundationEssentials/Error/ErrorCodes+POSIX.swift:20`; swift-foundation: `Sources/FoundationEssentials/Error/ErrorCodes+POSIX.swift:21`
 - readlinkat into a caller's buffer (System's readSymbolicLink returns a FilePath, which dro (covered): WasmKit: `Sources/WASI/Platform/PAL/PALFileDescriptor.swift:7`
