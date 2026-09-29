@@ -27,7 +27,8 @@ Two kinds of use sites, for every node of graph.json:
                  migration: the C interfaces they use, joined with the C
                  names each declaration's doc comment gives ("The
                  corresponding C function is `x`."), read by the coverage
-                 tools' own derivation (adopter-coverage's derive.py). The
+                 tools' own derivation (adopter-coverage's derive.py, run by
+                 cnames.py). The
                  interfaces are the coverage tools' extraction
                  (interfaces.json.gz in their results store) at the clone's
                  commit; a package the store has no extraction for is
@@ -43,6 +44,7 @@ directories are one package. System itself is skipped.
 
 Usage: adopters.py --graph graph.json --repo DIR --head COMMIT
                    --head-src DIR --base-src DIR --head-scan F --base-scan F
+                   --cnames cnames.json
                    --work DIR --cache DIR --out adopters.json
                    [--adopters DIR] [--ecosystem DIR] [--coverage-results DIR]
                    [--branch migrate-darwin] [--builds build|reuse|none]
@@ -1015,51 +1017,29 @@ def map_line(hunks, line):
 # ---------------------------------------------------------------- would benefit: C names
 
 C_FILES = (".c", ".h", ".cpp", ".cc", ".cxx", ".hpp", ".hh", ".m", ".mm", ".def", ".inc")
-SWIFT_WORDS = {"nil", "true", "false", "self", "Self", "super", "init", "Void", "Any", "some", "any", "inout"}
 
 
-def param_names(decl):
-    """The labels and parameter names a declaration's text spells."""
-    out = set()
-    m = re.search(r"\((.*)\)", decl)
-    if m:
-        for prm in top_level_split(m.group(1)):
-            out.update(re.findall(IDENT, prm.partition(":")[0]))
-    return out
-
-
-def c_names_by_node(nodes, derive, head_src, head_scan, base_src, base_scan):
-    """{nid: {"names", "restricted", "baseCovered"}} from the coverage tools'
-    derivation of the head commit, and {name: kinds}. A name the base
-    commit's derivation covers is set aside, and so are the Swift words and
-    parameter names the derivation takes for C names (`nil` in "with
-    `UTIME_OMIT` for a `nil` time", `value` in "the 8 bytes of `value`")."""
-    head = derive.derive(head_src, head_scan)
-    base = derive.derive(base_src, base_scan)
-    base_covered = {name for name, v in base["names"].items() if v["status"] == "covered"}
-    at = collections.defaultdict(list)
-    for nid, n in nodes.items():
-        for f, ln in n.get("sites") or [[n["file"], n["line"]]]:
-            if f:
-                at[(f, ln)].append(nid)
-    out = collections.defaultdict(lambda: {"names": set(), "restricted": set(), "baseCovered": set()})
-    kinds = {}
-    for name, v in head["names"].items():
-        if name in SWIFT_WORDS:
-            continue
-        kinds[name] = v["kinds"]
-        for d in v["declarations"]:
-            for nid in at.get((d["file"], d["line"]), []):
-                if d["role"] == "argument" and not name.isupper() and name in param_names(nodes[nid]["decl"]):
-                    continue
-                rec = out[nid]
-                if d["restricted"]:
-                    rec["restricted"].add(name)
-                elif name in base_covered:
-                    rec["baseCovered"].add(name)
-                else:
-                    rec["names"].add(name)
-    return {k: {kk: sorted(vv) for kk, vv in v.items()} for k, v in out.items()}, kinds
+def join_tables(cn):
+    """From cnames.json: {nid: {names, restricted, baseCovered}} (what each
+    declaration's would-benefit sites are joined on, and what's left out),
+    {name: [nid]} for the join, and every wrapped name with its kinds."""
+    per = collections.defaultdict(lambda: {"names": set(), "restricted": set(), "baseCovered": set()})
+    for w in cn["wraps"]:
+        rec = per[w["node"]]
+        if w["restricted"]:
+            rec["restricted"].add(w["name"])
+        elif cn["names"][w["name"]]["baseCovered"]:
+            rec["baseCovered"].add(w["name"])
+        else:
+            rec["names"].add(w["name"])
+    per = {k: {kk: sorted(vv - (v["names"] if kk != "names" else set())) for kk, vv in v.items()}
+           for k, v in per.items()}
+    name_nodes = collections.defaultdict(list)
+    for nid, v in per.items():
+        for nm in v["names"]:
+            name_nodes[nm].append(nid)
+    kinds = {n: v["kinds"] for n, v in cn["names"].items()}
+    return per, name_nodes, kinds
 
 
 def interfaces_for(results, commit):
@@ -1124,6 +1104,7 @@ def main():
     ap.add_argument("--base-src", required=True)
     ap.add_argument("--head-scan", required=True)
     ap.add_argument("--base-scan", required=True)
+    ap.add_argument("--cnames", required=True, help="cnames.json, from cnames.py")
     ap.add_argument("--work", required=True)
     ap.add_argument("--cache", required=True)
     ap.add_argument("--out", required=True)
@@ -1298,12 +1279,12 @@ def main():
               f"{round(time.time() - t0)} s", flush=True)
 
     # ------------------------------------------------------------ would benefit
-    derive = coverage_module("derive")
-    cnames, c_kinds = c_names_by_node(nodes, derive, a.head_src, load_json(a.head_scan), a.base_src, base_scan)
-    name_nodes = collections.defaultdict(list)
-    for nid, v in cnames.items():
-        for nm in v["names"]:
-            name_nodes[nm].append(nid)
+    # A site counts for every C name the graph wraps (so the graph can say
+    # who calls `fcntl` or `read`), and for a declaration's reach only
+    # through the names it's joined on: not restricted, and not covered on
+    # the base commit.
+    cnames, name_nodes, c_kinds = join_tables(load_json(a.cnames))
+    all_names = set(c_kinds)
     benefit_sites = []
     by_node_benefit = collections.defaultdict(list)
     for rec in pkg_out:
@@ -1358,11 +1339,13 @@ def main():
             for plat, wrapped in (shim.get("wraps") or {}).items():
                 for w in wrapped:
                     names.add(w[4:] if w.startswith("SYS_") else w)
-            hits = sorted({nid for nm in names for nid in name_nodes.get(nm, ())})
-            if not hits:
+            matched = sorted(names & all_names)
+            if not matched:
                 continue
+            hits = sorted({nid for nm in names for nid in name_nodes.get(nm, ())})
             via = sorted(nm for nm in names if nm in name_nodes)
-            used.add(itf["name"])
+            if hits:
+                used.add(itf["name"])
             type_only = not ({"function", "constant", "macro", "variable", "error"} & set(itf.get("kinds") or []))
             for s in itf["sites"]:
                 if type_only and s["file"].endswith(C_FILES):
@@ -1371,14 +1354,14 @@ def main():
                         "via": [v for v in via if v != itf["name"]], "target": s.get("target"),
                         "platforms": sorted(k for k, v in (s.get("platforms") or {}).items() if v),
                         "resolution": "precise" if s.get("evidence") == "index" else "lexical",
-                        "evidence": s.get("evidence"), "nodes": hits}
+                        "evidence": s.get("evidence"), "cnames": matched, "nodes": hits}
                 if maps is not None:
                     path_new, spans = maps.get(s["file"], (s["file"], []))
                     ml = map_line(spans, s["line"])
                     site["onBranch"] = {"file": path_new, "line": ml} if ml else None
                 k = len(benefit_sites)
                 benefit_sites.append(site)
-                n_sites += 1
+                n_sites += 1 if hits else 0
                 for nid in hits:
                     by_node_benefit[nid].append(k)
         rec["benefit"] = {"path": src["path"], "commit": commit, "subject": src.get("subject"), "role": src["role"],
