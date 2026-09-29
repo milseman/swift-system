@@ -52,6 +52,9 @@ import Android
 /// so it can't go deeper than the process's limit on open descriptors.
 /// Beyond that, the entry for a directory it can't open has the error
 /// ``Errno/tooManyOpenFiles``.
+/// `fts` with `FTS_NOCHDIR` holds none, and opens each directory by its path,
+/// so it goes deeper, but reports a directory whose path is `PATH_MAX` bytes
+/// or longer as unreadable (`FTS_DNR`), which a walk reads.
 ///
 /// `DirectoryWalk` can't be copied.
 /// Destroying a walk closes the directories it has open,
@@ -67,16 +70,27 @@ public struct DirectoryWalk: ~Copyable {
   // next call descends into, unless `skipDescendants()` closes it first.
   internal var _pending: _Level?
 
+  // With `.whenEntered`, the name of a directory in the current one that
+  // `next()` returned in preorder without opening it, which the next call
+  // opens and descends into, unless `skipDescendants()` forgets it first.
+  internal var _entered: FilePath.Component?
+
   // The name that `next()` returned last, reused as DirectoryStream's is.
   internal var _name: SystemString
 
   internal let _order: Order
 
-  internal init(_root dir: system_DIRPtr, path: FilePath, order: Order) {
+  internal let _opening: DirectoryOpening
+
+  internal init(
+    _root dir: system_DIRPtr, path: FilePath, order: Order, opening: DirectoryOpening
+  ) {
     self._levels = [_Level(dir: dir, path: path, name: nil)]
     self._pending = nil
+    self._entered = nil
     self._name = SystemString()
     self._order = order
+    self._opening = opening
   }
 
   deinit {
@@ -131,9 +145,41 @@ extension DirectoryWalk {
     ///
     /// The second visit's entry has ``Entry/isPostorderVisit``.
     /// A directory the walk can't open is visited once, with its error,
-    /// and so is one whose contents ``DirectoryWalk/skipDescendants()`` skips.
+    /// and so is one whose contents ``DirectoryWalk/skipDescendants()`` skips;
+    /// a walk that opens directories ``DirectoryOpening/whenEntered``
+    /// visits one it can't open twice, the second time with the error.
     /// This is `fts`'s pair of visits, `FTS_D` and `FTS_DP`.
     case preorderAndPostorder
+  }
+
+  /// When a walk opens a directory to read its contents.
+  @frozen
+  public enum DirectoryOpening: Sendable, Hashable {
+    /// When the walk reads the directory's entry,
+    /// before it visits the directory.
+    ///
+    /// The entry of a directory that the walk can't open has the error.
+    /// Darwin's `fdopendir` reads a directory's entries when it opens it,
+    /// so the walk has a directory's contents before the caller handles
+    /// the directory's entry.
+    case whenRead
+
+    /// When the walk goes into the directory,
+    /// after it visits the directory before its contents,
+    /// as `fts` does.
+    ///
+    /// The caller has handled the directory's first visit
+    /// when the walk reads its contents,
+    /// so copying a tree into itself sees what the copy has added.
+    /// A directory that the walk can't open has a first visit
+    /// without an error, and a second visit, as its postorder visit,
+    /// with the error, in place of its contents:
+    /// `fts`'s `FTS_D` and `FTS_DNR`.
+    /// ``DirectoryWalk/skipDescendants()`` after the first visit
+    /// keeps the walk from opening it at all.
+    /// A ``Order/postorder`` walk opens a directory before its contents,
+    /// as it reads the directory's entry, whichever the option.
+    case whenEntered
   }
 
   /// Opens a directory to walk the tree under it.
@@ -144,6 +190,8 @@ extension DirectoryWalk {
   ///     the walk starts at the directory it points to.
   ///   - order: When the walk visits a directory,
   ///     relative to its contents. The default is ``Order/preorder``.
+  ///   - opening: When the walk opens a directory to read its contents.
+  ///     The default is ``DirectoryOpening/whenRead``.
   ///   - retryOnInterrupt: Whether to retry opening the root
   ///     if it throws ``Errno/interrupted``.
   ///     The default is `true`.
@@ -156,10 +204,11 @@ extension DirectoryWalk {
   public init(
     _ root: FilePath,
     order: Order = .preorder,
+    opening: DirectoryOpening = .whenRead,
     retryOnInterrupt: Bool = true
   ) throws(Errno) {
     let stream = try DirectoryStream.open(root, retryOnInterrupt: retryOnInterrupt)
-    self.init(stream, path: root, order: order)
+    self.init(stream, path: root, order: order, opening: opening)
   }
 
   /// Walks the tree under a directory stream's directory,
@@ -174,6 +223,8 @@ extension DirectoryWalk {
   ///     is relative to the root.
   ///   - order: When the walk visits a directory,
   ///     relative to its contents. The default is ``Order/preorder``.
+  ///   - opening: When the walk opens a directory to read its contents.
+  ///     The default is ``DirectoryOpening/whenRead``.
   ///
   /// To make sure the root isn't a symbolic link,
   /// open it with `.noFollow` and convert it:
@@ -185,16 +236,18 @@ extension DirectoryWalk {
   public init(
     _ root: consuming DirectoryStream,
     path: FilePath = FilePath(),
-    order: Order = .preorder
+    order: Order = .preorder,
+    opening: DirectoryOpening = .whenRead
   ) {
-    self.init(_stream: root, path: path, order: order)
+    self.init(_stream: root, path: path, order: order, opening: opening)
   }
 
   @usableFromInline
   internal init(
-    _stream root: consuming DirectoryStream, path: FilePath, order: Order
+    _stream root: consuming DirectoryStream, path: FilePath, order: Order,
+    opening: DirectoryOpening = .whenRead
   ) {
-    self.init(_root: root._takeDIR(), path: path, order: order)
+    self.init(_root: root._takeDIR(), path: path, order: order, opening: opening)
   }
 }
 
@@ -230,7 +283,9 @@ extension DirectoryWalk {
     /// Why the walk couldn't visit this entry fully, if it couldn't.
     ///
     /// For a directory, this is the error from opening it,
-    /// and the walk doesn't visit its contents.
+    /// and the walk doesn't visit its contents;
+    /// a walk that opens directories ``DirectoryOpening/whenEntered``
+    /// reports it on the directory's second visit.
     /// It can be ``Errno/permissionDenied``,
     /// or ``Errno/tooManyOpenFiles`` when the tree is too deep,
     /// or ``Errno/notDirectory`` or ``Errno/tooManySymbolicLinkLevels``
@@ -281,7 +336,9 @@ extension DirectoryWalk {
   /// and doesn't visit the `.` and `..` entries.
   ///
   /// If opening a directory fails, the walk still returns its entry,
-  /// with the ``Entry/error``, and moves on.
+  /// with the ``Entry/error``, and moves on;
+  /// with ``DirectoryOpening/whenEntered``, it returns the directory's
+  /// entry again, with the error.
   /// If reading a directory's entries fails, this method throws,
   /// and the walk leaves that directory,
   /// so calling this method again continues with the rest of the tree.
@@ -302,6 +359,17 @@ extension DirectoryWalk {
     // Descend into the directory the last entry opened, in preorder.
     if let pending = _pending.take() {
       _levels.append(pending)
+    } else if let name = _entered.take(), let parent = _levels.last {
+      // Or open the one it named, with `.whenEntered`. If that fails, the
+      // directory's second visit has the error, in place of its contents.
+      switch _openChild(name, in: parent, retryOnInterrupt: retryOnInterrupt) {
+      case .success(let child):
+        _levels.append(child)
+      case .failure(let error):
+        return .success(Entry(
+          name: name, type: .directory, depth: _levels.count,
+          error: error, parentPath: parent.path, isPostorderVisit: true))
+      }
     }
     while let level = _levels.last {
       switch _readDirectoryEntry(level.dir, retryOnInterrupt: retryOnInterrupt) {
@@ -362,28 +430,37 @@ extension DirectoryWalk {
     let name = FilePath.Component(_directoryEntryName: _name)
 
     if type == .directory {
-      // Open the directory relative to its parent, without following a
-      // symbolic link, so that a directory replaced by a link since readdir
-      // fails to open rather than leading out of the tree.
-      let opened = name._withPlatformStringInPlace {
-        _openDirectoryStream(
-          $0, relativeTo: level.fileDescriptor, options: _O_NOFOLLOW,
-          retryOnInterrupt: retryOnInterrupt)
-      }
-      switch opened {
-      case .success(let dir):
-        let child = _Level(dir: dir, path: level.path.appending(name), name: name)
-        if _order == .postorder {
-          _levels.append(child)
-          return nil
+      if _opening == .whenEntered && _order != .postorder {
+        _entered = name
+      } else {
+        switch _openChild(name, in: level, retryOnInterrupt: retryOnInterrupt) {
+        case .success(let child):
+          if _order == .postorder {
+            _levels.append(child)
+            return nil
+          }
+          _pending = child
+        case .failure(let failure):
+          error = failure
         }
-        _pending = child
-      case .failure(let failure):
-        error = failure
       }
     }
     return Entry(
       name: name, type: type, depth: depth, error: error, parentPath: level.path)
+  }
+
+  /// Opens a directory in `level` for the walk to read.
+  internal func _openChild(
+    _ name: FilePath.Component, in level: _Level, retryOnInterrupt: Bool
+  ) -> Result<_Level, Errno> {
+    // Open the directory relative to its parent, without following a
+    // symbolic link, so that a directory replaced by a link since readdir
+    // fails to open rather than leading out of the tree.
+    name._withPlatformStringInPlace {
+      _openDirectoryStream(
+        $0, relativeTo: level.fileDescriptor, options: _O_NOFOLLOW,
+        retryOnInterrupt: retryOnInterrupt)
+    }.map { _Level(dir: $0, path: level.path.appending(name), name: name) }
   }
 
   /// Skips the contents of the directory that `next()` returned last.
@@ -406,6 +483,7 @@ extension DirectoryWalk {
     if let pending = _pending.take() {
       _ = system_closedir(pending.dir)
     }
+    _entered = nil
   }
 
   /// The file descriptor of the directory that contains the entry
@@ -473,6 +551,7 @@ extension DirectoryWalk {
     let result = _closeAll()
     // Forget the closed directories, so that deinit doesn't close them again.
     _pending = nil
+    _entered = nil
     _levels = []
     return result
   }
