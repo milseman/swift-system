@@ -9,8 +9,7 @@ on Darwin only.
 
 Before any change: XCTest 565 tests (4 skipped), swift-testing 485 tests in 76 suites, all passing.
 
-**Resume here:** sections 1 and 2 are done; next is item 3, DirectoryWalk visiting the root and giving each entry's
-status.
+**Resume here:** sections 1 to 3 are done; next is item 4, the number of loaded images.
 
 ## 1. `Errno.notCapable` on Darwin: `6ba9b30`
 
@@ -35,7 +34,7 @@ Coverage's Queue row B1 (Prototype/Status/REPORT.md) is marked done.
 
 Next: item 2.
 
-## 2. DirectoryWalk with a bounded number of descriptors
+## 2. DirectoryWalk with a bounded number of descriptors: `7c65c04`
 
 What: `DirectoryWalk.Options`, a new `options:` parameter of both initializers (default `[]`), with
 `.boundedDescriptors`. Such a walk reads each directory's entries whole the first time it reads the directory, as
@@ -105,3 +104,49 @@ Findings: Prototype/Directories/README.md's "Descriptors" paragraph ("Rejected f
 
 Next: item 3. For Foundation: pass `options: .boundedDescriptors` in `_LinkOrCopyWalk` and `_subpathsOfDirectory`,
 and drop the EMFILE notes.
+
+## 3. DirectoryWalk visiting the root, and giving each entry's status
+
+What: two more `DirectoryWalk.Options`.
+- `.includesRoot`: the walk visits the root itself where its order puts any directory's visits: first, last, or
+  both (fts's level-0 `FTS_D` and `FTS_DP`). The root's entry has depth 0, the name `.`, the root's path as its
+  `path` (empty for a walk made from a stream without one), and type `.directory`. During its visits
+  `parentDirectory` is the root itself. `skipDescendants()` after its first visit ends the walk, skipping its
+  second visit too, as for any directory.
+- `.includesStatus`: each entry gets `Entry.status: Stat?`, the `fstatat(parent, name, AT_SYMLINK_NOFOLLOW)` taken
+  when the walk reads the entry, or `Entry.statusError: Errno?` when that fails (fts's `FTS_NS`), and the entry's
+  type comes from the status. A directory's postorder visit has the status from its first (as fts's `FTS_DP` has),
+  and the root's is its descriptor's `fstat`. The one `fstatat` replaces the one a walk makes for an entry whose
+  directory records no type. With the two, Foundation's `_LinkOrCopyWalk` no longer needs its own root visits or its
+  `fstatat` per entry (its third SYSTEM-GAP marker); it still `lstat`s the root first for a root that isn't a
+  directory, or is a link, which fts visited as the only item.
+
+Design calls, with the alternatives rejected:
+- The root's name is `.`, with `parentDirectory` the root, so a call relative to `parentDirectory` with the entry's
+  name reaches the root (`fstatat` gives its status, and removing it fails with EINVAL). Rejected: the root's last
+  path component, which with the root as `parentDirectory` would name a file inside the root (walking `x`, where
+  `x/x` exists, an `unlinkat(parentDirectory, name)` would remove `x/x`), and which `/` and an empty path don't have;
+  an optional `name`, which changes every caller; the root's parent as `parentDirectory`, which the walk doesn't
+  have, and which `..` gets wrong when the root's path is a link.
+- The root's entry is the directory the walk opened, which is the link's target if the root's path is a symbolic
+  link; fts with `FTS_PHYSICAL` visits the link itself. Documented on the option; rejected: an `lstat` of the root's
+  path, which a walk made from a stream doesn't have.
+- The status is two properties, `status` and `statusError`, like `error`. Rejected: `Result<Stat, Errno>?`, which no
+  public property in System uses; reusing `error`, which for a directory already holds the error from opening it
+  (a directory in a directory that can be read but not searched fails both).
+- When the status fails, `type` is the directory's `d_type`, and `error` is set only if that's unknown too, so the
+  documented rule stays: the type is `nil` only if it couldn't be found, and then `error` says why.
+- Both options are members of section 2's `Options`; the root's visits are a small state machine (`_RootVisits`) in
+  front of either way of reading, and the root stays open for its last visit, which the next call closes.
+
+Tests (DirectoryWalkRootAndStatusTests.swift, swift-testing): `theRootIsVisitedInEachOrder` (every order, both
+openings, with and without `.boundedDescriptors`: the root's visits around the same visits as without the option,
+its entry's fields, and `.` through `parentDirectory` reaching the root), `skippingTheRootsContentsEndsTheWalk`,
+`eachEntrysStatus` (every order and opening, with and without `.boundedDescriptors`: each status is the entry's own
+`lstat`, the type agrees, a link's is the link's, a directory's two visits share one, and none without the option),
+and `entriesWhoseStatusCantBeRead` (a directory with only read permission: its entries have `statusError`
+EACCES and the type their directory records, and its subdirectory also fails to open).
+
+Next: item 4. For Foundation: `_LinkOrCopyWalk` can take `options: [.boundedDescriptors, .includesRoot,
+.includesStatus]` with `opening: .whenEntered`, keeping its `lstat` of the root, its `PATH_MAX` check and its "._"
+filter.

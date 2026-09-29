@@ -41,7 +41,8 @@ import Android
 ///       print(entry.path)
 ///     }
 ///
-/// A walk visits the root's entries, not the root itself.
+/// A walk visits the root's entries, not the root itself,
+/// unless it has ``Options/includesRoot``.
 /// By default, it visits a directory before its contents;
 /// pass ``Order/postorder`` to visit it after them instead,
 /// as removing a tree requires.
@@ -73,10 +74,13 @@ public struct DirectoryWalk: ~Copyable {
   // next call descends into, unless `skipDescendants()` closes it first.
   internal var _pending: _Level?
 
-  // With `.whenEntered`, the name of a directory in the current one that
-  // `next()` returned in preorder without opening it, which the next call
-  // opens and descends into, unless `skipDescendants()` forgets it first.
-  internal var _entered: FilePath.Component?
+  // With `.whenEntered`, a directory in the current one that `next()`
+  // returned in preorder without opening it, which the next call opens and
+  // descends into, unless `skipDescendants()` forgets it first.
+  internal var _entered: _Entered?
+
+  // With `.includesRoot`, where the walk is in the root's visits.
+  internal var _rootVisits: _RootVisits
 
   // The name that `next()` returned last, reused as DirectoryStream's is.
   internal var _name: SystemString
@@ -94,6 +98,7 @@ public struct DirectoryWalk: ~Copyable {
     self._levels = [_Level(handle: .stream(dir), path: path, name: nil)]
     self._pending = nil
     self._entered = nil
+    self._rootVisits = options.contains(.includesRoot) ? .next : .off
     self._name = SystemString()
     self._order = order
     self._opening = opening
@@ -113,6 +118,7 @@ extension DirectoryWalk: @unchecked Sendable {
 }
 
 /// A directory in a walk, between the root and the entry it visits.
+@available(System 199, *)
 internal struct _Level {
   // How the walk holds the directory, which it owns.
   var handle: _Handle
@@ -135,6 +141,11 @@ internal struct _Level {
   // With `.boundedDescriptors`, the directory's device and inode, to check
   // that a directory the walk reopens is the one it read.
   var identity: _DirectoryIdentity? = nil
+
+  // With `.includesStatus`, the directory's status, or why it couldn't be
+  // read, from when the walk read its entry, for its postorder visit.
+  var status: Stat? = nil
+  var statusError: Errno? = nil
 
   var fileDescriptor: CInt { handle.fileDescriptor }
 
@@ -306,6 +317,64 @@ extension DirectoryWalk {
     /// Without this option, a walk holds a descriptor for each level.
     @_alwaysEmitIntoClient
     public static var boundedDescriptors: Options { Options(rawValue: 1 << 0) }
+
+    /// Visits the root itself too,
+    /// before its contents, after them, or both,
+    /// as the walk's order visits any other directory.
+    ///
+    /// The root's entry has a depth of 0, the name `.`,
+    /// and the root's path as its path.
+    /// During the root's visits, ``DirectoryWalk/parentDirectory``
+    /// is the root itself,
+    /// so a call relative to it with the entry's name reaches the root,
+    /// and removing the entry that way fails.
+    /// ``DirectoryWalk/skipDescendants()`` after the root's first visit
+    /// ends the walk.
+    /// This is `fts`'s entry at level 0,
+    /// except that the root is a directory the walk has opened:
+    /// if the root's path is a symbolic link, its entry is the directory
+    /// the link points to.
+    @_alwaysEmitIntoClient
+    public static var includesRoot: Options { Options(rawValue: 1 << 1) }
+
+    /// Gets each file's status, as the entry's ``Entry/status``,
+    /// or the error from getting it, as its ``Entry/statusError``:
+    /// `fts`'s `FTS_NS`.
+    ///
+    /// The walk gets a file's status relative to the directory
+    /// that contains it, without following a symbolic link,
+    /// when it reads the file's entry, and takes the entry's type from it.
+    /// A directory's visit after its contents has the status from before them.
+    /// The root's status, with ``includesRoot``, is from its descriptor.
+    ///
+    /// This costs an `fstatat` for each entry,
+    /// which a walk without the option makes only when a directory
+    /// doesn't record an entry's type.
+    @_alwaysEmitIntoClient
+    public static var includesStatus: Options { Options(rawValue: 1 << 2) }
+  }
+
+  // A directory that `next()` returned without opening it, with
+  // `.whenEntered`.
+  internal struct _Entered {
+    var name: FilePath.Component
+    var status: Stat?
+    var statusError: Errno?
+  }
+
+  // Where a walk with `.includesRoot` is in the root's visits.
+  internal enum _RootVisits {
+    // No root visits: the walk doesn't have `.includesRoot`, or they're done.
+    case off
+    // The root's first visit is next: its only one in a postorder walk.
+    case next
+    // `next()` returned the root's visit before its contents last.
+    case justVisited
+    // The walk is in the root's contents.
+    case inside
+    // The root's last visit is done, or its contents were skipped: the next
+    // call ends the walk.
+    case ending
   }
 
   /// Opens a directory to walk the tree under it.
@@ -395,7 +464,8 @@ extension DirectoryWalk {
   /// use ``DirectoryWalk/parentDirectory`` right after `next()`
   /// returns the entry.
   public struct Entry: Sendable, Hashable {
-    /// The file's name in its directory.
+    /// The file's name in its directory,
+    /// or `.` for the root's own entry, with ``Options/includesRoot``.
     public var name: FilePath.Component
 
     /// The file's type.
@@ -409,7 +479,8 @@ extension DirectoryWalk {
     public var type: FileType?
 
     /// How deep the entry is: 1 for an entry in the root,
-    /// 2 for an entry in one of the root's directories, and so on.
+    /// 2 for an entry in one of the root's directories, and so on,
+    /// and 0 for the root's own entry, with ``Options/includesRoot``.
     public var depth: Int
 
     /// Why the walk couldn't visit this entry fully, if it couldn't.
@@ -433,27 +504,52 @@ extension DirectoryWalk {
     /// and the second in a ``Order/preorderAndPostorder`` one.
     public var isPostorderVisit: Bool
 
-    // The path of the directory that contains the entry.
+    /// The file's status, if the walk has ``Options/includesStatus``
+    /// and getting it succeeded.
+    ///
+    /// The walk gets it relative to the directory that contains the file,
+    /// without following a symbolic link.
+    ///
+    /// The corresponding C function is `fstatat`,
+    /// with `AT_SYMLINK_NOFOLLOW`.
+    public var status: Stat?
+
+    /// Why the walk couldn't get the file's status,
+    /// if it has ``Options/includesStatus`` and that failed:
+    /// `fts`'s `FTS_NS`.
+    ///
+    /// It can be ``Errno/permissionDenied``,
+    /// for each entry of a directory that can be read but not searched.
+    /// The entry's ``type`` is then the one its directory records, if any.
+    public var statusError: Errno?
+
+    // The path of the directory that contains the entry, or for the root's
+    // entry, the root's.
     @usableFromInline
     internal var _parentPath: FilePath
 
     internal init(
       name: FilePath.Component, type: FileType?, depth: Int,
-      error: Errno?, parentPath: FilePath, isPostorderVisit: Bool = false
+      error: Errno?, parentPath: FilePath, isPostorderVisit: Bool = false,
+      status: Stat? = nil, statusError: Errno? = nil
     ) {
       self.name = name
       self.type = type
       self.depth = depth
       self.error = error
       self.isPostorderVisit = isPostorderVisit
+      self.status = status
+      self.statusError = statusError
       self._parentPath = parentPath
     }
 
     /// The file's path: the root's path,
     /// followed by the names of the directories down to the file,
     /// and the file's name.
+    /// For the root's own entry, with ``Options/includesRoot``,
+    /// this is the root's path.
     @_alwaysEmitIntoClient
-    public var path: FilePath { _parentPath.appending(name) }
+    public var path: FilePath { depth == 0 ? _parentPath : _parentPath.appending(name) }
   }
 
   /// Visits the next entry in the tree.
@@ -493,19 +589,53 @@ extension DirectoryWalk {
 
   @usableFromInline
   internal mutating func _next(retryOnInterrupt: Bool) -> Result<Entry?, Errno> {
+    switch _rootVisits {
+    case .next:
+      // With `.includesRoot`, the root's first visit, unless the walk is
+      // postorder.
+      _rootVisits = .inside
+      if _options.contains(.includesStatus) {
+        switch Stat._fstat(
+          FileDescriptor(rawValue: _levels[0].fileDescriptor),
+          retryOnInterrupt: retryOnInterrupt
+        ) {
+        case .success(let status): _levels[0].status = Stat(rawValue: status)
+        case .failure(let error): _levels[0].statusError = error
+        }
+      }
+      if _order != .postorder {
+        _rootVisits = .justVisited
+        return .success(_rootEntry(isPostorderVisit: false))
+      }
+    case .justVisited:
+      _rootVisits = .inside
+    case .ending:
+      // The root's last visit is done, or its contents were skipped.
+      _ = _closeAll()
+      _pending = nil
+      _entered = nil
+      _levels = []
+      _rootVisits = .off
+      return .success(nil)
+    case .off, .inside:
+      break
+    }
     // Descend into the directory the last entry opened, in preorder.
     if let pending = _pending.take() {
       _descend(into: pending)
-    } else if let name = _entered.take(), let parent = _levels.last {
+    } else if let entered = _entered.take(), let parent = _levels.last {
       // Or open the one it named, with `.whenEntered`. If that fails, the
       // directory's second visit has the error, in place of its contents.
-      switch _openChild(name, in: parent, retryOnInterrupt: retryOnInterrupt) {
-      case .success(let child):
+      switch _openChild(entered.name, in: parent, retryOnInterrupt: retryOnInterrupt) {
+      case .success(var child):
+        child.status = entered.status
+        child.statusError = entered.statusError
         _descend(into: child)
       case .failure(let error):
         return .success(Entry(
-          name: name, type: .directory, depth: _levels.count,
-          error: error, parentPath: parent.path, isPostorderVisit: true))
+          name: entered.name, type: .directory, depth: _levels.count,
+          error: error, parentPath: parent.path, isPostorderVisit: true,
+          status: entered.status, statusError: entered.statusError))
       }
     }
     if _options.contains(.boundedDescriptors) {
@@ -519,6 +649,7 @@ extension DirectoryWalk {
         return .failure(error)
 
       case .success(nil):
+        if let rootEntry = _endOfRoot() { return .success(rootEntry) }
         // Closing a directory opened for reading fails only with EBADF, from
         // a descriptor closed behind the walk's back. As in the deinit, the
         // walk drops that error.
@@ -527,30 +658,19 @@ extension DirectoryWalk {
         if _order != .preorder, let name = finished.name, let parent = _levels.last {
           return .success(Entry(
             name: name, type: .directory, depth: _levels.count,
-            error: nil, parentPath: parent.path, isPostorderVisit: true))
+            error: nil, parentPath: parent.path, isPostorderVisit: true,
+            status: finished.status, statusError: finished.statusError))
         }
 
       case .success(let raw?):
-        var type = FileType(_directoryEntryType: raw.pointee.d_type)
-        var error: Errno? = nil
-        if type == nil {
-          // The directory doesn't record the type, so get it from the file.
-          switch _resolveType(
-            _directoryEntryName(raw), in: level.fileDescriptor,
-            retryOnInterrupt: retryOnInterrupt
-          ) {
-          case .success(let resolved): type = resolved
-          case .failure(let failure): error = failure
-          }
-        }
+        let found = _typeAndStatus(
+          _directoryEntryName(raw), directoryType: raw.pointee.d_type,
+          in: level.fileDescriptor, retryOnInterrupt: retryOnInterrupt)
         _name._replaceContents(
           withPlatformString: _directoryEntryName(raw),
           length: _directoryEntryNameLength(raw))
         let name = FilePath.Component(_directoryEntryName: _name)
-        if let entry = _visit(
-          name, type: type, error: error, in: level,
-          retryOnInterrupt: retryOnInterrupt
-        ) {
+        if let entry = _visit(name, found, in: level, retryOnInterrupt: retryOnInterrupt) {
           return .success(entry)
         }
         // A postorder walk opened a directory, and reads its contents
@@ -576,6 +696,9 @@ extension DirectoryWalk {
       let level = _levels[top]
       let entries = level.entries!
       guard level.nextEntry < entries.count else {
+        if level.readError == nil, let rootEntry = _endOfRoot() {
+          return .success(rootEntry)
+        }
         // Leave the finished directory, which needs no descriptor to leave.
         let finished = _levels.removeLast()
         _ = finished.handle.close()
@@ -587,7 +710,8 @@ extension DirectoryWalk {
           }
           return .success(Entry(
             name: name, type: .directory, depth: _levels.count,
-            error: nil, parentPath: _levels[top - 1].path, isPostorderVisit: true))
+            error: nil, parentPath: _levels[top - 1].path, isPostorderVisit: true,
+            status: finished.status, statusError: finished.statusError))
         }
         continue
       }
@@ -597,25 +721,48 @@ extension DirectoryWalk {
       _levels[top].nextEntry += 1
       let read = entries[level.nextEntry]
       let fd = _levels[top].fileDescriptor
-      var type = FileType(_directoryEntryType: read.type)
-      var error: Errno? = nil
-      if type == nil {
-        // The directory doesn't record the type, so get it from the file.
-        switch read.name._withPlatformStringInPlace({
-          _resolveType($0, in: fd, retryOnInterrupt: retryOnInterrupt)
-        }) {
-        case .success(let resolved): type = resolved
-        case .failure(let failure): error = failure
-        }
+      let found = read.name._withPlatformStringInPlace {
+        _typeAndStatus(
+          $0, directoryType: read.type, in: fd, retryOnInterrupt: retryOnInterrupt)
       }
-      if let entry = _visit(
-        read.name, type: type, error: error, in: _levels[top],
-        retryOnInterrupt: retryOnInterrupt
-      ) {
+      if let entry = _visit(read.name, found, in: _levels[top], retryOnInterrupt: retryOnInterrupt) {
         return .success(entry)
       }
     }
     return .success(nil)
+  }
+
+  /// An entry's type, and the error if that couldn't be found;
+  /// and with `.includesStatus`, the file's status, or why it couldn't be read.
+  internal typealias _TypeAndStatus = (
+    type: FileType?, error: Errno?, status: Stat?, statusError: Errno?
+  )
+
+  /// Finds the type of a directory's entry, from `d_type` or the file's
+  /// status, and with `.includesStatus`, gets the status.
+  internal func _typeAndStatus(
+    _ name: UnsafePointer<CInterop.PlatformChar>, directoryType: UInt8,
+    in fd: CInt, retryOnInterrupt: Bool
+  ) -> _TypeAndStatus {
+    let recorded = FileType(_directoryEntryType: directoryType)
+    if _options.contains(.includesStatus) {
+      switch Stat._fstatat(
+        name, relativeTo: fd, flags: .symlinkNoFollow, retryOnInterrupt: retryOnInterrupt
+      ) {
+      case .success(let raw):
+        let status = Stat(rawValue: raw)
+        return (status.type, nil, status, nil)
+      case .failure(let failure):
+        // The type the directory records, if it records one.
+        return (recorded, recorded == nil ? failure : nil, nil, failure)
+      }
+    }
+    guard recorded == nil else { return (recorded, nil, nil, nil) }
+    // The directory doesn't record the type, so get it from the file.
+    switch _resolveType(name, in: fd, retryOnInterrupt: retryOnInterrupt) {
+    case .success(let resolved): return (resolved, nil, nil, nil)
+    case .failure(let failure): return (nil, failure, nil, nil)
+    }
   }
 
   /// Makes the entry for a directory's entry,
@@ -624,18 +771,21 @@ extension DirectoryWalk {
   /// In a postorder walk, a directory that opens is descended into at once,
   /// and this returns `nil`, since its entry comes after its contents.
   internal mutating func _visit(
-    _ name: FilePath.Component, type: FileType?, error: Errno?,
+    _ name: FilePath.Component, _ found: _TypeAndStatus,
     in level: _Level,
     retryOnInterrupt: Bool
   ) -> Entry? {
     let depth = _levels.count
-    var error = error
-    if type == .directory {
+    var error = found.error
+    if found.type == .directory {
       if _opening == .whenEntered && _order != .postorder {
-        _entered = name
+        _entered = _Entered(
+          name: name, status: found.status, statusError: found.statusError)
       } else {
         switch _openChild(name, in: level, retryOnInterrupt: retryOnInterrupt) {
-        case .success(let child):
+        case .success(var child):
+          child.status = found.status
+          child.statusError = found.statusError
           if _order == .postorder {
             _descend(into: child)
             return nil
@@ -647,7 +797,27 @@ extension DirectoryWalk {
       }
     }
     return Entry(
-      name: name, type: type, depth: depth, error: error, parentPath: level.path)
+      name: name, type: found.type, depth: depth, error: error, parentPath: level.path,
+      status: found.status, statusError: found.statusError)
+  }
+
+  /// With `.includesRoot`, when the root's entries are done: the root's
+  /// visit after its contents, if the walk makes one. The root stays open
+  /// for it, and the next call ends the walk.
+  internal mutating func _endOfRoot() -> Entry? {
+    guard _levels.count == 1, _rootVisits == .inside, _order != .preorder else {
+      return nil
+    }
+    _rootVisits = .ending
+    return _rootEntry(isPostorderVisit: true)
+  }
+
+  /// The root's own entry, with `.includesRoot`.
+  internal func _rootEntry(isPostorderVisit: Bool) -> Entry {
+    Entry(
+      name: ".", type: .directory, depth: 0, error: nil,
+      parentPath: _levels[0].path, isPostorderVisit: isPostorderVisit,
+      status: _levels[0].status, statusError: _levels[0].statusError)
   }
 
   /// Opens a directory in `level` for the walk to read.
@@ -786,6 +956,8 @@ extension DirectoryWalk {
   /// If the walk isn't about to visit the contents of a directory,
   /// such as after visiting a file, or in a postorder walk,
   /// this method does nothing.
+  /// After the root's first visit, with ``Options/includesRoot``,
+  /// it ends the walk.
   @_alwaysEmitIntoClient
   public mutating func skipDescendants() {
     _skipDescendants()
@@ -793,6 +965,10 @@ extension DirectoryWalk {
 
   @usableFromInline
   internal mutating func _skipDescendants() {
+    if _rootVisits == .justVisited {
+      _rootVisits = .ending
+      return
+    }
     if let pending = _pending.take() {
       _ = pending.handle.close()
     }
@@ -812,7 +988,8 @@ extension DirectoryWalk {
   /// it's valid only until the walk moves on.
   /// Don't close it, and don't keep it.
   ///
-  /// Before the first call to `next()`, this is the root.
+  /// Before the first call to `next()`, this is the root,
+  /// and so it is for the root's own visits, with ``Options/includesRoot``.
   /// After `next()` returns `nil`, the walk has closed every directory,
   /// and accessing this property is a programming error.
   @_alwaysEmitIntoClient
