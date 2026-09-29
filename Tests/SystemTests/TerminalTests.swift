@@ -697,7 +697,7 @@ final class TerminalTests: XCTestCase {
       // Input that the terminal hasn't read. Waiting until the line is
       // readable makes sure it has reached the terminal.
       try controller.writeAll("discarded\n".utf8)
-      XCTAssertTrue(try isReadable(fd, timeout: 5_000))
+      XCTAssertTrue(try isReadable(fd, timeout: CInt(hangGuardSeconds * 1_000)))
       try terminal.flush(.input)
       try controller.writeAll("kept\n".utf8)
       XCTAssertEqual(try readBytes(from: fd, count: 5), Array("kept\n".utf8))
@@ -721,7 +721,7 @@ final class TerminalTests: XCTestCase {
       try terminal.setAttributes(attributes, when: .now)
 
       try controller.writeAll("discarded\n".utf8)
-      XCTAssertTrue(try isReadable(fd, timeout: 5_000))
+      XCTAssertTrue(try isReadable(fd, timeout: CInt(hangGuardSeconds * 1_000)))
       try terminal.setAttributes(attributes, when: .afterFlush)
       try controller.writeAll("kept\n".utf8)
       XCTAssertEqual(try readBytes(from: fd, count: 5), Array("kept\n".utf8))

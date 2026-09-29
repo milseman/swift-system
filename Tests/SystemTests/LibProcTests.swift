@@ -158,12 +158,22 @@ final class LibProcTest: XCTestCase {
     // No process is in a group that doesn't exist.
     XCTAssertEqual(try ProcessID.all(inGroup: ProcessID(.max)), [])
 
-    // The list is the same that sysctl gives, apart from processes that
-    // come and go.
+    // The list agrees with sysctl's about the processes that live through
+    // both calls, which are the only ones the test can know about: any
+    // number of others can come and go in between.
+    let child = try spawnWaitingChild()
+    defer {
+      try? child.sendSignal(.kill)
+      _ = try? child.wait()
+    }
+    let listed = Set(try ProcessID.all())
     let fromKernel = Set(try SystemControl.value(.allProcesses).map {
       ProcessID(rawValue: $0.kp_proc.p_pid)
     })
-    XCTAssertGreaterThan(Set(all).intersection(fromKernel).count, all.count * 9 / 10)
+    for id in [ProcessID.current, .parent, ProcessID(1), child] {
+      XCTAssertTrue(listed.contains(id), "\(id)")
+      XCTAssertTrue(fromKernel.contains(id), "\(id)")
+    }
   }
 
   func testBSDInfo() throws {

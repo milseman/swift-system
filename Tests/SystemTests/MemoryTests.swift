@@ -166,20 +166,6 @@ private struct MemoryTests {
     }
   }
 
-  @available(System 199, *)
-  @Test func reallocateFreeingOnFailureFreesTheBlock() throws {
-    // A zone of its own counts only this test's blocks, besides its name's.
-    let zone = try Memory.Zone.create(name: "reallocf test")
-    defer { zone.destroy() }
-    let baseline = zone.statistics().blocksInUse
-    var block = try zone.allocate(byteCount: 64)
-    block = try Memory.reallocateFreeingOnFailure(block, byteCount: 128)
-    #expect(zone.statistics().blocksInUse == baseline + 1)
-    #expect(throws: Errno.noMemory) {
-      try Memory.reallocateFreeingOnFailure(block, byteCount: .max)
-    }
-    #expect(zone.statistics().blocksInUse == baseline)
-  }
   #endif
 
   @available(System 199, *)

@@ -19,6 +19,14 @@
 
 import XCTest
 
+#if SYSTEM_PACKAGE_DARWIN
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif canImport(Musl)
+import Musl
+#endif
+
 #if SYSTEM_PACKAGE
 @testable import SystemPackage
 #else
@@ -26,6 +34,41 @@ import XCTest
 #endif
 
 internal let shell: FilePath = "/bin/sh"
+
+/// A pipe that no process writes to, whose read end is the standard input
+/// of the children that `spawnWaitingChild` starts. Only this process holds
+/// the write end, close-on-exec, so the pipe ends when this process does.
+private let keepAlive: (readEnd: CInt, writeEnd: CInt) = {
+  var ends: [CInt] = [-1, -1]
+  precondition(pipe(&ends) == 0, "pipe: \(errno)")
+  for end in ends { _ = fcntl(end, F_SETFD, FD_CLOEXEC) }
+  return (ends[0], ends[1])
+}()
+
+/// The arguments and file actions of a child that runs until it's signaled:
+/// `sh -c 'read line'`, reading a line that never comes, with its output
+/// going nowhere. It ends by itself only after this process ends.
+///
+/// A test that needs a running child uses one rather than `sleep`, which a
+/// busy machine can let finish before the test is done with it.
+internal let waitingChildArguments = ["sh", "-c", "read line"]
+
+@available(System 199, *)
+internal var waitingChildFileActions: [SpawnFileAction] {
+  [
+    .duplicate(FileDescriptor(rawValue: keepAlive.readEnd), as: .standardInput),
+    .open("/dev/null", .writeOnly, as: .standardOutput),
+    .open("/dev/null", .writeOnly, as: .standardError),
+  ]
+}
+
+/// Spawns a child that runs until it's signaled.
+@available(System 199, *)
+internal func spawnWaitingChild(attributes: SpawnAttributes = SpawnAttributes()) throws -> ProcessID {
+  try ProcessID.spawn(
+    shell, arguments: waitingChildArguments, fileActions: waitingChildFileActions,
+    attributes: attributes)
+}
 
 /// Reads from a descriptor until the end of the file.
 @available(System 199, *)

@@ -97,9 +97,14 @@ final class IORingTests: XCTestCase {
         XCTAssertEqual(completion.result, 0)
     }
 
+    /// Makes a directory of the test's own holding test.txt, which says
+    /// "Hello, World!", and returns the directory, open, and the file's path.
+    /// (A fixed path would be shared with every other run of these tests,
+    /// and with whatever an earlier run left there, perhaps as another user.)
     func makeHelloWorldFile() throws -> (dir: FileDescriptor, file: FilePath) {
-        mkdir("/tmp/IORingTests/", 0o777)
-        let path: FilePath = "/tmp/IORingTests/test.txt"
+        let directory = try FilePath.temporaryDirectory()
+            .appending("IORingTests.XXXXXX").makeUniqueDirectory()
+        let path = directory.appending("test.txt")
         let fd = try FileDescriptor.open(
             path, 
             .readWrite, 
@@ -108,14 +113,15 @@ final class IORingTests: XCTestCase {
         )
         try fd.writeAll("Hello, World!".utf8)
         try fd.close()
-        let parent = try FileDescriptor.open("/tmp/IORingTests/", .readOnly)
+        let parent = try FileDescriptor.open(directory, .readOnly)
 
         return (parent, path)
     }
 
-    func cleanUpHelloWorldFile(_ parent: FileDescriptor) throws {
+    func cleanUpHelloWorldFile(_ parent: FileDescriptor, _ file: FilePath) throws {
         try parent.close()
-        rmdir("/tmp/IORingTests/")
+        try? file.unlink()
+        try? file.removingLastComponent().removeDirectory()
     }
 
     func setupTestRing(depth: Int, fileSlots: Int, buffers: [UnsafeMutableRawBufferPointer]) throws -> IORing {
@@ -180,7 +186,7 @@ final class IORingTests: XCTestCase {
         XCTAssert(bytesRead == 13)
         let result2 = String(cString: rawBuffer.assumingMemoryBound(to: CChar.self).baseAddress!)
         XCTAssertEqual(result2, "Hello, World!")
-        try cleanUpHelloWorldFile(parent)
+        try cleanUpHelloWorldFile(parent, path)
         efdBuf.deallocate()
         rawBuffer.deallocate()
     }
@@ -192,11 +198,11 @@ final class IORingTests: XCTestCase {
     // between prepare and submit, then churn the heap to make UAFs observable.
     func testPathBufferLifetimeAcrossPrepareSubmit() throws {
         try XCTSkipIf(!uringEnabled, failureMessage)
-        let (parent, _) = try makeHelloWorldFile()
+        let (parent, file) = try makeHelloWorldFile()
         var ring = try IORing(queueDepth: 6)
 
         func enqueueOpen() {
-            let path: FilePath = "/tmp/IORingTests/test.txt"
+            let path = FilePath(file.string)
             let ok = ring.prepare(request: .open(path, in: parent, mode: .readOnly))
             XCTAssertTrue(ok)
         }
@@ -221,17 +227,17 @@ final class IORingTests: XCTestCase {
             let fd = FileDescriptor(rawValue: Int32(completion.result))
             try fd.close()
         }
-        try cleanUpHelloWorldFile(parent)
+        try cleanUpHelloWorldFile(parent, file)
     }
   
     func testPathBufferLifetimeAcrossLinkedRequests() throws {
         try XCTSkipIf(!uringEnabled, failureMessage)
-        let (parent, _) = try makeHelloWorldFile()
+        let (parent, file) = try makeHelloWorldFile()
         let rawBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 13, alignment: 16)
         var ring = try setupTestRing(depth: 6, fileSlots: 1, buffers: [rawBuffer])
 
         func enqueueLinkedReadback() {
-            let path: FilePath = "/tmp/IORingTests/test.txt"
+            let path = FilePath(file.string)
             let ok = ring.prepare(linkedRequests:
                 .open(path, in: parent, into: ring.registeredFileSlots[0], mode: .readOnly),
                 .read(ring.registeredFileSlots[0], into: ring.registeredBuffers[0]),
@@ -256,7 +262,7 @@ final class IORingTests: XCTestCase {
         let result = String(cString: rawBuffer.assumingMemoryBound(to: CChar.self).baseAddress!)
         XCTAssertEqual(result, "Hello, World!")
 
-        try cleanUpHelloWorldFile(parent)
+        try cleanUpHelloWorldFile(parent, file)
         rawBuffer.deallocate()
     }
 
@@ -343,7 +349,7 @@ final class IORingTests: XCTestCase {
 
         // Consume the completion from the poll operation
         let completion = try ring.blockingConsumeCompletion(
-            timeout: .seconds(1)
+            timeout: .seconds(hangGuardSeconds)
         )
         XCTAssertEqual(completion.context, pollInContext)
         let readable = Int32(IORing.Request.PollEvents.readable.rawValue)
@@ -382,7 +388,7 @@ final class IORingTests: XCTestCase {
 
         // Consume the completion from the poll operation
         let completionOut = try ring.blockingConsumeCompletion(
-            timeout: .seconds(1)
+            timeout: .seconds(hangGuardSeconds)
         )
         XCTAssertEqual(completionOut.context, pollOutContext)
         let writable = Int32(IORing.Request.PollEvents.writable.rawValue)
@@ -438,7 +444,7 @@ final class IORingTests: XCTestCase {
         XCTAssert(enqueued)
 
         try writeByte()
-        let first = try ring.blockingConsumeCompletion(timeout: .seconds(1))
+        let first = try ring.blockingConsumeCompletion(timeout: .seconds(hangGuardSeconds))
         // Kernels before 5.13 reject IORING_POLL_ADD_MULTI
         try XCTSkipIf(
             first.result == -EINVAL,
@@ -456,7 +462,7 @@ final class IORingTests: XCTestCase {
 
         try writeByte()
         // This written byte will only be reported by a re-armed poll.
-        let second = try ring.blockingConsumeCompletion(timeout: .seconds(1))
+        let second = try ring.blockingConsumeCompletion(timeout: .seconds(hangGuardSeconds))
         XCTAssertEqual(second.context, context)
         XCTAssertNotEqual(
             second.result & readable, 0, "expected POLLIN in the result mask"
@@ -473,10 +479,13 @@ final class IORingTests: XCTestCase {
         var terminal: (result: Int32, flags: IORing.Completion.Flags)? = nil
         var observed: [(context: UInt64, result: Int32, flags: UInt32)] = []
         // The cancel posts a completion of its own under a different context,
-        // and the two may land a moment apart, so retry briefly rather than
-        // draining exactly once.
-        for _ in 0..<100 where terminal == nil {
-            while let completion = ring.tryConsumeCompletion() {
+        // and the two may land apart, so this waits for completions until
+        // the poll's own arrives. (A catch-all ends the wait, since the
+        // compiler can crash on a pattern catch.)
+        waiting: while terminal == nil {
+            do {
+                let completion = try ring.blockingConsumeCompletion(
+                    timeout: .seconds(hangGuardSeconds))
                 observed.append(
                     (
                         completion.context,
@@ -487,8 +496,9 @@ final class IORingTests: XCTestCase {
                 if completion.context == context {
                     terminal = (completion.result, completion.flags)
                 }
+            } catch {
+                break waiting
             }
-            if terminal == nil { usleep(1000) }
         }
         XCTAssertNotNil(
             terminal,
@@ -531,7 +541,7 @@ final class IORingTests: XCTestCase {
         try writeFD.close()
         writeEndClosed = true
 
-        let dt = Duration.seconds(1)
+        let dt = Duration.seconds(hangGuardSeconds)
         let completion = try ring.blockingConsumeCompletion(timeout: dt)
 
         for event in IORing.Request.PollEvents.Event.allCases {
@@ -577,7 +587,7 @@ final class IORingTests: XCTestCase {
         try readFD.close()
         readEndClosed = true
 
-        let dt = Duration.seconds(1)
+        let dt = Duration.seconds(hangGuardSeconds)
         let completion = try ring.blockingConsumeCompletion(timeout: dt)
         XCTAssertEqual(completion.context, 98)
 

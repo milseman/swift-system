@@ -38,9 +38,11 @@ private let quiet: [SpawnFileAction] = [
   .open("/dev/null", .writeOnly, as: .standardError),
 ]
 
+/// A child that ends by itself, but only after twice the hang guard.
 @available(System 199, *)
-private func spawnSleep(_ seconds: Int = 10) throws -> ProcessID {
-  try ProcessID.spawn("/bin/sleep", arguments: ["sleep", "\(seconds)"], fileActions: quiet)
+private func spawnLongSleep() throws -> ProcessID {
+  try ProcessID.spawn(
+    "/bin/sleep", arguments: ["sleep", "\(2 * hangGuardSeconds)"], fileActions: quiet)
 }
 
 @available(System 199, *)
@@ -60,7 +62,7 @@ final class ProcessWaitTests: XCTestCase {
   }
 
   func testTryWait() throws {
-    let child = try spawnSleep()
+    let child = try spawnWaitingChild()
     XCTAssertNil(try child.tryWait())
     try child.sendSignal(.kill)
     var status: ExitStatus?
@@ -72,7 +74,7 @@ final class ProcessWaitTests: XCTestCase {
   }
 
   func testStoppedAndContinued() throws {
-    let child = try spawnSleep()
+    let child = try spawnWaitingChild()
     defer {
       try? child.sendSignal(.kill)
       _ = try? child.wait()
@@ -96,7 +98,7 @@ final class ProcessWaitTests: XCTestCase {
   }
 
   func testNoHangReportsNothingForARunningChild() throws {
-    let child = try spawnSleep()
+    let child = try spawnWaitingChild()
     defer {
       try? child.sendSignal(.kill)
       _ = try? child.wait()
@@ -120,7 +122,7 @@ final class ProcessWaitTests: XCTestCase {
   }
 
   func testTryWaitingForAnyChild() throws {
-    let child = try spawnSleep()
+    let child = try spawnWaitingChild()
     XCTAssertNil(try ProcessID.tryWaitForAnyChild())
     try child.sendSignal(.terminate)
     var reaped: (id: ProcessID, status: ExitStatus)?
@@ -136,7 +138,7 @@ final class ProcessWaitTests: XCTestCase {
     let leader = try ProcessID.spawn(
       shell, arguments: ["sh", "-c", "exit 3"],
       attributes: SpawnAttributes(processGroup: .new))
-    let outsider = try spawnSleep()
+    let outsider = try spawnWaitingChild()
     defer {
       try? outsider.sendSignal(.kill)
       _ = try? outsider.wait()
@@ -158,21 +160,25 @@ final class ChildProcessTests: XCTestCase {
   }
 
   func testSignalingTheChild() throws {
-    let child = try ChildProcess.spawn(searchingPathFor: "sleep", arguments: ["sleep", "10"])
+    let child = try ChildProcess.spawn(
+      searchingPathFor: "sh", arguments: waitingChildArguments,
+      fileActions: waitingChildFileActions)
     try child.sendSignal(nil)
     try child.sendSignal(.terminate)
     let status = try child.wait()
     XCTAssertEqual(status, .signaled(.terminate, coreDumped: false))
   }
 
+  // A deinit that waited for the child to end instead of ending it would
+  // take twice the hang guard.
   func testDestroyingARunningChildEndsAndReapsIt() throws {
-    let start = time(nil)
+    let start = monotonicNanoseconds()
     let id: ProcessID
     do {
-      let child = ChildProcess(taking: try spawnSleep(60))
+      let child = ChildProcess(taking: try spawnLongSleep())
       id = child.id
     }
-    XCTAssertLessThan(time(nil) - start, 10)
+    XCTAssertLessThan(monotonicNanoseconds() - start, hangGuardSeconds * 1_000_000_000)
     XCTAssertThrowsError(try id.tryWait()) {
       XCTAssertEqual($0 as? Errno, .noChildProcess)
     }
@@ -193,12 +199,14 @@ final class ChildProcessTests: XCTestCase {
 
   func testDestroyingAChildEndsItWhenAnErrorEndsTheScope() throws {
     struct Stop: Error {}
+    let start = monotonicNanoseconds()
     var id: ProcessID?
     do {
-      let child = ChildProcess(taking: try spawnSleep(60))
+      let child = ChildProcess(taking: try spawnLongSleep())
       id = child.id
       throw Stop()
     } catch is Stop {}
+    XCTAssertLessThan(monotonicNanoseconds() - start, hangGuardSeconds * 1_000_000_000)
     XCTAssertThrowsError(try id!.tryWait()) {
       XCTAssertEqual($0 as? Errno, .noChildProcess)
     }
@@ -223,7 +231,7 @@ final class ChildProcessTests: XCTestCase {
   }
 
   func testRelinquishLeavesTheChildRunning() throws {
-    let child = ChildProcess(taking: try spawnSleep())
+    let child = ChildProcess(taking: try spawnWaitingChild())
     let id = child.relinquish()
     try id.sendSignal(nil)
     XCTAssertNil(try id.tryWait())

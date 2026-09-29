@@ -71,7 +71,7 @@ final class PollTests: XCTestCase {
       // Polling skips an entry with a negative descriptor.
       FileDescriptor.PollEntry(FileDescriptor(rawValue: -1), events: .readable),
     ]
-    let ready = try poll(&entries, timeout: .seconds(10))
+    let ready = try poll(&entries, timeout: .seconds(hangGuardSeconds))
     XCTAssertEqual(ready, 1)
     XCTAssertEqual(entries.map(\.returnedEvents), [[], .readable, []])
     XCTAssertEqual(entries[1].fileDescriptor, second.readEnd.fileDescriptor)

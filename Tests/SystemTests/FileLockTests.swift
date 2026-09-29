@@ -348,7 +348,7 @@ final class FileLockTest: XCTestCase {
       // The other open file waits while the lock is in the way.
       XCTAssertEqual(locked.wait(timeout: .now() + .milliseconds(100)), .timedOut)
       try a.unlock()
-      XCTAssertEqual(locked.wait(timeout: .now() + .seconds(10)), .success)
+      XCTAssertEqual(locked.wait(timeout: .now() + .seconds(hangGuardSeconds)), .success)
       XCTAssertEqual(try result?.get(), true)
       XCTAssertFalse(try a.lock(.read))
     }
@@ -374,9 +374,9 @@ final class FileLockTest: XCTestCase {
       XCTAssertFalse(try b.lock(.read, byteRange: 5..<6, timeout: .zero))
       XCTAssertFalse(try b.lock(.read, byteRange: 5..<6, timeout: .seconds(-1)))
       // Bytes that aren't locked don't wait.
-      XCTAssertTrue(try b.lock(.write, byteRange: 10..., timeout: .seconds(10)))
+      XCTAssertTrue(try b.lock(.write, byteRange: 10..., timeout: .seconds(hangGuardSeconds)))
       try a.unlock()
-      XCTAssertTrue(try b.lock(.write, timeout: .seconds(10)))
+      XCTAssertTrue(try b.lock(.write, timeout: .seconds(hangGuardSeconds)))
     }
   }
   #endif // SYSTEM_PACKAGE_DARWIN

@@ -9,6 +9,7 @@
 
 #if SYSTEM_PACKAGE_DARWIN
 
+import Darwin
 import Testing
 
 #if SYSTEM_PACKAGE
@@ -19,9 +20,15 @@ import Testing
 
 private let pageSize = (try? SystemConfig.value(.pageSize)).flatMap { $0 } ?? 4096
 
-// Each test creates zones of its own, whose statistics other tests running
-// at the same time can't change.
-@Suite("Memory zones")
+// Each test creates zones of its own, and these tests run one at a time:
+// none can destroy a zone while another reads every zone's statistics, as
+// malloc_zone_statistics does without the lock that malloc_destroy_zone
+// takes, and no zone is created where one was just destroyed.
+//
+// A zone's statistics don't count its blocks exactly: about one new zone in
+// 250 is a ProbGuard zone, whose statistics are all zero. So the tests ask
+// which zone holds a block instead.
+@Suite("Memory zones", .serialized)
 private struct MemoryZoneTests {
   @available(System 199, *)
   @Test func theDefaultZoneAllocatesMemorysBlocks() throws {
@@ -38,10 +45,8 @@ private struct MemoryZoneTests {
     defer { zone.destroy() }
     #expect(zone != .default)
     #expect(zone.name == nil)
-    let baseline = zone.statistics()
 
     let block = try zone.allocate(byteCount: 1000)
-    #expect(Memory.Zone(containing: block) == zone)
     let zeroed = try zone.allocateZeroed(count: 10, stride: 100)
     #expect(UnsafeRawBufferPointer(start: zeroed, count: 1000).allSatisfy { $0 == 0 })
     let aligned = try zone.allocate(byteCount: 10, alignment: 256)
@@ -49,19 +54,22 @@ private struct MemoryZoneTests {
     let page = try zone.allocatePageAligned(byteCount: 100)
     #expect(Int(bitPattern: page) % pageSize == 0)
     #expect(UnsafeRawBufferPointer(start: page, count: 100).allSatisfy { $0 == 0 })
+    let blocks: [UnsafeMutableRawPointer] = [block, zeroed, aligned, page]
+    #expect(blocks.allSatisfy { Memory.Zone(containing: $0) == zone })
 
     let inUse = zone.statistics()
-    #expect(inUse.blocksInUse == baseline.blocksInUse + 4)
-    #expect(inUse.bytesInUse >= baseline.bytesInUse + 2110)
     #expect(inUse.bytesReserved >= inUse.bytesInUse)
 
-    // The zone's own free, and Memory.free, which finds the zone.
+    // The zone's own free, and Memory.free, which finds the zone. Then no
+    // zone holds the small blocks, whose memory the zone keeps. (A
+    // page-aligned block's memory can go back to the system, and to
+    // another thread.)
     zone.free(block)
     zone.free(zeroed)
     Memory.free(aligned)
     Memory.free(page)
     zone.free(nil)
-    #expect(zone.statistics().blocksInUse == baseline.blocksInUse)
+    #expect(blocks.dropLast().allSatisfy { Memory.Zone(containing: $0) == nil })
   }
 
   @available(System 199, *)
@@ -91,13 +99,27 @@ private struct MemoryZoneTests {
   }
 
   @available(System 199, *)
+  @Test func reallocateFreeingOnFailureFreesTheBlock() throws {
+    // No other test allocates in this zone, so the block's memory stays
+    // the zone's once it's free.
+    let zone = try Memory.Zone.create(name: "reallocf test")
+    defer { zone.destroy() }
+    var block = try zone.allocate(byteCount: 64)
+    block = try Memory.reallocateFreeingOnFailure(block, byteCount: 128)
+    #expect(Memory.Zone(containing: block) == zone)
+    #expect(throws: Errno.noMemory) {
+      try Memory.reallocateFreeingOnFailure(block, byteCount: .max)
+    }
+    #expect(Memory.Zone(containing: block) == nil)
+  }
+
+  @available(System 199, *)
   @Test func destroyingAZoneFreesItsBlocks() throws {
     let zone = try Memory.Zone.create(name: "destroyed")
-    var last: UnsafeMutableRawPointer? = nil
-    for _ in 0..<100 { last = try zone.allocate(byteCount: 1000) }
-    #expect(zone.statistics().blocksInUse >= 100)
-    let block = try #require(last)
-    #expect(Memory.Zone(containing: block) == zone)
+    var blocks: [UnsafeMutableRawPointer] = []
+    for _ in 0..<100 { blocks.append(try zone.allocate(byteCount: 1000)) }
+    #expect(blocks.allSatisfy { Memory.Zone(containing: $0) == zone })
+    let block = try #require(blocks.last)
     zone.destroy()
     // The zone is gone, so it doesn't claim its old block. Asking about an
     // address reads only the zones' records, not the memory there.
@@ -122,7 +144,7 @@ private struct MemoryZoneTests {
   }
 
   @available(System 199, *)
-  @Test func pressureReliefAndStatistics() throws {
+  @Test func pressureRelief() throws {
     let zone = try Memory.Zone.create()
     defer { zone.destroy() }
     var blocks: [UnsafeMutableRawPointer] = []
@@ -130,11 +152,20 @@ private struct MemoryZoneTests {
     for block in blocks { zone.free(block) }
     #expect(zone.relievePressure() >= 0)
     #expect(zone.relievePressure(goal: 4096) >= 0)
+    // Relieving every zone takes the lock that destroying one does.
     #expect(Memory.Zone.relievePressureInAllZones(goal: 1) >= 0)
+  }
 
-    let all = Memory.Zone.statisticsForAllZones()
-    #expect(all.blocksInUse > 0)
-    #expect(all.bytesReserved >= all.bytesInUse)
+  /// In a process of its own: reading every zone's statistics crashes if
+  /// another thread destroys a zone meanwhile, which a test outside this
+  /// suite could do.
+  @available(System 199, *)
+  @Test func statisticsForAllZones() async {
+    await #expect(processExitsWith: .success) {
+      let all = Memory.Zone.statisticsForAllZones()
+      if all.blocksInUse <= 0 { exit(1) }
+      if all.bytesReserved < all.bytesInUse { exit(2) }
+    }
   }
 }
 

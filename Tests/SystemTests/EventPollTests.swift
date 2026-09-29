@@ -192,13 +192,18 @@ final class EventPollTests: XCTestCase {
   func testOneShotTimer() throws {
     let timer = try IntervalTimer(clock: .monotonic, options: .closeOnExec)
     XCTAssertEqual(try timer.schedule(), .disarmed)
-    let previous = try timer.setSchedule(.init(nextExpiration: .milliseconds(10)))
+    // Long enough that it's still running when it's read back, however long
+    // the test waits for a processor.
+    let long = Duration.seconds(2 * hangGuardSeconds)
+    let previous = try timer.setSchedule(.init(nextExpiration: long))
     XCTAssertEqual(previous, .disarmed)
     let running = try timer.schedule()
     XCTAssertGreaterThan(running.nextExpiration, .zero)
-    XCTAssertLessThanOrEqual(running.nextExpiration, .milliseconds(10))
+    XCTAssertLessThanOrEqual(running.nextExpiration, long)
     XCTAssertEqual(running.interval, .zero)
 
+    // Then short, to read its expiration.
+    try timer.setSchedule(.init(nextExpiration: .milliseconds(10)))
     XCTAssertEqual(try timer.readExpirations(), 1)
     XCTAssertEqual(try timer.schedule(), .disarmed, "a one-shot timer stops")
   }
@@ -212,7 +217,7 @@ final class EventPollTests: XCTestCase {
     try epoll.add(timer.fileDescriptor, events: .readable, data: EventData(rawValue: 1))
     try timer.setSchedule(
       .init(nextExpiration: .milliseconds(2), interval: .milliseconds(2)))
-    XCTAssertEqual(try readyEvents(epoll, timeout: .seconds(10)).first?.data, EventData(rawValue: 1))
+    XCTAssertEqual(try readyEvents(epoll, timeout: .seconds(hangGuardSeconds)).first?.data, EventData(rawValue: 1))
     usleep(20_000)
     XCTAssertGreaterThan(try timer.readExpirations(), 1)
 

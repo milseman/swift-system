@@ -31,11 +31,15 @@ import Android
 private struct SystemIdentityTests {
   @available(System 199, *)
   @Test func currentIsUname() throws {
+    // The node name changes when the host name does, which the system can do
+    // at any moment, as when the network changes; the other names don't.
+    var before = utsname()
+    #expect(uname(&before) == 0)
     let system = try SystemIdentity.current()
     var names = utsname()
     #expect(uname(&names) == 0)
     #expect(system.systemName == _fixedString(names.sysname))
-    #expect(system.nodeName == _fixedString(names.nodename))
+    #expect([_fixedString(before.nodename), _fixedString(names.nodename)].contains(system.nodeName))
     #expect(system.release == _fixedString(names.release))
     #expect(system.version == _fixedString(names.version))
     #expect(system.machine == _fixedString(names.machine))
@@ -49,9 +53,13 @@ private struct SystemIdentityTests {
 
   @available(System 199, *)
   @Test func hostNameIsTheNodeName() throws {
+    // The host name can change at any moment, as when the network changes,
+    // so it's compared with the node names read before and after it.
+    let before = try SystemIdentity.current().nodeName
     let hostName = try SystemIdentity.hostName()
+    let after = try SystemIdentity.current().nodeName
     #expect(!hostName.isEmpty)
-    #expect(hostName == (try SystemIdentity.current().nodeName))
+    #expect([before, after].contains(hostName))
   }
 
   @available(System 199, *)

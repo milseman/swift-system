@@ -84,8 +84,10 @@ final class MachTimeTest: XCTestCase {
   }
 
   func testInstants() throws {
-    let start = Mach.AbsoluteTime.now
+    // The clock's interval starts first and ends last, so it contains the
+    // other however long the thread waits between the reads.
     let clockStart = SuspendingClock.now
+    let start = Mach.AbsoluteTime.now
     usleep(20_000)
     let elapsed = start.duration(to: .now)
     let clockElapsed = clockStart.duration(to: .now)

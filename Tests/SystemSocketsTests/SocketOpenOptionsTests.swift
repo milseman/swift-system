@@ -68,6 +68,7 @@ private struct SocketOpenOptionsTests {
   /// The accepted socket gets exactly the options asked for, even from a
   /// nonblocking listener, whose mode Darwin's accept passes on.
   @available(System 199, *)
+  @available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *)
   @Test(.requiresSocketBinding) func acceptSetsExactlyTheOptions() throws {
     let listener = try SocketDescriptor.open(.ipv4, .stream, options: [.closeOnExec, .nonBlocking])
     defer { try? listener.close() }
@@ -84,18 +85,13 @@ private struct SocketOpenOptionsTests {
     }
 
     // A connection can reach the listener's queue a moment after connect()
-    // returns, and the listener doesn't wait for it, so accept retries a
-    // while. (A catch-all, since catching Errno.wouldBlock by pattern in a
-    // loop has crashed the compiler.)
+    // returns, and the nonblocking listener doesn't wait for it. The
+    // listener is readable while a connection is queued, so accept waits
+    // for that.
     func accepting<T>(_ accept: () throws -> T) throws -> T {
-      for _ in 0..<2000 {
-        do {
-          return try accept()
-        } catch {
-          guard (error as? Errno) == .wouldBlock else { throw error }
-          usleep(1000)
-        }
-      }
+      #expect(
+        try listener.fileDescriptor.poll(for: .readable, timeout: .seconds(hangGuardSeconds))
+          .contains(.readable))
       return try accept()
     }
 

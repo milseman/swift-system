@@ -29,8 +29,14 @@ import Musl
 // so each test uses names of its own process ID, and removes them.
 @available(System 199, *)
 final class SharedMemoryTest: XCTestCase {
+  /// A name that no other running process uses. A test run that crashed
+  /// can have left objects of the name behind, which would make an
+  /// exclusive create fail, so this removes them first.
   private func name(_ suffix: String) -> String {
-    "/sys.\(ProcessID.current.rawValue).\(suffix)"
+    let name = "/sys.\(ProcessID.current.rawValue).\(suffix)"
+    try? FileDescriptor.removeSharedMemory(named: name)
+    try? NamedSemaphore.remove(named: name)
+    return name
   }
 
   #if ENABLE_MOCKING
@@ -187,7 +193,7 @@ final class SharedMemoryTest: XCTestCase {
     }
     poster.start()
     try semaphore.wait()
-    wait(for: [posted], timeout: 10)
+    wait(for: [posted], timeout: TimeInterval(hangGuardSeconds))
   }
 }
 

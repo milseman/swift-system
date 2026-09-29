@@ -37,14 +37,14 @@ final class WriteAllInterruptTest: XCTestCase {
     }
     // The unbuffered write honors `retryOnInterrupt: false`, which shows
     // that the signal reaches the blocked write.
-    let control = try writeOneByteToAFullPipe { fd, bytes in
+    let control = try writeOneByteToAFullPipe(retried: false) { fd, bytes in
       try fd.write(bytes, retryOnInterrupt: false)
     }
     XCTAssertThrowsError(try control.get()) {
       XCTAssertEqual($0 as? Errno, .interrupted)
     }
 
-    let notRetried = try writeOneByteToAFullPipe { fd, bytes in
+    let notRetried = try writeOneByteToAFullPipe(retried: false) { fd, bytes in
       try fd.writeAll(RawSpan(_unsafeBytes: bytes), retryOnInterrupt: false)
     }
     XCTAssertThrowsError(try notRetried.get()) {
@@ -53,7 +53,7 @@ final class WriteAllInterruptTest: XCTestCase {
 
     // By default, the write is retried after each interruption, and
     // finishes once the pipe is drained.
-    let retried = try writeOneByteToAFullPipe { fd, bytes in
+    let retried = try writeOneByteToAFullPipe(retried: true) { fd, bytes in
       try fd.writeAll(RawSpan(_unsafeBytes: bytes))
     }
     XCTAssertEqual(try retried.get(), 1)
@@ -110,14 +110,24 @@ final class WriteAllInterruptTest: XCTestCase {
 #if SYSTEM_PACKAGE_DARWIN
 private typealias OneByteWrite = @Sendable (FileDescriptor, UnsafeRawBufferPointer) throws -> Int
 
+/// How many times the SIGUSR2 handler has run.
+nonisolated(unsafe) private var handledSignals: CInt = 0
+
 /// Calls `write` to write one byte to a full pipe, on a new thread,
 /// while this thread interrupts it with SIGUSR2.
 ///
 /// After interrupting, this function reads from the pipe,
 /// so that a write that was retried can finish.
 /// It returns the result of `write`.
+///
+/// A signal that arrives before the write blocks doesn't interrupt it, so
+/// this sends one at a time, each once the thread has handled the last,
+/// until the write returns: at its first interruption, if it isn't
+/// retried. One that is `retried` never returns while the pipe is full, so
+/// for it this stops after three, whichever of them reached the write.
 @available(macOS 15, iOS 18, watchOS 11, tvOS 18, visionOS 2, *)
 private func writeOneByteToAFullPipe(
+  retried: Bool,
   _ write: @escaping OneByteWrite
 ) throws -> Result<Int, any Error> {
   let pipe = try FileDescriptor.pipe()
@@ -128,8 +138,9 @@ private func writeOneByteToAFullPipe(
   try fill(pipe.writeEnd)
 
   // A signal without SA_RESTART interrupts a blocked write with EINTR.
+  handledSignals = 0
   var action = sigaction()
-  action.__sigaction_u.__sa_handler = { _ in }
+  action.__sigaction_u.__sa_handler = { _ in handledSignals += 1 }
   sigemptyset(&action.sa_mask)
   var previous = sigaction()
   try check(sigaction(SIGUSR2, &action, &previous))
@@ -141,10 +152,16 @@ private func writeOneByteToAFullPipe(
   // ENOTSUP.)
   let writer = Writer(fd: pipe.writeEnd, write: write)
   let thread = try writer.start()
-  usleep(10_000)
-  for _ in 0..<40 where !writer.finished.load(ordering: .acquiring) {
+  // The guard counts milliseconds slept, which take at least as long.
+  var guardLeft = hangGuardSeconds * 1_000
+  func finished() -> Bool { writer.finished.load(ordering: .acquiring) }
+  while !finished() && !(retried && handledSignals >= 3) && guardLeft > 0 {
+    let handled = handledSignals
     pthread_kill(thread, SIGUSR2)
-    usleep(5_000)
+    repeat {
+      usleep(1_000)
+      guardLeft -= 1
+    } while handledSignals == handled && !finished() && guardLeft > 0
   }
   let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 64 * 1024, alignment: 1)
   defer { buffer.deallocate() }
