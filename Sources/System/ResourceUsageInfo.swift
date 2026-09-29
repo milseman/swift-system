@@ -135,6 +135,9 @@ extension ProcessID.ResourceUsageInfo {
   /// the number of bytes of memory that the system attributes to it,
   /// which the system compares with the process's memory limit.
   ///
+  /// It's the footprint that `task_info` reports for the `TASK_VM_INFO`
+  /// flavor, as `phys_footprint`.
+  ///
   /// The corresponding C field is `ri_phys_footprint`.
   @_alwaysEmitIntoClient
   public var physicalFootprint: UInt64 { rawValue.ri_phys_footprint }

@@ -27,6 +27,11 @@ extension Mach {
   ///
   /// Foundation's `Data` deallocates memory it's given with
   /// `.virtualMemory` as ``deallocate(_:)`` does.
+  ///
+  /// Each call acts on the calling task's memory;
+  /// the corresponding C variable is `mach_task_self_`.
+  /// The kernel takes a region's start and size as integers;
+  /// the corresponding C types are `vm_address_t` and `vm_size_t`.
   public enum VirtualMemory {}
 }
 
