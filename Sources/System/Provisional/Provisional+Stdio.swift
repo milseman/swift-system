@@ -244,6 +244,41 @@ extension FileStream {
     return system_fwrite(start, count, rawValue) == count ? .success(()) : .failure(.current)
   }
 
+  /// Writes a C string's bytes to the stream, up to its null byte.
+  ///
+  /// - Parameter string: A null-terminated C string,
+  ///   such as a message from C code.
+  ///
+  /// See ``write(_:)-(UnsafeRawBufferPointer)``.
+  ///
+  /// The corresponding C function is `fputs`.
+  @_alwaysEmitIntoClient
+  public func write(cString string: UnsafePointer<CChar>) throws(Errno) {
+    try _write(cString: string).get()
+  }
+
+  @usableFromInline
+  internal func _write(cString string: UnsafePointer<CChar>) -> Result<(), Errno> {
+    system_fputs(string, rawValue) == EOF ? .failure(.current) : .success(())
+  }
+
+  /// Writes one byte to the stream.
+  ///
+  /// - Parameter byte: The byte to write.
+  ///
+  /// See ``write(_:)-(UnsafeRawBufferPointer)``.
+  ///
+  /// The corresponding C functions are `fputc` and `putc`.
+  @_alwaysEmitIntoClient
+  public func write(byte: UInt8) throws(Errno) {
+    try _write(byte: byte).get()
+  }
+
+  @usableFromInline
+  internal func _write(byte: UInt8) -> Result<(), Errno> {
+    system_fputc(CInt(byte), rawValue) == EOF ? .failure(.current) : .success(())
+  }
+
   /// Reads bytes from the stream into a buffer.
   ///
   /// - Parameter buffer: Where to put the bytes.

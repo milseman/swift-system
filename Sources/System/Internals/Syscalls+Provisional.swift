@@ -168,6 +168,24 @@ internal func system_fwrite(
   return fwrite(bytes, 1, count, stream)
 }
 
+// fputs
+internal func system_fputs(
+  _ string: UnsafePointer<CChar>, _ stream: UnsafeMutablePointer<FILE>
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(Int(bitPattern: stream), String(cString: string)) == -1 ? EOF : 0 }
+#endif
+  return fputs(string, stream)
+}
+
+// fputc
+internal func system_fputc(_ byte: CInt, _ stream: UnsafeMutablePointer<FILE>) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(Int(bitPattern: stream), byte) == -1 ? EOF : byte }
+#endif
+  return fputc(byte, stream)
+}
+
 // fread: the count of bytes read, which is short at the end or after an error.
 internal func system_fread(
   _ bytes: UnsafeMutableRawPointer?, _ count: Int, _ stream: UnsafeMutablePointer<FILE>
