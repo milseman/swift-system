@@ -134,6 +134,12 @@ internal func system_memset(
   memset(buffer.baseAddress!, CInt(byte), buffer.count)
 }
 
+// free, for what the C library allocates for its caller to free
+// (realpath's path, getline's line, backtrace_symbols' strings).
+internal func system_free(_ pointer: UnsafeMutableRawPointer?) {
+  free(pointer)
+}
+
 // Interop between String and platfrom string
 extension String {
   internal func _withPlatformString<Result>(

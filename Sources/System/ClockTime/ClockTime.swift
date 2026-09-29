@@ -41,7 +41,8 @@ extension ClockID {
   /// on earlier releases, ``realtime``'s is the time of day
   /// that `gettimeofday` gives, to a microsecond.
   ///
-  /// The corresponding C function is `clock_gettime`.
+  /// The corresponding C function is `clock_gettime`,
+  /// or `timespec_get` with `TIME_UTC` for ``realtime``.
   @_alwaysEmitIntoClient
   public func currentTimeSpec() throws(Errno) -> CInterop.TimeSpec {
     try _currentTimeSpec().get()

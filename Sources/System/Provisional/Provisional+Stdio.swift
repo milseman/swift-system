@@ -304,6 +304,49 @@ extension FileStream {
     return .success(read)
   }
 
+  /// Reads a line from the stream:
+  /// its bytes up to and including the next newline,
+  /// or to the end of the file.
+  ///
+  /// - Parameter strippingNewline: Whether to leave out the line's
+  ///   newline, and a carriage return before it. The default is `true`.
+  /// - Returns: The line, decoded as UTF-8, or `nil` at the end of the file,
+  ///   where ``isAtEnd`` becomes `true`.
+  ///
+  /// This method reads any stream as the standard library's
+  /// `readLine(strippingNewline:)` reads the standard input,
+  /// replacing bytes that aren't valid UTF-8 with U+FFFD.
+  /// The stream reads its file descriptor as it needs to,
+  /// waiting until it has a whole line or the file ends.
+  /// If reading fails, this method throws the error,
+  /// and the stream's ``hasError`` is then `true`.
+  ///
+  /// The corresponding C function is `getline`.
+  @_alwaysEmitIntoClient
+  public func readLine(strippingNewline: Bool = true) throws(Errno) -> String? {
+    try _readLine(strippingNewline: strippingNewline).get()
+  }
+
+  @usableFromInline
+  internal func _readLine(strippingNewline: Bool) -> Result<String?, Errno> {
+    var line: UnsafeMutablePointer<CChar>? = nil
+    var capacity = 0
+    // getline allocates the line's buffer, whether or not it reads.
+    defer { system_free(line) }
+    let count = system_getline(&line, &capacity, rawValue)
+    guard count >= 0 else {
+      return system_ferror(rawValue) != 0 ? .failure(.current) : .success(nil)
+    }
+    var bytes = UnsafeRawBufferPointer(start: line, count: count)
+    if strippingNewline, bytes.last == UInt8(ascii: "\n") {
+      bytes = UnsafeRawBufferPointer(rebasing: bytes.dropLast())
+      if bytes.last == UInt8(ascii: "\r") {
+        bytes = UnsafeRawBufferPointer(rebasing: bytes.dropLast())
+      }
+    }
+    return .success(String(decoding: bytes, as: UTF8.self))
+  }
+
   /// Writes what the stream holds in its buffer to its file descriptor.
   ///
   /// The corresponding C function is `fflush`.

@@ -8,7 +8,7 @@
 */
 
 // Unique files with a suffix or relative to a directory, O_SYNC and
-// O_DSYNC, a clock's reading as a timespec, and a signal's message.
+// O_DSYNC, a clock's reading as a timespec, MAP_FILE, and a signal's message.
 
 #if SYSTEM_PACKAGE_DARWIN
 
@@ -101,6 +101,19 @@ final class SmallGapsTest: XCTestCase {
     XCTAssertGreaterThanOrEqual(again.seconds * 1_000_000_000 + again.nanoseconds, later.seconds * 1_000_000_000 + later.nanoseconds)
     let calendar: CInterop.Time = time(nil)
     XCTAssertGreaterThan(calendar, 0)
+    // C11's timespec_get with TIME_UTC, which currentTimeSpec's doc names,
+    // reads the same clock as realtime.
+    if #available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, *) {
+      var utc = timespec()
+      XCTAssertEqual(timespec_get(&utc, TIME_UTC), TIME_UTC)
+      let reading = try ClockID.realtime.currentTimeSpec()
+      XCTAssertLessThan(abs(reading.seconds - utc.tv_sec), 2)
+    }
+  }
+
+  // A mapping of a file needs no option to say so (MemoryMapping(file:)'s doc).
+  func testMapFileIsZero() {
+    XCTAssertEqual(MAP_FILE, 0)
   }
 
   func testSignalMessages() {

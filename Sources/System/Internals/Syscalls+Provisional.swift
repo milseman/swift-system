@@ -213,6 +213,19 @@ internal func system_fread(
   return fread(bytes, 1, count, stream)
 }
 
+// getline: the count of bytes read, or -1 at the end or after an error. A
+// mocked getline reads nothing, so it returns 0 and leaves the line alone.
+internal func system_getline(
+  _ line: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>,
+  _ capacity: UnsafeMutablePointer<Int>,
+  _ stream: UnsafeMutablePointer<FILE>
+) -> Int {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mockInt(Int(bitPattern: stream)) }
+#endif
+  return getline(line, capacity, stream)
+}
+
 // fileno
 internal func system_fileno(_ stream: UnsafeMutablePointer<FILE>) -> CInt {
 #if ENABLE_MOCKING

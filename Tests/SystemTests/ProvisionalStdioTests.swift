@@ -71,6 +71,11 @@ final class ProvisionalStdioTest: XCTestCase {
       MockTestCase(name: "fputc", .noInterrupt, address, CInt(0x41)) { _ in
         try stream.write(byte: 0x41)
       },
+      // A mocked getline reads an empty line; a failure would ask the
+      // placeholder stream for its error indicator.
+      MockTestCase(name: "getline", .noError, address) { _ in
+        _ = try stream.readLine()
+      },
       MockTestCase(name: "fileno", .noInterrupt, address) { _ in
         _ = try stream.fileDescriptor()
       },
@@ -109,6 +114,47 @@ final class ProvisionalStdioTest: XCTestCase {
       XCTAssertEqual(try input.read(into: buffer), 0)
       input.clearError()
       XCTAssertFalse(input.isAtEnd)
+    }
+  }
+
+  func testReadingLines() throws {
+    try withTemporaryFilePath(basename: "testReadingLines") { dir in
+      let path = dir.appending("file")
+      // Longer than getline's first buffer, so that it grows the buffer.
+      let long = String(repeating: "x", count: 10_000)
+      let output = try FileStream.open(path, mode: "w")
+      try output.write("one\ntwo\r\n\n\(long)\na\u{0}b\n")
+      // A byte that isn't UTF-8, then a last line without a newline.
+      try [UInt8(0x61), 0xFF, 0x0A, 0x6C, 0x61, 0x73, 0x74].withUnsafeBytes { try output.write($0) }
+      try output.close()
+
+      let input = try FileStream.open(path, mode: "r")
+      defer { try? input.close() }
+      XCTAssertEqual(try input.readLine(), "one")
+      XCTAssertEqual(try input.readLine(), "two")
+      XCTAssertEqual(try input.readLine(), "")
+      XCTAssertEqual(try input.readLine(), long)
+      XCTAssertEqual(try input.readLine(), "a\u{0}b")
+      XCTAssertEqual(try input.readLine(), "a\u{FFFD}")
+      XCTAssertFalse(input.isAtEnd)
+      XCTAssertEqual(try input.readLine(), "last")
+      XCTAssertNil(try input.readLine())
+      XCTAssertTrue(input.isAtEnd)
+      XCTAssertFalse(input.hasError)
+
+      let again = try FileStream.open(path, mode: "r")
+      defer { try? again.close() }
+      XCTAssertEqual(try again.readLine(strippingNewline: false), "one\n")
+      XCTAssertEqual(try again.readLine(strippingNewline: false), "two\r\n")
+      XCTAssertEqual(try again.readLine(strippingNewline: false), "\n")
+
+      // A stream opened for writing only can't be read.
+      let appending = try FileStream.open(path, mode: "a")
+      defer { try? appending.close() }
+      XCTAssertThrowsError(try appending.readLine()) {
+        XCTAssertEqual($0 as? Errno, .badFileDescriptor)
+      }
+      XCTAssertTrue(appending.hasError)
     }
   }
 

@@ -259,6 +259,9 @@ extension MemoryMapping {
   /// Where `mmap` fails, this initializer throws its error;
   /// the corresponding C constant is `MAP_FAILED`, which `mmap` returns then.
   ///
+  /// A mapping of a file needs no option to say so;
+  /// the corresponding C constant is `MAP_FILE`, which is zero.
+  ///
   /// The corresponding C function is `mmap`.
   @_alwaysEmitIntoClient
   public init(
