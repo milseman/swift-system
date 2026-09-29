@@ -792,6 +792,19 @@ def main():
             w("## Adopters")
             w("")
             adopters_md(w, data["adopters"], adopters, **pitch_view)
+        if u.get("related"):
+            w("## Related API, by domain")
+            w("")
+            w("New declarations in this pitch's domains (`Utilities/api-graph/domains.json`, after the chapters of "
+              "*Advanced Programming in the UNIX Environment*) that the graph doesn't link to it: no link to or "
+              "from its declarations, and no shared C family or block. Candidates to include, to leave to "
+              "another pitch, or to mention:")
+            w("")
+            for dom, fams in u["related"].items():
+                w(f"- **{dom}**: " + "; ".join(
+                    f"{fam}: " + ", ".join(f"`{x['path']}`" + (f" ({', '.join(x['pitches'])})" if x["pitches"] else "")
+                                           for x in xs) for fam, xs in fams.items()))
+            w("")
         w("## Prior text")
         w("")
         if prior:

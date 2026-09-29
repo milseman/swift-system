@@ -306,6 +306,7 @@ if [ -n "$ADOPTERS$ECOSYSTEM" ]; then
 fi
 log "graph snapshot"
 snapshot=(--graph "$WORK/graph.json" --cnames "$WORK/cnames.json" --delta-dir "$DELTA" --meta "$WORK/meta.json"
+  --domains "$TOOL/domains.json"
   --out "$STAGE/graph.json.gz" --diff-out "$STAGE" --previous-out "$WORK/previous-snapshot.json.gz")
 if [ -f "$WORK/adopters.json" ]; then snapshot+=(--adopters "$WORK/adopters.json"); fi
 if [ -n "$SNAPSHOTS" ]; then snapshot+=(--store "$SNAPSHOTS"); fi

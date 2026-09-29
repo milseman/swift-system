@@ -571,6 +571,7 @@ def bundle_units(result, pitches, graph, snapshot, conts, evidence, drafts, src_
                 for o in owner.get(used, []):
                     if o != pid and o not in prereq and len(impl[o]) < 6:
                         impl[o].append([gn[x]["path"], gn[used]["path"]])
+        related = related_api(snapshot, mine, owner, pid)
         p = by_id[pid]
         units_out.append({
             "id": pid, "kind": "pitch", "name": r["title"] or pid, "pattern": r["pattern"], "status": r["status"],
@@ -580,9 +581,56 @@ def bundle_units(result, pitches, graph, snapshot, conts, evidence, drafts, src_
             "metrics": U.metrics(gn, graph["tests"], verified, nids), "prior": prior.matches(gn, nids),
             "direct": direct, "inherited": inherited, "prerequisites": prereq, "allPrerequisites": prereq,
             "implPrerequisites": dict(impl), "dependents": sorted(dependents.get(pid, ())), "parts": [],
-            "reason": None,
+            "reason": None, "related": related,
         })
     return {"units": units_out, "owners": {k: v for k, v in owner.items()}, "gists": prior.gists}
+
+
+def related_api(G, mine, owner, pid, limit=40):
+    """New declarations in the pitch's domains (domains.json) that the graph
+    doesn't link to it: no stored link between them and the pitch's
+    declarations, and no shared C family or block. By domain, then C family,
+    each with the pitch that owns it."""
+    nodes = G.nodes
+    doms = {d for x in mine for d in (nodes[x].get("domains") or [])}
+    if not doms:
+        return {}
+    linked = set()
+    fams, blocks = set(), set()
+    for x in mine:
+        for ln in G.out[x]:
+            linked.add(ln["to"])
+            if ln["kind"] == "wraps" and nodes[ln["to"]].get("family"):
+                fams.add(nodes[ln["to"]]["family"])
+            if ln["kind"] == "inBlock":
+                blocks.add(ln["to"])
+        for ln in G.inc[x]:
+            linked.add(ln["from"])
+    out = collections.defaultdict(lambda: collections.defaultdict(list))
+    for nid, n in nodes.items():
+        if n["kind"] != "declaration" or n.get("origin") != "head" or nid in mine or nid in linked:
+            continue
+        if n.get("hiddenClass") == "unavailable":
+            continue
+        shared = set(n.get("domains") or []) & doms
+        if not shared:
+            continue
+        nf = {nodes[ln["to"]].get("family") or nodes[ln["to"]]["name"] for ln in G.out[nid] if ln["kind"] == "wraps"}
+        nb = {ln["to"] for ln in G.out[nid] if ln["kind"] == "inBlock"}
+        if nf & fams or nb & blocks or any(ln["to"] in mine for ln in G.out[nid]):
+            continue
+        for d in sorted(shared):
+            out[d][", ".join(sorted(nf)) or "—"].append({"path": n["path"],
+                                                         "pitches": [o for o in owner.get(nid, []) if o != pid]})
+    # Keep it short: the largest families first, up to `limit` declarations.
+    res, total = {}, 0
+    for d in sorted(out, key=lambda d: -sum(len(v) for v in out[d].values())):
+        for fam, xs in sorted(out[d].items(), key=lambda kv: -len(kv[1])):
+            if total >= limit:
+                break
+            res.setdefault(d, {})[fam] = sorted(xs, key=lambda x: x["path"])[:8]
+            total += min(len(xs), 8)
+    return res
 
 
 def members_of(snapshot_graph, tid):

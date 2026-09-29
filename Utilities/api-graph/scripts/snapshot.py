@@ -262,12 +262,51 @@ def build(a):
                 link("calls", "package:" + pkg, "cname:" + name, sites=sites)
         hunks = ad["hunks"]
 
+    # ------------------------------------------------------------ domains
+    if a.domains and os.path.exists(a.domains):
+        assign_domains(nodes, links, load(a.domains)["domains"])
+
     # ------------------------------------------------------------ reach
     reach_of(nodes, links)
     return {"schema": SCHEMA,
             "meta": dict(meta, snapshotDate=datetime.date.today().isoformat(),
-                         adopterMeta=ad["meta"] if ad else None),
+                         adopterMeta=ad["meta"] if ad else None,
+                         domains=load(a.domains)["domains"] if a.domains and os.path.exists(a.domains) else []),
             "nodes": nodes, "links": links, "hunks": hunks}
+
+
+def assign_domains(nodes, links, domains):
+    """Each C name's domains, where its name or family matches a domain's
+    globs, and each head declaration's, from the names it wraps."""
+    import fnmatch
+    for n in nodes.values():
+        if n["kind"] != "cname":
+            continue
+        keys = [n["name"]] + ([n["family"]] if n.get("family") else [])
+        n["domains"] = [d["id"] for d in domains if any(fnmatch.fnmatchcase(k, pat) for k in keys
+                                                         for pat in d["match"])]
+    by_node = collections.defaultdict(set)
+    for ln in links:
+        if ln["kind"] == "wraps":
+            by_node[ln["from"]] |= set(nodes[ln["to"]].get("domains", []))
+    # A type is in its members' domains too (TerminalDescriptor wraps nothing
+    # itself; its members wrap tcgetattr and tcsetpgrp).
+    members = collections.defaultdict(set)
+    for ln in links:
+        if ln["kind"] in ("memberOf", "nestedIn"):
+            members[ln["to"]].add(ln["from"])
+
+    def of(nid, seen):
+        out = set(by_node.get(nid, ()))
+        for m in members.get(nid, ()):
+            if m not in seen:
+                seen.add(m)
+                out |= of(m, seen)
+        return out
+    order = {d["id"]: k for k, d in enumerate(domains)}
+    for nid, n in nodes.items():
+        if n["kind"] == "declaration" and n["origin"] == "head":
+            n["domains"] = sorted(of(nid, {nid}) if n.get("isType") else by_node.get(nid, ()), key=order.get)
 
 
 def reach_of(nodes, links):
@@ -299,6 +338,7 @@ def main():
     ap.add_argument("--cnames", required=True)
     ap.add_argument("--adopters")
     ap.add_argument("--delta-dir")
+    ap.add_argument("--domains", help="domains.json: C families by domain")
     ap.add_argument("--meta", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--store")

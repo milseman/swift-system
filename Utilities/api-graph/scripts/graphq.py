@@ -10,6 +10,7 @@ name's callers, a package's reach, and the difference between snapshots.
   graphq.py family chmod                       the chmod family: C names, wrappers, callers
   graphq.py cname getpid                       who wraps getpid, and who calls it
   graphq.py package swift-nio                  what swift-nio uses, and could
+  graphq.py domain signals                     a domain's declarations, by C family
   graphq.py diff OLD NEW                       nodes and links added, removed, changed
   graphq.py summary --out GRAPH.md             the snapshot's report
 
@@ -261,7 +262,7 @@ def cmd_show(g, a):
             for k, d, o, x in res]}, indent=1))
     print(f"{g.label(nid)}  ({n['kind']}{'/' + n['origin'] if n.get('origin') else ''})  {nid}")
     for k in ("decl", "file", "line", "availability", "platforms", "docSummary", "family", "cKinds", "baseCovered",
-              "remote"):
+              "remote", "domains"):
         if n.get(k) not in (None, "", []):
             print(f"  {k}: {n[k]}")
     if n.get("reach") is not None:
@@ -386,6 +387,29 @@ def cnames_report(g, cids, title, a):
             s = c["sites"]
             print(f"  called by {c['package']}: {len(s)} site{'s' if len(s) != 1 else ''}: " + ", ".join(
                 f"{x['file']}:{x['line']}" for x in s[:a.limit]) + (", …" if len(s) > a.limit else ""))
+
+
+def cmd_domain(g, a):
+    doms = {d["id"]: d for d in g.doc["meta"].get("domains", [])}
+    if a.name not in doms:
+        raise SystemExit(f"graphq: no domain {a.name!r}; the domains are: {', '.join(doms)}")
+    rows = collections.defaultdict(list)
+    for nid, n in g.nodes.items():
+        if n["kind"] == "declaration" and n.get("origin") == "head" and a.name in (n.get("domains") or []):
+            fams = sorted({g.nodes[ln["to"]].get("family") or g.nodes[ln["to"]]["name"] for ln in g.out[nid]
+                           if ln["kind"] == "wraps" and a.name in (g.nodes[ln["to"]].get("domains") or [])})
+            rows[", ".join(fams)].append(nid)
+    if a.json:
+        return print(json.dumps({k: [g.label(x) for x in v] for k, v in rows.items()}, indent=1))
+    d = doms[a.name]
+    print(f"{d['title']}" + (f" (APUE chapter {d['apue']})" if d.get("apue") else "")
+          + f": {sum(len(v) for v in rows.values())} declarations")
+    for fam, xs in sorted(rows.items()):
+        print(f"\n  {fam}:")
+        for x in sorted(xs, key=g.label)[:a.limit]:
+            print(f"    {g.label(x)}  [{reach_line(g, x)}]")
+        if len(xs) > a.limit:
+            print(f"    … {len(xs) - a.limit} more")
 
 
 def cmd_package(g, a):
@@ -600,6 +624,22 @@ def summary_md(doc, diff_file=None):
           "python3 Utilities/api-graph/scripts/graphq.py cname getpid",
           "python3 Utilities/api-graph/scripts/graphq.py package swift-nio",
           "python3 Utilities/api-graph/scripts/graphq.py diff OLD_COMMIT NEW_COMMIT", "```", ""]
+    doms = doc["meta"].get("domains") or []
+    if doms:
+        L += ["## Domains", "", "Loose groupings by task (`Utilities/api-graph/domains.json`, after the chapters of "
+              "*Advanced Programming in the UNIX Environment*), for suggesting related API the links don't connect. "
+              "`graphq.py domain ID` lists one.", "", "| Domain | Declarations | Used by packages |", "|---|---:|---:|"]
+        for d in doms:
+            xs = [x for x in heads if d["id"] in (doc["nodes"][x].get("domains") or [])]
+            users = {p for x in xs for p in (doc["nodes"][x].get("reach") or {}).get("usedBy", [])}
+            L.append(f"| `{d['id']}`: {d['title']}" + (f" (APUE {d['apue']})" if d.get("apue") else "")
+                     + f" | {len(xs)} | {len(users)} |")
+        fams = collections.Counter(n.get("family") for n in doc["nodes"].values()
+                                   if n["kind"] == "cname" and n.get("family") and not n.get("domains"))
+        if fams:
+            L += ["", f"C function families no domain names yet ({len(fams)}): "
+                  + ", ".join(f"`{f}`" for f in sorted(fams)[:60]) + (", …" if len(fams) > 60 else "") + "."]
+        L.append("")
     if diff_file and os.path.exists(diff_file):
         L += ["## Since the previous snapshot", "", open(diff_file).read().split("\n", 2)[2].strip().split("\n")[0],
               "", "`DIFF.md` lists the nodes and links.", ""]
@@ -647,6 +687,8 @@ def main():
     p.add_argument("name")
     p = sub.add_parser("package")
     p.add_argument("key")
+    p = sub.add_parser("domain")
+    p.add_argument("name")
     p = sub.add_parser("diff")
     p.add_argument("old")
     p.add_argument("new")
@@ -661,7 +703,7 @@ def main():
         return cmd_diff(None, a)
     g = Graph(load(find_snapshot(a.snapshot, a.store)))
     {"find": cmd_find, "show": cmd_show, "neighbors": cmd_neighbors, "type": cmd_type, "family": cmd_family,
-     "cname": cmd_cname, "package": cmd_package, "summary": cmd_summary}[a.cmd](g, a)
+     "cname": cmd_cname, "package": cmd_package, "domain": cmd_domain, "summary": cmd_summary}[a.cmd](g, a)
 
 
 if __name__ == "__main__":
