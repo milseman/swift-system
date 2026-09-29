@@ -2,8 +2,8 @@
 
 Generated 2026-09-29 by `Utilities/adopter-coverage/status.sh`, from commits only; rerun it rather than editing this file. How each figure is made, and what it can't see, is in [How this is computed](#how-this-is-computed).
 
-- **System**: `coverage` @ `bd9fd0eb` (mapping.ini: pthread_yield_np is sched_yield; detached threads are PThread.detach(); system contention scope is every thread's; the private _SIG_init constants read as the static initializers), which contains `system-next` @ `3d1e67d7` (Merge branch 'coverage' into system-next); 27 commit(s) of `coverage` aren't in `system-next`.
-- **API delta**: `main` @ `1b452c29` → `HEAD` @ `bd9fd0eb`.
+- **System**: `coverage` @ `ca322824` (Merge branch 'system-next' into coverage), which contains `system-next` @ `7b0875fa` (Merge branch 'coverage' into system-next); 4 commit(s) of `coverage` aren't in `system-next`.
+- **API delta**: `main` @ `1b452c29` → `HEAD` @ `3b212344` (api-delta's last run; nothing it reads has changed since).
 - **Adopters** (`../adopters`, branch `migrate-darwin`, against its merge base with `main`):
   - WasmKit @ `4917e060`, base `1e9c513d`
   - indexstore-db @ `cc966b89`, base `441ead77`
@@ -12,7 +12,7 @@ Generated 2026-09-29 by `Utilities/adopter-coverage/status.sh`, from commits onl
   - swift-build @ `f4685a11`, base `f4685a11` (no commits beyond the merge base yet) (uncommitted changes in the checkout aren't counted)
   - swift-certificates @ `0df6bd14`, base `ff86b924`
   - swift-driver @ `ddb51ccd`, base `15cf6766`
-  - swift-foundation @ `fa0dede8`, base `6669273a` (uncommitted changes in the checkout aren't counted)
+  - swift-foundation @ `b31eed7c`, base `6669273a` (uncommitted changes in the checkout aren't counted)
   - swift-log @ `4d6d77fe`, base `9c9acde6`
   - swift-nio @ `e1623fbf`, base `feaf4ac5`
   - swift-package-manager @ `dbe05ec1`, base `24a8a7b0`
@@ -27,11 +27,11 @@ Copied verbatim from `Utilities/api-delta/regenerate.sh` (`BASE_REF=main`, `HEAD
 
 ## Summary
 
-- **3107 added, 0 removed, 0 changed** declarations in the macOS symbol graphs.
-  - SystemPackage: +2523 (448 → 2971 public symbols).
+- **3110 added, 0 removed, 0 changed** declarations in the macOS symbol graphs.
+  - SystemPackage: +2526 (448 → 2974 public symbols).
   - SystemSockets: +584 (0 → 584 public symbols). SystemSockets is a new module; it doesn't exist on `main`.
 - Availability of the additions:
-  - System 199: 3072
+  - System 199: 3075
   - System 199 + explicit OS floor: 26
   - System 0.0.1 + explicit OS floor: 8
   - System 0.0.1: 1
@@ -44,7 +44,7 @@ Copied verbatim from `Utilities/api-delta/regenerate.sh` (`BASE_REF=main`, `HEAD
 - 0 public declarations hidden from the graphs were removed.
 - No public declaration is conditional on `ENABLE_MOCKING` or `DEBUG`, so a release build has the same public API as the debug graphs.
 - Cross-check with `swift-api-digester`, which dumps every declaration, implicit ones included:
-  - SystemPackage: +2828 / -0 declarations, which is the graphs' +2523 plus 300 implicit ones; explicit declarations it has that the graphs don't: `_opaque_pthread_cond_t.initializer`, `_opaque_pthread_mutex_t.errorCheckingInitializer`, `_opaque_pthread_mutex_t.initializer`, `_opaque_pthread_mutex_t.recursiveInitializer`, `_opaque_pthread_rwlock_t.initializer`; it has every graph addition; `-diagnose-sdk` reports no breaking changes.
+  - SystemPackage: +2831 / -0 declarations, which is the graphs' +2526 plus 300 implicit ones; explicit declarations it has that the graphs don't: `_opaque_pthread_cond_t.initializer`, `_opaque_pthread_mutex_t.errorCheckingInitializer`, `_opaque_pthread_mutex_t.initializer`, `_opaque_pthread_mutex_t.recursiveInitializer`, `_opaque_pthread_rwlock_t.initializer`; it has every graph addition; `-diagnose-sdk` reports no breaking changes.
   - SystemSockets: +657 / -0 declarations, which is the graphs' +584 plus 72 implicit ones; explicit declarations it has that the graphs don't: `SocketAddress._withUnsafeMutablePointer(_:)`; it has every graph addition.
 - Nothing was removed or changed: no public declaration left the graphs or the source scan. The *changed* check compares declaration text (including default arguments), availability, conformances, generic and extension constraints, and access level, and pairs symbols by path when a signature change alters the USR.
 
@@ -72,6 +72,7 @@ Each row is a top-level type, and nested types count toward it: `FilePath.Resolu
 | SystemPackage | [`Entropy`](#systempackage-entropy) | 7 | 0 | 0 | S199 ×7 |
 | SystemPackage | [`Errno`](#systempackage-errno) | 4 | 0 | 0 | S199 ×3, S0.0.1 ×1 |
 | SystemPackage | [`ExitStatus`](#systempackage-exitstatus) | 6 | 0 | 0 | S199 ×6 |
+| SystemPackage | [`ExtendedAttributeName`](#systempackage-extendedattributename) | 3 | 0 | 0 | S199 ×3 |
 | SystemPackage | [`ExtendedAttributeOptions`](#systempackage-extendedattributeoptions) | 5 | 0 | 0 | S199 ×5 |
 | SystemPackage | [`FileDescriptor`](#systempackage-filedescriptor) | 246 | 0 | 0 | S199 ×233, S0.0.1+OS ×8, S199+OS ×5 |
 | SystemPackage | [`FilePath`](#systempackage-filepath) | 443 | 0 | 0 | S199 ×429, S199+OS ×14 |
@@ -145,7 +146,7 @@ Each row is a top-level type, and nested types count toward it: `FilePath.Resolu
 | SystemSockets | [`sockaddr_storage (extends Darwin)`](#systemsockets-sockaddr-storage-extends-darwin) | 3 | 0 | 0 | S199 ×3 |
 | SystemSockets | [`sockaddr_un (extends Darwin)`](#systemsockets-sockaddr-un-extends-darwin) | 5 | 0 | 0 | S199 ×5 |
 | SystemSockets | [`sockaddr_vm (extends Darwin)`](#systemsockets-sockaddr-vm-extends-darwin) | 5 | 0 | 0 | S199 ×5 |
-| **Total** | | **3107** | **0** | **0** | |
+| **Total** | | **3110** | **0** | **0** | |
 
 # 2. Adoption
 
@@ -160,7 +161,7 @@ Swift files of each package's own targets (from its manifest; not nested package
 | swift-build | 1057 | 2 | 1 | 0 | 0 | — | 0 (0) |
 | swift-certificates | 133 | 2 → 0 | 0 | 0 → 1 | 0 | 3 → 0 | 0 (0) → 1 (1) |
 | swift-driver | 195 | 11 → 0 | 1 → 0 | 0 | 0 | — | 0 (0) |
-| swift-foundation | 431 | 33 → 0 | 1 → 0 | 0 → 4 | 3 | 7 → 2 | 0 (0) → 7 (6) |
+| swift-foundation | 431 | 33 → 0 | 1 → 0 | 0 → 3 | 3 | 7 → 2 | 0 (0) → 6 (5) |
 | swift-log | 30 | 5 → 0 | 0 | 0 → 2 | 0 | 1 → 0 | 0 (0) → 3 (2) |
 | swift-nio | 479 | 41 → 0 | 3 → 0 | 0 | 0 | — | 0 (0) |
 | swift-package-manager | 883 | 3 → 0 | 2 → 0 | 0 | 0 | — | 0 (0) |
@@ -168,7 +169,7 @@ Swift files of each package's own targets (from its manifest; not nested package
 | swift-syntax | 586 | 2 → 0 | 0 | 0 → 2 | 0 | 3 → 0 | 0 (0) → 3 (2) |
 | swift-tools-protocols | 232 | 2 → 0 | 0 | 0 | 0 | — | 0 (0) |
 | swift-tools-support-core | 124 | 0 | 1 → 0 | 0 → 2 | 0 | 14 → 5 | 0 (0) → 2 (2) |
-| **All** | 4904 | 136 → 2 | 10 → 1 | 0 → 14 | 3 | | 0 (0) → 20 (17) |
+| **All** | 4904 | 136 → 2 | 10 → 1 | 0 → 13 | 3 | | 0 (0) → 19 (16) |
 
 Files whose imports aren't narrow yet: swift-build: `Sources/SWBUtil/Architecture.swift` (whole module), swift-build: `Sources/SWBUtil/MachO.swift` (whole module), swift-build: `Sources/SWBLibc/libc.swift` (submodule).
 
@@ -261,20 +262,20 @@ Verbatim, not rerun: each package's own test totals (at the start, and the lates
 
 **swift-foundation**
 
-- MIGRATION.md, tests (lines 124, 126, 154):
+- MIGRATION.md, tests (lines 127, 129, 158):
 
   ```text
   | Step | Result |
   | Baseline | 1701 tests in 128 suites passed (34 skipped) |
-  | Typed allocation (`Memory.TypeDescriptor`) | 1701 tests in 128 suites passed |
+  | `mktemp` (`makeUniqueFile`) | 1701 tests in 128 suites passed |
   ```
 
-- MIGRATION.md, re-exports (lines 59, 61, 86):
+- MIGRATION.md, re-exports (lines 59, 61, 87):
 
   ```text
   | | FoundationEssentials: whole module | scoped only (SYSTEM-GAP) | through a re-export | FoundationInternationalization | Tests |
   | At start (`21c6d01f`) | 25 | 0 | 7 | 1 | 8 |
-  | After typed allocation (`Memory.TypeDescriptor`) | 0 | 4 | 2 | 0 | 0 |
+  | After `mktemp` (`makeUniqueFile`) | 0 | 3 | 2 | 0 | 0 |
   ```
 
 - REPORT.md, tests (lines 14, 172):
@@ -382,7 +383,7 @@ Verbatim, not rerun: each package's own test totals (at the start, and the lates
 
 # 3. Gaps
 
-Every `SYSTEM-GAP:` marker in the packages' sources at the commits above: 20 markers in 17 files, of which 0 are outside the packages' targets. Each marker's text is read for the C interfaces it names (see [How this is computed](#how-this-is-computed)); a marker that names none is counted under its phrase, with the Darwin names imported under it deciding its status. Status is against System at `bd9fd0eb`:
+Every `SYSTEM-GAP:` marker in the packages' sources at the commits above: 19 markers in 16 files, of which 0 are outside the packages' targets. Each marker's text is read for the C interfaces it names (see [How this is computed](#how-this-is-computed)); a marker that names none is counted under its phrase, with the Darwin names imported under it deciding its status. Status is against System at `ca322824`:
 
 - **missing**: System documents none of it (or only some: *k of n*).
 - **covered**: a System declaration's doc comment names it as the corresponding C interface, a CInterop alias names it, or, for `X members`, System gives `CInterop` alias of `X` Swift-named accessors. The marker is stale, or the package hasn't adopted the API yet. *Not yet in `system-next`* means only this branch has it.
@@ -390,7 +391,7 @@ Every `SYSTEM-GAP:` marker in the packages' sources at the commits above: 20 mar
 
 A family marked *(provisional)* is a C-library layer above the OS (math, stdio, locales, string.h and ctype.h) that System wraps provisionally, in `Sources/System/Provisional/`, since it may move to the standard library; it counts like everything else.
 
-Interfaces: 51 covered, 51 in all.
+Interfaces: 3 missing, 47 covered, 50 in all.
 
 | # | Interface | Status | Files | Packages | Family |
 |---:|---|---|---:|---|---|
@@ -401,10 +402,10 @@ Interfaces: 51 covered, 51 in all.
 | 5 | `FTSENT` | covered (by DirectoryWalk) | 2 | swift-foundation | fts |
 | 6 | `memcmp` | covered (doc comment) | 2 | swift-syntax | string.h |
 | 7 | `TZDIR` | covered (doc comment) | 2 | swift-foundation | tzfile.h |
-| 8 | adding a file action to C file actions | covered (doc comment) | 1 | swift-subprocess | posix_spawn |
-| 9 | C-string arguments for the C-values spawns | covered (by ProcessID.spawn's C-array forms with C values; not yet in `system-next`) | 1 | swift-subprocess | C-string arguments for the C-values spawns |
-| 10 | `dirent` | covered (doc comment) | 1 | swift-tools-support-core | dirent |
-| 11 | `dlerror` | covered (doc comment) | 1 | swift-tools-support-core | dynamic loader |
+| 8 | adding a file action to C file actions | missing (named, but the marker asks for adding a SpawnFileAction to C file actions that other code built) | 1 | swift-subprocess | posix_spawn |
+| 9 | C-string arguments for the C-values spawns | covered (by ProcessID.spawn's C-array forms with C values) | 1 | swift-subprocess | C-string arguments for the C-values spawns |
+| 10 | `dirent` | missing (named, but the marker asks for a CInterop alias for struct dirent, with Swift-named accessors) | 1 | swift-tools-support-core | dirent |
+| 11 | `dlerror` | missing (named, but the marker asks for a call that returns and clears the loader's pending error) | 1 | swift-tools-support-core | dynamic loader |
 | 12 | `EX_USAGE` | covered (doc comment) | 1 | swift-argument-parser | sysexits |
 | 13 | `fdopen` | covered (doc comment) | 1 | swift-log | C stdio streams |
 | 14 | `fflush` | covered (doc comment) | 1 | swift-log | C stdio streams |
@@ -435,16 +436,15 @@ Interfaces: 51 covered, 51 in all.
 | 39 | `fwrite` | covered (doc comment) | 1 | swift-log | C stdio streams |
 | 40 | `gmtime_r` | covered (doc comment) | 1 | swift-certificates | calendar time |
 | 41 | `localtime` | covered (as `localtime_r`) | 1 | swift-log | calendar time |
-| 42 | `mktemp` | covered (doc comment) | 1 | swift-foundation | temporary files |
-| 43 | `POSIXErrorCode` | covered (doc comment) | 1 | swift-foundation | POSIXErrorCode |
-| 44 | readlinkat into a caller's buffer (System's readSymbolicLink returns a FilePath, which dro | covered (doc comment) | 1 | WasmKit | readlinkat into a caller's buffer (System's readSymbolicLink returns a FilePath, which dro |
-| 45 | `setvbuf` | covered (doc comment) | 1 | swift-log | C stdio streams |
-| 46 | `stdout` | covered (doc comment) | 1 | swift-log | C stdio streams |
-| 47 | `strftime` | covered (doc comment) | 1 | swift-log | calendar time |
-| 48 | `time` | covered (as `clock_gettime`) | 1 | swift-log | calendar time |
-| 49 | `time_t` | covered (doc comment) | 1 | swift-certificates | calendar time |
-| 50 | `tm` | covered (doc comment) | 1 | swift-certificates | calendar time |
-| 51 | `TZDEFAULT` | covered (doc comment) | 1 | swift-foundation | tzfile.h |
+| 42 | `POSIXErrorCode` | covered (doc comment) | 1 | swift-foundation | POSIXErrorCode |
+| 43 | readlinkat into a caller's buffer (System's readSymbolicLink returns a FilePath, which dro | covered (doc comment) | 1 | WasmKit | readlinkat into a caller's buffer (System's readSymbolicLink returns a FilePath, which dro |
+| 44 | `setvbuf` | covered (doc comment) | 1 | swift-log | C stdio streams |
+| 45 | `stdout` | covered (doc comment) | 1 | swift-log | C stdio streams |
+| 46 | `strftime` | covered (doc comment) | 1 | swift-log | calendar time |
+| 47 | `time` | covered (as `clock_gettime`) | 1 | swift-log | calendar time |
+| 48 | `time_t` | covered (doc comment) | 1 | swift-certificates | calendar time |
+| 49 | `tm` | covered (doc comment) | 1 | swift-certificates | calendar time |
+| 50 | `TZDEFAULT` | covered (doc comment) | 1 | swift-foundation | tzfile.h |
 
 ## Missing, by family
 
@@ -452,6 +452,9 @@ The missing interfaces above, grouped, largest first: the order to fill them in.
 
 | # | Family | Files | Packages | Interfaces |
 |---:|---|---:|---|---|
+| 1 | dirent | 1 | swift-tools-support-core | `dirent` |
+| 2 | dynamic loader | 1 | swift-tools-support-core | `dlerror` |
+| 3 | posix_spawn | 1 | swift-subprocess | adding a file action to C file actions |
 
 ## Markers that name no C interface
 
@@ -468,10 +471,10 @@ The missing interfaces above, grouped, largest first: the order to fill them in.
 - `FTSENT` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:120`; swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
 - `memcmp` (covered): swift-syntax: `Sources/SwiftCompilerPluginMessageHandling/JSON/JSONDecoding.swift:16`; swift-syntax: `Sources/SwiftSyntax/SyntaxText.swift:15`; swift-syntax: `Sources/SwiftSyntax/SyntaxText.swift:27`
 - `TZDIR` (covered): swift-foundation: `Sources/FoundationEssentials/TimeZone/TimeZone.swift:405`; swift-foundation: `Sources/FoundationEssentials/TimeZone/TimeZone_Cache.swift:34`
-- adding a file action to C file actions (covered): swift-subprocess: `Tests/SubprocessTests/DarwinTests.swift:15`
+- adding a file action to C file actions (missing): swift-subprocess: `Tests/SubprocessTests/DarwinTests.swift:15`
 - C-string arguments for the C-values spawns (covered): swift-subprocess: `Sources/Subprocess/Platforms/Subprocess+Darwin.swift:618`
-- `dirent` (covered): swift-tools-support-core: `Sources/TSCBasic/FileSystem.swift:19`
-- `dlerror` (covered): swift-tools-support-core: `Sources/TSCUtility/dlopen.swift:20`
+- `dirent` (missing): swift-tools-support-core: `Sources/TSCBasic/FileSystem.swift:19`
+- `dlerror` (missing): swift-tools-support-core: `Sources/TSCUtility/dlopen.swift:20`
 - `EX_USAGE` (covered): swift-argument-parser: `Sources/ArgumentParser/Utilities/Platform.swift:25`
 - `fdopen` (covered): swift-log: `Tests/LoggingTests/StreamLogHandlerTest.swift:22`
 - `fflush` (covered): swift-log: `Tests/LoggingTests/StreamLogHandlerTest.swift:22`
@@ -502,7 +505,6 @@ The missing interfaces above, grouped, largest first: the order to fill them in.
 - `fwrite` (covered): swift-log: `Tests/LoggingTests/StreamLogHandlerTest.swift:22`
 - `gmtime_r` (covered): swift-certificates: `Tests/X509Tests/TimeTests.swift:19`
 - `localtime` (covered): swift-log: `Sources/Logging/Handlers/StreamLogHandler.swift:23`
-- `mktemp` (covered): swift-foundation: `Sources/FoundationEssentials/Data/Data+Writing.swift:26`
 - `POSIXErrorCode` (covered): swift-foundation: `Sources/FoundationEssentials/Error/ErrorCodes+POSIX.swift:20`; swift-foundation: `Sources/FoundationEssentials/Error/ErrorCodes+POSIX.swift:21`
 - readlinkat into a caller's buffer (System's readSymbolicLink returns a FilePath, which dro (covered): WasmKit: `Sources/WASI/Platform/PAL/PALFileDescriptor.swift:7`
 - `setvbuf` (covered): swift-log: `Tests/LoggingTests/StreamLogHandlerTest.swift:22`
@@ -570,8 +572,12 @@ api-delta's last run, and a few seconds when they haven't.
   witness in System's sources shows the answer has what the markers ask for (`ANSWERED`: fts is DirectoryWalk, with
   its two-visit order, `malloc_type_descriptor_v0_t`'s members are `Memory.TypeDescriptor`'s properties, and
   Subprocess's raw posix_spawn path, a marker that names no C interface, is `ProcessID.spawn`'s C-values and
-  credentials forms). This sees what System documents, not whether the API fits the adopter's use: a partial
-  wrapper counts as covered, and an API whose doc comments don't name the C interface counts as missing.
+  credentials forms). The other way round, an interface that System's docs name counts as missing while the
+  markers ask for more than the naming API gives, until a witness shows the ask is met (`STILL_NEEDED`: struct
+  dirent needs a public name with accessors, dlerror a call that takes the pending error, and addchdir_np a way to
+  add an action to C file actions that other code built). This sees what System documents, not whether the API
+  fits the adopter's use: a partial wrapper counts as covered, and an API whose doc comments don't name the C
+  interface counts as missing.
 - **Provisional families** (libm, C stdio, locale and xlocale, string.h and ctype.h, numeric conversion) are a
   fixed list in `scripts/status.py`, matched by name or by the name's SDK module in adopter-coverage's stored
   vocabulary when there is one. They're C-library layers above the OS that System wraps provisionally, in
