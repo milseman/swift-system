@@ -55,7 +55,6 @@ A package spec is `NAME`, `NAME@REF`, `NAME=PATH` or `NAME=PATH@REF`: the packag
 - Only commits count, on both sides. Uncommitted changes aren't checked, and the script says so when there are some. A tool with uncommitted changes makes a *dirty* tool id, whose runs are stored but can't be verified.
 - Nothing tracked is modified, here or in any package's checkout. The script refuses an output, scratch or results directory that holds tracked files, or that's inside this repository's or a package's worktree without being ignored, and deletes only directories it created.
 - A manifest's `.package(path:)` is made absolute in the export; one that points at a swift-system checkout gets an export of the System commit being checked instead, so the build depends on commits only.
-- `Utilities/nio-coverage/check.sh`, the tool's old name, runs it for `nio` alone.
 
 Exit status:
 - `0`: the mapping accounts for everything.
