@@ -47,4 +47,19 @@ internal func system_dlerror() -> UnsafeMutablePointer<CChar>? {
   dlerror()
 }
 
+#if SYSTEM_PACKAGE_DARWIN
+// dladdr reports no error; it returns 0 when no loaded image contains the
+// address. glibc declares it only with _GNU_SOURCE, which its Swift module
+// doesn't define, so it's Darwin's for now.
+internal func system_dladdr(
+  _ address: UnsafeRawPointer
+) -> (path: UnsafePointer<CChar>, base: UnsafeRawPointer?,
+      symbol: UnsafePointer<CChar>?, symbolAddress: UnsafeRawPointer?)? {
+  var info = Dl_info()
+  guard dladdr(address, &info) != 0, let path = info.dli_fname else { return nil }
+  return (path, info.dli_fbase.map(UnsafeRawPointer.init),
+          info.dli_sname, info.dli_saddr.map(UnsafeRawPointer.init))
+}
+#endif
+
 #endif // !os(Windows) && !os(WASI)

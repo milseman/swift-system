@@ -7,7 +7,7 @@
 - **The results** are stored by commit, outside every worktree, so any run can be repeated, verified, and compared with any other.
 - **The Darwin metric** says, for every library file, how it sees the Darwin module: by importing it, through a re-export (NIOPosix's, TSCLibc's), or only through Apple Foundation's.
 
-The audited adopters are swift-nio (`nio`), swift-foundation (`foundation`), swift-package-manager (`swiftpm`) and swift-subprocess (`subprocess`). `ecosystem.sh` audits the rest of the toolchain's packages that import Darwin (`packages/ecosystem/`).
+The audited adopters are swift-nio (`nio`), swift-foundation (`foundation`), swift-package-manager (`swiftpm`) and swift-subprocess (`subprocess`). `ecosystem.sh` audits the rest of the toolchain's packages that import Darwin (`packages/ecosystem/`), and with `--popular` the popular packages beyond the toolchain that `popular.tsv` lists (`packages/popular/`).
 
 ## Running it
 
@@ -30,6 +30,8 @@ Utilities/adopter-coverage/ecosystem.sh clone                # the toolchain's p
 Utilities/adopter-coverage/ecosystem.sh survey               # which import Darwin; their package files
 Utilities/adopter-coverage/ecosystem.sh run                  # check.sh over all of them
 Utilities/adopter-coverage/ecosystem.sh report               # ECOSYSTEM.md for the latest ecosystem run
+Utilities/adopter-coverage/ecosystem.sh --popular clone      # the same for popular.tsv's packages; its report
+                                                             # is the run's POPULAR.md
 ```
 
 A package spec is `NAME`, `NAME@REF`, `NAME=PATH` or `NAME=PATH@REF`: the package file's settings, at any checkout and ref. A run's id (`<System commit>-<hash>`) comes from its System commit, the tool and the package commits; RUN can be an id or a prefix of one, `latest`, or a System commit (its latest run).
@@ -47,7 +49,7 @@ A package spec is `NAME`, `NAME@REF`, `NAME=PATH` or `NAME=PATH@REF`: the packag
 | `ADOPTER_COVERAGE_WORK` | `.build/adopter-coverage-work` | Scratch: exports and builds, deleted as soon as their index is stored. The most a run needs at once is the largest package's build (SwiftPM's is 6 GB). |
 | `ADOPTER_COVERAGE_MAPPING` | `mapping.ini` here | The mapping file. |
 | `ADOPTER_COVERAGE_REBUILD` | unset | `1` rebuilds packages even when the store has their index. |
-| `ADOPTER_COVERAGE_ECOSYSTEM` | `ecosystem` next to the worktree | The toolchain packages' clones (`ecosystem.sh`). |
+| `ADOPTER_COVERAGE_ECOSYSTEM` | `ecosystem` next to the worktree | The toolchain packages' clones, and the popular ones' (`ecosystem.sh`). |
 
 - Refs resolve in the worktree you run the script from, as with api-delta.
 - Only commits count, on both sides. Uncommitted changes aren't checked, and the script says so when there are some. A tool with uncommitted changes makes a *dirty* tool id, whose runs are stored but can't be verified.
@@ -77,7 +79,7 @@ Everything goes to the results store; see its `README.md` (a copy of `results-RE
 - The report's *OS use through dependencies* section, for a package whose dependencies do OS work for it (SwiftPM's swift-tools-support-core, llbuild and swift-driver): how many of its lines use a dependency symbol that reaches the OS, bounded both ways, against the lines where it names an OS interface itself.
 - `logs/`: the package's build log, and its `swift package describe` and `dump-package` output.
 
-`results.sh delta` writes, per package and combined: interfaces newly covered, from missing to partial, regressed and still missing; new and gone interfaces; and Darwin-importing files. `ecosystem.sh report` writes `ECOSYSTEM.md` into a run's directory: the toolchain's packages side by side, the standard library's C interfaces (SwiftShims and the runtime), and the top gaps, each with the System lane that should take it.
+`results.sh delta` writes, per package and combined: interfaces newly covered, from missing to partial, regressed and still missing; new and gone interfaces; and Darwin-importing files. `ecosystem.sh report` writes `ECOSYSTEM.md` into a run's directory: the toolchain's packages side by side, the standard library's C interfaces (SwiftShims and the runtime), and the top gaps, each with the System lane that should take it. `ecosystem.sh --popular report` writes `POPULAR.md` the same way, for popular.tsv's packages, without the standard library's section.
 
 ## Keeping the mapping current
 
@@ -129,7 +131,7 @@ As in api-delta: SwiftPM runs each manifest under `sandbox-exec`, and inside ano
 |---|---|
 | `check.sh` | Runs everything: scans System and derives its coverage, runs `scripts/package.sh` for each package, stores the results and writes the combined report. |
 | `results.sh` | The results store: list, delta, verify, rerun, migration. |
-| `ecosystem.sh` | The toolchain's packages: clone, survey, run, report. |
+| `ecosystem.sh` | The toolchain's packages, or with `--popular` popular.tsv's: clone, survey, run, report. |
 | `status.sh` | Rewrites `Prototype/Status/STATUS.md`: api-delta's summary, the adopters' Darwin imports and SYSTEM-GAP markers, and the gaps by interface. |
 | `scripts/status.py` | What `status.sh` reports, and how: the marker parser, the not-System's families, the method. |
 | `scripts/package.sh` | One package: export, build, index, extraction, check and report. |
@@ -149,7 +151,7 @@ As in api-delta: SwiftPM runs each manifest under `sandbox-exec`, and inside ano
 | `scripts/results.py` | Files results in the store; list, delta, compare. |
 | `scripts/combine.py` | Writes a run's combined report. |
 | `scripts/lanes.py` | The System lane for a gap, from mapping.ini's `lanes`. |
-| `scripts/ecosystem.py` | The toolchain's packages: scheme, clones, survey, package files, report. |
+| `scripts/ecosystem.py` | The toolchain's packages and the popular ones: scheme, clones, survey, package files, report. |
 | `scripts/swiftshims.py` | Counts the standard library's C interfaces and System's coverage of them. |
 | `scripts/mapping_edit.py` | Edits `mapping.ini`'s entries without reformatting it; `prune` drops redundant hand statuses. |
 | `scripts/compare.py` | Compares two results of a package in detail. |

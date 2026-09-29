@@ -120,6 +120,23 @@ internal func system_iscntrl(_ c: CInt) -> CInt { iscntrl(c) }
 internal func system_tolower(_ c: CInt) -> CInt { tolower(c) }
 internal func system_toupper(_ c: CInt) -> CInt { toupper(c) }
 
+// MARK: - execinfo.h
+
+#if SYSTEM_PACKAGE_DARWIN
+// Neither sets errno; backtrace_symbols returns NULL when it can't allocate.
+internal func system_backtrace(
+  _ buffer: UnsafeMutablePointer<UnsafeMutableRawPointer?>, _ count: CInt
+) -> CInt {
+  backtrace(buffer, count)
+}
+
+internal func system_backtrace_symbols(
+  _ addresses: UnsafePointer<UnsafeMutableRawPointer?>, _ count: CInt
+) -> UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>? {
+  backtrace_symbols(addresses, count)
+}
+#endif
+
 // MARK: - stdio
 
 // fopen
@@ -194,6 +211,19 @@ internal func system_fread(
   if mockingEnabled { return _mockInt(Int(bitPattern: stream), count) == -1 ? 0 : count }
 #endif
   return fread(bytes, 1, count, stream)
+}
+
+// getline: the count of bytes read, or -1 at the end or after an error. A
+// mocked getline reads nothing, so it returns 0 and leaves the line alone.
+internal func system_getline(
+  _ line: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>,
+  _ capacity: UnsafeMutablePointer<Int>,
+  _ stream: UnsafeMutablePointer<FILE>
+) -> Int {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mockInt(Int(bitPattern: stream)) }
+#endif
+  return getline(line, capacity, stream)
 }
 
 // fileno

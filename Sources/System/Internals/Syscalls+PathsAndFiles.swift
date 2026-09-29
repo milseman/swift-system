@@ -37,10 +37,6 @@ internal func system_realpath(
   return realpath(path, nil)
 }
 
-internal func system_free(_ pointer: UnsafeMutableRawPointer?) {
-  free(pointer)
-}
-
 internal func system_remove(_ path: UnsafePointer<CChar>) -> CInt {
 #if ENABLE_MOCKING
   if mockingEnabled { return _mock(path: path) }

@@ -770,8 +770,9 @@ extension StatFS {
   /// waits for the answers, which can take a long time, or never come, from a
   /// network file system that can't respond.
   ///
-  /// The corresponding C function is `getfsstat()`, with `MNT_NOWAIT`, or
-  /// with `MNT_WAIT` if `waitForUpdates` is `true`.
+  /// The corresponding C function is `getfsstat`.
+  /// The corresponding C constants are `MNT_NOWAIT`,
+  /// and `MNT_WAIT` if `waitForUpdates` is `true`.
   /// - Note: Only available on Darwin and BSD.
   @_alwaysEmitIntoClient
   public static func mountedFileSystems(

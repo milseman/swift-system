@@ -283,6 +283,111 @@ extension DynamicLibrary {
   }
 }
 
+@available(System 199, *)
+extension DynamicLibrary {
+  /// Returns the calling thread's pending dynamic loader error,
+  /// and clears it.
+  ///
+  /// - Returns: The error of the last loader call on this thread
+  ///   that failed since the error was last taken,
+  ///   or `nil` if there's none.
+  ///
+  /// `DynamicLibrary`'s initializers and ``close()`` throw their errors,
+  /// taking them as this method does.
+  /// This is for a call that fails without throwing,
+  /// such as ``address(of:)-(String)`` returning `nil`,
+  /// which clears the pending error first:
+  ///
+  ///     guard let address = library.address(of: "entry") else {
+  ///       print(DynamicLibrary.takePendingError()?.message ?? "not found")
+  ///       return
+  ///     }
+  ///
+  /// It's also for the loader calls that C code makes.
+  ///
+  /// The corresponding C function is `dlerror`.
+  @_alwaysEmitIntoClient
+  public static func takePendingError() -> LoaderError? {
+    _takePendingError()
+  }
+
+  @usableFromInline
+  internal static func _takePendingError() -> LoaderError? {
+    system_dlerror().map { LoaderError(message: String(platformString: $0)) }
+  }
+}
+
+#if SYSTEM_PACKAGE_DARWIN
+@available(System 199, *)
+extension DynamicLibrary {
+  /// Where an address is among the loaded libraries:
+  /// the library that contains it, and the nearest symbol at or below it.
+  ///
+  /// The corresponding C type is `Dl_info`.
+  /// - Note: Only available on Darwin.
+  public struct SymbolInfo: Hashable {
+    /// The path of the library, or of the program, that contains the address,
+    /// as the dynamic loader loaded it.
+    ///
+    /// The corresponding C field is `dli_fname`.
+    public var libraryPath: FilePath
+
+    /// The address the library is loaded at.
+    ///
+    /// The corresponding C field is `dli_fbase`.
+    public var libraryAddress: UnsafeRawPointer?
+
+    /// The name of the nearest symbol at or below the address,
+    /// or `nil` if the loader has none.
+    ///
+    /// The corresponding C field is `dli_sname`.
+    public var symbolName: String?
+
+    /// The address of that symbol, or `nil` if the loader has none.
+    ///
+    /// The corresponding C field is `dli_saddr`.
+    public var symbolAddress: UnsafeRawPointer?
+
+    /// Creates information about an address from its parts.
+    public init(
+      libraryPath: FilePath, libraryAddress: UnsafeRawPointer?,
+      symbolName: String?, symbolAddress: UnsafeRawPointer?
+    ) {
+      self.libraryPath = libraryPath
+      self.libraryAddress = libraryAddress
+      self.symbolName = symbolName
+      self.symbolAddress = symbolAddress
+    }
+  }
+
+  /// Returns the loaded library that contains an address,
+  /// and the nearest symbol at or below it,
+  /// or `nil` if no loaded library contains the address.
+  ///
+  /// - Parameter address: An address, such as a function's.
+  ///
+  /// To find the library that contains the calling code,
+  /// pass the address of one of its functions.
+  ///
+  /// The corresponding C function is `dladdr`.
+  /// - Note: Only available on Darwin.
+  @_alwaysEmitIntoClient
+  public static func symbolInfo(containing address: UnsafeRawPointer) -> SymbolInfo? {
+    _symbolInfo(containing: address)
+  }
+
+  @usableFromInline
+  internal static func _symbolInfo(containing address: UnsafeRawPointer) -> SymbolInfo? {
+    guard let info = system_dladdr(address) else { return nil }
+    return SymbolInfo(
+      libraryPath: FilePath(platformString: info.path),
+      libraryAddress: info.base,
+      symbolName: info.symbol.map { String(platformString: $0) },
+      symbolAddress: info.symbolAddress)
+  }
+}
+#endif
+
 /// The calling thread's last dynamic linking error.
 @available(System 199, *)
 internal func _loaderError() -> DynamicLibrary.LoaderError {

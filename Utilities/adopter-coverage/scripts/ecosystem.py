@@ -1,25 +1,29 @@
 #!/usr/bin/env python3
 """The toolchain's Swift packages: the ones swift's update-checkout clones
-for the main branch scheme, and which of them import Darwin.
+for the main branch scheme, and which of them import Darwin. Or, with SET
+`popular`, the popular packages beyond the toolchain that popular.tsv lists.
 
   ecosystem.py scheme  ECOSYSTEM          the main scheme's repositories, from
                                           ECOSYSTEM/swift's utils/update_checkout
-  ecosystem.py clone   ECOSYSTEM          shallow clones of the Swift packages
+  ecosystem.py clone   ECOSYSTEM [SET]    shallow clones of the Swift packages
                                           among them, at the scheme's refs
-  ecosystem.py survey  ECOSYSTEM OUT      each clone's manifest tools version and
+  ecosystem.py survey  ECOSYSTEM OUT [SET]
+                                          each clone's manifest tools version and
                                           a lexical count of the files of its library
                                           targets that import Darwin
-  ecosystem.py packages SURVEY PACKAGES   a package file per Darwin-importing
-                                          package, in PACKAGES/ecosystem
+  ecosystem.py packages SURVEY PACKAGES [SET]
+                                          a package file per Darwin-importing
+                                          package, in PACKAGES/ecosystem (or
+                                          PACKAGES/popular)
   ecosystem.py specs   SURVEY             check.sh's arguments for the ecosystem run
   ecosystem.py latest-run SURVEY RESULTS  the newest stored run with every one of them
-  ecosystem.py report  RUN_DIR RESULTS SURVEY MAPPING SWIFTSHIMS OUT.md
+  ecosystem.py report  RUN_DIR RESULTS SURVEY MAPPING SWIFTSHIMS OUT.md [SET]
                                           the ecosystem report for a run
 
 The four audited adopters (swift-nio, swift-foundation, swiftpm,
 swift-subprocess) keep their own package files, pointed at the ecosystem's
-clones; the others get generated ones (see packages/ecosystem/README.md).
-Nothing here edits a clone after it's made.
+clones; the others get generated ones (see packages/ecosystem/README.md and
+packages/popular/README.md). Nothing here edits a clone after it's made.
 """
 
 import sys
@@ -58,12 +62,32 @@ def scheme(eco):
     return out
 
 
+# The popular packages beyond the toolchain (`ecosystem.sh --popular`), from
+# popular.tsv next to this directory.
+POPULAR_LIST = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "popular.tsv")
+
+
+def popular():
+    out = []
+    for line in open(POPULAR_LIST, encoding="utf-8"):
+        if not line.strip() or line.startswith("#") or line.startswith("name\t"):
+            continue
+        name, remote, ref, why = (line.rstrip("\n").split("\t") + [""] * 4)[:4]
+        out.append({"name": name, "ref": ref, "remote": remote, "platforms": [], "why": why})
+    return out
+
+
+def repos(eco, which):
+    """The repositories of a set: the main scheme's, or the popular list's."""
+    return popular() if which == "popular" else scheme(eco)
+
+
 def git(*args, cwd=None):
     return subprocess.run(["git"] + list(args), cwd=cwd, capture_output=True, text=True)
 
 
-def clone(eco):
-    for r in scheme(eco):
+def clone(eco, which="main"):
+    for r in repos(eco, which):
         dest = os.path.join(eco, r["name"])
         if r["name"] == "swift" or os.path.isdir(os.path.join(dest, ".git")):
             continue
@@ -117,16 +141,17 @@ def library_dirs(d):
     return dirs
 
 
-def survey(eco, out):
+def survey(eco, out, which="main"):
     rows = []
-    for r in scheme(eco):
+    for r in repos(eco, which):
         d = os.path.join(eco, r["name"])
         manifest = os.path.join(d, "Package.swift")
         if r["name"] == "swift" or not os.path.isfile(manifest):
             rows.append(dict(r, package=False))
             continue
-        first = open(manifest, encoding="utf-8", errors="replace").readline()
-        m = re.search(r"swift-tools-version\s*:\s*([\d.]+)", first)
+        # The first line, in every manifest but vapor's, which opens with an import.
+        head = "".join(open(manifest, encoding="utf-8", errors="replace").readlines()[:3])
+        m = re.search(r"//\s*swift-tools-version\s*:\s*([\d.]+)", head)
         libs = library_dirs(d)
         files, exported = [], []
         for dirpath, dirnames, fs in os.walk(d):
@@ -157,13 +182,22 @@ def survey(eco, out):
     json.dump(rows, open(out, "w"), indent=1)
     pk = [x for x in rows if x.get("package")]
     dz = [x for x in pk if x["darwinFiles"]]
-    print(f"survey: {len(rows)} repositories in the main scheme, {len(pk)} Swift packages, {len(dz)} import "
+    print(f"survey: {len(rows)} repositories ({SET_NAMES[which]}), {len(pk)} Swift packages, {len(dz)} import "
           f"Darwin in {sum(x['darwinFiles'] for x in dz)} files (lexical pre-scan) -> {out}")
 
 
-PACKAGE_FILE = """# {name}: generated by `Utilities/adopter-coverage/ecosystem.sh survey` from the
+SET_NAMES = {"main": "the main scheme", "popular": "popular packages beyond the toolchain"}
+
+HEADERS = {
+    "main": """# {name}: generated by `Utilities/adopter-coverage/ecosystem.sh survey` from the
 # swift repository's update-checkout main scheme ({remote} at {ref}). Edit it
-# by hand only to say what the generator can't know; see README.md here.
+# by hand only to say what the generator can't know; see README.md here.""",
+    "popular": """# {name}: generated by `Utilities/adopter-coverage/ecosystem.sh --popular
+# survey` from popular.tsv ({remote} at {ref}).
+# Edit it by hand only to say what the generator can't know; see README.md here.""",
+}
+
+PACKAGE_FILE = """{header}
 
 [package]
 title = {name}
@@ -174,15 +208,15 @@ in-all = no
 # The mapping has no entries for this package's interfaces: those it
 # doesn't name get entries of their own (see mapping.ini's header).
 strict = no
-note = One of the toolchain's packages ({remote}, {ref}).
+note = {note} ({remote}, {ref}).
 # Library targets only: the executables and tests aren't audited.
 build-targets = :libraries
 """
 
 
-def packages(survey_path, packages_dir):
+def packages(survey_path, packages_dir, which="main"):
     rows = json.load(open(survey_path))
-    d = os.path.join(packages_dir, "ecosystem")
+    d = os.path.join(packages_dir, "popular" if which == "popular" else "ecosystem")
     os.makedirs(d, exist_ok=True)
     made = []
     for r in rows:
@@ -192,7 +226,11 @@ def packages(survey_path, packages_dir):
         if os.path.exists(path):
             continue      # kept: it may have hand edits
         var = re.sub(r"\W", "_", r["name"]).upper()
-        open(path, "w").write(PACKAGE_FILE.format(name=r["name"], remote=r["remote"], ref=r["ref"], variable=var))
+        open(path, "w").write(PACKAGE_FILE.format(
+            header=HEADERS[which].format(name=r["name"], remote=r["remote"], ref=r["ref"]),
+            name=r["name"], remote=r["remote"], ref=r["ref"], variable=var,
+            note=f"A popular package beyond the toolchain: {r.get('why', '')}" if which == "popular"
+            else "One of the toolchain's packages"))
         made.append(r["name"])
     print(f"packages: {len(made)} new package files in {d}" + (": " + ", ".join(made) if made else ""))
 
@@ -290,7 +328,7 @@ def darwin_queue(run, results):
     return out
 
 
-def report(run_dir, results, survey_path, mapping, swiftshims_path, out_path):
+def report(run_dir, results, survey_path, mapping, swiftshims_path, out_path, which="main"):
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     import check
     import combine
@@ -315,19 +353,29 @@ def report(run_dir, results, survey_path, mapping, swiftshims_path, out_path):
     out = []
     w = out.append
     swift_commit = shims["swiftCommit"] if shims else "?"
-    w("# The toolchain's Swift packages: the Darwin module, and what swift-system covers")
-    w("")
-    w(f"Run `{run['id']}`: System `{run['systemCommit']}`, tool `{run['tool']}`. The packages are the Swift packages "
-      f"that swift's `utils/update_checkout/update-checkout-config.json` (swift `{swift_commit[:12]}`) clones for the "
-      "`main` branch scheme, at the scheme's refs, cloned shallowly next to the worktree (`ecosystem.sh clone`). "
-      "Those whose library code imports Darwin are audited with `check.sh`, from their own package files "
-      "(`packages/ecosystem/`, generated; the four audited adopters keep theirs). Where a package builds with the "
-      "installed toolchain (Swift 6.2) the extraction is the index store's; where it doesn't, it's lexical, and "
-      "labeled so.")
+    if which == "popular":
+        w("# Popular Swift packages beyond the toolchain: the Darwin module, and what swift-system covers")
+        w("")
+        w(f"Run `{run['id']}`: System `{run['systemCommit']}`, tool `{run['tool']}`. The packages are the "
+          "swift-server and swiftlang ecosystems' popular packages that `Utilities/adopter-coverage/popular.tsv` "
+          "lists, at its refs, cloned shallowly next to the worktree (`ecosystem.sh --popular clone`). Those whose "
+          "library code imports Darwin are audited with `check.sh`, from their own package files "
+          "(`packages/popular/`, generated). Where a package builds with the installed toolchain (Swift 6.2) the "
+          "extraction is the index store's; where it doesn't, it's lexical, and labeled so.")
+    else:
+        w("# The toolchain's Swift packages: the Darwin module, and what swift-system covers")
+        w("")
+        w(f"Run `{run['id']}`: System `{run['systemCommit']}`, tool `{run['tool']}`. The packages are the Swift "
+          f"packages that swift's `utils/update_checkout/update-checkout-config.json` (swift `{swift_commit[:12]}`) "
+          "clones for the `main` branch scheme, at the scheme's refs, cloned shallowly next to the worktree "
+          "(`ecosystem.sh clone`). Those whose library code imports Darwin are audited with `check.sh`, from their "
+          "own package files (`packages/ecosystem/`, generated; the four audited adopters keep theirs). Where a "
+          "package builds with the installed toolchain (Swift 6.2) the extraction is the index store's; where it "
+          "doesn't, it's lexical, and labeled so.")
     w("")
 
     # ------------------------------------------------------- the table
-    w("## Every Swift package in the main scheme")
+    w("## Every Swift package in " + ("the list" if which == "popular" else "the main scheme"))
     w("")
     w("*Darwin files*: library files that import Darwin in any form (the tool's count, from the manifest's library "
       "targets; for packages not audited, the lexical pre-scan's). *Via Foundation*: files that see Darwin only "
@@ -466,17 +514,17 @@ def main():
         for r in scheme(sys.argv[2]):
             print("\t".join([r["name"], r["ref"], r["remote"], ",".join(r["platforms"])]))
     elif cmd == "clone":
-        clone(sys.argv[2])
+        clone(*sys.argv[2:4])
     elif cmd == "survey":
-        survey(sys.argv[2], sys.argv[3])
+        survey(*sys.argv[2:5])
     elif cmd == "packages":
-        packages(sys.argv[2], sys.argv[3])
+        packages(*sys.argv[2:5])
     elif cmd == "specs":
         specs(sys.argv[2])
     elif cmd == "latest-run":
         sys.exit(latest_run(sys.argv[2], sys.argv[3]))
     elif cmd == "report":
-        report(*sys.argv[2:8])
+        report(*sys.argv[2:9])
     else:
         sys.exit(__doc__)
 

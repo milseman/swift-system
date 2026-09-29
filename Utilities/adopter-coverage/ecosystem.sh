@@ -8,6 +8,11 @@
 #   Utilities/adopter-coverage/ecosystem.sh report [RUN]   # the ecosystem report for a run (default: the latest
 #                                                           # ecosystem run)
 #
+# With --popular first, each command works on the popular packages beyond the
+# toolchain that popular.tsv lists instead: their survey is
+# ../ecosystem/survey-popular.json, their package files packages/popular/,
+# and their report a run's POPULAR.md.
+#
 # ADOPTER_COVERAGE_ECOSYSTEM names the clones' directory (default: ecosystem
 # next to this worktree). Clones are shallow and made once; the scheme's
 # refs decide what they check out.
@@ -21,13 +26,25 @@ REPO="$(git -C "$TOOL" rev-parse --show-toplevel)"
 ECO="$(abspath "${ADOPTER_COVERAGE_ECOSYSTEM:-$(dirname "$REPO")/ecosystem}")"
 RESULTS="$(abspath "${ADOPTER_COVERAGE_RESULTS:-$(dirname "$REPO")/coverage-results}")"
 
+SET=main
+SURVEY_NAME=survey.json
+REPORT_NAME=ECOSYSTEM.md
+if [ "${1:-}" = "--popular" ]; then
+  SET=popular
+  SURVEY_NAME=survey-popular.json
+  REPORT_NAME=POPULAR.md
+  shift
+fi
 cmd="${1:-}"
-[ -n "$cmd" ] || { sed -n '2,13p' "$0"; exit 1; }
+[ -n "$cmd" ] || { sed -n '2,18p' "$0"; exit 1; }
 shift
 
 case "$cmd" in
   clone)
     mkdir -p "$ECO"
+    if [ "$SET" = popular ]; then
+      exec python3 "$S/ecosystem.py" clone "$ECO" popular
+    fi
     if [ ! -d "$ECO/swift/.git" ]; then
       log "cloning swiftlang/swift (sparse: update-checkout's config, SwiftShims, the stdlib and runtime)"
       git clone --quiet --filter=blob:none --no-checkout --depth 1 https://github.com/swiftlang/swift.git "$ECO/swift"
@@ -39,26 +56,31 @@ case "$cmd" in
     fi
     python3 "$S/ecosystem.py" clone "$ECO" ;;
   survey)
-    python3 "$S/ecosystem.py" survey "$ECO" "$ECO/survey.json"
-    python3 "$S/ecosystem.py" packages "$ECO/survey.json" "$TOOL/packages" ;;
+    python3 "$S/ecosystem.py" survey "$ECO" "$ECO/$SURVEY_NAME" "$SET"
+    python3 "$S/ecosystem.py" packages "$ECO/$SURVEY_NAME" "$TOOL/packages" "$SET" ;;
   run)
-    [ -f "$ECO/survey.json" ] || fail "run \`ecosystem.sh survey\` first"
+    [ -f "$ECO/$SURVEY_NAME" ] || fail "run \`ecosystem.sh survey\` first"
     # shellcheck disable=SC2046
-    exec "$TOOL/check.sh" $(python3 "$S/ecosystem.py" specs "$ECO/survey.json") ;;
+    exec "$TOOL/check.sh" $(python3 "$S/ecosystem.py" specs "$ECO/$SURVEY_NAME") ;;
   report)
     run="${1:-}"
     if [ -z "$run" ]; then
-      run="$(python3 "$S/ecosystem.py" latest-run "$ECO/survey.json" "$RESULTS")" \
+      run="$(python3 "$S/ecosystem.py" latest-run "$ECO/$SURVEY_NAME" "$RESULTS")" \
         || fail "no stored run covers the ecosystem's packages; run \`ecosystem.sh run\`"
     fi
     dir="$(python3 "$S/results.py" resolve "$run" --results "$RESULTS")"
-    sys="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["systemCommit"])' "$dir/run.json")"
-    derived="$(ls -d "$RESULTS/systems/$sys"/*/derived.json | head -n 1)"
-    vocab="$(ls -t "$RESULTS"/vocab/*.json.gz | head -n 1)"
-    python3 "$S/swiftshims.py" "$ECO/swift" "$vocab" "$derived" "$dir/swiftshims.json"
-    python3 "$S/ecosystem.py" report "$dir" "$RESULTS" "$ECO/survey.json" "$TOOL/mapping.ini" "$dir/swiftshims.json" \
-      "$dir/ECOSYSTEM.md"
-    echo "$dir/ECOSYSTEM.md" ;;
+    shims="$dir/swiftshims.json"
+    if [ "$SET" = main ]; then
+      sys="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["systemCommit"])' "$dir/run.json")"
+      derived="$(ls -d "$RESULTS/systems/$sys"/*/derived.json | head -n 1)"
+      vocab="$(ls -t "$RESULTS"/vocab/*.json.gz | head -n 1)"
+      python3 "$S/swiftshims.py" "$ECO/swift" "$vocab" "$derived" "$shims"
+    else
+      shims="$dir/no-swiftshims.json"   # the standard library's section is the toolchain report's
+    fi
+    python3 "$S/ecosystem.py" report "$dir" "$RESULTS" "$ECO/$SURVEY_NAME" "$TOOL/mapping.ini" "$shims" \
+      "$dir/$REPORT_NAME" "$SET"
+    echo "$dir/$REPORT_NAME" ;;
   *)
     fail "unknown command $cmd; see $0" ;;
 esac

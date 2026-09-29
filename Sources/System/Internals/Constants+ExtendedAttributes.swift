@@ -17,6 +17,12 @@ internal var _XATTR_CREATE: CInt { XATTR_CREATE }
 
 @_alwaysEmitIntoClient
 internal var _XATTR_REPLACE: CInt { XATTR_REPLACE }
+
+@_alwaysEmitIntoClient
+internal var _XATTR_FINDERINFO_NAME: String { XATTR_FINDERINFO_NAME }
+
+@_alwaysEmitIntoClient
+internal var _XATTR_RESOURCEFORK_NAME: String { XATTR_RESOURCEFORK_NAME }
 #else
 // Linux's values, the same on every architecture. glibc declares them in an
 // enum that its Swift module doesn't include.

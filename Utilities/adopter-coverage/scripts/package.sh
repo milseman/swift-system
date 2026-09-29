@@ -109,7 +109,8 @@ else
     # either, so its extraction is lexical.
     have="$(swift --version 2>/dev/null | sed -n 's/.*Swift version \([0-9]*\.[0-9]*\).*/\1/p' | head -n 1)"
     if grep -q "is using Swift tools version" "$N/dump.log" && [ -n "$have" ]; then
-      sed -i '' "1s/swift-tools-version: *[0-9.]*/swift-tools-version:$have/" "$N/src/Package.swift"
+      # The first line, or the first three: vapor's main opens with an import.
+      sed -i '' "1,3s/swift-tools-version: *[0-9.]*/swift-tools-version:$have/" "$N/src/Package.swift"
       echo "the manifest's tools version, lowered to $have in the export" > "$C/tools-version-lowered"
       "${benv[@]}" swift package "${SWIFTPM[@]}" --package-path "$N/src" --scratch-path "$N/build" \
         ${PKG_BUILD_FLAGS[@]+"${PKG_BUILD_FLAGS[@]}"} dump-package > "$C/dump.json" 2> "$N/dump.log" \

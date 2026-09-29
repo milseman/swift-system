@@ -152,6 +152,10 @@ extension NetworkInterface {
     ///
     /// - Returns: The interface's name, or `nil` if no interface has this index.
     ///
+    /// The name can be as long as the C library's limit,
+    /// the size of the buffer this method passes;
+    /// the corresponding C constant is `IF_NAMESIZE`.
+    ///
     /// The corresponding C function is `if_indextoname`.
     @_alwaysEmitIntoClient
     public func name() throws(Errno) -> String? {

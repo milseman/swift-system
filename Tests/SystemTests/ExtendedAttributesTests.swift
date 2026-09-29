@@ -114,6 +114,14 @@ private struct ExtendedAttributesTests {
     }
   }
 
+  #if SYSTEM_PACKAGE_DARWIN
+  @available(System 199, *)
+  @Test func darwinsNames() {
+    #expect(ExtendedAttributeName.finderInfo == "com.apple.FinderInfo")
+    #expect(ExtendedAttributeName.resourceFork == "com.apple.ResourceFork")
+  }
+  #endif
+
   @available(System 199, *)
   @Test func aMissingFile() {
     #expect(throws: Errno.noSuchFileOrDirectory) {

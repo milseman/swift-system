@@ -7,16 +7,44 @@ everything here is built and tested on Darwin only.
 
 ## Queue
 
-The work list for toolchain packages to drop `import Darwin` in every form, kept current. Source: `ecosystem.sh
-report`'s *What the files that import Darwin still need* (section 25), which counts the interfaces that library files
+The work list for packages to drop `import Darwin` in every form, kept current. Source: the ecosystem report's
+*What the files that import Darwin still need* (section 25), which counts the interfaces that library files
 importing Darwin in any form but through Apple Foundation's re-export use, per symbol, with System's coverage on
-Darwin; grouped here into clusters and ranked by packages, then call sites. After step 0: run `6e784c6e7026-4676fb13`
-(System `6e784c6`, the 21 main-scheme packages that import Darwin): 756 interfaces, 567 covered, 131 gaps (24 in two
-or more packages).
+Darwin; grouped here into clusters and ranked by packages, then call sites. `ecosystem.sh report` writes it for the
+toolchain's packages, and `ecosystem.sh --popular report` for popular.tsv's (section 37). Counts are in the runs'
+reports and in STATUS.md, not here.
 
-Next: cluster 11. Resume from the first row not marked done. Latest re-rank: run `b64ee9f1591b-d229d468` (System
-`b64ee9f`): 756 interfaces, 615 covered, 78 gaps; set apart, 19 the standard library answers, 18 other modules' names,
-26 the packages' own shims.
+**Resume here** (stopped 2026-09-29, quota; STATUS.md regenerated at `145df6b`). Nothing is in progress; take the
+rows in order:
+
+| # | Item | For | Plan |
+|---|---|---|---|
+| B1 | `Errno.notCapable` (ENOTCAPABLE, 107) is in the macOS 26 SDK, but System declares it on FreeBSD only (Errno.swift, near line 1465); Samples/Beneath.swift works around it with `Errno(rawValue: ENOTCAPABLE)` | the foundation lane (Michael's ask) | widen the declaration's `#if` to Darwin, gated on the SDK if older SDKs lack it; a test; leave Beneath.swift to the demos lane |
+| B2 | Utilities/adopter-coverage/README.md still names `Utilities/nio-coverage/check.sh` (the bullet at line 58 since `9541436`), which the utilities merge retired | Michael's ask | drop the bullet |
+| M1 | New SYSTEM-GAP markers in `../adopters` (STATUS.md's gaps part lists them): swift-build's Mach-O file structures (mach_header, load_command, segment_command, section, fat_header, fat_arch, dylib_command, rpath_command, uuid_command, build_version_command, version_min_command), mach-o/utils.h's three functions, ar.h's archive header (ar_hdr, AR_EFMT1, SARMAG), MacTypes OSStatus, abort, off_t, vm_prot_t, `constants`; swift-docc's PIPE_BUF | swift-build, swift-docc | decide first: section 36 rejected Mach-O's header types as the MachO module's, which a file can import instead of Darwin; the markers ask anyway. OSStatus, off_t and vm_prot_t have `swift` answers already (sections 25, 31 and 37), so check what the markers say |
+| P3a | pthread_cancel (swift-distributed-actors' Concurrency/_Thread.swift) | popular.tsv's third batch, run `145df6bd3157-16fa0c4f` | PThread has no cancel: design it with the Threads API's conventions (section 32) |
+| P3b | `Comment` in swift-homomorphic-encryption's `_TestUtilities`: a test-support target the survey's pattern misses, read lexically | the same run | `skip._TestUtilities` in packages/popular/swift-homomorphic-encryption.ini, or widen ecosystem.py's test-support pattern to `_Test*` |
+
+Then: when the rows above are done, rerun `ecosystem.sh --popular run` and `report` to confirm the popular queue is
+empty, and decide whether popular.tsv needs a fourth batch. sqlite-nio's extraction takes minutes on each run,
+scanning its vendored SQLite; a `skip.CSQLite` would speed runs, but would drop SQLite's OS use from the package's
+table.
+
+The toolchain's queue has been empty since run `a3a634eb2b19-06a7ddd5` (section 37), and popular.tsv's first and
+second batches since sections 38 and 39. What follows is the toolchain's work, all done.
+
+Ahead of the ranked clusters, the adopters' own asks (Michael, 2026-09-29), in this order:
+
+| # | Ask | For | Plan |
+|---|---|---|---|
+| A1 | A public name for C's `struct dirent`: a CInterop alias with Swift-named accessors (decision 84) | TSC's public `extension dirent { var name }` (TSCBasic/FileSystem.swift:19) | done: `CInterop.DirectoryEntry` (section 34) |
+| A2 | A call that returns and clears the dynamic loader's pending error (dlerror) | TSC's deprecated public `dlerror()` (TSCUtility/dlopen.swift:20) | done: `DynamicLibrary.takePendingError()` (section 34) |
+| A3 | C-string argument and environment overloads of the C-values spawn and its `credentials:` form | Subprocess+Darwin.swift:618 | done (section 29) |
+| A4 | Adding a SpawnFileAction to C file actions that other code built (`inout CInterop.SpawnFileActions`) | Subprocess's configurator test (DarwinTests.swift:15-20) | done: `SpawnFileAction.add(to:)` (section 34) |
+| A5 | A DirectoryWalk option that opens a directory's stream when the walk goes into it, not when it reads the directory's entry; section 14's two corrections (on APFS an unreadable entry still has a type; fts's FTS_DNR also covers paths of PATH_MAX bytes or more) | Foundation's copy and link (its REPORT.md, "fts for copy and link: tried, kept") | done: `opening: .whenEntered`, corrections (section 35); one descriptor per level kept, a known difference |
+
+status.sh's `STILL_NEEDED` (section 34) counts an interface that System names as missing while a marker asks for more;
+dirent, dlerror and posix_spawn_file_actions_addchdir_np were, until A1, A2 and A4 landed.
 
 | # | Cluster | Packages | Sites | Interfaces | Plan |
 |---|---|---:|---:|---|---|
@@ -30,13 +58,13 @@ Next: cluster 11. Resume from the first row not marked done. Latest re-rank: run
 | 8 | MacTypes | 2 | 12 | OSStatus, UniChar, DarwinBoolean | done: `swift` answers (section 31) |
 | 9 | sysctl process information | 2 | 9 | kinfo_proc's fields, P_TRACED, extern_proc | done: `CInterop.KernelProcessInfo` (section 31) |
 | 10 | pthreads | 2 | 8 | pthread_attr_getstacksize, setdetachstate, setscope, PTHREAD_CREATE_DETACHED, PTHREAD_SCOPE_SYSTEM, pthread_exit, pthread_yield_np, the error-checking initializer | done: exit(), defaultStackSize(), static initializers, mapping (section 32) |
-| 11 | Signals | 2 | 7 | signal, SIG_ERR, SIG_UNBLOCK, sigprocmask, NSIG | check the processes lane's API |
-| 12 | Spawn attributes | 2 | 6 | posix_spawnattr_setpgroup, setsigdefault, setsigmask | check SpawnAttributes' docs |
-| 13 | Mounts and quotas | 2 | 6 | getfsstat, quotactl, SUBCMDMASK, SUBCMDSHIFT, getmntinfo_r_np | |
-| 14 | Extended attribute names | 2 | 4 | XATTR_FINDERINFO_NAME, XATTR_RESOURCEFORK_NAME | |
-| 15 | CPU types | 1 | 22 | cpu_type_t, cpu_subtype_t, CPU_TYPE_*, CPU_ARCH_ABI64 (swift-build) | |
-| 16 | wait | 1 | 17 | siginfo_t, id_t, idtype_t, CLD_*, waitid (Subprocess) | check ProcessWait |
-| 17 | One-package gaps | 1 each | 1-3 each | dladdr and Dl_info, backtrace, strtod and strtof, AT_FDONLY and AT_REALDEV, sysdir's enumeration state, getiopolicy_np, ATTR_BIT_MAP_COUNT, execv, getdtablesize | |
+| 11 | Signals | 2 | 7 | signal, SIG_ERR, SIG_UNBLOCK, sigprocmask, NSIG | done: docs, mapping (section 33) |
+| 12 | Spawn attributes | 2 | 6 | posix_spawnattr_setpgroup, setsigdefault, setsigmask | done: docs (section 33) |
+| 13 | Mounts and quotas | 2 | 6 | getfsstat, quotactl, SUBCMDMASK, SUBCMDSHIFT, getmntinfo_r_np | done: docs, mapping (section 33) |
+| 14 | Extended attribute names | 2 | 4 | XATTR_FINDERINFO_NAME, XATTR_RESOURCEFORK_NAME | done: `ExtendedAttributeName` (section 33) |
+| 15 | CPU types | 1 | 22 | cpu_type_t, cpu_subtype_t, CPU_TYPE_*, CPU_ARCH_ABI64 (swift-build) | done: `Mach.CPUType`, `CPUSubtype` (section 36) |
+| 16 | wait | 1 | 17 | siginfo_t, id_t, idtype_t, CLD_*, waitid (Subprocess) | done: enum cases' docs read, [wait] (section 36) |
+| 17 | One-package gaps | 1 each | 1-3 each | dladdr and Dl_info, backtrace, strtod and strtof, AT_FDONLY and AT_REALDEV, sysdir's enumeration state, getiopolicy_np, ATTR_BIT_MAP_COUNT, execv, getdtablesize | done (section 36) |
 
 Not counted, with the reason: the lexical scan's false positives (`index(after:)` read as strings.h's index;
 Float80) and other modules' names it can't place (Logger, NSDictionary, CFRunLoopStop), which mapping.ini should
@@ -44,7 +72,7 @@ say; the standard library's answers (off_t, ssize_t, size_t and uintptr_t are In
 memset; round, sqrt, ceil, floor, fabs, modf); Dispatch and ObjectiveC names; the packages' own C shims
 (CNIODarwin_*, c_nio_posix_*, _subprocess_*).
 
-Done: step 0, what the tools couldn't see (section 25); clusters 1 (section 26), 2 (section 27), 3 and 7 (section 28), 4 and 5 (section 30), 6, 8 and 9 (section 31), 10 (section 32); and Subprocess's new marker, C arrays for the C-values spawns (section 29). New SYSTEM-GAP markers in `../adopters` come first: status.sh lists them.
+Done: step 0, what the tools couldn't see (section 25); clusters 1 (section 26), 2 (section 27), 3 and 7 (section 28), 4 and 5 (section 30), 6, 8 and 9 (section 31), 10 (section 32), 11 to 14 (section 33), the asks A1 to A5 (sections 34 and 35), 15 to 17 (section 36); and Subprocess's new marker, C arrays for the C-values spawns (section 29). New SYSTEM-GAP markers in `../adopters` come first: status.sh lists them.
 
 ## 1. status.sh and STATUS.md (2026-09-28)
 
@@ -351,7 +379,10 @@ wrapping fts, which would reverse that decision.
   unopenable directory is visited once, with its error; `skipDescendants()` also skips the second visit.
   Rejected: fts's balancing of a skipped directory's visits, which makes callers read past an extra entry.
 - The other two needs were there: the caller has the root's path (the walk visits its entries); an unreadable
-  directory is an entry with `type == .directory` and an error, an unstat-able one has no type.
+  directory is an entry with `type == .directory` and an error, an unstat-able one has no type. (Corrected in
+  section 35: where a file system records types in its directories, as APFS does, an entry whose status can't be
+  read still has its type, since the walk doesn't read the status then, so fts's FTS_NS needs the caller's own
+  fstatat; and fts's FTS_DNR also covers a directory whose path is PATH_MAX bytes or longer, which the walk reads.)
 - status.py gains `ANSWERED`: fts names count as covered by DirectoryWalk once its two-visit order is in the
   sources, since no *corresponding C* sentence could truthfully name fts.
 
@@ -756,3 +787,218 @@ Tests: PThreadTests' `defaultStackSize` and `exitEndsTheThread`; PThreadMutexTes
 EDEADLK and EPERM for error checking, relocking the recursive mutex, a condition and a read-write lock). XCTest 555 (4
 skipped, and testVolumeAttributes skipped), swift-testing 471 in 74 suites, passing with `setCurrentQualityOfService`
 skipped (section 28).
+
+## 33. Signals, spawn attributes, mounts and quotas, xattr names: `470bf2c`, `52d74d3`
+
+Queue clusters 11 to 14 (two packages each).
+
+- **Signals**: swiftpm resets every signal with `signal()` from 1 to NSIG and unblocks them with `sigprocmask`;
+  swift-tools-protocols ignores SIGPIPE with `signal`. `SignalSet.all`, a sequence of every signal, `Signal`'s
+  `setAction(_:)` and `PThread.unblockSignals(_:)` do that; the mask calls now name SIG_SETMASK, SIG_BLOCK and
+  SIG_UNBLOCK, `unblockSignals` says it's sigprocmask's effect with one thread, and `SignalSet.all` names NSIG. In
+  mapping.ini, signal and SIG_ERR read as sigaction and sigprocmask as pthread_sigmask, and the notes that said System
+  has no signal API go.
+- **Spawn attributes**: `processGroup`, `signalMask` and `defaultSignals` named their functions "with the
+  POSIX_SPAWN_* flag", which the tools read as restricting each function to one use; the flags have sentences of
+  their own now. Rejected: rewording all 25 such sentences, most of which are real restrictions (fcntl with one
+  command).
+- **Mounts and quotas**: `StatFS.mountedFileSystems` named getfsstat "with MNT_NOWAIT, or with MNT_WAIT", read the
+  same way; getmntinfo and getmntinfo_r_np read as getfsstat; quotactl is covered for the commands Foundation uses
+  (Q_QUOTASTAT, Q_GETQUOTA), each form of which the tools read as restricted to its command, and DiskQuota names QCMD's
+  SUBCMDSHIFT and SUBCMDMASK.
+- **`ExtendedAttributeName`** (Darwin): `finderInfo` and `resourceFork` (XATTR_FINDERINFO_NAME,
+  XATTR_RESOURCEFORK_NAME), for Foundation's and swift-build's copies. Rejected: static members of FilePath, which the
+  names aren't about.
+
+Tests: ExtendedAttributesTests' `darwinsNames`. XCTest 555, swift-testing 472 in 74 suites, passing with
+`setCurrentQualityOfService` skipped.
+
+## 34. The adopters' asks: a dirent name, the pending loader error, adding to C file actions: `3b21234`, `f7b06e3`, `a3012f9`, `273f560`
+
+Michael's asks A1 to A4, ahead of the ranked clusters. A3, C-string arguments for the C-values spawns, was section 29.
+
+- **status.py** (`3b21234`): `STILL_NEEDED` lists interfaces that System's docs name but whose markers ask for more,
+  each with a witness in System's sources; until the witness is there, the interface counts as missing, with the
+  ask as the reason. dirent (DirectoryStream.Entry names it, but it's another type), dlerror (LoaderError names it,
+  but carries only the errors System throws) and posix_spawn_file_actions_addchdir_np (named for System's own C file
+  actions) went from covered to missing, and STATUS.md then showed 47 of 50 interfaces covered.
+- **`CInterop.DirectoryEntry`** (`f7b06e3`, A1): the alias for struct dirent, with Swift-named accessors
+  `fileName` (`FilePath.Component?`, nil only for an entry without a name, such as a zero one), `fileType` and
+  `inode`, for TSC's public `extension dirent { var name }`, which can now extend the alias and read `fileName`.
+  Rejected: `name` and `type`, DirectoryStream.Entry's names, since TSC's own public `dirent.name: String?` would make
+  every use ambiguous for a client importing both. The MemberImportVisibility probes read the accessors, and the
+  accessors probe gains section 31's kinfo_proc ones, which had none.
+- **`DynamicLibrary.takePendingError()`** (`a3012f9`, A2): dlerror, the calling thread's pending loader error, taken
+  and cleared, as a `LoaderError?`, for TSC's deprecated public `dlerror()`. `address(of:)` clears the pending
+  error before dlsym, so after a `nil` it's dlsym's reason. Rejected: `pendingError`, a property-like name for a
+  read that clears; `String?`, when LoaderError is what the other calls throw.
+- **`SpawnFileAction.add(to:)`** (`273f560`, A4): adds an action to `inout CInterop.SpawnFileActions` that other code
+  built, such as the ones Subprocess's `preSpawnProcessConfigurator` hands its closure, with the C call for the
+  action's kind and its error. Rejected: a static form over an array, which a loop is.
+
+Tests: DirectoryEntryTypeTests' `cEntryAccessors` (readdir's entries against Stat, the dot entries, a zero entry),
+DynamicLibraryTests' `takingThePendingError`, RawSpawnTests' `testAddingActionsToCFileActions` (/bin/pwd with a
+working directory, a duplicate and a close added to empty C file actions; an invalid close throws EBADF). XCTest
+556, swift-testing 474 in 74 suites, passing with `setCurrentQualityOfService` skipped. STATUS.md after these: every
+interface the markers name is covered again (48 of 48, as the adopters remove markers).
+
+## 35. DirectoryWalk's opening option, and section 14's corrections: `6666fbe`
+
+Michael's ask A5, for Foundation's copy and link, which keep fts. Foundation's REPORT.md ("fts for copy and link:
+tried, kept") compared the two in 382 runs: 366 identical, and 16 differing in two properties of DirectoryWalk. It
+opened a directory when it read the directory's entry, and Darwin's fdopendir reads the entries then, before the
+copy has handled the directory's first visit, so copying a directory into its own tree copied it as it was, where
+fts recursed until ENAMETOOLONG (12 runs); and it holds a descriptor per level, where fts with FTS_NOCHDIR holds
+none (4 runs, EMFILE at about level 250 under a 256-descriptor limit).
+
+- `DirectoryWalk.DirectoryOpening`: `.whenRead`, the default, as before, and `.whenEntered`, an `opening:` parameter
+  of both initializers. With `.whenEntered`, a walk opens a directory on the next call after the directory's first
+  visit, relative to its parent, unless `skipDescendants()` forgets it; one it can't open then gets a second visit,
+  marked `isPostorderVisit`, with the error, in place of its contents (fts's FTS_D and FTS_DNR). A postorder walk
+  opens a directory before its contents whichever the option. Rejected: a Bool parameter; throwing the open's error
+  from `next()`, which ends the walk's directory as a read error does, where fts goes on.
+- Kept, as Michael asked: one descriptor per level. The type's doc now names it as a known difference from fts,
+  with the other one: fts opens each directory by its path, so it reports a directory whose path is PATH_MAX bytes
+  or longer as FTS_DNR, which the walk reads.
+- Section 14's two corrections, made there: on a file system that records types in its directories, as APFS does,
+  an entry whose status can't be read still has its type (the walk reads the status only when the directory records
+  no type), so FTS_NS needs the caller's own fstatat; and FTS_DNR also covers paths of PATH_MAX bytes or more.
+
+Tests: DirectoryWalkVisitsTests' `openingWhenEnteredVisitsTheSame` (every order, and skipping),
+`openingWhenEnteredReadsWhatTheFirstVisitAdded` (a file created on a directory's first visit is walked with
+`.whenEntered`, and on Darwin not with `.whenRead`), `anUnreadableDirectoryWhenEntered` (both preorder orders: the two
+visits, the directory the error's visit is in, and skipping). XCTest 556 (4 skipped, and testVolumeAttributes
+skipped), swift-testing 477 in 74 suites, passing with `setCurrentQualityOfService` skipped (section 28).
+
+## 36. CPU types, wait, and the one-package gaps: `90b1273`, `d3f786a`, `ea3c54b`, `c36731b`, `73ea160`
+
+Queue clusters 15 to 17.
+
+- **CPU types** (`90b1273`, swift-build): `Mach.CPUType` (cpu_type_t) with `any`, `x86` (CPU_TYPE_X86 and its old name
+  CPU_TYPE_I386), `x86_64`, `arm`, `arm64`, `arm64_32`, and the 64-bit ABI bit (`has64BitABI`, `with64BitABI`,
+  `without64BitABI`); `Mach.CPUSubtype` (cpu_subtype_t) with `featureFlags` and `withoutFeatureFlags`
+  (CPU_SUBTYPE_MASK). SystemControl's `cpuType` and `cpuSubtype` keep their raw values, which these take. Rejected:
+  Mach-O's header types, which are the MachO module's.
+- **wait** (`d3f786a`, `ea3c54b`, Subprocess): System's `wait(for:)` and `waitForAnyChild` are waitid, with the state
+  change decoded; the tools missed it twice. The CLD_* codes shared sentences with the W* macros ("and the C constant
+  is"), and derive.py read no enum case's doc at all, since api-delta's scan lists no case (a case has no access
+  modifier): it now reads each public enum's own cases as the enum's (37 cases, 17 names, among them the W* macros and
+  PRIO_*). mapping.ini's [wait] is covered, since waitid's forms, each read as restricted to its idtype, take every
+  idtype together.
+- **One-package gaps** (`c36731b`, `73ea160`): `Stat.Flags.realDevice` and `.descriptorOnly` (AT_REALDEV, AT_FDONLY,
+  fstatat-only, for WasmKit; rejected: members of ResolutionFlags, which the other `*at` calls take);
+  `DynamicLibrary.symbolInfo(containing:)` (dladdr, for swift-build; Darwin only, since glibc declares it only with
+  _GNU_SOURCE; the nearest symbol can be an alias, such as `__getpid`); `CallStack`, provisionally (backtrace and
+  backtrace_symbols, for swift-corelibs-foundation's call-stack properties; Darwin only, musl has neither);
+  `IOPolicy` (getiopolicy_np and setiopolicy_np with kinds and scopes, a raw kind for swift-build's private case
+  sensitivity type); SearchPaths' iterator names sysdir_search_path_enumeration_state and getattrlist's forms
+  ATTR_BIT_MAP_COUNT (Foundation); strtod and strtof read as CLocale's `_l` forms, execv as execve, getdtablesize as
+  _SC_OPEN_MAX. swift-build's `vm_prot_t` and `USEC_PER_SEC` are its own declarations, which the scan reads as
+  Darwin's.
+
+Tests: MachCPUTypeTests (constants, the ABI bit, the host's type, feature flags), SmallDarwinGapsTest (the stat
+flags against fstat, dladdr, the call stack, a thread's disk policy, mocks). XCTest 561 (4 skipped, and
+testVolumeAttributes skipped), swift-testing 481 in 75 suites, passing with `setCurrentQualityOfService` skipped.
+
+## 37. The toolchain's queue is empty; popular packages beyond it: `4365a83`, `9541436`, `d3c7a3a`, `55841f0`
+
+The ecosystem run after section 36 left four gaps, all swift-build's, and `4365a83` mapped them: extern_proc and
+eproc read as kinfo_proc, whose kp_proc and kp_eproc CInterop.KernelProcessInfo's accessors read; dl_info is
+Dl_info's structure tag; USEC_PER_SEC and vm_prot_t, which swift-build declares only off Darwin, get the standard
+library's answers (Duration's units or the literal, and Int32).
+
+The toolchain's queue is now empty. In run `a3a634eb2b19-06a7ddd5` (System `a3a634e`), System covers on Darwin every
+interface that the toolchain's library files importing Darwin use, except the ones set apart: the standard
+library's answers, other modules' names, and the packages' own C shims. Its ECOSYSTEM.md has the counts. Step 4
+extends the survey:
+
+- `Utilities/adopter-coverage/popular.tsv` lists the packages beyond the toolchain, with why each is there. They're
+  cloned shallowly into `../ecosystem`, next to the toolchain's, each at `main`. The first batch has 21:
+  - swift-server's own: async-http-client (the HTTP client), swift-service-lifecycle (service lifecycle and signal
+    handling), swift-aws-lambda-runtime;
+  - the server APIs and a backend: swift-metrics, swift-distributed-tracing, swift-otel (OpenTelemetry);
+  - NIO's libraries beyond swift-nio: swift-nio-ssl, swift-nio-http2, swift-nio-extras,
+    swift-nio-transport-services, swift-nio-ssh;
+  - OpenAPI and gRPC: swift-openapi-generator, swift-openapi-runtime, swift-protobuf, grpc-swift-2,
+    grpc-swift-nio-transport;
+  - the web frameworks and their database client: vapor, hummingbird, postgres-nio;
+  - swiftlang's packages outside update-checkout's scheme: swiftly, swift-java.
+
+  Why these: they're the swift-server ecosystem's most used packages and the libraries under them, plus swiftlang's
+  packages that the toolchain doesn't clone. None is in the main scheme. Three import Darwin in no library file
+  (swift-nio-http2, swift-openapi-generator, swiftly), so they get no package file; the report's table lists them.
+- `ecosystem.sh --popular` (`9541436`) runs clone, survey, run and report over that list. Its survey is
+  `survey-popular.json`, its package files are generated into `packages/popular/`, and its report is a run's
+  POPULAR.md, without the standard library's section. Rejected: folding the list into the main scheme's survey,
+  which would mix the toolchain's figures with the others'.
+- Three packages don't build with Swift 6.2, so they're extracted lexically: vapor's main (Vapor 5, tools 6.4),
+  swift-aws-lambda-runtime's main (a Sendable conversion 6.2 rejects), and swift-java's JExtractSwiftLib.
+- The run needed two tool fixes. `d3c7a3a` lowers a newer tools version anywhere in the manifest's first three
+  lines, because vapor's opens with an import; it also cites DirectoryWalk's path initializer with section 35's
+  `opening:`, whose absence every run had reported as a cited declaration missing on the tip. `55841f0` makes the
+  Darwin metric count a lexical name that a site qualifies with Darwin (`Darwin.write`). That found
+  swift-aws-lambda-runtime's write and, in the toolchain, a calloc, both covered.
+
+Tests: the runs at `a3a634e`, the toolchain's and the popular set's.
+
+## 38. The popular packages' first queue: gai_strerror, IF_NAMESIZE, frexp, M_LOG2E: `a3a634e`
+
+The popular set's first run (at `d3c7a3a`) found four interfaces that its library files importing Darwin use and
+System didn't cover on Darwin, each in one package:
+
+- **gai_strerror** (grpc-swift-nio-transport's DNS resolver): `AddressResolutionError.message` calls it, and now
+  says so.
+- **IF_NAMESIZE** (grpc-swift-nio-transport sizes an if_indextoname buffer with it, for an IPv6 scope's name):
+  `NetworkInterface.Index.name()` now says its buffer is IF_NAMESIZE bytes, as `reverseLookup` says of NI_MAXHOST
+  and NI_MAXSERV. The call spares its caller both.
+- **frexp and M_LOG2E** (swift-otel's exponential histogram): the standard library answers both. mapping.ini's
+  `[floating-point parts]` gives frexp as `significand / 2` and `exponent + 1` for a finite, nonzero value, which
+  is how the Darwin overlay's own frexp computes it. `[math constants]` gives M_LOG2E as the literal. Math's doc
+  now names the frexp conversion next to the other standard-library answers. Rejected: `Math.frexp`, and math.h's
+  M_ constants as Math members, each for one call site the standard library already answers.
+
+After this commit the popular set's queue is empty too (run `a3a634eb2b19-67e0cd30`).
+
+Tests: SocketAddressResolutionTests, the first tests of `SocketAddress.resolve`. A numeric host and service
+resolve to the loopback address and port, and a non-numeric host under `.numericHost` fails with EAI_NONAME and
+gai_strerror's message. The full suite passes with testVolumeAttributes skipped.
+
+## 39. The popular list's second batch, and its queue: getline, MAP_FILE, timespec_get: `7a5b6bc`, `6953d40`
+
+With the first batch's queue empty, `7a5b6bc` adds 25 more swift-server ecosystem packages to popular.tsv, each at
+`main`:
+
+- the database and cache clients: RediStack, valkey-swift, swift-memcache-gsoc, swift-cassandra-client, MongoKitten,
+  mysql-nio, sqlite-nio, fluent-kit;
+- the metrics API's backends: swift-prometheus, swift-statsd-client;
+- messaging: swift-kafka-client, mqtt-nio, APNSwift;
+- the rest: soto-core (the AWS SDK's core), swift-profile-recorder (the in-process sampling profiler),
+  swift-configuration, swift-http-types, swift-async-dns-resolver, swift-nio-imap, websocket-kit, swift-websocket,
+  jwt-kit, swift-openapi-async-http-client, swift-webauthn, swift-container-plugin.
+
+Eight of them import Darwin in library code: soto-core, swift-prometheus, swift-memcache-gsoc, valkey-swift,
+swift-profile-recorder, swift-configuration, swift-nio-imap and sqlite-nio. The report's per-package table is much
+larger than the queue. It counts every platform and the packages' C targets, which is where swift-profile-recorder's
+sampler and sqlite-nio's vendored SQLite do their OS work. The queue counts only what Swift files importing Darwin
+use on Darwin.
+
+Their queue (run `7a5b6bcd3804-48fa9ade`) had four gaps, in two packages, and `6953d40` closes them:
+
+- **getline** (swift-profile-recorder reads its sampler's messages from a stream, line by line):
+  `FileStream.readLine(strippingNewline:)`. It reads any stream the way the standard library's
+  `readLine(strippingNewline:)` reads the standard input, and has its name and parameter: the line is decoded as
+  UTF-8 with invalid bytes repaired, the newline (and a carriage return before it) is stripped by default, and the
+  end of the file is `nil`. A failure throws without retrying, as FileStream's other reads do; the stream's error
+  indicator is set. Rejected: a bytes result, and reusing a caller's buffer across calls as getline can, since the
+  adopter decodes each line.
+- **MAP_FILE** (swift-profile-recorder maps an image with `MAP_FILE|MAP_PRIVATE`): `MemoryMapping(file:)` now says
+  a file mapping needs no option, and that MAP_FILE is zero.
+- **timespec_get and TIME_UTC** (swift-memcache-gsoc's timestamps): `ClockID.currentTimeSpec()` now says they give
+  realtime's reading.
+- `system_free` moves to Exports.swift. It was in Syscalls+PathsAndFiles.swift, which WASI doesn't compile, and
+  FileStream, which now calls it, exists on WASI.
+
+Tests: ProvisionalStdioTest's `testReadingLines` covers lines with and without a newline, CRLF, an empty line, a
+line longer than getline's first buffer, a NUL byte, an invalid UTF-8 byte, the end of the file, and a write-only
+stream's EBADF. The getline mock case is new too. SmallGapsTest checks timespec_get against realtime, and checks
+that MAP_FILE is zero. The full suite passes with testVolumeAttributes skipped.

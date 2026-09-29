@@ -68,6 +68,7 @@ target_sources(SystemPackage PRIVATE
 target_sources(SystemPackage PRIVATE
   ClockTime/ClockTime.swift)
 target_sources(SystemPackage PRIVATE
+  Directories/CInterop+DirectoryEntry.swift
   Directories/DirectoryStream.swift
   Directories/DirectoryWalk.swift)
 target_sources(SystemPackage PRIVATE
@@ -180,6 +181,8 @@ target_sources(SystemPackage PRIVATE
   Internals/Constants+Limits.swift
   Limits/CompileTimeLimits.swift)
 target_sources(SystemPackage PRIVATE
+  MachCPU/MachCPUType.swift)
+target_sources(SystemPackage PRIVATE
   Internals/Syscalls+MachTime.swift
   MachTime/MachTime.swift)
 target_sources(SystemPackage PRIVATE
@@ -239,6 +242,7 @@ target_sources(SystemPackage PRIVATE
   Internals/Syscalls+ProvisionalLocale.swift
   Internals/Syscalls+ProvisionalMath.swift
   Provisional/Provisional+CType.swift
+  Provisional/Provisional+Execinfo.swift
   Provisional/Provisional+Locale.swift
   Provisional/Provisional+Math.swift
   Provisional/Provisional+POSIXErrorCode.swift
@@ -323,6 +327,7 @@ target_sources(SystemPackage PRIVATE
 target_sources(SystemPackage PRIVATE
   Internals/Constants+TimersAndPriority.swift
   Internals/Syscalls+TimersAndPriority.swift
+  TimersAndPriority/IOPolicy.swift
   TimersAndPriority/ProcessPriority.swift
   TimersAndPriority/ProcessTimer.swift)
 target_sources(SystemPackage PRIVATE

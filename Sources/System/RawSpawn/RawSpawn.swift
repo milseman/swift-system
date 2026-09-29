@@ -126,6 +126,35 @@ extension SpawnFileAction {
   }
 }
 
+@available(System 199, *)
+extension SpawnFileAction {
+  /// Adds the action to the end of C file actions that other code built,
+  /// such as the ones that a pre-spawn configurator gets.
+  ///
+  /// - Parameter cFileActions: C file actions that
+  ///   `posix_spawn_file_actions_init` initialized.
+  ///
+  /// This method throws the error of an action that the system rejects,
+  /// such as ``Errno/noFunction`` where the C library lacks
+  /// ``setWorkingDirectory(_:)-(FilePath)``'s call.
+  ///
+  /// The corresponding C functions are `posix_spawn_file_actions_addopen`,
+  /// `posix_spawn_file_actions_adddup2`, `posix_spawn_file_actions_addclose`,
+  /// `posix_spawn_file_actions_addchdir`, `posix_spawn_file_actions_addchdir_np`,
+  /// `posix_spawn_file_actions_addfchdir`, `posix_spawn_file_actions_addfchdir_np`,
+  /// and on Darwin `posix_spawn_file_actions_addinherit_np`, one for each kind of action.
+  @_alwaysEmitIntoClient
+  public func add(to cFileActions: inout CInterop.SpawnFileActions) throws(Errno) {
+    try _add(toCFileActions: &cFileActions).get()
+  }
+
+  @usableFromInline
+  internal func _add(toCFileActions cFileActions: inout CInterop.SpawnFileActions) -> Result<(), Errno> {
+    let result = _add(to: &cFileActions)
+    return result == 0 ? .success(()) : .failure(Errno(rawValue: result))
+  }
+}
+
 // MARK: - Their flags
 
 @available(System 199, *)

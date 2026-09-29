@@ -78,4 +78,20 @@ internal func system_setpriority(_ which: CInt, _ who: id_t, _ priority: CInt) -
   return setpriority(numericCast(which), who, priority)
 }
 
+#if SYSTEM_PACKAGE_DARWIN
+internal func system_getiopolicy_np(_ type: CInt, _ scope: CInt) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(type, scope) }
+#endif
+  return getiopolicy_np(type, scope)
+}
+
+internal func system_setiopolicy_np(_ type: CInt, _ scope: CInt, _ policy: CInt) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(type, scope, policy) }
+#endif
+  return setiopolicy_np(type, scope, policy)
+}
+#endif
+
 #endif // !os(Windows) && !os(WASI)

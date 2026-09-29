@@ -1,0 +1,70 @@
+# Popular Swift packages beyond the toolchain, for ecosystem.sh --popular: the
+# swift-server and swiftlang ecosystems' most used packages, and the libraries
+# they're built on. One per line: name, GitHub repository, ref (a tag or
+# branch), and why it's here. The survey audits those whose library code
+# imports Darwin. The first batch runs to swift-java; the second, from
+# RediStack, and the third, from swift-distributed-actors, came when the
+# batch before ran out (Prototype/Status/REPORT.md, sections 37 and 39).
+name	remote	ref	why
+async-http-client	swift-server/async-http-client	main	the swift-server HTTP client
+swift-service-lifecycle	swift-server/swift-service-lifecycle	main	swift-server's service lifecycle, signal handling
+swift-aws-lambda-runtime	swift-server/swift-aws-lambda-runtime	main	swift-server's AWS Lambda runtime
+swift-metrics	apple/swift-metrics	main	the server metrics API
+swift-distributed-tracing	apple/swift-distributed-tracing	main	the server tracing API
+swift-nio-ssl	apple/swift-nio-ssl	main	NIO's TLS
+swift-nio-http2	apple/swift-nio-http2	main	NIO's HTTP/2
+swift-nio-extras	apple/swift-nio-extras	main	NIO's extra handlers
+swift-nio-transport-services	apple/swift-nio-transport-services	main	NIO on Network.framework
+swift-nio-ssh	apple/swift-nio-ssh	main	NIO's SSH
+swift-openapi-generator	apple/swift-openapi-generator	main	the OpenAPI generator
+swift-openapi-runtime	apple/swift-openapi-runtime	main	the OpenAPI runtime
+swift-protobuf	apple/swift-protobuf	main	Protocol Buffers
+grpc-swift-2	grpc/grpc-swift-2	main	gRPC's core library
+grpc-swift-nio-transport	grpc/grpc-swift-nio-transport	main	gRPC's NIO transport
+vapor	vapor/vapor	main	the Vapor web framework
+postgres-nio	vapor/postgres-nio	main	the PostgreSQL client
+hummingbird	hummingbird-project/hummingbird	main	the Hummingbird web framework
+swift-otel	swift-otel/swift-otel	main	OpenTelemetry for the server API
+swiftly	swiftlang/swiftly	main	swiftlang's toolchain installer
+swift-java	swiftlang/swift-java	main	swiftlang's Java interoperability
+RediStack	swift-server/RediStack	main	the Redis client
+APNSwift	swift-server-community/APNSwift	main	Apple push notifications from servers
+soto-core	soto-project/soto-core	main	the AWS SDK's core
+swift-prometheus	swift-server/swift-prometheus	main	Prometheus for the metrics API
+swift-statsd-client	apple/swift-statsd-client	main	StatsD for the metrics API
+swift-kafka-client	swift-server/swift-kafka-client	main	the Kafka client
+swift-cassandra-client	apple/swift-cassandra-client	main	the Cassandra client
+swift-memcache-gsoc	swift-server/swift-memcache-gsoc	main	the memcached client
+valkey-swift	valkey-io/valkey-swift	main	the Valkey client
+MongoKitten	orlandos-nl/MongoKitten	main	the MongoDB client
+swift-profile-recorder	apple/swift-profile-recorder	main	the in-process sampling profiler for services
+swift-configuration	apple/swift-configuration	main	the configuration API
+swift-http-types	apple/swift-http-types	main	HTTP's currency types
+swift-async-dns-resolver	apple/swift-async-dns-resolver	main	the DNS resolver
+swift-nio-imap	apple/swift-nio-imap	main	NIO's IMAP
+mqtt-nio	swift-server-community/mqtt-nio	main	the MQTT client
+mysql-nio	vapor/mysql-nio	main	the MySQL client
+sqlite-nio	vapor/sqlite-nio	main	the SQLite client
+websocket-kit	vapor/websocket-kit	main	Vapor's WebSockets
+fluent-kit	vapor/fluent-kit	main	Vapor's ORM
+jwt-kit	vapor/jwt-kit	main	JSON Web Tokens
+swift-openapi-async-http-client	swift-server/swift-openapi-async-http-client	main	OpenAPI's HTTP client transport
+swift-webauthn	swift-server/swift-webauthn	main	WebAuthn
+swift-container-plugin	apple/swift-container-plugin	main	container images from SwiftPM
+swift-websocket	hummingbird-project/swift-websocket	main	Hummingbird's WebSockets
+swift-distributed-actors	apple/swift-distributed-actors	main	the cluster actor system
+swift-cluster-membership	apple/swift-cluster-membership	main	SWIM cluster membership
+swift-service-context	apple/swift-service-context	main	the tracing API's context propagation
+swift-homomorphic-encryption	apple/swift-homomorphic-encryption	main	homomorphic encryption for servers
+pkl-swift	apple/pkl-swift	main	Pkl configuration bindings
+swift-http-server	swift-server/swift-http-server	main	swift-server's HTTP server
+swift-aws-lambda-events	swift-server/swift-aws-lambda-events	main	the Lambda runtime's event types
+swift-openapi-lambda	swift-server/swift-openapi-lambda	main	OpenAPI's Lambda transport
+swift-openapi-urlsession	apple/swift-openapi-urlsession	main	OpenAPI's URLSession transport
+postgres-kit	vapor/postgres-kit	main	Vapor's PostgreSQL driver
+redis	vapor/redis	main	Vapor's Redis
+queues	vapor/queues	main	Vapor's job queues
+hummingbird-auth	hummingbird-project/hummingbird-auth	main	Hummingbird's authentication
+swift-jobs	hummingbird-project/swift-jobs	main	Hummingbird's job queues
+swift-docc-plugin	swiftlang/swift-docc-plugin	main	swiftlang's DocC plugin
+swift-evolution-metadata-extractor	swiftlang/swift-evolution-metadata-extractor	main	swiftlang's evolution metadata tool

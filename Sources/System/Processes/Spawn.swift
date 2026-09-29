@@ -54,8 +54,8 @@ public struct SpawnAttributes: Hashable, Sendable {
   /// The process group to put the child in,
   /// or `nil` for the parent's group.
   ///
-  /// The corresponding C function is `posix_spawnattr_setpgroup`,
-  /// with the `POSIX_SPAWN_SETPGROUP` flag.
+  /// The corresponding C function is `posix_spawnattr_setpgroup`.
+  /// The corresponding C constant is `POSIX_SPAWN_SETPGROUP`, the flag that it sets.
   public var processGroup: ProcessGroup?
 
   /// The signals for the child to block,
@@ -63,8 +63,8 @@ public struct SpawnAttributes: Hashable, Sendable {
   ///
   /// The default is none.
   ///
-  /// The corresponding C function is `posix_spawnattr_setsigmask`,
-  /// with the `POSIX_SPAWN_SETSIGMASK` flag.
+  /// The corresponding C function is `posix_spawnattr_setsigmask`.
+  /// The corresponding C constant is `POSIX_SPAWN_SETSIGMASK`, the flag that it sets.
   public var signalMask: SignalSet?
 
   /// The signals for the child to take the default action for,
@@ -78,8 +78,8 @@ public struct SpawnAttributes: Hashable, Sendable {
   /// The system skips the signals that no process can change,
   /// so ``SignalSet/all`` resets every signal that it can.
   ///
-  /// The corresponding C function is `posix_spawnattr_setsigdefault`,
-  /// with the `POSIX_SPAWN_SETSIGDEF` flag.
+  /// The corresponding C function is `posix_spawnattr_setsigdefault`.
+  /// The corresponding C constant is `POSIX_SPAWN_SETSIGDEF`, the flag that it sets.
   public var defaultSignals: SignalSet?
 
   #if SYSTEM_PACKAGE_DARWIN

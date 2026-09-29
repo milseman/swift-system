@@ -73,6 +73,9 @@ public struct SearchPaths: Sequence, Hashable, Sendable {
   }
 
   /// An iterator over the paths of a directory.
+  ///
+  /// The corresponding C type is `sysdir_search_path_enumeration_state`,
+  /// the iterator's state.
   @frozen
   public struct Iterator: IteratorProtocol {
     @usableFromInline
