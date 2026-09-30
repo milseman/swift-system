@@ -64,6 +64,7 @@ loadavg() { sysctl -n vm.loadavg | tr -d '{}' | awk '{print $1, $2, $3}'; }
 freegb() { df -g "$ROOT" | awk 'NR == 2 {print $4}'; }
 (while sleep 60; do echo "$(date +%T) $(loadavg)"; done) > "$RUN/load.txt" &
 sampler=$!
+disown "$sampler"   # no "Terminated" line when it's stopped
 trap 'kill $sampler 2>/dev/null || true' EXIT
 {
   echo "run: $NAME ($(date '+%F %T')); tool: $tool; base $BASE_REF, head $HEAD_REF"

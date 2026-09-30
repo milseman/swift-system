@@ -4,57 +4,35 @@ Lane `api-graph-speed`, base `3f9f9e1` (system-next), merged with system-next `6
 
 ## Resume here
 
-Stopped 2026-09-30, waiting for a permission rule. The auto mode classifier denied the lane's runs twice before Michael approved them in chat, and denied b1 again after he did: the classifier goes by permission rules, not by the conversation. Every remaining step needs these runs.
+2026-09-30: step 1 is measured and checked; step 2's measurements are next. The runs go through now, since Michael put the allow rules this report proposed into the worktree's `.claude/settings.local.json`. Before that, the auto mode classifier had denied three runs, one of them after Michael approved them in chat, because it goes by allow rules, not by the conversation.
 
 **Committed:**
-- `943c479`: the merge of system-next `6a9833f` (coverage-2: `Utilities/adopter-coverage` and `Prototype/Status` only). It touched none of this lane's files, so it went in over the uncommitted step 1 work, without a WIP commit.
-- `f12d631`: step 1, and the measurement tools `pin.sh`, `measure.sh`, `summarize.sh` and `compare.py`.
-- `ae57686`: step 2, and `check_builds.py`.
-- `279c229`: the scratch commit for c, which rewords one comment in `Syscalls.swift`, so its Sources differ from 3f9f9e1's by that line. `cdb9e87` reverts it. The measurements keep using `279c229` as a head commit.
-- `2c474b4`: the merge of system-next `4365f83` (windows-api and others, which change Sources). It came after the scratch commit, so that commit's Sources are still 3f9f9e1's plus one comment. Its Utilities changes don't touch anything the api-graph tool reads: `derive.py`, `check.py`, `pathdeps.py`, `package.py` and `packages/` are unchanged.
-- `e4a2730`: `measure.sh NAME [COMMIT] [VAR=value ...]`. Settings go as arguments, so that every run's command starts with the script.
+- `943c479`: the merge of system-next `6a9833f`.
+- `f12d631`: step 1, with `pin.sh`, `measure.sh`, `summarize.sh` and `compare.py`.
+- `ae57686`: step 2, with `check_builds.py`.
+- `279c229`: the scratch commit for c. It rewords one comment in `Syscalls.swift`, so its Sources differ from 3f9f9e1's by that line. `cdb9e87` reverts it, and the measurements keep using `279c229` as a head commit.
+- `2c474b4`: the merge of system-next `4365f83`. It came after the scratch commit, so that commit's Sources are still 3f9f9e1's plus one comment. None of the merge's Utilities changes touch what the api-graph tool reads.
+- `e4a2730`: `measure.sh NAME [COMMIT] [VAR=value ...]`, so that every run's command starts with the script.
 
-**Uncommitted in the working tree:** step 3, parallel builds (`adopters.py`, `regenerate.sh`, `README.md`, `method.md` decision 39). It passes `bash -n`, `py_compile` and pyflakes, but it has never run.
+**Uncommitted in the working tree:** step 3, parallel builds (`adopters.py`, `regenerate.sh`, `README.md`, `method.md` decision 39). It has never run.
 
-**Denied** ("Blocked by fast classifier"). None of these was retried in another form:
-1. `API_GRAPH_KEEP_WORK=1 Prototype/ApiGraphSpeed/measure.sh b1-step1 .build/speed/tools/step1`: the b run for step 1, with a copy of the step 1 tool in `.build`.
-2. `python3 Prototype/ApiGraphSpeed/check_builds.py .build/speed/check-builds`: the rerun that checks the step 2 fix.
-3. After the approval in chat, `Prototype/ApiGraphSpeed/measure.sh b1 f12d631`.
+**Done:** `check_builds.py` passes all 16 checks, the fix included; b1 and c1 match the baseline (step 1, below).
 
-Earlier in the session, `measure.sh a-old HEAD` (the 23-minute baseline) and the first `check_builds.py` run went through. The runs need allow rules, which are the user's to add, in this worktree's `.claude/settings.local.json` (ignored by git):
-
-```json
-{
-  "permissions": {
-    "allow": [
-      "Bash(Prototype/ApiGraphSpeed/measure.sh:*)",
-      "Bash(python3 Prototype/ApiGraphSpeed/check_builds.py:*)",
-      "Bash(python3 Prototype/ApiGraphSpeed/compare.py:*)"
-    ]
-  }
-}
-```
-
-**Next, once they're allowed:**
-1. `python3 Prototype/ApiGraphSpeed/check_builds.py .build/speed/check-builds`. Expect every check to pass, including the build against the other System commit, which failed before the fix.
-2. b and c for step 1, then the comparison with the baseline's snapshot:
-   - `measure.sh b1 f12d631`: 3f9f9e1 with the baseline's cache. Expect all 18 reused, and their entries upgraded.
-   - `measure.sh c1 f12d631 HEAD_REF=279c229`: expect all 18 revalidated.
-   - `compare.py .build/speed/runs/a-old/out/graph.json.gz .build/speed/runs/<run>/out/graph.json.gz` for each run.
-3. Step 2:
-   - `measure.sh s2-cold ae57686 API_GRAPH_CACHE=<fresh>`, which fills `.build/speed/builds`.
-   - Then `measure.sh s2-incr ae57686 API_GRAPH_CACHE=<same> API_GRAPH_ADOPTER_VALIDATE=tree HEAD_REF=279c229`: a forced rebuild, incremental. That's what step 2 buys. Report the builds directory's size.
-4. Step 3, the working tree's tool:
+**Next:**
+1. Step 2:
+   - `measure.sh s2-cold ae57686 API_GRAPH_CACHE=.build/speed/cache-s2`, cold, which fills `.build/speed/builds`.
+   - `measure.sh s2-incr ae57686 API_GRAPH_CACHE=.build/speed/cache-s2 API_GRAPH_ADOPTER_VALIDATE=tree HEAD_REF=279c229`: every migration rebuilt, incrementally.
+   - Compare both with the baseline, and record the builds directory's size.
+2. Step 3, the working tree's tool:
    - The cold case with `API_GRAPH_ADOPTER_JOBS=4`, then `=18`, each with a fresh cache and builds directory. Commit step 3 after the first one passes.
-   - Then (b), nothing changed, and (c), `HEAD_REF=279c229`.
-   - Update the README's "Run time".
-5. At the stop, delete `.build/speed` and `${TMPDIR}api-graph-speed`. The exception is a persistent builds directory: keep it, and say where it is and how big.
+   - Then (b), nothing changed, and (c), `HEAD_REF=279c229`. Update the README's "Run time".
+3. At the stop, delete `.build/speed` and `${TMPDIR}api-graph-speed`, except a persistent builds directory, whose place and size go here.
 
-**Kept for those runs** (scratch; delete it all if the lane stops here):
-- `.build/speed/cache`: the baseline's old-format entries for 3f9f9e1's tree, which b1 upgrades.
-- `.build/speed/runs/a-old/out`: the baseline's output and snapshot, which `compare.py` compares against.
+**Scratch in use:**
+- `.build/speed/cache`: the baseline's entries, upgraded by b1.
+- `.build/speed/runs/*/out`: the runs' outputs and snapshots. `compare.py` compares against `a-old`'s.
 - `.build/speed/snapshots`.
-- `${TMPDIR}api-graph-speed`: the pinned inputs, as APFS clones that take almost no disk. The cache keys hold the pinned adopters' absolute paths, so a pin made anywhere else would miss the cache.
+- `${TMPDIR}api-graph-speed`: the pinned inputs, as APFS clones, almost no disk. The cache keys hold the pinned adopters' absolute paths, so a pin anywhere else would miss the cache.
 
 ## Measurement setup
 
@@ -73,7 +51,7 @@ Earlier in the session, `measure.sh a-old HEAD` (the 23-minute baseline) and the
   - The body is one bash block, so editing the script during a run can't change the run. An edit during the baseline broke its summary step, not the run itself, and that summary was rebuilt from the log.
 - The Sources and manifest of 3f9f9e1 and of system-next's tip, 6a9833f, are the same.
 
-## Step 1: validate cached indexes instead of keying on System's tree (committed `f12d631`; b and c pending)
+## Step 1: validate cached indexes instead of keying on System's tree (committed `f12d631`; measured)
 
 **What:**
 - The cache key no longer includes System's tree.
@@ -105,7 +83,19 @@ Earlier in the session, `measure.sh a-old HEAD` (the 23-minute baseline) and the
   - Load: 28.7 at the start. The one-minute averages, sampled each minute, had a median of 44.5 (min 23.7, max 90.7, mean 47.4).
   - The previous session's (a), with eee1da2's cache, took 29 min 9 s at a load of 11 to 45.
   - It exited 0, so it's also the "before" api-graph check.
-- (b) and (c): pending (denied).
+- (b), the step 1 tool (`f12d631`) on 3f9f9e1 with the baseline's cache.
+  - 221.1 s wall (3 min 41 s); user 387 s, sys 94 s. The adopters step took 82 s.
+  - All 18 migrations were reused ("built against this System tree, by the previous version of this tool"). Each entry was upgraded to the new format, a second file beside the old one.
+  - Load: 61.0 at the start and 47.5 at the end; the per-minute mean was 57.5.
+- (c), the step 1 tool on `279c229`, which differs from 3f9f9e1 by one comment under Sources.
+  - 287.2 s wall (4 min 47 s); user 397 s, sys 100 s. The adopters step took 95 s.
+  - All 18 migrations were revalidated. swift-nio, for one: "its 516 System declarations are unchanged".
+  - Load: 47.5 at the start and 68.2 at the end; the per-minute mean was 76.1, max 109. System's own indexed build took 117 s under that load, against 73 s in b1.
+  - With the old tool, (c) is (a), a full rebuild: 1375.8 s.
+- Both runs' adopter links are identical to the baseline's (`compare.py`): every `usedBy` and `calls` link, with its sites, and every hunk.
+- What step 1 bought: after a change under Sources that leaves the declarations alone, 287 s instead of 1376 s, 4.8 times faster, and nothing is built.
+  - With nothing to build, the adopters step's time is about a third site extraction for the 18 migrations (31 s in c1) and two thirds the would-benefit scan of 99 packages (64 s). That scan is outside this lane's steps.
+  - The rest of the run is fixed costs, mostly api-delta and System's indexed build: 75 to 120 s, depending on load.
 
 ## Step 2: persistent per-adopter build directories (committed `ae57686`)
 
@@ -137,17 +127,21 @@ Earlier in the session, `measure.sh a-old HEAD` (the 23-minute baseline) and the
 - Its package-structure check covers only the root packages' targets.
 - Against a System commit without a file the last build compiled, the build failed with "couldn't build …/SystemPackage.build/sources because of missing inputs".
 - A file System adds would be left out of the build silently.
-- The fix is to date the root manifests now before an incremental build, which makes SwiftPM plan again. Its check is the denied rerun.
+- The fix is to date the root manifests now before an incremental build, which makes SwiftPM plan again. The rerun below confirms it.
 
-**Check** (`check_builds.py`, first run; the load at its start was 17.5, 26.9 and 34.7 over 1, 5 and 15 minutes). The references were the same in every build that indexed. The two build directories took 583 MB.
+**Check** (`check_builds.py`). The references were the same in every build that indexed.
+- First run, before the fix. The load at its start was 17.5, 26.9 and 34.7 over 1, 5 and 15 minutes. The two build directories took 583 MB.
+- Rerun, with the fix. The load was 83.3 at the start and 68.1 at the end. It passed all 16 checks, and the build directories took 582 MB.
 
-| Build | swift-log | swift-driver |
-|---|---|---|
-| cold, kept | 16 s | 49 s |
-| again, nothing changed | 2 s | 4 s |
-| System at 3f9f9e1's first parent (6 files under `Sources` differ) | failed, missing inputs | failed, missing inputs |
-| back to 3f9f9e1 | 9 s | 12 s |
-| cold, scratch (as before) | 17 s | 50 s |
+| Build | swift-log, first | swift-log, rerun | swift-driver, first | swift-driver, rerun |
+|---|---|---|---|---|
+| cold, kept | 16 s | 19 s | 49 s | 42 s |
+| again, nothing changed | 2 s | 2 s | 4 s | 4 s |
+| System at 3f9f9e1's first parent (6 files under `Sources` differ) | failed, missing inputs | 13 s | failed, missing inputs | 27 s |
+| back to 3f9f9e1 | 9 s | 12 s | 12 s | 20 s |
+| cold, scratch (as before) | 17 s | 16 s | 50 s | 45 s |
+
+These two packages are small, so an incremental build after a real System change saves little: most of it is recompiling SystemPackage and what imports it.
 
 ## Step 3: parallel adopter builds (uncommitted; never run)
 
