@@ -10,8 +10,10 @@ kept inside `#if os(Windows)`; its tests are Windows-only and haven't run.
 Darwin, before any change (`6a9833f`): XCTest 565 tests (4 skipped), swift-testing 496 tests in 80 suites, all
 passing. After each commit: the same, since every new file compiles to nothing on Darwin.
 
-**Resume here:** all seven drafts are done (sections 1 to 7). Next is part 2, the adopter ranking, with
-`survey-windows-imports.py`; its results go in section 8.
+**Resume here:** both parts are done: the seven drafts (sections 1 to 7) and the adopter ranking (section 8).
+Nothing is in progress. What's left needs a Windows machine or other lanes' files: a Windows run of the tests
+(each section's last list), and patches P1 and P2 (section 10). This worktree's `.build` and the lane's scratch
+output under `$TMPDIR` are deleted.
 
 ## How it was checked
 
@@ -331,7 +333,7 @@ throwing `invalidFunction`. The last two are the draft's observations.
 
 Next: SYS-0016.
 
-## 7. SYS-0016: the final path name: this commit
+## 7. SYS-0016: the final path name: `ca68ef8`
 
 What: `Win32FinalPath.swift`: `Win32.VolumeNameFormat` (`dos`, `guid`, `nt`, `volumeRelative`) and
 `finalPath(volumeName:normalized:)` on both handle types, over `GetFinalPathNameByHandleW`, starting with a stack
@@ -347,6 +349,169 @@ A Windows run must check: each format's shape (`\\?\`, `\Device\`, `\\?\Volume{`
 which needs the retry; and a pipe (`badPathName`) and `NUL` (`invalidParameter`), the draft's observations.
 
 Next: the adopter ranking.
+
+## 8. What the adopters' Windows code imports: this commit
+
+What the adopters' Windows code takes from WinSDK, ucrt, CRT and visualc, and how much of it System covers,
+from `Prototype/Win32/survey-windows-imports.py`. It's lexical, since nothing here compiles for Windows.
+
+**What was surveyed.** The 20 checkouts in `../adopters`, committed content at each one's branch (`no-darwin` for
+swift-foundation, `migrate-darwin` for the rest): WasmKit `4917e06`, indexstore-db `cc966b8`, sourcekit-lsp
+`cb2881c5`, swift-argument-parser `0fbda27`, swift-async-algorithms `bd5f6f4`, swift-build `56ad2d9`,
+swift-certificates `0df6bd1`, swift-corelibs-xctest `80a3f95`, swift-docc `ad021e3`, swift-driver `ddb51ccd`,
+swift-foundation `ef3c5667`, swift-llbuild `f7a0650`, swift-log `4d6d77f`, swift-nio `e1623fbf`,
+swift-package-manager `dbe05ec1e`, swift-sdk-generator `5956672`, swift-subprocess `d6b5866`, swift-syntax
+`961f0b723`, swift-tools-protocols `18e8a9f9`, swift-tools-support-core `1ad4129`.
+- A file counts if it imports one of the modules, in any form (`import struct WinSDK.socklen_t` too), on a line
+  Windows compiles: 203 files in 18 packages, 156 in sources and 47 in tests; 160 import WinSDK, 48 ucrt and 42
+  CRT, and none visualc. swift-corelibs-xctest and swift-sdk-generator have none.
+- Which lines Windows compiles comes from the adopter-coverage tool's `#if` evaluator
+  (`Utilities/adopter-coverage/scripts/platforms.py`). A line active only in some Windows builds counts. Flags
+  that are decided on Windows are modeled: Apple-internal ones (`FOUNDATION_FRAMEWORK`, `LLBUILD_FRAMEWORK`,
+  `DATA_LEGACY_ABI`) and swift-foundation's opt-outs (`NO_FILESYSTEM` and the like) are off, and `SWIFT_PACKAGE`
+  is on.
+- The names are the ones on those lines that look like C names: ALL_CAPS names, names that begin with an
+  underscore, lowercase names from the C library interfaces that the coverage mapping lists (as calls, bare
+  globals, or `_t` types), and other names that none of these declares: System's libraries, the adopters, and
+  the macOS SDK's interfaces for the standard library, Foundation, Dispatch, XCTest and swift-testing. Names the
+  SDK or UCRT declares count even where a package redeclares one. 815 names, every one classified by hand in
+  the script's `CONCEPTS`.
+- Limits: a file that reaches WinSDK through a re-export (swift-tools-support-core's TSCLibc, swift-build's
+  SWBLibc, NIOPosix's ucrt) doesn't count, as the task asks for importing files; the re-exporting files do. An
+  implicit member (`.foo`) isn't a name here. A lowercase C name outside the mapping's vocabulary is missed.
+  Several names serve more than one concept and are counted in one (see *What this lane covers*). Code inside
+  string literals, such as SwiftPM's generated test observer, isn't code.
+
+**Which files System covers.** A file is covered when every name it uses is System's (currency types aside):
+before this lane, with the API that already existed on Windows; now, with this lane's too.
+
+| package | files (sources, tests) | nothing seen | only types | covered before | covered now | need a gap | need only other libraries |
+|---|---|---|---|---|---|---|---|
+| WasmKit | 9 (8, 1) | 0 | 0 | 0 | 2 | 4 | 3 |
+| indexstore-db | 4 (4, 0) | 0 | 0 | 1 | 1 | 3 | 0 |
+| sourcekit-lsp | 16 (14, 2) | 3 | 0 | 1 | 2 | 4 | 7 |
+| swift-argument-parser | 2 (2, 0) | 0 | 0 | 0 | 0 | 2 | 0 |
+| swift-async-algorithms | 1 (1, 0) | 0 | 0 | 0 | 0 | 1 | 0 |
+| swift-build | 11 (9, 2) | 1 | 0 | 0 | 1 | 7 | 2 |
+| swift-certificates | 3 (3, 0) | 0 | 0 | 0 | 0 | 3 | 0 |
+| swift-docc | 6 (4, 2) | 0 | 0 | 0 | 0 | 5 | 1 |
+| swift-driver | 12 (7, 5) | 8 | 0 | 0 | 0 | 4 | 0 |
+| swift-foundation | 34 (27, 7) | 6 | 1 | 0 | 2 | 22 | 3 |
+| swift-llbuild | 7 (7, 0) | 3 | 0 | 0 | 1 | 1 | 2 |
+| swift-log | 6 (3, 3) | 2 | 0 | 0 | 0 | 4 | 0 |
+| swift-nio | 50 (34, 16) | 6 | 0 | 2 | 7 | 36 | 1 |
+| swift-package-manager | 12 (11, 1) | 3 | 0 | 0 | 0 | 7 | 2 |
+| swift-subprocess | 16 (10, 6) | 2 | 1 | 0 | 2 | 11 | 0 |
+| swift-syntax | 3 (3, 0) | 1 | 0 | 0 | 0 | 2 | 0 |
+| swift-tools-protocols | 5 (3, 2) | 1 | 0 | 1 | 1 | 3 | 0 |
+| swift-tools-support-core | 6 (6, 0) | 0 | 0 | 0 | 0 | 6 | 0 |
+| all | 203 (156, 47) | 36 | 2 | 5 | 19 | 125 | 21 |
+
+So 14 more files could drop their Windows imports with this lane's API, and 36 use nothing the survey sees:
+imports kept for re-exports, for lowercase C functions it doesn't know, or for nothing. 125 files need at least
+one gap, and 21 need only replacements that aren't System's (mostly the C library's strings, memory and stdio).
+
+**What this lane covers.** The `new` rows of the ranking below. Some names are shared with gaps:
+- `CloseHandle` is in 25 files: 8 close only file handles (from `CreateFileW`, `_get_osfhandle` or pipes), 5
+  file handles and others, 10 only other kinds (processes, threads, jobs, events, tokens), and 2 can't be told.
+  Owners for the other kinds are gaps.
+- `ReadFile` and `WriteFile` are in 5 files. swift-foundation's read files it opened with `CreateFileW`, which
+  `Win32.FileHandle` covers. NIO's pass an `OVERLAPPED` offset for positional reads and writes on a descriptor's
+  handle, which `read(fromAbsoluteOffset:into:)` and `write(_:toAbsoluteOffset:)` cover through
+  `withWin32HandleIfAvailable`. swift-subprocess's are overlapped reads of pipes, a gap.
+- `SetFileInformationByHandle` is covered for `FileEndOfFileInfo` (WasmKit); swift-foundation's
+  `FileRenameInfoEx` and NIO's `FileDispositionInfoEx` are in the file-information gap.
+- `GetCurrentProcess` is in 10 files, 3 of them for `DuplicateHandle`; the rest query or end processes, so it's
+  counted with processes.
+- Error codes: 26 of `Win32.Error`'s 33 named codes are used. 43 more appear, most of them in WasmKit's copy of
+  the C runtime's `_dosmaperr` table, which `Errno(approximating:)` replaces. The ones two or more packages use
+  are the candidates for more names (section 1): `ERROR_FILENAME_EXCED_RANGE` (206, 3 packages), and
+  `ERROR_BAD_ARGUMENTS` (160), `ERROR_INVALID_ACCESS` (12), `ERROR_INVALID_DATA` (13), `ERROR_INVALID_DRIVE`
+  (15), `ERROR_BUFFER_OVERFLOW` (111), `ERROR_DIR_NOT_EMPTY` (145), `ERROR_NOT_ENOUGH_MEMORY` (8),
+  `ERROR_NOT_FOUND` (1168), `ERROR_NOT_SAME_DEVICE` (17) and `ERROR_TOO_MANY_OPEN_FILES` (4), 2 packages each.
+
+**The ranking.** Gaps first, by packages, then files; then what System covers, what isn't System's, the
+currency types, and what the survey ignores. The names are each concept's most used; the script's `names`
+output has them all, with their files.
+
+| class | concept | packages | files (sources) | names, by uses | System, or owner |
+|---|---|---|---|---|---|
+| gap | Creating, waiting for and ending processes | 12: sourcekit-lsp, swift-argument-parser, swift-build, swift-docc, swift-driver, swift-foundation, swift-nio, swift-package-manager, swift-subprocess, swift-syntax, swift-tools-protocols, swift-tools-support-core | 27 (21) | `GetCurrentProcess`, `TerminateProcess`, `WaitForSingleObject`, `OpenProcess`, `PROCESS_INFORMATION`, `CREATE_SUSPENDED` and 59 more | Processes and RawSpawn are POSIX-only |
+| gap | Clocks, sleeping and time zones | 10: WasmKit, indexstore-db, sourcekit-lsp, swift-build, swift-driver, swift-foundation, swift-llbuild, swift-log, swift-nio, swift-tools-protocols | 25 (14) | `Sleep`, `GetSystemTimePreciseAsFileTime`, `GetTickCount64`, `__time64_t`, `strftime`, `usleep` and 12 more | ClockTime, Sleep and BrokenDownTime are POSIX-only |
+| gap | SRW locks and condition variables | 8: WasmKit, swift-argument-parser, swift-async-algorithms, swift-certificates, swift-docc, swift-log, swift-nio, swift-subprocess | 11 (10) | `AcquireSRWLockExclusive`, `ReleaseSRWLockExclusive`, `SRWLOCK`, `InitializeSRWLock`, `CONDITION_VARIABLE`, `SleepConditionVariableSRW` and 12 more | Synchronization.Mutex covers the lock |
+| gap | Consoles and standard handles | 8: sourcekit-lsp, swift-argument-parser, swift-docc, swift-nio, swift-package-manager, swift-subprocess, swift-syntax, swift-tools-support-core | 10 (9) | `GetStdHandle`, `STD_OUTPUT_HANDLE`, `CONSOLE_SCREEN_BUFFER_INFO`, `SetConsoleCtrlHandler`, `GetConsoleScreenBufferInfo`, `SetConsoleMode` and 10 more | Terminal is POSIX-only; SYS-0011 and SYS-0012's future directions |
+| gap | The current, temporary, Windows and executable directories | 7: indexstore-db, sourcekit-lsp, swift-build, swift-foundation, swift-nio, swift-package-manager, swift-subprocess | 11 (9) | `GetSystemDirectoryW`, `GetWindowsDirectoryW`, `GetModuleFileNameW`, `GetCurrentDirectoryW`, `GetTempPathW`, `GetTempPath2W` and 2 more | SystemPaths and Executable are POSIX-only |
+| gap | Dynamic loading | 7: indexstore-db, sourcekit-lsp, swift-build, swift-driver, swift-foundation, swift-package-manager, swift-subprocess | 8 (7) | `GetProcAddress`, `HMODULE`, `LoadLibraryW`, `FreeLibrary`, `GetModuleHandleW`, `GetModuleHandleA` | DynamicLibrary is POSIX-only |
+| gap | Environment variables | 6: swift-build, swift-docc, swift-foundation, swift-nio, swift-package-manager, swift-subprocess | 10 (6) | `GetEnvironmentVariableW`, `SetEnvironmentVariableW`, `_putenv`, `FreeEnvironmentStringsW`, `GetEnvironmentStringsW`, `LPWCH` and 3 more | ProcessEnvironment is POSIX-only |
+| gap | Querying and setting file information | 5: WasmKit, swift-driver, swift-foundation, swift-nio, swift-subprocess | 18 (18) | `FILE_ATTRIBUTE_DIRECTORY`, `FILE_ATTRIBUTE_REPARSE_POINT`, `FILE_ATTRIBUTE_READONLY`, `BY_HANDLE_FILE_INFORMATION`, `FILETIME`, `GetFileAttributesExW` and 16 more | SYS-0010's roadmap: GetFileInformationByHandleEx and SetFileInformationByHandle's other classes |
+| gap | Long paths and canonicalization | 5: swift-build, swift-foundation, swift-package-manager, swift-subprocess, swift-tools-support-core | 10 (10) | `PATHCCH_ALLOW_LONG_PATHS`, `GetFullPathNameW`, `PATHCCH_ENSURE_IS_EXTENDED_LENGTH_PATH`, `PathAllocCanonicalize`, `PathCchStripPrefix` | System canonicalizes internally; nothing public |
+| gap | Threads and thread-local storage | 5: swift-foundation, swift-log, swift-nio, swift-subprocess, swift-tools-support-core | 9 (7) | `GetCurrentThread`, `GetCurrentThreadId`, `FlsAlloc`, `FlsGetValue`, `FlsSetValue`, `TF_USE_KERNEL_APC` and 5 more | Threads (PThread) is POSIX-only |
+| gap | HRESULT | 4: swift-build, swift-foundation, swift-package-manager, swift-subprocess | 12 (12) | `HRESULT`, `S_OK`, `HRESULT_CODE`, `HRESULT_FACILITY`, `WIN32_FROM_HRESULT`, `FACILITY_WIN32` and 1 more | SYS-0010's future directions: Win32.HResult |
+| gap | Creating, removing, renaming, copying and linking files | 4: WasmKit, swift-foundation, swift-nio, swift-tools-support-core | 11 (8) | `CreateDirectoryW`, `DeleteFileW`, `FILE_RENAME_INFO`, `MOVEFILE_COPY_ALLOWED`, `_mktemp_s`, `COPY_FILE_FAIL_IF_EXISTS` and 23 more | FilePathOperations is POSIX-only |
+| gap | Overlapped I/O and completion ports | 4: swift-build, swift-nio, swift-subprocess, swift-tools-support-core | 7 (7) | `OVERLAPPED`, `GetOverlappedResult`, `_OVERLAPPED`, `CreateIoCompletionPort`, `FILE_FLAG_OVERLAPPED`, `CancelIoEx` and 3 more | SYS-0011 and SYS-0013's future directions |
+| gap | System and processor information | 4: swift-driver, swift-foundation, swift-nio, swift-subprocess | 5 (5) | `VER_NT_WORKSTATION`, `SYSTEM_INFO`, `SYSTEM_LOGICAL_PROCESSOR_INFORMATION`, `GetSystemInfo`, `RTL_OSVERSIONINFOEXW`, `GetLogicalProcessorInformation` and 9 more | SystemConfig and uname are POSIX-only |
+| gap | Users, tokens and security identifiers | 3: swift-foundation, swift-package-manager, swift-subprocess | 6 (5) | `TOKEN_QUERY`, `GetUserNameW`, `GetUserNameExW`, `GetUserProfileDirectoryW`, `LookupAccountNameW`, `NameDisplay` and 16 more | UserDatabase and ProcessCredentials are POSIX-only; SYS-0011's future directions |
+| gap | Winsock sockets | 2: swift-certificates, swift-nio | 23 (19) | `socklen_t`, `WSAGetLastError`, `SOCKET_ERROR`, `AF_INET`, `AF_INET6`, `ADDRESS_FAMILY` and 139 more | SystemSockets is Unix-only |
+| gap | Anonymous and named pipes | 2: swift-log, swift-subprocess | 4 (2) | `CreateNamedPipeW`, `CreatePipe`, `FILE_FLAG_FIRST_PIPE_INSTANCE`, `PIPE_ACCESS_INBOUND`, `PIPE_ACCESS_OUTBOUND`, `PIPE_NOWAIT` and 6 more | SYS-0011's future directions; FileDescriptor.pipe() makes C runtime pipes |
+| gap | Job objects | 2: swift-subprocess, swift-tools-support-core | 3 (2) | `JOBOBJECT_EXTENDED_LIMIT_INFORMATION`, `AssignProcessToJobObject`, `JOBOBJECT_ASSOCIATE_COMPLETION_PORT`, `CreateJobObjectW`, `IsProcessInJob`, `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` and 7 more | the Windows counterpart of process groups |
+| gap | Reparse points | 2: swift-foundation, swift-nio | 3 (3) | `CNIOWindows_REPARSE_DATA_BUFFER`, `DeviceIoControl`, `FSCTL_GET_REPARSE_POINT`, `IO_REPARSE_TAG_SYMLINK`, `REPARSE_DATA_BUFFER`, `IO_REPARSE_TAG_AF_UNIX` and 4 more | SYS-0016's future directions: DeviceIoControl with FSCTL_GET_REPARSE_POINT |
+| gap | Events | 2: swift-subprocess, swift-tools-support-core | 2 (2) | `CreateEventW`, `SetEvent` | an owner for event handles |
+| gap | Network interfaces | 2: swift-foundation, swift-nio | 2 (2) | `GetAdaptersAddresses`, `NETWORK_PREFIX` | NetworkInterfaces is POSIX-only |
+| gap | Memory-mapped files | 1: swift-foundation | 3 (3) | `FILE_MAP_READ`, `PAGE_READONLY`, `UnmapViewOfFile`, `CreateFileMappingW`, `MapViewOfFile` | MemoryMapping is POSIX-only |
+| gap | Directory enumeration | 1: swift-foundation | 2 (2) | `FIND_FIRST_EX_LARGE_FETCH`, `FIND_FIRST_EX_ON_DISK_ENTRIES_ONLY`, `FindNextFileW`, `FindClose`, `FindExInfoBasic`, `FindExSearchNameMatch` and 2 more | SYS-0011's future directions (DirectoryHandle) |
+| gap | Directory change notification | 1: swift-tools-support-core | 1 (1) | `FILE_NOTIFY_INFORMATION`, `FILE_NOTIFY_CHANGE_CREATION`, `FILE_NOTIFY_CHANGE_DIR_NAME`, `FILE_NOTIFY_CHANGE_FILE_NAME`, `FILE_NOTIFY_CHANGE_LAST_WRITE`, `FILE_NOTIFY_CHANGE_SIZE` and 1 more | SYS-0011's future directions (DirectoryHandle) |
+| gap | Free space and volume paths | 1: swift-foundation | 1 (1) | `GetDiskFreeSpaceExW`, `GetVolumePathNameW` | SYS-0015's future directions |
+| new | Error codes, messages and last error | 11: WasmKit, indexstore-db, sourcekit-lsp, swift-argument-parser, swift-build, swift-driver, swift-foundation, swift-nio, swift-package-manager, swift-subprocess, swift-tools-support-core | 49 (43) | `GetLastError`, `ERROR_FILE_NOT_FOUND`, `ERROR_ACCESS_DENIED`, `ERROR_SUCCESS`, `ERROR_INVALID_DATA`, `ERROR_PATH_NOT_FOUND` and 73 more | Win32.Error, its description, Errno(approximating:) |
+| new | Opening and closing files | 9: sourcekit-lsp, swift-build, swift-foundation, swift-llbuild, swift-nio, swift-package-manager, swift-subprocess, swift-tools-protocols, swift-tools-support-core | 35 (29) | `CloseHandle`, `INVALID_HANDLE_VALUE`, `CreateFileW`, `FILE_SHARE_READ`, `FILE_SHARE_WRITE`, `OPEN_EXISTING` and 13 more | Win32.FileHandle.open, openOrCreate, close(); DirectoryHandle.open |
+| new | Descriptor and handle bridges | 7: WasmKit, swift-foundation, swift-log, swift-nio, swift-package-manager, swift-subprocess, swift-tools-support-core | 21 (14) | `_get_osfhandle`, `_O_BINARY`, `_open_osfhandle`, `_O_APPEND`, `_O_NOINHERIT` | FileDescriptor.withWin32HandleIfAvailable(_:), init(adopting:translation:append:) |
+| new | Reading, writing, size and flush | 4: WasmKit, swift-foundation, swift-nio, swift-subprocess | 7 (7) | `ReadFile`, `SetFileInformationByHandle`, `WriteFile`, `GetFileSizeEx`, `FILE_END_OF_FILE_INFO`, `FileEndOfFileInfo` and 1 more | Win32.FileHandle read, readFully, write, append, size(), flush(), resize(to:) |
+| new | File type | 2: swift-foundation, swift-nio | 7 (7) | `FILE_TYPE_DISK`, `GetFileType`, `FILE_TYPE_PIPE`, `FILE_TYPE_CHAR`, `FILE_TYPE_UNKNOWN` | Win32.FileHandle.fileType() |
+| new | Duplicating handles and inheritance | 2: swift-nio, swift-subprocess | 4 (3) | `HANDLE_FLAG_INHERIT`, `SetHandleInformation`, `DUPLICATE_SAME_ACCESS`, `DuplicateHandle` | duplicate(access:inheritable:), setInheritable(_:) |
+| new | Final path of a handle | 2: swift-foundation, swift-tools-support-core | 3 (3) | `GetFinalPathNameByHandleW`, `VOLUME_NAME_DOS`, `FILE_NAME_NORMALIZED` | finalPath(volumeName:normalized:) |
+| new | Byte-range locks | 1: swift-build | 1 (1) | `LOCKFILE_EXCLUSIVE_LOCK`, `LockFileEx`, `UnlockFileEx` | withLock(byteRange:mode:_:), withLockIfAvailable |
+| new | Volume information | 1: swift-foundation | 1 (1) | `GetVolumeInformationW` | volumeInformation(), through a handle to the volume's root |
+| existing | Descriptor I/O | 7: WasmKit, swift-build, swift-foundation, swift-log, swift-nio, swift-package-manager, swift-tools-support-core | 23 (19) | `off_t`, `_read`, `_write`, `_close`, `_O_RDWR`, `_SH_DENYNO` and 18 more | FileDescriptor open, close, read, write, seek, duplicate, pipe, resize |
+| existing | errno and its values | 5: WasmKit, swift-foundation, swift-nio, swift-package-manager, swift-tools-support-core | 17 (14) | `errno`, `_get_errno`, `strerror`, `_set_errno`, `strerror_s`, `EAFNOSUPPORT` and 8 more | Errno, Errno.current, Errno.description |
+| existing | Path syntax | 5: indexstore-db, sourcekit-lsp, swift-foundation, swift-tools-protocols, swift-tools-support-core | 8 (8) | `PathCchIsRoot`, `PathIsRelativeW`, `PathCchRemoveFileSpec`, `PathCchSkipRoot`, `PathCchStripToRoot`, `PathFindExtensionW` and 2 more | FilePath: root, isAbsolute, isRelative, lastComponent, extension, removingLastComponent |
+| existing | Permissions for new files | 4: WasmKit, swift-foundation, swift-nio, swift-tools-support-core | 7 (5) | `_S_IWRITE`, `_S_IREAD`, `_S_IEXEC` | FilePermissions, through FileDescriptor.open |
+| other | The C library: strings, memory, stdio, locales | 14: WasmKit, sourcekit-lsp, swift-argument-parser, swift-build, swift-certificates, swift-docc, swift-foundation, swift-llbuild, swift-log, swift-nio, swift-package-manager, swift-subprocess, swift-syntax, swift-tools-support-core | 41 (38) | `free`, `stderr`, `wcslen`, `strlen`, `memcmp`, `stdout` and 31 more | Swift's standard library and Foundation |
+| other | Shell and COM: known folders, file info, MIME types | 5: swift-build, swift-docc, swift-foundation, swift-nio, swift-package-manager | 7 (7) | `KF_FLAG_DEFAULT`, `CoTaskMemFree`, `_GUID`, `KNOWNFOLDERID`, `SHGFI_EXETYPE`, `SHGetKnownFolderPath` and 17 more | the Shell; not System's |
+| other | The registry | 1: swift-foundation | 2 (2) | `RRF_RT_REG_SZ`, `HKEY_LOCAL_MACHINE`, `RegGetValueW` | advapi32's registry; not System's |
+| other | Hashing | 1: swift-build | 1 (1) | `BCRYPT_ALG_HANDLE`, `BCRYPT_HASH_HANDLE`, `BCryptCloseAlgorithmProvider`, `BCryptCreateHash`, `BCryptDestroyHash`, `BCryptFinishHash` and 2 more | bcrypt's hashes; swift-crypto's |
+| other | User accounts (tests) | 1: swift-subprocess | 1 (0) | `NERR_Success`, `USER_INFO_1`, `NetUserAdd`, `NetUserDel`, `UF_DONT_EXPIRE_PASSWD`, `UF_SCRIPT` and 1 more | netapi32; test set-up |
+| types | Windows' currency types and constants, and LocalFree | 13: WasmKit, indexstore-db, sourcekit-lsp, swift-build, swift-docc, swift-driver, swift-foundation, swift-llbuild, swift-log, swift-nio, swift-package-manager, swift-subprocess, swift-tools-support-core | 75 (66) | `DWORD`, `HANDLE`, `WCHAR`, `size_t`, `ULONG`, `MAX_PATH` and 23 more | follow the calls that take or return them |
+| ignore | Swift names the survey can't see declared | 9: WasmKit, sourcekit-lsp, swift-certificates, swift-docc, swift-foundation, swift-llbuild, swift-nio, swift-package-manager, swift-subprocess | 32 (25) | `ChannelInitializerResult`, `DestinationType`, `CommandResult`, `ManagedAtomic`, `BuildValueFileTimestamp`, `BuildValueFileInfo` and 29 more | the packages' own types, and their dependencies' |
+| ignore | Other C modules' names | 7: sourcekit-lsp, swift-driver, swift-foundation, swift-llbuild, swift-nio, swift-package-manager, swift-subprocess | 17 (14) | `CONNECT_DELAYER`, `MAX_DEPTH`, `SWIFT_SCANNER_LIB`, `CONNECT_RECORDER`, `LLBUILD_C_API_VERSION`, `NSEC_PER_SEC` and 19 more | CoreFoundation's and Foundation's shims, sourcekitd, swiftScan, llbuild |
+| ignore | Darwin names on lines Windows also compiles | 1: swift-driver | 1 (1) | `QUASI_PID_START` | #if conditions the evaluator can't decide |
+
+**The top gaps**, with where each would go. Four of them (standard handles, file information, HRESULT and
+overlapped I/O) are the drafts' own future directions; most of the rest are areas System has for POSIX and not
+for Windows:
+1. **Processes** (12 packages, 27 files): `CreateProcessW` with `STARTUPINFOEXW` and an inherited-handle list,
+   waiting (`WaitForSingleObject`, `GetExitCodeProcess`), `TerminateProcess`, `OpenProcess`, and the current
+   process's ID. SYS-0011's owned-handle model extends to a `Win32.ProcessHandle`, which
+   `Prototype/PlatformEnum` already sketches; `ProcessID` would need Windows' `DWORD` process IDs.
+2. **Clocks and sleeping** (10 packages, 25 files, many of them tests calling `Sleep`): `QueryPerformanceCounter`,
+   `GetTickCount64`, `GetSystemTimePreciseAsFileTime`, `Sleep`, and the C runtime's 64-bit time functions.
+   Swift's `ContinuousClock` and `Task.sleep` cover much of it without System; ClockTime and Sleep on Windows
+   would cover the rest.
+3. **SRW locks and condition variables** (8 packages): each package's own lock type. `Synchronization.Mutex`
+   covers the lock; condition variables have no Swift equivalent, so this is the Windows side of PThreadMutex
+   and PThreadCondition.
+4. **Consoles and standard handles** (8 packages): `GetStdHandle`, which SYS-0011 lists as a future direction,
+   console modes and screen buffer sizes (the Terminal area's Windows side), and `SetConsoleCtrlHandler`.
+5. **Well-known directories** (7 packages): the current, temporary, Windows and system directories, and the
+   executable's path (`GetModuleFileNameW`): SystemPaths and Executable on Windows.
+6. **Dynamic loading** (7 packages): `LoadLibraryW`, `GetProcAddress`, `FreeLibrary`: DynamicLibrary on Windows.
+7. **Environment variables** (6 packages): `GetEnvironmentVariableW`, `SetEnvironmentVariableW`,
+   `GetEnvironmentStringsW`, and the C runtime's `_putenv`: ProcessEnvironment on Windows.
+8. **File information** (5 packages, 18 files): attributes, `BY_HANDLE_FILE_INFORMATION`, file IDs, times, and
+   setting rename and delete dispositions with POSIX semantics: the next drafts in SYS-0010's roadmap.
+9. **Long paths** (5 packages): the packages canonicalize for the path functions System doesn't wrap yet; this
+   lane's `_withCanonicalPath` could be the public API, or go away as they're wrapped.
+10. **Threads**, **HRESULT** (SYS-0010's `Win32.HResult`), **path operations** (create, remove, rename, copy,
+    link), **overlapped I/O** (SYS-0011 and SYS-0013's future direction) and **system information**, 4 or 5
+    packages each; **Winsock** is 2 packages but 23 files, nearly all NIO's.
 
 ## 9. Findings
 
@@ -366,7 +531,15 @@ Next: the adopter ranking.
   `Win32` would shadow System's, and its `FileDescriptor` extensions (`TranslationMode`, `init(adopting:)`,
   `withWin32HandleIfAvailable`) would overlap System's.
 - **`_MAX_PATH` is the UCRT's** (`stdlib.h`), so the internal constant is `_win32MaxPath`.
-- **SYS-0014's range resolution traps** for `..<(-1)` and `...(-2)` (section 5).
+- **SYS-0014's range resolution would trap** for `..<(-1)` and `...(-2)`, which the draft says throw; the
+  implementation checks those two range types first (section 5).
+- **36 adopter files import a Windows module and use nothing the survey sees** (section 8): some re-export it,
+  some use lowercase C functions it doesn't know, and some may use nothing, which would be the cheapest imports
+  to drop.
+- **Re-exports hide Windows users.** TSCLibc and SWBLibc re-export WinSDK and CRT (and SWBLibc ucrt), and
+  NIOPosix re-exports ucrt, so a file that imports one of them, in SwiftPM or swift-driver through TSCLibc for
+  instance, uses WinSDK without importing it, and the survey doesn't count it. A compiler-backed survey would
+  need a Windows build's index store, as adopter-coverage uses a macOS one.
 
 ## 10. Patches for files outside the lane
 
@@ -376,6 +549,9 @@ swift-testing 496 tests in 80 suites). Errno patterns keep working on every plat
 `catch Errno.x` has no other candidate, and a typed one uses the standard library's `~=` for `Equatable` values.
 
 ```diff
+--- a/Sources/System/Errno.swift
++++ b/Sources/System/Errno.swift
+@@ -1593,6 +1593,7 @@
  @available(System 0.0.1, *)
  extension Errno {
    @_alwaysEmitIntoClient
@@ -383,8 +559,6 @@ swift-testing 496 tests in 80 suites). Errno patterns keep working on every plat
    public static func ~=(_ lhs: Errno, _ rhs: Error) -> Bool {
      guard let value = rhs as? Errno else { return false }
      return lhs == value
-   }
- }
 ```
 
 With it, add this test to `Win32ErrorTests`; without P1 it fails:
@@ -410,29 +584,42 @@ private func catchesImplicitFileExists() -> Bool {
 `GetFullPathNameW`.** Not compiled here (the file is Windows-only); the conversions match `_win32Error(fromHRESULT:)`
 in `Win32Open.swift`, which the harness compiles.
 
+Both patches apply to `6a9833f` with `git apply`.
+
 ```diff
+--- a/Sources/System/FilePath/FilePathWindows.swift
++++ b/Sources/System/FilePath/FilePathWindows.swift
+@@ -479,6 +479,9 @@
+     // of the registry or process setting to enable long paths (but it will also
+     // not add the \\?\ prefix required by other functions under these conditions).
      let dwLength: DWORD = GetFullPathNameW(self, 0, nil, nil)
 +    guard dwLength > 0 else {
 +      throw Errno(rawValue: _mapWindowsErrorToErrno(GetLastError()))
 +    }
      return try withUnsafeTemporaryAllocation(of: WCHAR.self, capacity: Int(dwLength)) { pwszFullPath in
-@@
+       guard (1..<dwLength).contains(GetFullPathNameW(self, DWORD(pwszFullPath.count), pwszFullPath.baseAddress, nil)) else {
+         throw Errno(rawValue: _mapWindowsErrorToErrno(GetLastError()))
+@@ -512,12 +515,12 @@
+ 
  @inline(__always)
  fileprivate func HRESULT_CODE(_ hr: HRESULT) -> DWORD {
 -    DWORD(hr) & 0xffff
 +    DWORD(bitPattern: hr) & 0xffff
  }
-
+ 
  @inline(__always)
  fileprivate func HRESULT_FACILITY(_ hr: HRESULT) -> DWORD {
 -    DWORD(hr >> 16) & 0x1fff
 +    (DWORD(bitPattern: hr) >> 16) & 0x1fff
  }
-@@
+ 
+ @inline(__always)
+@@ -533,6 +536,6 @@
      if HRESULT_FACILITY(hr) == FACILITY_WIN32 {
          return HRESULT_CODE(hr)
      }
 -    return DWORD(hr)
 +    return DWORD(bitPattern: hr)
  }
+ #endif
 ```
