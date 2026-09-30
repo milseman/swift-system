@@ -16,9 +16,10 @@ Utilities/linux/build.sh run -- system-samples platform process
 Utilities/linux/build.sh --user 1000:1000 test        # unprivileged
 Utilities/linux/build.sh --quiet test                 # the output only in the log, and a summary
 Utilities/linux/build.sh shell                        # bash in the container
+Utilities/linux/build.sh --root .. --dir adopters-unix/swift-nio build-tests   # another package (below)
 ```
 
-The package directory is mounted at `/code`, and each run starts a new container and removes it afterward. The arguments after `--` go to the swift command, after its `--scratch-path`. The first run of an image pulls it (about 3.7 GB), and the first build in a scratch path fetches the dependencies; a clean build and test takes under a minute.
+The package directory is mounted at `/code` (or `--root`'s directory, below), and each run starts a new container and removes it afterward. The arguments after `--` go to the swift command, after its `--scratch-path`. The first run of an image pulls it (about 3.7 GB), and the first build in a scratch path fetches the dependencies; a clean build and test takes under a minute.
 
 | Option | Default | |
 |---|---|---|
@@ -29,8 +30,11 @@ The package directory is mounted at `/code`, and each run starts a new container
 | `--user <uid:gid>` | root | Runs as this user, with `HOME=/tmp`. `1000:1000` is `ubuntu` in the noble images, and can write the mount. |
 | `--memory <size>` | `8G` | The container's memory. |
 | `--cpus <count>` | the tool's | The container's CPUs. |
+| `--root <dir>` | this package | The directory to mount at `/code` (below). |
+| `--dir <path>` | the root | The package to build, relative to the root; the swift command runs there. |
+| `--mount <dir>:<path>` | none | Also mounts `<dir>` at `<path>`, relative to the root, over what's there. Repeatable. |
 | `--scratch <path>` | `.build/linux-<tag>` | SwiftPM's scratch path, relative to the package. |
-| `--log <path>` | `.build/linux-<tag>-<action>.log` | The log, which also gets a line with the date and command. A test run ends with XCTest's and swift-testing's totals. |
+| `--log <path>` | `.build/linux-<tag>-<action>.log` | The log, relative to the package unless it's absolute, which also gets a line with the date and command. A test run ends with XCTest's and swift-testing's totals. |
 | `--quiet` | off | Writes the output only to the log, and prints a summary instead (below). |
 
 - `<tag>` is the image's tag, such as `6.2-noble`, with `-amd64` for amd64, so each image and architecture builds into a scratch path of its own. Another image keeps its name: `swiftlang/swift:nightly-main-noble` is `swiftlang-swift-nightly-main-noble`.
@@ -48,8 +52,35 @@ of the log, and the exit status line; the log is the same as without it. The sum
   swift-testing's lines with ✘ (each issue, failed test and failed suite, but not its total) and XCTest's
   failures, its `error:` lines for files under `Tests/`, which have a line number but no column.
 
-Each list keeps the log's order, drops repeats, and takes the mount's `/code/` out of paths, so a path is relative
+Each list keeps the log's order, drops repeats, and makes paths relative to the package (below), so a path is relative
 to the package. A long XCTest message shows only its first line.
+
+## Another package, with the packages beside it
+
+A package whose manifest names others by path, as the adopters' `.package(path: "../../swift-system")` does, can't
+build from its own directory alone: the container sees only what's mounted. `--root` mounts a directory above them
+all at `/code` instead of this package, and `--dir` names the package under it, where the swift command runs.
+Without them, the root and the package are this package, as before.
+
+```sh
+# swift-nio's unix-adopt worktree, against the swift-system checkout its manifest names (../../swift-system)
+Utilities/linux/build.sh --root ~/development/base_dir/system-next --dir adopters-unix/swift-nio build-tests
+
+# The same, against this worktree, with the scratch path and the log outside the package
+Utilities/linux/build.sh --quiet --root .. --dir adopters-unix/swift-nio --mount .:swift-system \
+  --scratch ../../linux-2/.build/linux-nio --log ../../linux-logs/nio-build-tests.log build-tests
+```
+
+- `--scratch` and `--log` are relative to the package, which is now `<root>/<dir>`, so by default the scratch path and
+  the log are in the package's `.build`. Point them elsewhere under the root to leave the package's directory alone;
+  SwiftPM also writes `Package.resolved` there if resolving changes it.
+- `--mount <dir>:<path>` mounts another host directory over a directory under the root, as a second `-v` does. With
+  `.:swift-system`, the package builds against this worktree rather than the checkout its manifest names, which is
+  how a System change can be tried on an adopter before it's merged.
+- The `==` lines, and the log's first line, name the package's path in the container and the root.
+- The summary's paths are relative to the package: the package's own lose `/code/<dir>/`, and the root's others start
+  with `../` up to it, as the manifest names them (`../../swift-system/Sources/...`). XCTest's failures are its
+  `error:` lines under the package's `Tests/`.
 
 ## What it has checked
 
