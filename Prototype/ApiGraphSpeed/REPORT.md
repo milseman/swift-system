@@ -4,7 +4,7 @@ Lane `api-graph-speed`, base `3f9f9e1` (system-next), merged with system-next `6
 
 ## Resume here
 
-2026-09-30: step 1 is measured and checked; step 2's measurements are next. The runs go through now, since Michael put the allow rules this report proposed into the worktree's `.claude/settings.local.json`. Before that, the auto mode classifier had denied three runs, one of them after Michael approved them in chat, because it goes by allow rules, not by the conversation.
+2026-09-30: steps 1 and 2 are measured and checked; step 3's runs are next. The runs go through now, since Michael put the allow rules this report proposed into the worktree's `.claude/settings.local.json`. Before that, the auto mode classifier had denied three runs, one of them after Michael approved them in chat, because it goes by allow rules, not by the conversation.
 
 **Committed:**
 - `943c479`: the merge of system-next `6a9833f`.
@@ -16,17 +16,18 @@ Lane `api-graph-speed`, base `3f9f9e1` (system-next), merged with system-next `6
 
 **Uncommitted in the working tree:** step 3, parallel builds (`adopters.py`, `regenerate.sh`, `README.md`, `method.md` decision 39). It has never run.
 
-**Done:** `check_builds.py` passes all 16 checks, the fix included; b1 and c1 match the baseline (step 1, below).
+**Done:**
+- `check_builds.py` passes all 16 checks, the fix included.
+- b1 and c1 match the baseline (step 1, below).
+- s2-cold and s2-incr match it too (step 2, below). s2's builds directory is deleted.
 
 **Next:**
-1. Step 2:
-   - `measure.sh s2-cold ae57686 API_GRAPH_CACHE=.build/speed/cache-s2`, cold, which fills `.build/speed/builds`.
-   - `measure.sh s2-incr ae57686 API_GRAPH_CACHE=.build/speed/cache-s2 API_GRAPH_ADOPTER_VALIDATE=tree HEAD_REF=279c229`: every migration rebuilt, incrementally.
-   - Compare both with the baseline, and record the builds directory's size.
-2. Step 3, the working tree's tool:
-   - The cold case with `API_GRAPH_ADOPTER_JOBS=4`, then `=18`, each with a fresh cache and builds directory. Commit step 3 after the first one passes.
-   - Then (b), nothing changed, and (c), `HEAD_REF=279c229`. Update the README's "Run time".
-3. At the stop, delete `.build/speed` and `${TMPDIR}api-graph-speed`, except a persistent builds directory, whose place and size go here.
+1. Step 3, the working tree's tool:
+   - `measure.sh d4 API_GRAPH_ADOPTER_JOBS=4 API_GRAPH_CACHE=<speed>/cache-d4 API_GRAPH_BUILDS=<speed>/builds-d4`, cold. Commit step 3 once it passes, then delete `builds-d4`.
+   - The same with `=18`, into `cache-d18` and `builds-d18`.
+   - Then (b), nothing changed, (c), `HEAD_REF=279c229`, and a forced rebuild with 4 jobs, `API_GRAPH_ADOPTER_VALIDATE=tree HEAD_REF=279c229`, all three against `d18`'s cache and builds.
+   - Update the README's "Run time".
+2. At the stop, delete `.build/speed` and `${TMPDIR}api-graph-speed`, except a persistent builds directory, whose place and size go here.
 
 **Scratch in use:**
 - `.build/speed/cache`: the baseline's entries, upgraded by b1.
@@ -97,7 +98,7 @@ Lane `api-graph-speed`, base `3f9f9e1` (system-next), merged with system-next `6
   - With nothing to build, the adopters step's time is about a third site extraction for the 18 migrations (31 s in c1) and two thirds the would-benefit scan of 99 packages (64 s). That scan is outside this lane's steps.
   - The rest of the run is fixed costs, mostly api-delta and System's indexed build: 75 to 120 s, depending on load.
 
-## Step 2: persistent per-adopter build directories (committed `ae57686`)
+## Step 2: persistent per-adopter build directories (committed `ae57686`; measured)
 
 **What:**
 - `API_GRAPH_BUILDS` (default `.build/api-graph-builds`) holds, per migration:
@@ -142,6 +143,20 @@ Lane `api-graph-speed`, base `3f9f9e1` (system-next), merged with system-next `6
 | cold, scratch (as before) | 17 s | 16 s | 50 s | 45 s |
 
 These two packages are small, so an incremental build after a real System change saves little: most of it is recompiling SystemPackage and what imports it.
+
+**Measurements** (the tool at `ae57686`, serial builds):
+- s2-cold: every migration built cold into a fresh builds directory, with a fresh cache.
+  - 1966.4 s wall (32 min 46 s); user 3712 s, sys 808 s. The adopters step took 1804 s.
+  - Load: the per-minute mean was 116.9 (median 102, max 201), two and a half times the baseline's 47, and each build ran 1.2 to 2 times as long as the baseline's (swift-build 161 s against 91 s). So this time says nothing about step 2 against (a). It's the same cold builds, plus the build directories' `du`.
+  - The 18 build directories take 11.8 GB. The largest are swift-package-manager's 1.7 GB, swift-foundation's 1.2 GB and swift-nio's 1.1 GB. That's less than the "several GB each" the design assumed.
+- s2-incr: every migration rebuilt (`API_GRAPH_ADOPTER_VALIDATE=tree`) on `279c229`, the one-comment change, in the build directories s2-cold left.
+  - 540.8 s wall (9 min 1 s); user 660 s, sys 159 s. The adopters step took 421 s.
+  - All 18 builds were incremental, 8 to 54 s each (swift-foundation 54 s, swift-package-manager 43 s, wasmkit 37 s), 337 s in all. The same 18 builds took 1125 s cold in (a).
+  - Each build recompiled one thing, SystemPackage. The rest of the time is SwiftPM planning again (the manifests are dated now) and checking the package's files.
+  - Load: the per-minute mean was 23.7, half the baseline's.
+- All three runs' adopter links (s2-cold, s2-incr and the check's builds) are identical to the baseline's.
+- What step 2 bought: a rebuild that step 1 can't avoid (a failed build, a changed declaration, `tree`) costs what SwiftPM's incremental build costs, about a third of the cold builds here, instead of a cold build. It doesn't help the cold case, and it keeps 11.8 GB on disk.
+- A possible next step: date the manifests only when System's or a dependency's list of files changed since the package's last build. Then a change inside existing files wouldn't make SwiftPM plan again. Not tried.
 
 ## Step 3: parallel adopter builds (uncommitted; never run)
 
