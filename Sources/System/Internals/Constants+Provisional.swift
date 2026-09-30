@@ -18,17 +18,20 @@
 import CSystem
 #endif
 
+// glibc, Musl and Bionic declare stdin, stdout and stderr as mutable
+// globals, which Swift 6 rejects reading unless the module is imported
+// @preconcurrency.
 #if SYSTEM_PACKAGE_DARWIN
 import CSystem
 import Darwin
 #elseif canImport(Glibc)
-import Glibc
+@preconcurrency import Glibc
 #elseif canImport(Musl)
-import Musl
+@preconcurrency import Musl
 #elseif canImport(WASILibc)
 import WASILibc
 #elseif canImport(Android)
-import Android
+@preconcurrency import Android
 #else
 #error("Unsupported Platform")
 #endif

@@ -13,14 +13,18 @@
 
 #if !os(Windows) && !os(WASI)
 
-// Must import here to use the C timespec type in @_alwaysEmitIntoClient code.
+// Must import here to use the C timespec type in @_alwaysEmitIntoClient code,
+// and CSystem on Linux, whose copy of timespec can own its members.
 #if SYSTEM_PACKAGE_DARWIN
 import Darwin
 #elseif canImport(Glibc)
+import CSystem
 import Glibc
 #elseif canImport(Musl)
+import CSystem
 import Musl
 #elseif canImport(Android)
+import CSystem
 import Android
 #else
 #error("Unsupported Platform")

@@ -283,10 +283,7 @@ internal func system_open_memstream(
 ) -> UnsafeMutablePointer<FILE>? {
   open_memstream(text, length)
 }
-
-internal func system_fclose(_ stream: UnsafeMutablePointer<FILE>) -> CInt {
-  fclose(stream)
-}
+// The stream closes with Syscalls+Provisional.swift's system_fclose.
 #endif // os(Linux) && canImport(Glibc)
 
 // MARK: - Memory functions
