@@ -10,17 +10,17 @@ interface at Swift's default API level (21), and said otherwise.
 
 ## Resume here
 
-- State: inventory (section 1) and batches 1 to 11 (sections 2.1 to 2.11)
+- State: inventory (section 1) and batches 1 to 12 (sections 2.1 to 2.12)
   committed. Batch 9 made system-next's code build on Linux: SystemPackage,
   the MemberImportVisibility probes and SystemTests all build, and the tests
   run; the failures left are other lanes' tests (section 3). Every earlier
   batch's Linux check (below) passed at `eabcd46`, but batch 8's pipe
   expectation, fixed in `08c79ad`.
-- Next: `clone3` with `CLONE_PIDFD` (Subprocess), then the section 4
-  needs, or a new pass over section 1.4 against the adopters' current
-  branches. `SpawnCredentials` on Linux (Subprocess) is designed but left
-  (section 2.10's note). `copy_file_range` turned out not to be needed on
-  Linux (2.8).
+- Next: section 1.4's list is done within this lane's files but for
+  `clone3`, which System won't wrap (section 3). What's left is section 4
+  (SystemSockets: vsock, UDP offload; Tests/MemberImportVisibility), or a
+  new pass over section 1.4 against the adopters' current branches.
+  `copy_file_range` turned out not to be needed on Linux (2.8).
 - This lane owns `Sources/System/**`, `Sources/CSystem`, `Tests/SystemTests`
   and this report, not SystemSockets or its tests: socket API (vsock, UDP
   offload) goes to section 4, with a patch where one is written.
@@ -113,6 +113,10 @@ musl.
    passed at `7f99387`.
 10. Batch 11 (`FileWatcher`): `--filter FileWatcherTest`, 4 XCTest tests;
     passed at `1c3e1c5`.
+11. Batch 12 (`SpawnCredentials`): `--filter SpawnCredentials`, 9 XCTest
+    tests run (1 skipped as root) at `c5fface`, among them
+    `testAnotherUsersChild`, which needs root: the child ran as 1234:5678
+    with group 4242, and the parent's credentials stayed its own.
 
 ## Baseline (Darwin)
 
@@ -753,8 +757,61 @@ Linux (`../linux-logs/linux-api-1c3e1c5-noble-test.log`,
 Darwin, after: XCTest 565 tests, 4 skipped, 0 failures; swift-testing 498
 tests in 81 suites passed.
 
+### 2.12 Batch 12: `SpawnCredentials` on Linux (swift-subprocess)
+
+- `SpawnCredentials` and the four `ProcessID.spawn(... credentials:)`
+  forms widen to Linux (glibc and Musl; not Android, whose `posix_spawn`
+  is from API level 28). Subprocess's Darwin branch spawns with them; its
+  Linux branch forks and execs in its own C (`_subprocess_fork_exec`).
+- Darwin's shim forks, sets the child's credentials, and runs the program
+  with `POSIX_SPAWN_SETEXEC`, which Linux lacks. On Linux, credentials are
+  per thread (glibc's and Musl's `setuid` and friends make every thread
+  change together, but the raw system calls change only the caller), and a
+  child gets those of the thread that spawns it. So Linux's
+  `csystem_spawn_with_credentials`, with Darwin's signature, starts a
+  thread, sets its groups, group and user with the raw `setgroups`,
+  `setresgid` and `setresuid` calls (the `*32` ones on 32-bit ABIs), calls
+  `posix_spawn` or `posix_spawnp` from it, and joins it. No fork, the file
+  actions and attributes are `posix_spawn`'s own, and the process's other
+  threads keep their credentials (the root-only test checks the caller's).
+  The Swift side is shared, but for the closes it adds on Darwin (its
+  `SETEXEC` closes close-on-exec descriptors early): on Linux
+  `posix_spawn` already gives the program what a spawn without
+  credentials would, so it adds none, and `fileActionDescriptors` is
+  unused. The docs say so.
+- Rejected: forking and applying the file actions in the child by hand,
+  which can't read the C-values form's glibc `posix_spawn_file_actions_t`,
+  and which Darwin's design note had assumed; `vfork`-style `clone` from
+  Swift. Open: whether a library should make a thread for this (it's
+  joined before the call returns).
+
+Tests: `SpawnCredentialsTests.swift` widens to Linux: the `inherit` action,
+`closeOnExecByDefault`, `POSIX_SPAWN_SETEXEC` and the C-values descriptor
+test stay Darwin's; a bad descriptor comes from a duplicate on Linux,
+since glibc's `posix_spawn` ignores closing an unopened one; and glibc
+clears close-on-exec on a descriptor duplicated onto itself (POSIX.1-2024),
+where Darwin doesn't, so the expected descriptors differ. The mock test
+expects no flag read on Linux. `Tests/SystemTests/SpawnCredentialsAsRootTests.swift`
+(Darwin and Linux, root only): a child as user 1234, group 5678 and
+supplementary group 4242, and the caller's credentials unchanged.
+
+Linux (`../linux-logs/linux-api-c5fface-noble-test.log`,
+`--filter SpawnCredentials`): 9 XCTest tests run, 1 skipped
+(`testCredentialsThatNeedRoot`, as root), 0 failures. The first run (at
+`4036138`) found the added closes changing what the program gets, fixed in
+`c5fface`.
+
+Darwin, after: XCTest 566 tests, 5 skipped (the root-only test), 0
+failures; swift-testing 498 tests in 81 suites passed.
+
 ## 3. Findings
 
+- **`clone3` isn't wrapped.** Subprocess's Linux shim calls it with
+  `CLONE_PIDFD`, to get a process descriptor atomically. It returns
+  twice, as `fork` does, and Swift can't run in the child. System's answer
+  is `ProcessDescriptor(pid)` (`pidfd_open`) after a spawn, which is safe
+  unless something else reaps the child first (a `SIGCHLD` handler that
+  waits for any child, or `SIGCHLD` ignored).
 - **Linux test failures at `eabcd46`, in other lanes' tests** (Tests/SystemTests;
   diagnoses from the log, not fixed here, since they're changes to those
   tests' logic rather than gates):
