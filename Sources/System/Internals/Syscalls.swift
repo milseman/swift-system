@@ -24,7 +24,7 @@ import Android
 #error("Unsupported Platform")
 #endif
 
-// Interacting with the mocking system, tracing, etc., is a potentially large
+// Interacting with the mocking system, tracing, etc., is a potentially significant
 // amount of code size, so we hand outline that code for every syscall
 
 // open
