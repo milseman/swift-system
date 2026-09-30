@@ -428,11 +428,15 @@ typedef enum _FILE_INFORMATION_CLASS : int {
 #define STANDARD_RIGHTS_REQUIRED 0x000F0000
 #define PROCESS_ALL_ACCESS (STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | 0xFFFF)
 
-#define WAIT_OBJECT_0 0
-#define WAIT_ABANDONED 0x80
+// As the SDK spells them, casts and all, less the L suffixes.
+#define STATUS_WAIT_0 ((DWORD)0x00000000)
+#define STATUS_ABANDONED_WAIT_0 ((DWORD)0x00000080)
+#define STATUS_PENDING ((DWORD)0x00000103)
+#define WAIT_OBJECT_0 ((STATUS_WAIT_0) + 0)
+#define WAIT_ABANDONED ((STATUS_ABANDONED_WAIT_0) + 0)
 #define WAIT_TIMEOUT 258
-#define WAIT_FAILED 0xFFFFFFFF
-#define STILL_ACTIVE 259
+#define WAIT_FAILED ((DWORD)0xFFFFFFFF)
+#define STILL_ACTIVE STATUS_PENDING
 
 #define CREATE_SUSPENDED 0x00000004
 #define CREATE_NO_WINDOW 0x08000000
@@ -478,3 +482,76 @@ DWORD GetProcessId(HANDLE Process);
 BOOL GetExitCodeProcess(HANDLE hProcess, LPDWORD lpExitCode);
 BOOL TerminateProcess(HANDLE hProcess, UINT uExitCode);
 DWORD WaitForSingleObject(HANDLE hHandle, DWORD dwMilliseconds);
+
+// processthreadsapi.h, processenv.h, stringapiset.h, winnt.h: threads and
+// creating processes
+
+#define THREAD_TERMINATE 0x0001
+#define THREAD_SUSPEND_RESUME 0x0002
+#define THREAD_GET_CONTEXT 0x0008
+#define THREAD_SET_CONTEXT 0x0010
+#define THREAD_SET_INFORMATION 0x0020
+#define THREAD_QUERY_INFORMATION 0x0040
+#define THREAD_SET_THREAD_TOKEN 0x0080
+#define THREAD_IMPERSONATE 0x0100
+#define THREAD_DIRECT_IMPERSONATION 0x0200
+#define THREAD_SET_LIMITED_INFORMATION 0x0400
+#define THREAD_QUERY_LIMITED_INFORMATION 0x0800
+#define THREAD_RESUME 0x1000
+#define THREAD_ALL_ACCESS (STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | 0xFFFF)
+
+#define DEBUG_PROCESS 0x00000001
+#define DETACHED_PROCESS 0x00000008
+#define CREATE_NEW_CONSOLE 0x00000010
+#define CREATE_NEW_PROCESS_GROUP 0x00000200
+#define CREATE_UNICODE_ENVIRONMENT 0x00000400
+#define EXTENDED_STARTUPINFO_PRESENT 0x00080000
+#define CREATE_BREAKAWAY_FROM_JOB 0x01000000
+#define CREATE_DEFAULT_ERROR_MODE 0x04000000
+#define STARTF_USESTDHANDLES 0x00000100
+
+// As the SDK spells them.
+#define STD_INPUT_HANDLE ((DWORD)-10)
+#define STD_OUTPUT_HANDLE ((DWORD)-11)
+#define STD_ERROR_HANDLE ((DWORD)-12)
+
+#define CSTR_LESS_THAN 1
+#define CSTR_EQUAL 2
+#define CSTR_GREATER_THAN 3
+
+typedef ULONG_PTR SIZE_T, *PSIZE_T;
+typedef const WCHAR *LPCWCH;
+
+struct _PROC_THREAD_ATTRIBUTE_LIST;
+typedef struct _PROC_THREAD_ATTRIBUTE_LIST *PPROC_THREAD_ATTRIBUTE_LIST,
+    *LPPROC_THREAD_ATTRIBUTE_LIST;
+
+typedef struct _STARTUPINFOEXW {
+  STARTUPINFOW StartupInfo;
+  LPPROC_THREAD_ATTRIBUTE_LIST lpAttributeList;
+} STARTUPINFOEXW, *LPSTARTUPINFOEXW;
+
+BOOL InitializeProcThreadAttributeList(LPPROC_THREAD_ATTRIBUTE_LIST lpAttributeList,
+                                       DWORD dwAttributeCount, DWORD dwFlags,
+                                       PSIZE_T lpSize);
+BOOL UpdateProcThreadAttribute(LPPROC_THREAD_ATTRIBUTE_LIST lpAttributeList,
+                               DWORD dwFlags, DWORD_PTR Attribute, PVOID lpValue,
+                               SIZE_T cbSize, PVOID lpPreviousValue,
+                               PSIZE_T lpReturnSize);
+void DeleteProcThreadAttributeList(LPPROC_THREAD_ATTRIBUTE_LIST lpAttributeList);
+HANDLE GetStdHandle(DWORD nStdHandle);
+BOOL SetStdHandle(DWORD nStdHandle, HANDLE hHandle);
+int CompareStringOrdinal(LPCWCH lpString1, int cchCount1, LPCWCH lpString2,
+                         int cchCount2, BOOL bIgnoreCase);
+
+HANDLE GetCurrentThread(void);
+DWORD GetCurrentThreadId(void);
+HANDLE OpenThread(DWORD dwDesiredAccess, BOOL bInheritHandle, DWORD dwThreadId);
+DWORD GetThreadId(HANDLE Thread);
+BOOL GetExitCodeThread(HANDLE hThread, LPDWORD lpExitCode);
+DWORD ResumeThread(HANDLE hThread);
+DWORD SuspendThread(HANDLE hThread);
+
+// processenv.h: environment variables
+
+DWORD GetEnvironmentVariableW(LPCWSTR lpName, LPWSTR lpBuffer, DWORD nSize);

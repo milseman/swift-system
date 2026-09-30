@@ -14,8 +14,8 @@ The windows-2 lane (sections 11 on, base system-next at `4365f83`) applies patch
 adds API for the adopters' top Windows gaps of section 8, in its order, checked the same way.
 
 **Resume here:** windows-api's parts are done (sections 1 to 10). windows-2: P1 and P2 are applied (section 11);
-processes have `ProcessID` and `Win32.ProcessHandle` (section 12). Next: creating processes (`CreateProcessW`), then
-the rest of section 8's gaps in order. Findings and patches for other lanes' files are the last two sections;
+processes have `ProcessID` and `Win32.ProcessHandle` (section 12), creation and thread handles (section 13). Next:
+clocks and sleeping, the second gap, then the rest of section 8's gaps in order. Findings and patches for other lanes' files are the last two sections;
 patch P3 (the CMake source list) grows with each new file.
 
 ## How it was checked
@@ -627,13 +627,13 @@ Both patches apply to `6a9833f` with `git apply`.
  #endif
 ```
 
-## 11. windows-2: patches P1 and P2: `037de61`, this commit
+## 11. windows-2: patches P1 and P2: `037de61`, `5d843d5`
 
 What:
 - **P1** (`037de61`), as section 10 has it: `@_disfavoredOverload` on `Errno.~=` in `Errno.swift`, and
   `testTypedCatchOfASharedName` in `Win32ErrorTests`. `Win32.Error.~=`'s doc comment and the harness's `Errno`
   stand-in follow.
-- **P2** (this commit), section 10's diff applied with `git apply`: in `FilePathWindows.swift`,
+- **P2** (`5d843d5`), section 10's diff applied with `git apply`: in `FilePathWindows.swift`,
   `withCanonicalPathRepresentation` throws when the sizing `GetFullPathNameW` returns 0, and `HRESULT_CODE`,
   `HRESULT_FACILITY` and `WIN32_FROM_HRESULT` convert with `DWORD(bitPattern:)`. A new test file,
   `Win32OverlongPathTests.swift`, opens a path of 40,007 characters through `FileDescriptor.open` and
@@ -654,11 +654,11 @@ A Windows run must check:
   runtime's mapping of `ERROR_FILENAME_EXCED_RANGE`, from whichever call fails); the test checks only that it's an
   `Errno`, and a Windows run should record which one.
 
-## 12. Processes: `ProcessID` on Windows and `Win32.ProcessHandle`: this commit
+## 12. Processes: `ProcessID` on Windows and `Win32.ProcessHandle`: `92a1dbd`
 
-The first gap of section 8: 12 packages, 27 files. The names most of those files use are `GetCurrentProcess`
-(10 files), `TerminateProcess` (7), `OpenProcess` and `WaitForSingleObject` (6 each), `GetCurrentProcessId` (4) and
-`GetExitCodeProcess` (3); `CreateProcessW` is in 2, and is the next commit.
+The first gap of section 8. The names most of its files use, by `survey-windows-imports.py names`, are
+`GetCurrentProcess`, `TerminateProcess`, `OpenProcess`, `WaitForSingleObject`, `GetCurrentProcessId` and
+`GetExitCodeProcess`; `CreateProcessW` is in two packages' files, and is section 13.
 
 What:
 - `ProcessIDWindows.swift`: `CInterop.ProcessID`, a `DWORD`, and `ProcessID` on Windows, with `current`
@@ -735,15 +735,96 @@ A Windows run must check:
 - Not covered: ending the calling process, waits beyond 49.7 days, and a process of another user, where
   `queryLimitedInformation` is granted and `queryInformation` isn't.
 
-## 13. windows-2: findings
+## 13. Creating processes, and thread handles: this commit
+
+What:
+- `Win32ProcessCreation.swift`: `Win32.ProcessCreationFlags` (`suspended`, `detached`, `newConsole`,
+  `newProcessGroup`, `breakawayFromJob`, `defaultErrorMode`, `noWindow`), `Win32.CreatedProcess` (`process`,
+  `thread`, `processID`, `threadID`), and `Win32.ProcessHandle.create(commandLine:application:environment:
+  currentDirectory:standardInput:standardOutput:standardError:flags:)`, over `CreateProcessW` with a
+  `STARTUPINFOEXW` and `PROC_THREAD_ATTRIBUTE_HANDLE_LIST`.
+- `Win32Thread.swift`, since a created process's first thread is its handle to resume: `Win32.ThreadID` (with
+  `current`, `GetCurrentThreadId`), `Win32.ThreadAccess`, and `Win32.ThreadHandle`, an owner like
+  `ProcessHandle`, with `current(access:inheritable:)` (a real handle, `DuplicateHandle` of `GetCurrentThread`'s),
+  `open(_:access:inheritable:)` (`OpenThread`), `threadID()` (`GetThreadId`), `waitForExit()`,
+  `waitForExit(timeout:)`, `exitCode()` (`GetExitCodeThread` after a zero wait), `resume()` and `suspend()`
+  (`ResumeThread`, `SuspendThread`), and the duplicate and inheritance members.
+
+Design calls, with the alternatives rejected:
+- **A child inherits its standard handles and nothing else.** Given any standard handle, System passes
+  `bInheritHandles` with a `PROC_THREAD_ATTRIBUTE_HANDLE_LIST` of inheritable duplicates of the three, and closes
+  the duplicates after the call; given none, it passes no inheritance. That's `POSIX_SPAWN_CLOEXEC_DEFAULT`'s
+  behavior, and swift-subprocess's. Rejected: inheriting every inheritable handle, which is `bInheritHandles`
+  alone and Rust's default (Rust takes a process-wide lock around it); and marking the caller's own handles
+  inheritable, as swift-subprocess does, which changes them and races with other threads creating processes.
+  The duplicates are inheritable during the call, so another thread's `CreateProcessW` that inherits without a
+  list can receive them; that's inherent.
+- **`nil` means the caller's own handle**, duplicated the same way, as Rust's `Stdio::inherit` does. If the caller
+  has none of the three and passes none, `STARTF_USESTDHANDLES` stays off and Windows' default applies. Rejected:
+  `nil` as no handle, which leaves a child given only an output without input or error; and setting the handles
+  only when all three are given.
+- **Standard handles are `borrowing Win32.FileHandle?`**, as `open`'s `templateFile` is, so callers pass them
+  through optional bindings, as the doc comment shows; `Ref` (SE-0519) would remove that, as SYS-0011 says.
+  Rejected: an overload for each combination, eight of them.
+- **The command line is one string, unquoted**, as `CreateProcessW` takes it and the program receives it. Open: a
+  helper that quotes arguments by the C runtime's rules, which swift-tools-support-core (`quote`),
+  swift-subprocess (`quoteWindowsCommandLine`) and Foundation's `Process` each implement; a batch file needs
+  cmd.exe's rules instead.
+- **The environment is `[String]` of `NAME=value`**, as POSIX's `spawn` takes it, sorted by name ignoring case
+  with `CompareStringOrdinal`, as Windows' documentation requires of an environment block and Rust does, with
+  ties kept in order. A name ends at the first `=` after its first character, for the per-drive `=C:` variables.
+  An empty string or a null character is `invalidParameter`, since either would end the block early. Rejected: a
+  dictionary, which can't keep duplicate names or their order; and passing the strings unsorted.
+- **`application` and `currentDirectory`** go through the namespace's path canonicalization, as `open`'s paths do:
+  resolved against the current directory, and `\\?\`-prefixed past `MAX_PATH`, as swift-subprocess passes its
+  application.
+- **`ThreadHandle.current(access:inheritable:)` returns a real handle**, unlike `ProcessHandle.current`:
+  `GetCurrentThread`'s pseudo handle means whichever thread uses it, and the owner is `Sendable`, so sending one
+  would change the thread it names. For the same reason, `init?(unsafelyAdopting:)` rejects `NULL` and
+  `INVALID_HANDLE_VALUE` (the process's pseudo handle), and its doc warns against the thread's.
+- **No thread `terminate()`**: `TerminateThread` leaves its process inconsistent (locks held, a stack not freed),
+  and no adopter calls it. `suspend()` is there, with a warning, for its counts' sake.
+- **Not wrapped here**: the window members of `STARTUPINFOW` (swift-subprocess sets `wShowWindow`), security
+  attributes for the returned handles, `CreateProcessWithLogonW`, and creating threads, which the threads gap
+  covers. Jobs are their own gap.
+
+Tests: `Win32ThreadTests` (suspended children from raw `CreateProcessW`) and `Win32ProcessCreationTests`. The
+environment block's sorting also ran on macOS, copied into a scratch program with an ASCII stand-in for
+`CompareStringOrdinal`.
+
+A Windows run must check:
+- `Win32ThreadTests`: the constants; `testCurrentThreadHandle` (a real handle with the current ID and no exit
+  code, and a `.synchronize`-only one that's inheritable); `testOpeningByID`; `testSuspendAndResume` (the count
+  starts at 1, `suspend` returns 1, the resumes 2 and 1, and the first thread's exit code is the process's);
+  `testAdoptionRejectsSentinels`.
+- `Win32ProcessCreationTests`: the constants, with `STD_*_HANDLE` through `truncatingIfNeeded`;
+  `testExitCodeAndIDs`; `testSuspended`; `testStandardOutput` (a line through a pipe, and the caller's end still
+  writable); `testStandardInputAndError` (sort.exe between two pipes, and `(echo oops) 1>&2`);
+  `testOnlyStandardHandlesAreInherited`, the only check of `PROC_THREAD_ATTRIBUTE_HANDLE_LIST`'s value, `0x20002`,
+  whose macro doesn't import; `testUnspecifiedHandlesAreTheCallers` (`SetStdHandle` to a pipe, only input given);
+  `testEnvironment` (cmd.exe expands a variable from the block); `testEnvironmentBlock`; `testCurrentDirectory`;
+  `testApplication` (a full path runs; `cmd` isn't searched for: `fileNotFound`); `testFailures`.
+- Not covered: consoles (`newConsole`, `detached`), breaking away from a job, a command line at the limit of
+  32,767 characters, and callers whose standard handles are console handles.
+
+## 14. windows-2: findings
 
 - **The PlatformEnum samples' Windows arms now reach System's `Win32.ProcessHandle`** (the stand-ins compile only
   with `SIMULATE_PLATFORMS`), and differ from it: `Platform.Process` reads `processID` as a property, where
   System's is `processID()`, a throwing method, and its wait opens a process with `.synchronize` alone and then
   reads the exit code, which System's `exitCode()` refuses with `accessDenied`, as `GetExitCodeProcess` would.
   Those files are the platform-enum lane's.
+- **Some SDK macros can't import, so the overlay must declare them.** In the model, spelled as the SDK spells
+  them, `WAIT_OBJECT_0` (`((STATUS_WAIT_0 ) + 0 )`, a sum with a cast) doesn't import, and `STD_INPUT_HANDLE`
+  (`((DWORD)-10)`) imports as a `DWORD` holding a negative literal, which is an error at every use. The adopters
+  use both on Windows, so Swift's WinSDK overlay must declare them; the model's overlay does, and a Windows build
+  of the tests confirms it. System's own code spells both as values.
+- **Borrowed optional owners are awkward to pass**, as SYS-0011 found for `templateFile`: a pipe's end goes to
+  `create` through a `var end: Win32.FileHandle? = pipe.writeEnd`, closed by assigning `nil`. `Optional.map` isn't
+  available for a noncopyable wrapped type in Swift 6.2, and a closure that captures a partially consumed struct
+  is "used after consume" even when it touches only a field that wasn't consumed.
 
-## 14. windows-2: patches for files outside the lane
+## 15. windows-2: patches for files outside the lane
 
 **P3, `Sources/System/CMakeLists.txt`: list the lane's new sources.** CI's CMake job fails when a SwiftPM source is
 missing from the list. Kept current with each commit; it applies to this branch with `git apply`.
@@ -757,13 +838,15 @@ missing from the list. Kept current with each commit; it applies to this branch 
 +  Win32/ProcessIDWindows.swift
    Win32/Win32.swift
    Win32/Win32Constants.swift
-@@ -366,7 +367,9 @@
+@@ -366,7 +367,11 @@
    Win32/Win32Locking.swift
    Win32/Win32Open.swift
 +  Win32/Win32Process.swift
++  Win32/Win32ProcessCreation.swift
    Win32/Win32SecurityDescriptor.swift
    Win32/Win32Syscalls.swift
 -  Win32/Win32VolumeInformation.swift)
++  Win32/Win32Thread.swift
 +  Win32/Win32VolumeInformation.swift
 +  Win32/Win32Wait.swift)
  target_link_libraries(SystemPackage PUBLIC

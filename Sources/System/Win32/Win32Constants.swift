@@ -93,4 +93,39 @@ internal var _WAIT_OBJECT_0: DWORD { 0x0 }
 @_alwaysEmitIntoClient
 internal var _WAIT_TIMEOUT: DWORD { 0x102 }
 
+// MARK: - Creating processes
+
+@_alwaysEmitIntoClient
+internal var _CREATE_UNICODE_ENVIRONMENT: DWORD { 0x0000_0400 }
+
+@_alwaysEmitIntoClient
+internal var _CSTR_EQUAL: CInt { 2 }
+
+@_alwaysEmitIntoClient
+internal var _CSTR_GREATER_THAN: CInt { 3 }
+
+@_alwaysEmitIntoClient
+internal var _CSTR_LESS_THAN: CInt { 1 }
+
+@_alwaysEmitIntoClient
+internal var _EXTENDED_STARTUPINFO_PRESENT: DWORD { 0x0008_0000 }
+
+// ProcThreadAttributeValue(ProcThreadAttributeHandleList, FALSE, TRUE,
+// FALSE): attribute 2, an input. The SDK spells it with a function-like
+// macro, which doesn't import.
+@_alwaysEmitIntoClient
+internal var _PROC_THREAD_ATTRIBUTE_HANDLE_LIST: DWORD_PTR { 0x0002_0002 }
+
+@_alwaysEmitIntoClient
+internal var _STARTF_USESTDHANDLES: DWORD { 0x0000_0100 }
+
+@_alwaysEmitIntoClient
+internal var _STD_ERROR_HANDLE: DWORD { DWORD(bitPattern: -12) }
+
+@_alwaysEmitIntoClient
+internal var _STD_INPUT_HANDLE: DWORD { DWORD(bitPattern: -10) }
+
+@_alwaysEmitIntoClient
+internal var _STD_OUTPUT_HANDLE: DWORD { DWORD(bitPattern: -11) }
+
 #endif // os(Windows)

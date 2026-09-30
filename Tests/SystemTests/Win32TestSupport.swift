@@ -162,4 +162,31 @@ internal func win32RawSpawn(
 /// ended, and needs no console input.
 internal var win32LongRunningCommand: String { "ping.exe -n 60 127.0.0.1" }
 
+/// Everything `handle`'s pipe delivers until its last writer closes.
+@available(System 199, *)
+internal func win32ReadToEnd(_ handle: borrowing Win32.FileHandle) throws -> [UInt8] {
+  var contents: [UInt8] = []
+  var chunk = [UInt8](repeating: 0, count: 4096)
+  while true {
+    let count: Int
+    do {
+      var span = chunk.mutableSpan
+      count = try handle.read(into: &span)
+    }
+    if count == 0 { return contents }
+    contents += chunk[..<count]
+  }
+}
+
+/// The value of an environment variable of this process, read with a raw
+/// Win32 call, or `nil`.
+internal func win32RawEnvironmentValue(_ name: String) -> String? {
+  name.withCString(encodedAs: UTF16.self) { name -> String? in
+    var buffer = [WCHAR](repeating: 0, count: 32_768)
+    let length = GetEnvironmentVariableW(name, &buffer, DWORD(buffer.count))
+    guard length > 0, Int(length) < buffer.count else { return nil }
+    return String(decoding: buffer[..<Int(length)], as: UTF16.self)
+  }
+}
+
 #endif // os(Windows)

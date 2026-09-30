@@ -306,4 +306,97 @@ internal func system_WaitForSingleObject(_ hHandle: HANDLE, _ dwMilliseconds: DW
   WaitForSingleObject(hHandle, dwMilliseconds)
 }
 
+// MARK: - Threads
+
+internal func system_GetCurrentThread() -> HANDLE {
+  GetCurrentThread()
+}
+
+internal func system_GetCurrentThreadId() -> DWORD {
+  GetCurrentThreadId()
+}
+
+internal func system_OpenThread(
+  _ dwDesiredAccess: DWORD, _ bInheritHandle: Bool, _ dwThreadId: DWORD
+) -> HANDLE? {
+  OpenThread(dwDesiredAccess, bInheritHandle, dwThreadId)
+}
+
+internal func system_GetThreadId(_ Thread: HANDLE) -> DWORD {
+  GetThreadId(Thread)
+}
+
+internal func system_GetExitCodeThread(
+  _ hThread: HANDLE, _ lpExitCode: UnsafeMutablePointer<DWORD>
+) -> Bool {
+  GetExitCodeThread(hThread, lpExitCode)
+}
+
+internal func system_ResumeThread(_ hThread: HANDLE) -> DWORD {
+  ResumeThread(hThread)
+}
+
+internal func system_SuspendThread(_ hThread: HANDLE) -> DWORD {
+  SuspendThread(hThread)
+}
+
+// MARK: - Creating processes
+
+internal func system_CreateProcessW(
+  _ lpApplicationName: UnsafePointer<WCHAR>?,
+  _ lpCommandLine: UnsafeMutablePointer<WCHAR>?,
+  _ lpProcessAttributes: UnsafeMutablePointer<SECURITY_ATTRIBUTES>?,
+  _ lpThreadAttributes: UnsafeMutablePointer<SECURITY_ATTRIBUTES>?,
+  _ bInheritHandles: Bool,
+  _ dwCreationFlags: DWORD,
+  _ lpEnvironment: UnsafeMutableRawPointer?,
+  _ lpCurrentDirectory: UnsafePointer<WCHAR>?,
+  _ lpStartupInfo: UnsafeMutablePointer<STARTUPINFOW>,
+  _ lpProcessInformation: UnsafeMutablePointer<PROCESS_INFORMATION>
+) -> Bool {
+  CreateProcessW(
+    lpApplicationName, lpCommandLine, lpProcessAttributes, lpThreadAttributes,
+    bInheritHandles, dwCreationFlags, lpEnvironment, lpCurrentDirectory, lpStartupInfo,
+    lpProcessInformation)
+}
+
+internal func system_InitializeProcThreadAttributeList(
+  _ lpAttributeList: LPPROC_THREAD_ATTRIBUTE_LIST?,
+  _ dwAttributeCount: DWORD,
+  _ dwFlags: DWORD,
+  _ lpSize: UnsafeMutablePointer<SIZE_T>
+) -> Bool {
+  InitializeProcThreadAttributeList(lpAttributeList, dwAttributeCount, dwFlags, lpSize)
+}
+
+internal func system_UpdateProcThreadAttribute(
+  _ lpAttributeList: LPPROC_THREAD_ATTRIBUTE_LIST,
+  _ dwFlags: DWORD,
+  _ Attribute: DWORD_PTR,
+  _ lpValue: UnsafeMutableRawPointer,
+  _ cbSize: SIZE_T
+) -> Bool {
+  UpdateProcThreadAttribute(lpAttributeList, dwFlags, Attribute, lpValue, cbSize, nil, nil)
+}
+
+internal func system_DeleteProcThreadAttributeList(
+  _ lpAttributeList: LPPROC_THREAD_ATTRIBUTE_LIST
+) {
+  DeleteProcThreadAttributeList(lpAttributeList)
+}
+
+internal func system_GetStdHandle(_ nStdHandle: DWORD) -> HANDLE? {
+  GetStdHandle(nStdHandle)
+}
+
+internal func system_CompareStringOrdinal(
+  _ lpString1: UnsafePointer<WCHAR>,
+  _ cchCount1: CInt,
+  _ lpString2: UnsafePointer<WCHAR>,
+  _ cchCount2: CInt,
+  _ bIgnoreCase: Bool
+) -> CInt {
+  CompareStringOrdinal(lpString1, cchCount1, lpString2, cchCount2, bIgnoreCase)
+}
+
 #endif // os(Windows)
