@@ -28,7 +28,7 @@ import Android
 // Cloning a file's contents (FICLONE). The containers' file systems, ext4,
 // overlayfs and tmpfs, don't share storage between files, so the clone
 // itself is checked only on one that does; the checks the kernel makes
-// first are checked everywhere.
+// first are checked everywhere (Linux 6.18: the mounts, then the modes).
 @available(System 199, *)
 final class FileContentsCloneTest: XCTestCase {
   #if ENABLE_MOCKING
@@ -50,15 +50,16 @@ final class FileContentsCloneTest: XCTestCase {
         permissions: .ownerReadWrite)
       defer { try? destination.close() }
 
-      // The kernel checks the descriptors before the file system:
-      // a pipe isn't a regular file, and the destination must be writable.
+      // The kernel checks the descriptors before the file system: first
+      // that both are on one mount, which a pipe (on pipefs) isn't, and then
+      // that the destination is writable.
       let pipe = try FileDescriptor.pipe()
       defer {
         try? pipe.readEnd.close()
         try? pipe.writeEnd.close()
       }
       XCTAssertThrowsError(try destination.cloneContents(of: pipe.readEnd)) {
-        XCTAssertEqual($0 as? Errno, .invalidArgument)
+        XCTAssertEqual($0 as? Errno, .improperLink)
       }
       let readOnly = try FileDescriptor.open(dir.appending("destination"), .readOnly)
       defer { try? readOnly.close() }

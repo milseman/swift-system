@@ -23,10 +23,11 @@ extension FileDescriptor {
   ///   open for reading.
   ///
   /// This descriptor must be a regular file open for writing,
-  /// without ``OpenOptions/append``, on the same file system as `source`.
+  /// without ``OpenOptions/append``, on the same mount as `source`:
+  /// two mounts, even of one file system, throw ``Errno/improperLink``,
+  /// as a pipe does.
   /// The file system must share storage between files, as Btrfs and XFS can;
-  /// others, such as ext4 and tmpfs, throw ``Errno/notSupported``,
-  /// and two file systems throw ``Errno/improperLink``.
+  /// others, such as ext4 and tmpfs, throw ``Errno/notSupported``.
   /// Then copy the bytes instead,
   /// as ``sendFile(_:fromAbsoluteOffset:count:retryOnInterrupt:)`` can.
   ///
