@@ -355,7 +355,8 @@ target_sources(SystemPackage PRIVATE
   Win32/Win32Locking.swift
   Win32/Win32Open.swift
   Win32/Win32SecurityDescriptor.swift
-  Win32/Win32Syscalls.swift)
+  Win32/Win32Syscalls.swift
+  Win32/Win32VolumeInformation.swift)
 target_link_libraries(SystemPackage PUBLIC
   CSystem)
 

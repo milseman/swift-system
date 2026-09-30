@@ -10,8 +10,8 @@ kept inside `#if os(Windows)`; its tests are Windows-only and haven't run.
 Darwin, before any change (`6a9833f`): XCTest 565 tests (4 skipped), swift-testing 496 tests in 80 suites, all
 passing. After each commit: the same, since every new file compiles to nothing on Darwin.
 
-**Resume here:** SYS-0010 to SYS-0014 are done (sections 1 to 5). Next is SYS-0015, volume information, then
-SYS-0016; then the adopter ranking.
+**Resume here:** SYS-0010 to SYS-0015 are done (sections 1 to 6). Next is SYS-0016, the final path name; then the
+adopter ranking.
 
 ## How it was checked
 
@@ -281,7 +281,7 @@ A Windows run must check:
 
 Next: SYS-0014.
 
-## 5. SYS-0014: byte-range locking: this commit
+## 5. SYS-0014: byte-range locking: `cfc5d2c`
 
 What: `Win32Locking.swift`: `Win32.LockMode` (`shared`, `exclusive`), and on `FileHandle`,
 `withLock(byteRange:mode:_:)` (`noasync`) and `withLockIfAvailable(byteRange:mode:_:)`, each with a typed overload
@@ -312,6 +312,24 @@ shows); `testNegativeBoundsAreRejected` (all five forms); `testRangesClosedAtThe
 `testBodyErrorsWinAndTheRangeIsUnlocked`.
 
 Next: SYS-0015.
+
+## 6. SYS-0015: volume information: this commit
+
+What: `Win32VolumeInformation.swift`: `Win32.VolumeInformation` (`name`, `fileSystemName`, `serialNumber`,
+`maximumComponentLength`, `flags`), `Win32.FileSystemFlags` (30 flags, in bit order), and `volumeInformation()`
+on both handle types, over `GetVolumeInformationByHandleW` with two stack buffers of `MAX_PATH + 1` characters.
+
+Follows the draft exactly. `VolumeInformation` has an internal memberwise initializer, and no public one, as
+drafted. The flag values are `winnt.h`'s; the newest (`0x200` to `0x2000`, `0x40000000`) weren't in any source
+available here to check against, so the Windows test is the check.
+
+Darwin tests: unchanged. Windows tests: `Win32VolumeInformationTests`.
+
+A Windows run must check: the 30 flags against the SDK; a temporary file's volume (a file system name, a component
+length) equal to its directory's, which is opened with no access rights; a pipe reporting `NPFS`; and `NUL`
+throwing `invalidFunction`. The last two are the draft's observations.
+
+Next: SYS-0016.
 
 ## 9. Findings
 

@@ -247,4 +247,22 @@ internal func system_UnlockFileEx(
     hFile, dwReserved, nNumberOfBytesToUnlockLow, nNumberOfBytesToUnlockHigh, lpOverlapped)
 }
 
+// MARK: - Volume information
+
+internal func system_GetVolumeInformationByHandleW(
+  _ hFile: HANDLE,
+  _ lpVolumeNameBuffer: UnsafeMutablePointer<WCHAR>?,
+  _ nVolumeNameSize: DWORD,
+  _ lpVolumeSerialNumber: UnsafeMutablePointer<DWORD>?,
+  _ lpMaximumComponentLength: UnsafeMutablePointer<DWORD>?,
+  _ lpFileSystemFlags: UnsafeMutablePointer<DWORD>?,
+  _ lpFileSystemNameBuffer: UnsafeMutablePointer<WCHAR>?,
+  _ nFileSystemNameSize: DWORD
+) -> Bool {
+  GetVolumeInformationByHandleW(
+    hFile, lpVolumeNameBuffer, nVolumeNameSize, lpVolumeSerialNumber,
+    lpMaximumComponentLength, lpFileSystemFlags, lpFileSystemNameBuffer,
+    nFileSystemNameSize)
+}
+
 #endif // os(Windows)
