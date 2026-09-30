@@ -10,17 +10,16 @@ interface at Swift's default API level (21), and said otherwise.
 
 ## Resume here
 
-- State: inventory (section 1) and batches 1 to 9 (sections 2.1 to 2.9)
+- State: inventory (section 1) and batches 1 to 10 (sections 2.1 to 2.10)
   committed. Batch 9 made system-next's code build on Linux: SystemPackage,
   the MemberImportVisibility probes and SystemTests all build, and the tests
   run; the failures left are other lanes' tests (section 3). Every earlier
   batch's Linux check (below) passed at `eabcd46`, but batch 8's pipe
   expectation, fixed in `08c79ad`.
-- Next: the larger items (section 1.5, item 7), each its own batch, in
-  adopter order: `SpawnCredentials` on Linux (Subprocess), `readPassphrase`
-  on Linux (SwiftPM), inotify (TSC), `clone3` (Subprocess). Each needs a
-  design first; section 1.2 has the C interfaces. `copy_file_range` turned
-  out not to be needed on Linux (section 2.8).
+- Next: inotify (TSC), then `clone3` (Subprocess). `SpawnCredentials` on
+  Linux (Subprocess) is designed but left (section 2.10's note):
+  its C file actions can't be replayed on glibc. `readPassphrase` is done
+  (2.10). `copy_file_range` turned out not to be needed on Linux (2.8).
 - This lane owns `Sources/System/**`, `Sources/CSystem`, `Tests/SystemTests`
   and this report, not SystemSockets or its tests: socket API (vsock, UDP
   offload) goes to section 4, with a patch where one is written.
@@ -109,6 +108,8 @@ musl.
      `EOPNOTSUPP`, which the test accepts after checking `EINVAL` for a
      pipe and `EBADF` for a read-only destination. To see a clone work,
      run it on Btrfs or XFS with reflinks, if there's one to mount.
+9. Batch 10 (`readPassphrase`): `--filter ReadPassphrase`, 5 XCTest tests;
+   passed at `7f99387`.
 
 ## Baseline (Darwin)
 
@@ -254,9 +255,9 @@ In the ranking's order, each small enough to review alone:
    `RTLD_DEEPBIND` on glibc (done, section 2.5).
 6. swift-sdk-generator: the three default pthread initializers; `O_SYNC`
    and `O_DSYNC` (done, section 2.6).
-7. Larger, later: `readPassphrase` on Linux (SwiftPM), `SpawnCredentials` on
-   Linux (Subprocess), inotify (TSC), `FICLONE` (Foundation; done, section
-   2.8), `clone3` (Subprocess).
+7. Larger, later: `readPassphrase` on Linux (SwiftPM; done, section 2.10),
+   `SpawnCredentials` on Linux (Subprocess; left, 2.10), inotify (TSC),
+   `FICLONE` (Foundation; done, 2.8), `clone3` (Subprocess).
 
 ## 2. Batches
 
@@ -646,6 +647,59 @@ Linux (swift:6.2-noble, arm64, as root), full runs:
   run, 5 skipped, 5 failures; swift-testing 459 tests in 77 suites, 7
   issues. Every failure is one of section 3's, in other lanes' tests; this
   lane's tests all pass.
+
+Darwin, after: XCTest 565 tests, 4 skipped, 0 failures; swift-testing 498
+tests in 81 suites passed.
+
+### 2.10 Batch 10: `readPassphrase` on Linux and Android (swift-package-manager)
+
+- `TerminalDescriptor.readPassphrase(prompt:into:options:)` and
+  `readPassphrase(prompt:maxByteCount:options:)`, and `PassphraseOptions`,
+  widen to Linux and Android. SwiftPM's Darwin branch reads a registry
+  password with them; its Linux branch calls `getpass`.
+- glibc, Musl and Bionic have no `readpassphrase`, so there System takes
+  its steps itself (`_readPassphrase(prompt:into:options:input:output:onTerminal:)`),
+  following OpenBSD's: `/dev/tty`, or standard input and standard error
+  (with `standardInput`, or without a terminal), and `ENOTTY` for
+  `requireTerminal` without one; echo and `ECHONL` off on the terminal it
+  opened, unless `echo`, set with `TCSAFLUSH`, which discards type-ahead;
+  the prompt; a line to a newline or carriage return, keeping what fits,
+  with `sevenBit` and the C locale's case changes; a newline when echo was
+  off; the attributes restored. `EINTR` ends the read and is thrown after
+  the terminal is restored. The options' raw values are the BSDs'
+  and libbsd's.
+- Design calls: no signal handling, unlike `readpassphrase`, which
+  restores the terminal on `SIGINT` and re-raises it, and restarts after
+  `SIGTSTP`: a signal that ends the process leaves echo off, as glibc's
+  `getpass` does, and the doc says so. Rejected: wrapping `getpass`, which
+  takes no options and isn't in Bionic; porting `readpassphrase`'s signal
+  handling to C, which is process-wide state for a library to take. Open:
+  that port, if adopters need it.
+- `SpawnCredentials` on Linux, looked at for this batch and left: Darwin's
+  forks, sets the credentials, and runs the program with `posix_spawn` and
+  `POSIX_SPAWN_SETEXEC`, which glibc lacks, so a Linux version would apply
+  the file actions and attributes itself in the child, and the `cFileActions:`
+  form's glibc `posix_spawn_file_actions_t` can't be replayed. The
+  `[SpawnFileAction]` forms could, in C in `shims.c`, as Subprocess's
+  `_subprocess_fork_exec` does; that's a batch of its own, with a design.
+
+Tests:
+
+- `ReadPassphraseTests.swift` widens to Linux and Android (its standard
+  input, long line and `requireTerminal` tests); its mock test, which
+  expects `readpassphrase` calls, stays Darwin's.
+- `Tests/SystemTests/ReadPassphraseLinuxTests.swift` (Linux and Android,
+  XCTest): the steps on a pseudoterminal, from a thread, with the test
+  typing only after the prompt arrives (echo is off by then): nothing
+  typed is echoed, a CR LF follows, the attributes come back; with `echo`
+  and `uppercase`, what's typed is echoed and upcased. The controller
+  reads everything before the thread is joined: restoring the attributes
+  with `TCSAFLUSH` waits until the terminal's output is read, on Darwin,
+  which is where a first version of the test hung (in a scratch copy with
+  the Linux path taken, where all 5 tests then passed).
+
+Linux (`../linux-logs/linux-api-7f99387-noble-test.log`,
+`--filter ReadPassphrase`): 5 XCTest tests pass.
 
 Darwin, after: XCTest 565 tests, 4 skipped, 0 failures; swift-testing 498
 tests in 81 suites passed.
