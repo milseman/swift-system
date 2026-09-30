@@ -87,6 +87,7 @@ target_sources(SystemPackage PRIVATE
 target_sources(SystemPackage PRIVATE
   Events/EventCounter.swift
   Events/EventPoll.swift
+  Events/FileWatcher.swift
   Events/IntervalTimer.swift
   Events/KernelEvent.swift
   Events/KernelQueue.swift
@@ -152,6 +153,7 @@ target_sources(SystemPackage PRIVATE
   Internals/Constants+DynamicLoading.swift
   Internals/Constants+Events.swift
   Internals/Constants+ExtendedAttributes.swift
+  Internals/Constants+FileWatcher.swift
   Internals/Constants+MemoryMapping.swift
   Internals/Constants+NetworkInterfaces.swift
   Internals/Constants+StatFS.swift
@@ -166,6 +168,7 @@ target_sources(SystemPackage PRIVATE
   Internals/Syscalls+Environment.swift
   Internals/Syscalls+Events.swift
   Internals/Syscalls+ExtendedAttributes.swift
+  Internals/Syscalls+FileWatcher.swift
   Internals/Syscalls+MemoryMapping.swift
   Internals/Syscalls+NetworkInterfaces.swift
   Internals/Syscalls+PathsAndFiles.swift
