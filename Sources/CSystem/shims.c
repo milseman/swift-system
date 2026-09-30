@@ -80,6 +80,15 @@ int _system_ioctl_TIOCSWINSZ(int fd, const void *ws) {
   return ioctl(fd, TIOCSWINSZ, ws);
 }
 
+// <linux/fs.h>'s definition. That header includes <linux/mount.h>, which
+// some glibc versions' <sys/mount.h> conflicts with, so it isn't included.
+#ifndef FICLONE
+#define FICLONE _IOW(0x94, 9, int)
+#endif
+int _system_ioctl_FICLONE(int fd, int source) {
+  return ioctl(fd, FICLONE, source);
+}
+
 #endif
 
 #if defined(__APPLE__)

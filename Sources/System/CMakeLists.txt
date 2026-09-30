@@ -102,9 +102,11 @@ target_sources(SystemPackage PRIVATE
   ExtendedAttributes/ExtendedAttributes.swift)
 target_sources(SystemPackage PRIVATE
   FileCopying/FileClone.swift
+  FileCopying/FileContentsClone.swift
   FileCopying/FileCopy.swift
   FileCopying/FileCopyState.swift
   Internals/Constants+FileCopying.swift
+  Internals/Syscalls+FileContentsClone.swift
   Internals/Syscalls+FileCopying.swift)
 target_sources(SystemPackage PRIVATE
   FilePath/FilePath.swift

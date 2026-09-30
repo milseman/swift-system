@@ -34,6 +34,11 @@
 int _system_ioctl_TIOCGWINSZ(int fd, void *ws);
 int _system_ioctl_TIOCSWINSZ(int fd, const void *ws);
 
+// FICLONE, which clones the contents of the file that `source` refers to
+// into the file that `fd` refers to. It's in <linux/fs.h>, which this header
+// doesn't include; see shims.c.
+int _system_ioctl_FICLONE(int fd, int source);
+
 // timerfd. Each value points to a struct itimerspec, untyped so that this
 // header needn't include <sys/timerfd.h>, whose <time.h> declares timespec.
 extern int csystem_timerfd_create(int clockid, int flags);

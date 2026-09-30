@@ -10,14 +10,14 @@ interface at Swift's default API level (21), and said otherwise.
 
 ## Resume here
 
-- State: inventory (section 1) and batches 1 to 7 (sections 2.1 to 2.7)
+- State: inventory (section 1) and batches 1 to 8 (sections 2.1 to 2.8)
   committed: the small widenings in the plan are done, and Foundation's
-  `makeUniqueFile(options:permissions:)`.
+  `makeUniqueFile(options:permissions:)` and `FICLONE`.
 - Next: the larger items (section 1.5, item 7), each its own batch, in
-  adopter order: `copy_file_range` and `FICLONE` (Foundation, NIO),
-  `SpawnCredentials` on Linux (Subprocess), `readPassphrase` on Linux
-  (SwiftPM), inotify (TSC), `clone3` (Subprocess). Each needs a design
-  first; section 1.2 has the C interfaces.
+  adopter order: `SpawnCredentials` on Linux (Subprocess), `readPassphrase`
+  on Linux (SwiftPM), inotify (TSC), `clone3` (Subprocess). Each needs a
+  design first; section 1.2 has the C interfaces. `copy_file_range` turned
+  out not to be needed on Linux (section 2.8).
 - This lane owns `Sources/System/**`, `Sources/CSystem`, `Tests/SystemTests`
   and this report, not SystemSockets or its tests: socket API (vsock, UDP
   offload) goes to section 4, with a patch where one is written.
@@ -92,6 +92,12 @@ later; a log goes to `../linux-logs/`.
      `UniqueFilesWithPermissionsLinuxTest`. With `--user 1000:1000` too, to
      be sure the creation-mask test holds for an unprivileged user.
    - The link should print no `mktemp` warning: say if one appears.
+8. Batch 8 (`FICLONE`):
+   - `Utilities/linux/build.sh test -- --filter FileContentsCloneTest`: 2
+     XCTest tests. On the container's file systems the clone throws
+     `EOPNOTSUPP`, which the test accepts after checking `EINVAL` for a
+     pipe and `EBADF` for a read-only destination. To see a clone work,
+     run it on Btrfs or XFS with reflinks, if there's one to mount.
 
 ## Baseline (Darwin)
 
@@ -238,8 +244,8 @@ In the ranking's order, each small enough to review alone:
 6. swift-sdk-generator: the three default pthread initializers; `O_SYNC`
    and `O_DSYNC` (done, section 2.6).
 7. Larger, later: `readPassphrase` on Linux (SwiftPM), `SpawnCredentials` on
-   Linux (Subprocess), inotify (TSC), `copy_file_range` and `FICLONE`
-   (Foundation, NIO), `clone3` (Subprocess).
+   Linux (Subprocess), inotify (TSC), `FICLONE` (Foundation; done, section
+   2.8), `clone3` (Subprocess).
 
 ## 2. Batches
 
@@ -542,6 +548,38 @@ Tests:
   Linux branch: the 2 mock tests and the 4 real ones passed.
 - Darwin, after: XCTest 565 tests, 4 skipped, 0 failures; swift-testing 498
   tests in 81 suites passed (the Darwin mock and real tests unchanged).
+
+### 2.8 Batch 8: `FICLONE` (swift-foundation)
+
+- `FileDescriptor.cloneContents(of:)`, on Linux and Android: the `FICLONE`
+  ioctl, which makes this file's contents another file's, sharing storage
+  (Btrfs, XFS, bcachefs), and throws `EOPNOTSUPP` where the file system
+  can't. Foundation's `FileOperations.swift` tries it first on Linux
+  (through `_filemanager_shims_FICLONE`), then falls back to a `sendfile`
+  loop, which System already has (`FileDescriptor.sendFile`, in
+  `SendFile.swift`), so that loop needs nothing new: the inventory's
+  `copy_file_range` is FreeBSD's use in Foundation, not Linux's.
+- The request is `_IOW(0x94, 9, int)`, whose encoding differs by
+  architecture, so it's a shim, `_system_ioctl_FICLONE`, beside the
+  terminal ones. `shims.c` defines `FICLONE` itself rather than include
+  `<linux/fs.h>`, which pulls in `<linux/mount.h>`, which some glibc
+  versions' `<sys/mount.h>` conflicts with.
+- Naming: Darwin's `clonefile` makes a new file (`clone(to:options:)`),
+  where `FICLONE` fills an open one, so it gets a name of its own. Rejected:
+  `clone(from:)`, which reads as the inverse of Darwin's call on the same
+  type. Open: `FICLONERANGE` (a range) and `FIDEDUPERANGE`, which no adopter
+  uses.
+- No `retryOnInterrupt`: the call doesn't wait for anything.
+
+Tests: `Tests/SystemTests/FileContentsCloneTests.swift` (Linux and Android,
+XCTest): the mock test (`.noInterrupt`), and on a real file, `EINVAL` for a
+pipe source and `EBADF` for a read-only destination (the kernel checks
+those before the file system), then the clone, or `EOPNOTSUPP` where the
+file system can't. The mock test ran on Darwin in a scratch copy with the
+Linux condition made true.
+
+Darwin, after: XCTest 565 tests, 4 skipped, 0 failures; swift-testing 498
+tests in 81 suites passed (no new Darwin tests).
 
 ## 3. Findings
 
