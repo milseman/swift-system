@@ -10,11 +10,10 @@ interface at Swift's default API level (21), and said otherwise.
 
 ## Resume here
 
-- State: inventory (section 1) and batches 1 to 4 (sections 2.1 to 2.4)
+- State: inventory (section 1) and batches 1 to 5 (sections 2.1 to 2.5)
   committed.
-- Next: batch 5 in the plan (section 1.5): `makeUniqueFile(suffixLength:)`
-  (`mkostemps`) for TSC, `symbolInfo(containing:)` (`dladdr`) for
-  swift-build, `RTLD_DEEPBIND` for TSC and swift-driver.
+- Next: batch 6 in the plan (section 1.5): the three default pthread
+  initializers (swift-sdk-generator), and `O_SYNC` and `O_DSYNC`.
 - This lane owns `Sources/System/**`, `Sources/CSystem`, `Tests/SystemTests`
   and this report, not SystemSockets or its tests: socket API (vsock, UDP
   offload) goes to section 4, with a patch where one is written.
@@ -71,6 +70,12 @@ later; a log goes to `../linux-logs/`.
      `TimeZoneFilesLinuxTests`' test to pass. Where
      `/usr/share/zoneinfo` exists it also stats `Etc/UTC`; say whether the
      image has it.
+5. Batch 5 (`mkostemps`, `dladdr`, `RTLD_DEEPBIND`):
+   - `Utilities/linux/build.sh test -- --filter SmallLinuxGapsTest`. Expect
+     the build to pass (`csystem_mkostemps` and `csystem_dladdr` in
+     `shims.c`, `RTLD_DEEPBIND` from Glibc's module) and 4 XCTest tests to
+     pass. `testSymbolInfo` names the symbol `getpid` or `__getpid`; say
+     which, and the library path, if it fails.
 
 ## Baseline (Darwin)
 
@@ -213,7 +218,7 @@ In the ranking's order, each small enough to review alone:
    Darwin's (section 2.4).
 5. TSC: `makeUniqueFile(suffixLength:)` (`mkostemps`); swift-build:
    `symbolInfo(containing:)` (`dladdr`); TSC and swift-driver:
-   `RTLD_DEEPBIND` on glibc.
+   `RTLD_DEEPBIND` on glibc (done, section 2.5).
 6. swift-sdk-generator: the three default pthread initializers; `O_SYNC`
    and `O_DSYNC`.
 7. Larger, later: `readPassphrase` on Linux (SwiftPM), `SpawnCredentials` on
@@ -423,6 +428,41 @@ Tests:
 - `Tests/SystemTests/TimeZoneFilesLinuxTests.swift` (Linux, swift-testing):
   the two paths, and `Etc/UTC` a regular file where the directory exists.
   Typechecked on Darwin in a scratch copy.
+- Darwin, after: XCTest 565 tests, 4 skipped, 0 failures; swift-testing 498
+  tests in 81 suites passed (no new Darwin tests).
+
+### 2.5 Batch 5: `mkostemps`, `dladdr`, `RTLD_DEEPBIND` (TSC, swift-build, swift-driver)
+
+- `FilePath.makeUniqueFile(suffixLength:options:)` (`mkostemps`) widens to
+  Linux and Android. TSC's `TemporaryFile.swift` calls it on Darwin and
+  `mkstemps` on Linux. glibc and Musl declare `mkostemps` only with
+  `_GNU_SOURCE`, and Bionic from API level 23, so it's
+  `csystem_mkostemps`, beside `csystem_mkostemp` and on its pattern: below
+  API 23 it calls `mkstemps` when there are no options and fails with
+  `ENOSYS` when there are. The relative variant (`mkostempsat_np`) stays
+  Darwin's.
+- `DynamicLibrary.symbolInfo(containing:)` and `SymbolInfo` (`dladdr`,
+  `Dl_info`) widen to Linux and Android, for swift-build's Linux `dladdr`.
+  glibc declares both only with `_GNU_SOURCE`, so `csystem_dladdr` returns
+  `Dl_info`'s four fields through pointers; the Swift type is unchanged.
+  The doc says what Linux's loader finds: exported symbols only, and
+  nothing in a statically linked program.
+- `DynamicLibrary.OpenOptions.deepBind` (`RTLD_DEEPBIND`), on Linux with
+  glibc only: Musl and Bionic don't have it. TSC and swift-driver load
+  libSwiftScan with it on Linux where they pass `RTLD_FIRST` on Darwin.
+  Named on the pattern of `noLoad` and `noDelete`; rejected: `deepBinding`.
+
+Tests:
+
+- `Tests/SystemTests/SmallLinuxGapsTests.swift` (Linux and Android,
+  XCTest, as its Darwin counterparts are): the `mkostemps` mock test; a
+  unique file with a suffix (name, mode 0600, close-on-exec, and the
+  six-X rule); `dladdr` on `getpid`'s address, found through
+  `mainProgram()` (skipped where the program has no dynamic symbols, as a
+  static Musl one doesn't), with glibc's library path; and on glibc,
+  `libm.so.6` loaded with `deepBind` finding `cos`.
+- Typechecked on Darwin in a scratch copy, with the Linux branches made
+  true and the shims stubbed.
 - Darwin, after: XCTest 565 tests, 4 skipped, 0 failures; swift-testing 498
   tests in 81 suites passed (no new Darwin tests).
 

@@ -168,6 +168,17 @@ extern int csystem_getentropy(void *buffer, size_t length);
 // fails with ENOSYS when there are.
 extern int csystem_mkostemp(char *path_template, int flags);
 
+// mkostemps, the same with a suffix after the X's, which glibc and Musl
+// declare only with _GNU_SOURCE, and Bionic only from API level 23; below
+// it, this calls mkstemps when there are no flags.
+extern int csystem_mkostemps(char *path_template, int suffix_length, int flags);
+
+// dladdr, which glibc declares, with Dl_info, only with _GNU_SOURCE. It
+// returns Dl_info's fields, dli_fname, dli_fbase, dli_sname and dli_saddr,
+// through the pointers, and dladdr's result.
+extern int csystem_dladdr(const void *address, const char **path, void **base,
+                          const char **symbol, void **symbol_address);
+
 // Whether the process runs with privileges it didn't start with, as a
 // set-user-ID program does: getauxval(AT_SECURE). No C library's Swift module
 // includes <sys/auxv.h>.

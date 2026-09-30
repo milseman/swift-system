@@ -11,7 +11,7 @@
 // Darwin, unique files relative to a directory: mkostemps and
 // mkostempsat_np, next to UniqueFiles.swift's mkostemp.
 
-#if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
+#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD)
 
 @available(System 199, *)
 extension FilePath {
@@ -40,7 +40,9 @@ extension FilePath {
   ///
   /// The corresponding C function is `mkostemps`.
   ///
-  /// - Note: Only available on Darwin, FreeBSD, and OpenBSD.
+  /// - Note: Only available on Darwin, Linux, Android, FreeBSD, and OpenBSD.
+  ///   On Android before API level 23, passing options throws
+  ///   ``Errno/noFunction``.
   @_alwaysEmitIntoClient
   public func makeUniqueFile(
     suffixLength: Int,
@@ -147,4 +149,4 @@ internal func _retryingTemplate<T>(
   }
 }
 
-#endif // SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
+#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD)

@@ -378,8 +378,35 @@ extern int csystem_mkostemp(char *path_template, int flags) {
   #endif
 }
 
+extern int csystem_mkostemps(char *path_template, int suffix_length, int flags) {
+  #if defined(__ANDROID__) && __ANDROID_API__ < 23
+  if (flags == 0) return mkstemps(path_template, suffix_length);
+  errno = ENOSYS;
+  return -1;
+  #else
+  return mkostemps(path_template, suffix_length, flags);
+  #endif
+}
+
 extern int csystem_is_secure_execution(void) {
   return getauxval(AT_SECURE) != 0;
+}
+#endif // __linux__
+
+#ifdef __linux__
+#include <dlfcn.h>
+
+extern int csystem_dladdr(const void *address, const char **path, void **base,
+                          const char **symbol, void **symbol_address) {
+  Dl_info info;
+  int result = dladdr(address, &info);
+  if (result != 0) {
+    *path = info.dli_fname;
+    *base = info.dli_fbase;
+    *symbol = info.dli_sname;
+    *symbol_address = info.dli_saddr;
+  }
+  return result;
 }
 #endif // __linux__
 
