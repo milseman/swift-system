@@ -14,21 +14,27 @@ Darwin; grouped here into clusters and ranked by packages, then call sites. `eco
 toolchain's packages, and `ecosystem.sh --popular report` for popular.tsv's (section 37). Counts are in the runs'
 reports and in STATUS.md, not here.
 
-**Resume here** (stopped 2026-09-29, quota; STATUS.md regenerated at `145df6b`). Nothing is in progress; take the
-rows in order:
+**Resume here** (coverage-2 stopped 2026-09-29, quota; STATUS.md not regenerated since `145df6b`). Committed:
+`5e89235` (B2, P3b) and `b583bdf` (status.py's marker parser). Nothing is uncommitted. Section 40 has the per-marker
+answers, the designs, a tool finding and the baseline tests. Take the steps in order:
 
-| # | Item | For | Plan |
+| # | Step | State | Plan |
 |---|---|---|---|
-| B1 | `Errno.notCapable` (ENOTCAPABLE, 107) is in the macOS 26 SDK, but System declares it on FreeBSD only (Errno.swift, near line 1465); Samples/Beneath.swift works around it with `Errno(rawValue: ENOTCAPABLE)` | the foundation lane (Michael's ask) | done: the `#if` is `canImport(Darwin, _version: 346) \|\| os(FreeBSD)`, since the macOS 26.0 SDK is the first to define it; a test (foundation-gaps lane, Prototype/FoundationGaps/REPORT.md section 1); Beneath.swift left to the demos lane |
-| B2 | Utilities/adopter-coverage/README.md still names `Utilities/nio-coverage/check.sh` (the bullet at line 58 since `9541436`), which the utilities merge retired | Michael's ask | drop the bullet |
-| M1 | New SYSTEM-GAP markers in `../adopters` (STATUS.md's gaps part lists them): swift-build's Mach-O file structures (mach_header, load_command, segment_command, section, fat_header, fat_arch, dylib_command, rpath_command, uuid_command, build_version_command, version_min_command), mach-o/utils.h's three functions, ar.h's archive header (ar_hdr, AR_EFMT1, SARMAG), MacTypes OSStatus, abort, off_t, vm_prot_t, `constants`; swift-docc's PIPE_BUF | swift-build, swift-docc | decide first: section 36 rejected Mach-O's header types as the MachO module's, which a file can import instead of Darwin; the markers ask anyway. OSStatus, off_t and vm_prot_t have `swift` answers already (sections 25, 31 and 37), so check what the markers say |
-| P3a | pthread_cancel (swift-distributed-actors' Concurrency/_Thread.swift) | popular.tsv's third batch, run `145df6bd3157-16fa0c4f` | PThread has no cancel: design it with the Threads API's conventions (section 32) |
-| P3b | `Comment` in swift-homomorphic-encryption's `_TestUtilities`: a test-support target the survey's pattern misses, read lexically | the same run | `skip._TestUtilities` in packages/popular/swift-homomorphic-encryption.ini, or widen ecosystem.py's test-support pattern to `_Test*` |
+| B1 | `Errno.notCapable` on Darwin | done by the foundation-gaps lane | |
+| B2 | README.md's retired nio-coverage bullet | done, `5e89235` | |
+| P3b | `Comment` in swift-homomorphic-encryption's `_TestUtilities` | done, `5e89235`: `skip._TestUtilities` | alternative in section 40 |
+| M1a | status.py reads the markers' names | done, `b583bdf` | |
+| M1b | status.py: answers outside System | not started | from mapping.ini: a `swift` answer is *standard library*, `wrap = no` *not System's*, for names System doesn't cover (swift first, as ecosystem.py's queue); out of the work list; METHOD and section 3's header say so; coverage stays what System documents |
+| M1c | mapping.ini | not started | `[Mach-O file format]` and `[Mach-O architecture names]` (`wrap = no`), `[ar archive header]` (`swift`, `wrap = no`), a note in `[termination]`, off_t out of `[C scalar types]` once `CInterop.Offset` exists (section 40) |
+| M1d | platforms.py's Darwin `canImport` set | not started | add Darwin.ar, Darwin.C, MachO, MachO.dyld.utils, os.log, os.signpost (section 40's finding) |
+| M1e | `CInterop.Offset` (off_t), `SystemConfig.maxAtomicPipeWriteBytes: Int` (PIPE_BUF) | not started | new files only; tests |
+| P3a | PThread cancellation | designed, not started | section 40 |
 
-Then: when the rows above are done, rerun `ecosystem.sh --popular run` and `report` to confirm the popular queue is
-empty, and decide whether popular.tsv needs a fourth batch. sqlite-nio's extraction takes minutes on each run,
-scanning its vendored SQLite; a `skip.CSQLite` would speed runs, but would drop SQLite's OS use from the package's
-table.
+Then: `swift build && swift test`; `ecosystem.sh --popular run` and `report` to confirm the popular queue is empty
+(and the toolchain's `run` and `report`, since M1d changes swift-build's extraction); decide on a fourth batch;
+status.sh, and answer what the packages-5 and foundation-walk lanes' new markers ask (item 2 of the brief, not
+started). sqlite-nio's extraction takes minutes on each run, scanning its vendored SQLite; a `skip.CSQLite` would
+speed runs, but would drop SQLite's OS use from the package's table.
 
 The toolchain's queue has been empty since run `a3a634eb2b19-06a7ddd5` (section 37), and popular.tsv's first and
 second batches since sections 38 and 39. What follows is the toolchain's work, all done.
@@ -1002,3 +1008,64 @@ Tests: ProvisionalStdioTest's `testReadingLines` covers lines with and without a
 line longer than getline's first buffer, a NUL byte, an invalid UTF-8 byte, the end of the file, and a write-only
 stream's EBADF. The getline mock case is new too. SmallGapsTest checks timespec_get against realtime, and checks
 that MAP_FILE is zero. The full suite passes with testVolumeAttributes skipped.
+
+## 40. coverage-2: the Resume-here rows, part done: `5e89235`, `b583bdf`
+
+The coverage-2 lane (worktree `../coverage-2`, from system-next `3f9f9e1`) took the Resume-here rows and stopped
+on quota partway; the table above says what's left.
+
+- **B2** (`5e89235`): the README bullet naming `Utilities/nio-coverage/check.sh` goes.
+- **P3b** (`5e89235`): `skip._TestUtilities` in swift-homomorphic-encryption's package file. The lexical scan read
+  swift-testing's `Comment` there as an OS name. The survey's test-support pattern,
+  `(Test|Testing)(Support|Utilities|Utils|Helpers)$`, already matches `_TestUtilities`; the generated file just
+  doesn't carry that to check.sh. Rejected for now: the generator writing `skip.<Target>` for every target its
+  pattern matches, which would keep the survey and the check agreeing, but only for files it generates later (it
+  never rewrites one).
+- **status.py's marker parser** (`b583bdf`): `MacTypes OSStatus` and `Mach-O load_command` name OSStatus and
+  load_command, as `string.h memcmp` names memcmp; a plural generic noun alone (`constants (FAT_CIGAM, ...)`)
+  isn't a C name; a comment line opening with a parenthesis continues a marker. `--dump-markers` over every
+  adopter changed only swift-build's three markers that need it.
+
+**M1, per marker** (swift-build's, and swift-docc's PIPE_BUF). Section 36's call holds where the names are the
+MachO module's; the files already import them from MachO.
+
+| Marker | Answer |
+|---|---|
+| MachO.swift:16, Mach-O file structures | not System's: the MachO module's (section 36); the marker says so too |
+| MachOTests.swift:20, MergeableLibrariesBuildOperationTests.swift:23 (load_command, segment_command, FAT_\*, LC_\*) | not System's: MachO's, as above |
+| Architecture.swift:29, mach-o/utils.h's three functions | not System's: libdyld's, in `MachO.dyld.utils`; Mach.CPUType has the types they take |
+| Architecture.swift:18 and MachO.swift:69, CPU types | covered: `Mach.CPUType` and `CPUSubtype` (section 36) |
+| MachO.swift:69, vm_prot_t | the standard library's `Int32` (section 37): it types segment_command's `maxprot` and `initprot`, and swift-build declares it so off Darwin already |
+| MachO.swift:76, ar.h (ar_hdr, ar_name, ar_size, SARMAG, AR_EFMT1) | section 36's call doesn't cover it: `Darwin.ar` is an explicit submodule of Darwin, and no other module declares it. Default: not System's, a file format as Mach-O's are, with the standard library's answer (the 60-byte header's fields read from the buffer; SARMAG is 8, AR_EFMT1 the literal `#1/`), which would also let swift-build parse archives off Darwin, where its `canImport(Darwin.ar)` path throws. Alternative: `CInterop.ArchiveHeader` with Swift-named accessors and ARMAG, SARMAG, ARFMAG and AR_EFMT1, if the C library's file-format headers belong with section 7's families; one adopter, and no call takes it |
+| Error.swift:21 and PbxCp.swift:21, MacTypes OSStatus | the standard library's `Int32` (section 31) |
+| SWBBuildServiceConnection.swift:23, abort | `fatalError(_:)` (mapping.ini's `[termination]`): an opt-in crash of the IDE when the build service fails. fatalError traps where abort raises SIGABRT; both leave a crash report, and fatalError's has the message |
+| SWBDispatch.swift:22, off_t | new: `CInterop.Offset` (off_t), as `CInterop.Time` is time_t. The marker asks for an alias, and `Int64` doesn't serve cross-platform code: 64-bit Linux's off_t is `Int` |
+| swift-docc's OutOfProcessReferenceResolver.swift:16, PIPE_BUF | new: `SystemConfig.maxAtomicPipeWriteBytes: Int` (PIPE_BUF, 512 on Darwin), next to `maxFileNameBytes` (NAME_MAX), as `PathName.maxAtomicPipeWriteBytes` is `_PC_PIPE_BUF` (section 3's pattern) |
+
+**P3a, PThread cancellation, designed** (not in code): `PThread.ID.cancel() throws(Errno)` (pthread_cancel), on the
+ID as `setName`, `setAffinity` and `setScheduling` are, since swift-distributed-actors cancels a detached thread; not
+`noasync`, as Darwin doesn't mark pthread_cancel. For the calling thread, `PThread.testCancellation()`
+(pthread_testcancel) and `PThread.withCancellationDisabled(_:)` (pthread_setcancelstate, restoring the previous
+state however the body ends), both `noasync` as Darwin marks them. The docs say that a cancelled thread ends at a
+cancellation point (System's blocking calls among them) as `PThread.exit()` ends it: no `defer` runs, and what the
+stack holds leaks. Rejected: asynchronous cancellation (no Swift code is async-cancel-safe; the runtime allocates
+and retains anywhere), a bare enable/disable toggle that code can forget to restore, a method on the owner. Not on
+Android, whose Bionic has no pthread_cancel. Mocks: pthread_cancel and pthread_setcancelstate return error
+numbers. Test without timing: the thread disables cancellation, signals, and waits on a pipe while the test cancels
+it; after the scope, `testCancellation()` must end it, and a flag set after that call must stay false. Open: a join
+can't tell a cancelled thread from one that returned (System's joins return nothing).
+
+**Finding: the tool never saw swift-build's ar.h.** platforms.py's Darwin `canImport` set has `Darwin.uuid` but not
+`Darwin.ar`, so `#if canImport(Darwin.ar)` is false everywhere, and the code under it isn't extracted: swift-build's
+index at `4df9fdd` has `c:@S@ar_hdr` in module `Darwin.ar`, but no run lists it, so section 37's empty toolchain queue
+missed it. The ecosystem clones' submodule `canImport`s: Darwin.ar (4), MachO.dyld.utils (3), os.log and os.signpost
+(3 each), Darwin.C (1), Foundation.Process (12) and Foundation.NSTask (3). The last two may really be false on
+Darwin; check before adding them.
+
+Files: the brief allows new files only under Sources/System and Tests/SystemTests (and sorted inserts in
+CMakeLists.txt, CSystem and Samples/main.swift), so the new API goes in new files, its syscalls and constants
+included.
+
+Tests: before any change, at `3f9f9e1`: XCTest 565 tests, 4 skipped (dup3, pipe2 twice, the controlling terminal),
+0 failures; swift-testing 496 tests in 80 suites, passed. Nothing under Sources has changed since, so there was no
+second run.
