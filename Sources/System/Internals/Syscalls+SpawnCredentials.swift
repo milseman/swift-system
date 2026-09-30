@@ -7,13 +7,21 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-// The CSystem shim that spawns with other credentials: it forks, sets the
-// child's groups and user, and runs the program with POSIX_SPAWN_SETEXEC.
+// The CSystem shim that spawns with other credentials: on Darwin it forks,
+// sets the child's groups and user, and runs the program with
+// POSIX_SPAWN_SETEXEC; on Linux it sets them on a thread of its own and
+// spawns from that thread.
 
-#if SYSTEM_PACKAGE_DARWIN
+#if SYSTEM_PACKAGE_DARWIN || os(Linux)
 
 import CSystem
+#if SYSTEM_PACKAGE_DARWIN
 import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif canImport(Musl)
+import Musl
+#endif
 
 // Returns an error number. A mocked call records its arguments and starts
 // nothing.
@@ -50,4 +58,4 @@ internal func system_spawn_with_credentials(
   }
 }
 
-#endif // SYSTEM_PACKAGE_DARWIN
+#endif // SYSTEM_PACKAGE_DARWIN || os(Linux)

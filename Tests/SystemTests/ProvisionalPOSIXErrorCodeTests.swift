@@ -7,10 +7,18 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-#if SYSTEM_PACKAGE_DARWIN
+#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
 
 import Testing
+#if SYSTEM_PACKAGE_DARWIN
 import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif canImport(Musl)
+import Musl
+#elseif canImport(Android)
+import Android
+#endif
 
 #if SYSTEM_PACKAGE
 import SystemPackage
@@ -37,4 +45,4 @@ private struct ProvisionalPOSIXErrorCodeTests {
   }
 }
 
-#endif // SYSTEM_PACKAGE_DARWIN
+#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)

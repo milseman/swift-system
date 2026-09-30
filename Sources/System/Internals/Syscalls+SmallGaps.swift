@@ -14,6 +14,9 @@
 
 #if !os(Windows) && !os(WASI)
 
+#if os(Linux) || os(Android)
+import CSystem
+#endif
 #if SYSTEM_PACKAGE_DARWIN
 import CSystem
 import Darwin
@@ -27,15 +30,20 @@ import Android
 #error("Unsupported Platform")
 #endif
 
-#if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
-// mkostemps
+#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD)
+// mkostemps, which glibc and Musl declare only with _GNU_SOURCE, and Bionic
+// only from API level 23, so it's a CSystem shim there.
 internal func system_mkostemps(
   _ template: UnsafeMutablePointer<CChar>, _ suffixLength: CInt, _ flags: CInt
 ) -> CInt {
 #if ENABLE_MOCKING
   if mockingEnabled { return _mock(path: template, suffixLength, flags) }
 #endif
+#if os(Linux) || os(Android)
+  return csystem_mkostemps(template, suffixLength, flags)
+#else
   return mkostemps(template, suffixLength, flags)
+#endif
 }
 #endif
 

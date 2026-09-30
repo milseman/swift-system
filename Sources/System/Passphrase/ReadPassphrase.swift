@@ -9,18 +9,27 @@
 
 // readpassphrase: a prompt, and a line read with echo off, from the
 // controlling terminal or, without one, from standard input. FreeBSD and
-// OpenBSD have it too; their module maps are unchecked, so it's Darwin's
-// here for now.
+// OpenBSD have it too; their module maps are unchecked, so they're left
+// out. Linux's C libraries don't have it, so there System takes the same
+// steps itself, but for readpassphrase's signal handling.
+
+#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
 
 #if SYSTEM_PACKAGE_DARWIN
-
 import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif canImport(Musl)
+import Musl
+#elseif canImport(Android)
+import Android
+#endif
 
 @available(System 199, *)
 extension TerminalDescriptor {
   /// Options for reading a passphrase.
   ///
-  /// - Note: Only available on Darwin.
+  /// - Note: Only available on Darwin, Linux, and Android.
   @frozen
   public struct PassphraseOptions: OptionSet, Sendable, Hashable, Codable {
     /// The raw C flags.
@@ -110,8 +119,15 @@ extension TerminalDescriptor {
   /// After a signal that stops the process, such as `SIGTSTP`,
   /// it prompts again when the process continues.
   ///
+  /// On Linux and Android, whose C libraries have no `readpassphrase`,
+  /// this method takes its steps itself, but catches no signals:
+  /// a signal that interrupts the read throws ``Errno/interrupted``
+  /// after the terminal is restored,
+  /// and one that ends the process leaves the terminal's echo off,
+  /// as glibc's `getpass` does.
+  ///
   /// The corresponding C function is `readpassphrase`.
-  /// - Note: Only available on Darwin.
+  /// - Note: Only available on Darwin, Linux, and Android.
   @_alwaysEmitIntoClient
   public static func readPassphrase(
     prompt: String,
@@ -130,6 +146,7 @@ extension TerminalDescriptor {
     guard let start = buffer.baseAddress, buffer.count > 0 else {
       return .failure(.invalidArgument)
     }
+    #if SYSTEM_PACKAGE_DARWIN
     let characters = start.assumingMemoryBound(to: CChar.self)
     return prompt.withCString { prompt in
       guard system_readpassphrase(prompt, characters, buffer.count, options.rawValue) != nil else {
@@ -137,7 +154,93 @@ extension TerminalDescriptor {
       }
       return .success(system_strlen(characters))
     }
+    #else
+    _ = start
+    // readpassphrase's descriptors: the controlling terminal, unless the
+    // caller asks for standard input; without one, standard input and
+    // standard error, unless the caller requires a terminal.
+    var terminal: FileDescriptor? = nil
+    if !options.contains(.standardInput) {
+      terminal = try? FileDescriptor.open("/dev/tty", .readWrite, options: .closeOnExec)
+    }
+    if terminal == nil && options.contains(.requireTerminal) {
+      return .failure(.inappropriateIOCTLForDevice)
+    }
+    defer { try? terminal?.close() }
+    return _readPassphrase(
+      prompt: prompt, into: buffer, options: options,
+      input: terminal ?? .standardInput, output: terminal ?? .standardError,
+      onTerminal: terminal != nil)
+    #endif
   }
+
+  #if os(Linux) || os(Android)
+  /// Reads a passphrase as `readpassphrase` does, from `input`,
+  /// prompting on `output`. Like `readpassphrase`, it turns echo off only
+  /// on the terminal it opened (`onTerminal`), not on standard input.
+  internal static func _readPassphrase(
+    prompt: String,
+    into buffer: UnsafeMutableRawBufferPointer,
+    options: PassphraseOptions,
+    input: FileDescriptor,
+    output: FileDescriptor,
+    onTerminal: Bool
+  ) -> Result<Int, Errno> {
+    // Echo off, unless the caller asks for it, discarding what was typed
+    // ahead, as readpassphrase's TCSAFLUSH does; it ignores a failure to
+    // set the attributes, and so does this.
+    let terminal = TerminalDescriptor(unchecked: input)
+    var original: TerminalAttributes? = nil
+    var echoIsOff = false
+    if onTerminal, let attributes = try? terminal.attributes() {
+      original = attributes
+      var quiet = attributes
+      if !options.contains(.echo) {
+        quiet.localFlags.remove([.echo, .echoNL])
+      }
+      echoIsOff = !quiet.localFlags.contains(.echo)
+      _ = try? terminal.setAttributes(quiet, when: .afterFlush)
+    }
+    defer {
+      if let original, !options.contains(.echo) {
+        _ = try? terminal.setAttributes(original, when: .afterFlush)
+      }
+    }
+    _ = try? output.writeAll(prompt.utf8)
+
+    // A line, of which the buffer keeps what fits before its zero byte.
+    func isUpper(_ c: UInt8) -> Bool { (UInt8(ascii: "A")...UInt8(ascii: "Z")).contains(c) }
+    func isLower(_ c: UInt8) -> Bool { (UInt8(ascii: "a")...UInt8(ascii: "z")).contains(c) }
+    let end = buffer.count - 1
+    var count = 0
+    var byte: UInt8 = 0
+    defer { Swift.withUnsafeMutableBytes(of: &byte) { Memory._secureZero($0) } }
+    var failure: Errno? = nil
+    reading: while true {
+      switch Swift.withUnsafeMutableBytes(of: &byte, { input._read(into: $0, retryOnInterrupt: false) }) {
+      case .failure(let error):
+        failure = error
+        break reading
+      case .success(0):
+        break reading
+      case .success:
+        if byte == UInt8(ascii: "\n") || byte == UInt8(ascii: "\r") { break reading }
+        guard count < end else { continue reading }
+        var character = byte
+        if options.contains(.sevenBit) { character &= 0x7F }
+        // readpassphrase's isalpha, tolower and toupper, in the C locale.
+        if options.contains(.lowercase) && isUpper(character) { character += 0x20 }
+        if options.contains(.uppercase) && isLower(character) { character -= 0x20 }
+        buffer[count] = character
+        count += 1
+      }
+    }
+    buffer[count] = 0
+    if echoIsOff { _ = try? output.writeAll("\n".utf8) }
+    if let failure { return .failure(failure) }
+    return .success(count)
+  }
+  #endif
 
   /// Prompts for a passphrase on the controlling terminal,
   /// and reads it with echo off.
@@ -156,7 +259,7 @@ extension TerminalDescriptor {
   /// which describes the rest of this method's behavior.
   ///
   /// The corresponding C function is `readpassphrase`.
-  /// - Note: Only available on Darwin.
+  /// - Note: Only available on Darwin, Linux, and Android.
   @_alwaysEmitIntoClient
   public static func readPassphrase(
     prompt: String,
@@ -184,4 +287,4 @@ extension TerminalDescriptor {
   }
 }
 
-#endif // SYSTEM_PACKAGE_DARWIN
+#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)

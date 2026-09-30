@@ -36,7 +36,13 @@ private struct ProcessPriorityTests {
   @available(System 199, *)
   @Test func readingPriorities() throws {
     let mine = try ProcessPriority.current(for: .process(.current))
+    #if canImport(Glibc)
+    // PRIO_PROCESS is a member of glibc's enum __priority_which, which
+    // getpriority takes as an int.
+    #expect(mine == Int(getpriority(__priority_which_t(PRIO_PROCESS.rawValue), 0)))
+    #else
     #expect(mine == Int(getpriority(PRIO_PROCESS, 0)))
+    #endif
     #expect((-20...20).contains(mine))
     // A group's and a user's are their most favored process's.
     #expect(try ProcessPriority.current(for: .processGroup(.currentProcessGroup)) <= mine)

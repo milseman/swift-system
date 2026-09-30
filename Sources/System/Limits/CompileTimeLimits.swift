@@ -50,27 +50,47 @@ extension SystemConfig {
   @_alwaysEmitIntoClient
   public static var guaranteedArgumentBytes: Int { Int(__POSIX_ARG_MAX) }
 
-  #if SYSTEM_PACKAGE_DARWIN
+  #if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
+  /// The maximum number of buffers that one vectored read or write takes,
+  /// as the C library's headers define it.
+  ///
+  /// More buffers throw ``Errno/invalidArgument``.
+  /// ``Name/maxIOVectors`` is the system's own limit, at run time.
+  ///
+  /// The corresponding C constant is `IOV_MAX`, or on Linux `UIO_MAXIOV`.
+  ///
+  /// - Note: Only available on Darwin, Linux, and Android.
+  @_alwaysEmitIntoClient
+  public static var maxIOVectors: Int { Int(_IOV_MAX) }
+  #endif
+
+  #if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
   /// The maximum number of bytes in an extended attribute's name,
   /// not counting the null terminator.
   ///
-  /// A longer name throws ``Errno/fileNameTooLong``.
+  /// On Darwin it's 127, and a longer name throws ``Errno/fileNameTooLong``.
+  /// On Linux it's 255, counting the namespace prefix, such as `user.`,
+  /// and a longer name throws ``Errno/outOfRange``.
   ///
-  /// The corresponding C constant is `XATTR_MAXNAMELEN`.
+  /// The corresponding C constant is `XATTR_MAXNAMELEN`,
+  /// or on Linux `XATTR_NAME_MAX`.
   ///
-  /// - Note: Only available on Darwin.
+  /// - Note: Only available on Darwin, Linux, and Android.
   @_alwaysEmitIntoClient
   public static var maxExtendedAttributeNameBytes: Int { Int(_XATTR_MAXNAMELEN) }
 
-  /// The maximum number of symbolic links that resolving one path follows.
+  /// The maximum number of symbolic links that resolving one path follows,
+  /// as the C library's headers define it.
   ///
   /// Every link counts, in any component of the path.
-  /// Resolving a path that needs more
+  /// On Darwin, resolving a path that needs more
   /// fails with ``Errno/tooManySymbolicLinkLevels``.
+  /// On Linux the headers' limit, 20 in glibc and Musl,
+  /// is lower than the kernel's: the kernel follows up to 40 links.
   ///
   /// The corresponding C constant is `MAXSYMLINKS`.
   ///
-  /// - Note: Only available on Darwin.
+  /// - Note: Only available on Darwin, Linux, and Android.
   @_alwaysEmitIntoClient
   public static var maxSymbolicLinks: Int { Int(_MAXSYMLINKS) }
   #endif

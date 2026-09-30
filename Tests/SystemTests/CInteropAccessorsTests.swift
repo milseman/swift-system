@@ -65,16 +65,30 @@ private struct CInteropAccessorsTests {
     var changed = time
     changed.duration += .seconds(1)
     #expect(changed.seconds == 2)
+    #if SYSTEM_PACKAGE_DARWIN
     // The C library's own conversion, which has no label, is still there.
+    // On Linux this target's other files import CSystem, whose copy of
+    // timespec this compile can then use, and the Glibc overlay's
+    // conversion extends its own copy, so it isn't found here; the
+    // MemberImportVisibility probes, which don't import CSystem, check
+    // what a client sees.
     #expect(timespec(Duration.seconds(2)).tv_sec == 2)
+    #endif
   }
 
   #if !os(WASI)
   /// The markers that futimens and utimensat read.
   @available(System 199, *)
   @Test func fileTimeMarkers() throws {
+    #if os(Linux) || os(Android)
+    // glibc and Bionic define UTIME_NOW and UTIME_OMIT as expressions Swift
+    // can't import: ((1l << 30) - 1l) and ((1l << 30) - 2l).
+    #expect(CInterop.TimeSpec.fileTimeNow.tv_nsec == (1 << 30) - 1)
+    #expect(CInterop.TimeSpec.fileTimeUnchanged.tv_nsec == (1 << 30) - 2)
+    #else
     #expect(CInterop.TimeSpec.fileTimeNow.tv_nsec == UTIME_NOW)
     #expect(CInterop.TimeSpec.fileTimeUnchanged.tv_nsec == UTIME_OMIT)
+    #endif
     #expect(CInterop.TimeSpec.fileTimeNow.tv_sec == 0)
     // This file doesn't import SystemPackage for testing, so it makes its
     // own scratch file.

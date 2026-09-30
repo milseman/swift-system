@@ -10,14 +10,17 @@
 #if !os(Windows) && !os(WASI)
 
 // Must import here to use the C itimerval type in @_alwaysEmitIntoClient
-// APIs.
+// APIs, and CSystem on Linux, whose copy of timeval can own its members.
 #if SYSTEM_PACKAGE_DARWIN
 import Darwin
 #elseif canImport(Glibc)
+import CSystem
 import Glibc
 #elseif canImport(Musl)
+import CSystem
 import Musl
 #elseif canImport(Android)
+import CSystem
 import Android
 #else
 #error("Unsupported Platform")

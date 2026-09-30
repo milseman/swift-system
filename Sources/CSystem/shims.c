@@ -52,6 +52,22 @@ uint64_t _system_get_ST_APPEND(void) { return ST_APPEND; }
 uint64_t _system_get_ST_IMMUTABLE(void) { return ST_IMMUTABLE; }
 #endif
 
+// O_TMPFILE and AT_EMPTY_PATH, which <fcntl.h> declares only with
+// _GNU_SOURCE in glibc and Musl.
+#include <fcntl.h>
+int _system_get_AT_EMPTY_PATH(void) { return AT_EMPTY_PATH; }
+int _system_get_O_TMPFILE(void) { return O_TMPFILE; }
+
+// MAXSYMLINKS, and XATTR_NAME_MAX, which Musl's <limits.h> doesn't define:
+// there it's the kernel's value, which hasn't changed.
+#include <limits.h>
+#include <sys/param.h>
+#ifndef XATTR_NAME_MAX
+#define XATTR_NAME_MAX 255
+#endif
+int _system_get_MAXSYMLINKS(void) { return MAXSYMLINKS; }
+int _system_get_XATTR_NAME_MAX(void) { return XATTR_NAME_MAX; }
+
 #include <CSystemLinux.h>
 #include <sys/ioctl.h>
 
@@ -62,6 +78,15 @@ int _system_ioctl_TIOCGWINSZ(int fd, void *ws) {
 
 int _system_ioctl_TIOCSWINSZ(int fd, const void *ws) {
   return ioctl(fd, TIOCSWINSZ, ws);
+}
+
+// <linux/fs.h>'s definition. That header includes <linux/mount.h>, which
+// some glibc versions' <sys/mount.h> conflicts with, so it isn't included.
+#ifndef FICLONE
+#define FICLONE _IOW(0x94, 9, int)
+#endif
+int _system_ioctl_FICLONE(int fd, int source) {
+  return ioctl(fd, FICLONE, source);
 }
 
 #endif
@@ -362,8 +387,35 @@ extern int csystem_mkostemp(char *path_template, int flags) {
   #endif
 }
 
+extern int csystem_mkostemps(char *path_template, int suffix_length, int flags) {
+  #if defined(__ANDROID__) && __ANDROID_API__ < 23
+  if (flags == 0) return mkstemps(path_template, suffix_length);
+  errno = ENOSYS;
+  return -1;
+  #else
+  return mkostemps(path_template, suffix_length, flags);
+  #endif
+}
+
 extern int csystem_is_secure_execution(void) {
   return getauxval(AT_SECURE) != 0;
+}
+#endif // __linux__
+
+#ifdef __linux__
+#include <dlfcn.h>
+
+extern int csystem_dladdr(const void *address, const char **path, void **base,
+                          const char **symbol, void **symbol_address) {
+  Dl_info info;
+  int result = dladdr(address, &info);
+  if (result != 0) {
+    *path = info.dli_fname;
+    *base = info.dli_fbase;
+    *symbol = info.dli_sname;
+    *symbol_address = info.dli_saddr;
+  }
+  return result;
 }
 #endif // __linux__
 
@@ -576,6 +628,40 @@ extern int csystem_recvmmsg(int fd, void *msgvec, unsigned int vlen, int flags, 
 }
 #endif // __linux__
 
+// MARK: - Locales
+
+#if defined(__linux__) && !defined(__ANDROID__)
+#include <locale.h>
+#include <stdlib.h>
+
+// With _GNU_SOURCE, which this file defines on Linux, <stdlib.h> declares
+// strtod_l and strtof_l.
+extern double csystem_strtod_l(const char *string, char **end, void *locale) {
+  return strtod_l(string, end, (locale_t)locale);
+}
+
+extern float csystem_strtof_l(const char *string, char **end, void *locale) {
+  return strtof_l(string, end, (locale_t)locale);
+}
+
+int _system_get_LC_ALL_MASK(void) { return LC_ALL_MASK; }
+
+// MARK: - Time zone files
+
+#if __has_include(<tzfile.h>)
+#include <tzfile.h>
+#endif
+#ifndef TZDIR
+#define TZDIR "/usr/share/zoneinfo"
+#endif
+#ifndef TZDEFAULT
+#define TZDEFAULT "/etc/localtime"
+#endif
+
+const char *_system_get_TZDEFAULT(void) { return TZDEFAULT; }
+const char *_system_get_TZDIR(void) { return TZDIR; }
+#endif // defined(__linux__) && !defined(__ANDROID__)
+
 // MARK: - The allocator
 
 #if defined(__linux__) && defined(__GLIBC__)
@@ -786,3 +872,93 @@ extern int csystem_spawn_with_credentials(
   return error;
 }
 #endif // defined(__APPLE__)
+
+#if defined(__linux__) && !defined(__ANDROID__)
+#include <pthread.h>
+#include <spawn.h>
+#include <sys/syscall.h>
+#include <unistd.h>
+
+// Linux keeps credentials per thread, and the raw system calls change only
+// the calling thread's (glibc's and Musl's setuid and the like change every
+// thread's). A child gets the credentials of the thread that spawns it, so
+// this spawns from a thread of its own, whose credentials it sets first:
+// the process's other threads keep theirs, and the thread ends after the
+// spawn. posix_spawn applies the file actions before exec closes the
+// close-on-exec descriptors, so the descriptors that Darwin's version
+// clears close-on-exec on need nothing here. On the 32-bit ABIs whose
+// setgroups and friends take 16-bit IDs, the *32 calls take 32-bit ones.
+#if defined(SYS_setresuid32)
+#define CSYSTEM_SYS_SETGROUPS SYS_setgroups32
+#define CSYSTEM_SYS_SETRESGID SYS_setresgid32
+#define CSYSTEM_SYS_SETRESUID SYS_setresuid32
+#else
+#define CSYSTEM_SYS_SETGROUPS SYS_setgroups
+#define CSYSTEM_SYS_SETRESGID SYS_setresgid
+#define CSYSTEM_SYS_SETRESUID SYS_setresuid
+#endif
+
+struct csystem_credentials_spawn {
+  int *pid;
+  const char *path;
+  int search_path;
+  const void *file_actions;
+  const void *attributes;
+  char *const *arguments;
+  char *const *environment;
+  const unsigned int *user;
+  const unsigned int *group;
+  int group_count;
+  const unsigned int *groups;
+  int result;
+};
+
+static void *csystem_spawn_with_thread_credentials(void *argument) {
+  struct csystem_credentials_spawn *spawn = argument;
+  // The groups, the group, then the user: once the thread isn't root, it
+  // can't change the others.
+  if (spawn->group_count >= 0 &&
+      syscall(CSYSTEM_SYS_SETGROUPS, (size_t)spawn->group_count, spawn->groups) != 0) {
+    spawn->result = errno;
+    return NULL;
+  }
+  if (spawn->group != NULL &&
+      syscall(CSYSTEM_SYS_SETRESGID, *spawn->group, *spawn->group, *spawn->group) != 0) {
+    spawn->result = errno;
+    return NULL;
+  }
+  if (spawn->user != NULL &&
+      syscall(CSYSTEM_SYS_SETRESUID, *spawn->user, *spawn->user, *spawn->user) != 0) {
+    spawn->result = errno;
+    return NULL;
+  }
+  pid_t pid = 0;
+  const posix_spawn_file_actions_t *actions = spawn->file_actions;
+  const posix_spawnattr_t *attributes = spawn->attributes;
+  spawn->result = spawn->search_path
+      ? posix_spawnp(&pid, spawn->path, actions, attributes, spawn->arguments, spawn->environment)
+      : posix_spawn(&pid, spawn->path, actions, attributes, spawn->arguments, spawn->environment);
+  if (spawn->result == 0) *spawn->pid = pid;
+  return NULL;
+}
+
+int csystem_spawn_with_credentials(
+    int *pid, const char *path, int search_path,
+    const void *file_actions, const void *attributes,
+    char *const arguments[], char *const environment[],
+    const unsigned int *user, const unsigned int *group,
+    int group_count, const unsigned int *groups,
+    int descriptor_count, const int *descriptors) {
+  (void)descriptor_count;
+  (void)descriptors;
+  struct csystem_credentials_spawn spawn = {
+      pid, path, search_path, file_actions, attributes, arguments, environment,
+      user, group, group_count, groups, 0,
+  };
+  pthread_t thread;
+  int error = pthread_create(&thread, NULL, csystem_spawn_with_thread_credentials, &spawn);
+  if (error != 0) return error;
+  error = pthread_join(thread, NULL);
+  return error != 0 ? error : spawn.result;
+}
+#endif // defined(__linux__) && !defined(__ANDROID__)

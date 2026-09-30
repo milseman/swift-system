@@ -31,4 +31,28 @@ internal var _RPP_SEVENBIT: CInt { RPP_SEVENBIT }
 @_alwaysEmitIntoClient
 internal var _RPP_STDIN: CInt { RPP_STDIN }
 
-#endif // SYSTEM_PACKAGE_DARWIN
+#elseif os(Linux) || os(Android)
+
+// Linux's C libraries have no <readpassphrase.h>, and System reads the
+// passphrase itself (ReadPassphrase.swift), so these are the flags' values
+// in the BSDs' and libbsd's header.
+
+@_alwaysEmitIntoClient
+internal var _RPP_ECHO_ON: CInt { 0x01 }
+
+@_alwaysEmitIntoClient
+internal var _RPP_REQUIRE_TTY: CInt { 0x02 }
+
+@_alwaysEmitIntoClient
+internal var _RPP_FORCELOWER: CInt { 0x04 }
+
+@_alwaysEmitIntoClient
+internal var _RPP_FORCEUPPER: CInt { 0x08 }
+
+@_alwaysEmitIntoClient
+internal var _RPP_SEVENBIT: CInt { 0x10 }
+
+@_alwaysEmitIntoClient
+internal var _RPP_STDIN: CInt { 0x20 }
+
+#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)

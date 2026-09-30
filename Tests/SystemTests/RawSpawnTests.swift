@@ -75,7 +75,11 @@ final class RawSpawnTests: XCTestCase {
       var flags = try SpawnAttributes.Flags(of: &attributes)
       XCTAssertTrue(flags.contains(.resetIDs))
       XCTAssertEqual(flags.rawValue & CShort(POSIX_SPAWN_SETPGROUP), CShort(POSIX_SPAWN_SETPGROUP))
+      #if SYSTEM_PACKAGE_DARWIN
       flags.insert(.closeOnExecByDefault)
+      #else
+      flags.insert(.createSession)
+      #endif
       flags.remove(.resetIDs)
       try flags.store(in: &attributes)
       let stored = try SpawnAttributes.Flags(of: &attributes)
