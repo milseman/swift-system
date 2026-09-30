@@ -122,18 +122,29 @@ final class SpawnCredentialsTest: XCTestCase {
     // use only as a source is closed when the program starts: the pipe's
     // write end, a duplicate's source, and a working directory; so is one
     // duplicated onto itself, which on Darwin keeps its flag.
+    // `inherit` is Darwin's (posix_spawn_file_actions_addinherit_np), so
+    // elsewhere `inherited` is closed, as any close-on-exec descriptor is.
     func actions(_ writer: FileDescriptor) -> [SpawnFileAction] {
-      [
+      var actions: [SpawnFileAction] = [
         .duplicate(writer, as: .standardOutput),
         .setWorkingDirectory(directory),
         .duplicate(same, as: same),
-        .inherit(inherited),
+      ]
+      #if SYSTEM_PACKAGE_DARWIN
+      actions.append(.inherit(inherited))
+      #endif
+      actions += [
         .close(closed),
         .duplicate(replaced, as: .standardInput),
         .duplicate(plain, as: replaced),
       ]
+      return actions
     }
+    #if SYSTEM_PACKAGE_DARWIN
     let expected = ["inherited", "replaced", "plain"]
+    #else
+    let expected = ["replaced", "plain"]
+    #endif
     XCTAssertEqual(
       try descriptorsOpen(among: descriptors) { arguments, writer in
         try ProcessID.spawn("/bin/sh", arguments: arguments, fileActions: actions(writer))
