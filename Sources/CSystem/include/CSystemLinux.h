@@ -34,6 +34,11 @@
 int _system_ioctl_TIOCGWINSZ(int fd, void *ws);
 int _system_ioctl_TIOCSWINSZ(int fd, const void *ws);
 
+// FICLONE, which clones the contents of the file that `source` refers to
+// into the file that `fd` refers to. It's in <linux/fs.h>, which this header
+// doesn't include; see shims.c.
+int _system_ioctl_FICLONE(int fd, int source);
+
 // timerfd. Each value points to a struct itimerspec, untyped so that this
 // header needn't include <sys/timerfd.h>, whose <time.h> declares timespec.
 extern int csystem_timerfd_create(int clockid, int flags);
@@ -61,6 +66,20 @@ extern int csystem_renameat2(int olddirfd, const char *oldpath,
 // _GNU_SOURCE, and Bionic defines as F_LINUX_SPECIFIC_BASE + 7 and + 8.
 #define CSYSTEM_F_SETPIPE_SZ 1031
 #define CSYSTEM_F_GETPIPE_SZ 1032
+
+// open's O_TMPFILE and the *at functions' AT_EMPTY_PATH, which glibc and
+// Musl declare only with _GNU_SOURCE, which can't be defined here; see
+// shims.c. O_TMPFILE includes O_DIRECTORY, whose value differs by
+// architecture, so these are the headers' own values.
+int _system_get_AT_EMPTY_PATH(void);
+int _system_get_O_TMPFILE(void);
+
+// MAXSYMLINKS, from <sys/param.h>, which glibc's and Bionic's Swift modules
+// don't include, and which this header can't, since it includes
+// <signal.h>; and XATTR_NAME_MAX, from <linux/limits.h>, which Musl's
+// <limits.h> doesn't include. See shims.c.
+int _system_get_MAXSYMLINKS(void);
+int _system_get_XATTR_NAME_MAX(void);
 
 // The special times for futimens and utimensat, which glibc and Bionic define
 // as expressions that Swift can't import. They have these values on every
@@ -154,6 +173,17 @@ extern int csystem_getentropy(void *buffer, size_t length);
 // fails with ENOSYS when there are.
 extern int csystem_mkostemp(char *path_template, int flags);
 
+// mkostemps, the same with a suffix after the X's, which glibc and Musl
+// declare only with _GNU_SOURCE, and Bionic only from API level 23; below
+// it, this calls mkstemps when there are no flags.
+extern int csystem_mkostemps(char *path_template, int suffix_length, int flags);
+
+// dladdr, which glibc declares, with Dl_info, only with _GNU_SOURCE. It
+// returns Dl_info's fields, dli_fname, dli_fbase, dli_sname and dli_saddr,
+// through the pointers, and dladdr's result.
+extern int csystem_dladdr(const void *address, const char **path, void **base,
+                          const char **symbol, void **symbol_address);
+
 // Whether the process runs with privileges it didn't start with, as a
 // set-user-ID program does: getauxval(AT_SECURE). No C library's Swift module
 // includes <sys/auxv.h>.
@@ -213,6 +243,38 @@ extern int csystem_accept4(int fd, void *addr, void *addrlen, int flags);
 extern int csystem_sendmmsg(int fd, void *msgvec, unsigned int vlen, int flags);
 extern int csystem_recvmmsg(int fd, void *msgvec, unsigned int vlen, int flags, void *timeout);
 #endif // __linux__
+
+#if defined(__linux__) && !defined(__ANDROID__)
+// strtod_l and strtof_l, which glibc and Musl declare only with _GNU_SOURCE,
+// and LC_ALL_MASK, which glibc defines as an OR of its twelve categories'
+// masks, which Swift can't import; see shims.c. `locale` is a locale_t,
+// untyped so that this header needn't include <locale.h> (see the top of
+// this file).
+// Starts a child that runs a program with other credentials, which
+// posix_spawn can't set, as Darwin's version in CSystemDarwin.h does, with
+// its arguments: from a thread whose own credentials it sets first (the
+// supplementary groups unless group_count is -1, the group and the user
+// unless NULL), with posix_spawn or posix_spawnp. The descriptors are
+// unused. Returns 0 and sets *pid, or returns the error number of the step
+// that failed. See shims.c and SpawnCredentials.swift.
+int csystem_spawn_with_credentials(
+    int *pid, const char *path, int search_path,
+    const void *file_actions, const void *attributes,
+    char *const arguments[], char *const environment[],
+    const unsigned int *user, const unsigned int *group,
+    int group_count, const unsigned int *groups,
+    int descriptor_count, const int *descriptors);
+
+extern double csystem_strtod_l(const char *string, char **end, void *locale);
+extern float csystem_strtof_l(const char *string, char **end, void *locale);
+int _system_get_LC_ALL_MASK(void);
+
+// <tzfile.h>'s TZDIR and TZDEFAULT, which glibc doesn't install and Musl
+// doesn't have: the system's, where it has the header, and otherwise the
+// conventional paths; see shims.c.
+const char *_system_get_TZDEFAULT(void);
+const char *_system_get_TZDIR(void);
+#endif // defined(__linux__) && !defined(__ANDROID__)
 
 #if defined(__linux__) && defined(__GLIBC__)
 // glibc's allocator extensions, which it declares in <malloc.h>, which its

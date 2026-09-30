@@ -11,11 +11,21 @@
 // a mutex, condition variable or read-write lock in its own storage, such as
 // a field of a structure it shares with Swift, can start it out initialized
 // without a call. Swift can't import the C macros, which are structure
-// initializers. Darwin only, so far: glibc's are the zero values, but for
-// its error-checking and recursive mutexes, whose kind is a field.
+// initializers. On Linux and Android the default ones are all zero bytes
+// in glibc, Musl and Bionic. The error-checking and recursive mutexes'
+// are Darwin's only: glibc and Bionic spell them with _NP and a kind field,
+// and Musl has none.
 
+#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
 #if SYSTEM_PACKAGE_DARWIN
 import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif canImport(Musl)
+import Musl
+#elseif canImport(Android)
+import Android
+#endif
 
 @available(System 199, *)
 extension CInterop.PThreadMutex {
@@ -28,10 +38,17 @@ extension CInterop.PThreadMutex {
   ///
   /// The corresponding C macro is `PTHREAD_MUTEX_INITIALIZER`.
   ///
-  /// - Note: Only available on Darwin.
+  /// - Note: Only available on Darwin, Linux, and Android.
   @_alwaysEmitIntoClient
-  public static var initializer: Self { _initialized(signature: Int(_PTHREAD_MUTEX_SIG_init)) }
+  public static var initializer: Self {
+    #if SYSTEM_PACKAGE_DARWIN
+    _initialized(signature: Int(_PTHREAD_MUTEX_SIG_init))
+    #else
+    Self()
+    #endif
+  }
 
+  #if SYSTEM_PACKAGE_DARWIN
   /// A statically initialized error-checking mutex,
   /// which reports a relock by its owner or an unlock by another thread
   /// rather than deadlock or misbehave.
@@ -66,6 +83,7 @@ extension CInterop.PThreadMutex {
     mutex.__sig = signature
     return mutex
   }
+  #endif
 }
 
 @available(System 199, *)
@@ -78,12 +96,16 @@ extension CInterop.PThreadCondition {
   ///
   /// The corresponding C macro is `PTHREAD_COND_INITIALIZER`.
   ///
-  /// - Note: Only available on Darwin.
+  /// - Note: Only available on Darwin, Linux, and Android.
   @_alwaysEmitIntoClient
   public static var initializer: Self {
+    #if SYSTEM_PACKAGE_DARWIN
     var condition = pthread_cond_t()
     condition.__sig = Int(_PTHREAD_COND_SIG_init)
     return condition
+    #else
+    Self()
+    #endif
   }
 }
 
@@ -97,13 +119,17 @@ extension CInterop.PThreadReadWriteLock {
   ///
   /// The corresponding C macro is `PTHREAD_RWLOCK_INITIALIZER`.
   ///
-  /// - Note: Only available on Darwin.
+  /// - Note: Only available on Darwin, Linux, and Android.
   @_alwaysEmitIntoClient
   public static var initializer: Self {
+    #if SYSTEM_PACKAGE_DARWIN
     var lock = pthread_rwlock_t()
     lock.__sig = Int(_PTHREAD_RWLOCK_SIG_init)
     return lock
+    #else
+    Self()
+    #endif
   }
 }
 
-#endif // SYSTEM_PACKAGE_DARWIN
+#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)

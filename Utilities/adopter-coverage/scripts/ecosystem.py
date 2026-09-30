@@ -39,8 +39,19 @@ import subprocess
 # The audited adopters, by repository: their package files in packages/.
 AUDITED = {"swift-nio": "nio", "swift-foundation": "foundation", "swiftpm": "swiftpm",
            "swift-subprocess": "subprocess"}
-IMPORT_DARWIN = re.compile(r"^\s*(?:@[\w.]+(?:\([^)]*\))?\s+)*(?:(?:public|internal|package|private|fileprivate)\s+)?"
-                           r"import\s+(?:(?:func|let|var|struct|class|enum|typealias|protocol)\s+)?Darwin\b", re.M)
+
+
+def import_of(modules):
+    """A Swift import of one of `modules`, in any form: the whole module, a
+    submodule (`import Darwin.C`), one declaration (`import func
+    Darwin.sleep`), with attributes (`@_exported`, `@preconcurrency`) and an
+    access modifier. Group 1 is the module."""
+    return re.compile(r"^\s*(?:@[\w.]+(?:\([^)]*\))?\s+)*(?:(?:public|internal|package|private|fileprivate)\s+)?"
+                      r"import\s+(?:(?:func|let|var|struct|class|enum|typealias|protocol)\s+)?"
+                      r"(" + "|".join(modules) + r")\b", re.M)
+
+
+IMPORT_DARWIN = import_of(["Darwin"])
 EXPORTED_DARWIN = re.compile(r"@_exported\s+(?:@[\w.]+\s+)*(?:public\s+)?import\s+Darwin\b")
 # Directories that don't hold library code, for the lexical pre-scan.
 NOT_LIBRARY = re.compile(r"(^|/)(Tests?|IntegrationTests|Benchmarks?|Examples?|Fixtures|Snippets|Plugins|"

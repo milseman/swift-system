@@ -14,30 +14,29 @@ Darwin; grouped here into clusters and ranked by packages, then call sites. `eco
 toolchain's packages, and `ecosystem.sh --popular report` for popular.tsv's (section 37). Counts are in the runs'
 reports and in STATUS.md, not here.
 
-**Resume here** (coverage-2 stopped 2026-09-29, quota; STATUS.md not regenerated since `145df6b`). Committed:
-`5e89235` (B2, P3b) and `b583bdf` (status.py's marker parser). Nothing is uncommitted. Section 40 has the per-marker
-answers, the designs, a tool finding and the baseline tests. Take the steps in order:
+**Resume here** (coverage-3 stopped 2026-09-30, done; STATUS.md regenerated at the stop). Section 40's rows are all
+closed (sections 41 to 43), both queues are empty and popular.tsv needs no fourth batch (section 44), the
+`_version: 346` gates stay (section 45), `Utilities/linux/build.sh --quiet` exists (section 46), and STATUS.md's
+section 4 tracks the platform imports (section 47). Nothing is uncommitted. Open, for a next lane:
 
-| # | Step | State | Plan |
-|---|---|---|---|
-| B1 | `Errno.notCapable` on Darwin | done by the foundation-gaps lane | |
-| B2 | README.md's retired nio-coverage bullet | done, `5e89235` | |
-| P3b | `Comment` in swift-homomorphic-encryption's `_TestUtilities` | done, `5e89235`: `skip._TestUtilities` | alternative in section 40 |
-| M1a | status.py reads the markers' names | done, `b583bdf` | |
-| M1b | status.py: answers outside System | not started | from mapping.ini: a `swift` answer is *standard library*, `wrap = no` *not System's*, for names System doesn't cover (swift first, as ecosystem.py's queue); out of the work list; METHOD and section 3's header say so; coverage stays what System documents |
-| M1c | mapping.ini | not started | `[Mach-O file format]` and `[Mach-O architecture names]` (`wrap = no`), `[ar archive header]` (`swift`, `wrap = no`), a note in `[termination]`, off_t out of `[C scalar types]` once `CInterop.Offset` exists (section 40) |
-| M1d | platforms.py's Darwin `canImport` set | not started | add Darwin.ar, Darwin.C, MachO, MachO.dyld.utils, os.log, os.signpost (section 40's finding) |
-| M1e | `CInterop.Offset` (off_t), `SystemConfig.maxAtomicPipeWriteBytes: Int` (PIPE_BUF) | not started | new files only; tests |
-| P3a | PThread cancellation | designed, not started | section 40 |
+| # | Item | State |
+|---|---|---|
+| O1 | Linux, Windows and WASI builds of sections 42 and 43's API: `CInterop.Offset` everywhere, PIPE_BUF and cancellation off Darwin | unbuilt; `Utilities/linux/build.sh --quiet test` when the container service runs |
+| O2 | A `_SystemPackageForPlugin` product for sourcekit-lsp's plugins (the packages-5 lane's ask) | Package.swift, outside this lane's files |
+| O3 | A join that tells a cancelled thread from one that returned (section 43) | open |
+| O4 | Why Foundation's build ignores `_version` (section 45) | open, Foundation's |
+| O5 | A fourth popular batch | not needed now (section 44); the alternative is there |
 
-Then: `swift build && swift test`; `ecosystem.sh --popular run` and `report` to confirm the popular queue is empty
-(and the toolchain's `run` and `report`, since M1d changes swift-build's extraction); decide on a fourth batch;
-status.sh, and answer what the packages-5 and foundation-walk lanes' new markers ask (item 2 of the brief, not
-started). sqlite-nio's extraction takes minutes on each run, scanning its vendored SQLite; a `skip.CSQLite` would
-speed runs, but would drop SQLite's OS use from the package's table.
+sqlite-nio's extraction takes minutes on each run, scanning its vendored SQLite; a `skip.CSQLite` would speed runs,
+but would drop SQLite's OS use from the package's table.
 
-The toolchain's queue has been empty since run `a3a634eb2b19-06a7ddd5` (section 37), and popular.tsv's first and
-second batches since sections 38 and 39. What follows is the toolchain's work, all done.
+Left for Michael: this worktree's `.build` is deleted, but the permission classifier refused the deletion of the
+lane's files in the temporary directory (`/var/folders/8l/z1y20ccj5g1087mk50sbcznr0000gn/T/`): SwiftPM's
+`_Users_milseman_development_base_dir_system-next_coverage-3_*.lock` files from check.sh's package builds, and
+`coverage-3-baseline.log` and `coverage-3-after.log`, the test runs' logs.
+
+The toolchain's queue has been empty since run `a3a634eb2b19-06a7ddd5` (section 37), and popular.tsv's three
+batches' queues since sections 38, 39 and 44. What follows is the toolchain's work, all done.
 
 Ahead of the ranked clusters, the adopters' own asks (Michael, 2026-09-29), in this order:
 
@@ -1069,3 +1068,171 @@ included.
 Tests: before any change, at `3f9f9e1`: XCTest 565 tests, 4 skipped (dup3, pipe2 twice, the controlling terminal),
 0 failures; swift-testing 496 tests in 80 suites, passed. Nothing under Sources has changed since, so there was no
 second run.
+
+## 41. Answers outside System, and what the extraction couldn't see: `419fd1b`, `1c054a2`, `6b6c307`, `3e4e890`, `d5137df`
+
+The coverage-3 lane (worktree `../coverage-3`, from system-next `6a9833f`) took section 40's rows M1b, M1c and M1d
+as designed there.
+
+- **M1b** (`419fd1b`): status.py takes answers outside System from mapping.ini at System's commit, for the gap names
+  System doesn't name at all. A name in an entry with a `swift` answer is *standard library*, and one in an entry
+  marked `wrap = no` is *not System's*, the `swift` answer first, as ecosystem.py's Darwin queue decides them. `X
+  members` takes X's entry, and a phrase whose uncovered names all have answers takes the first kind among them; the
+  table gives the entries. Neither status is in the work list. *Covered* is still only what System's sources
+  document, and a name that System names while a marker asks for more keeps its gap (`STILL_NEEDED`). Section 3's
+  header and METHOD say so, and the header notes uncommitted changes to mapping.ini, which aren't read. Rejected:
+  counting the answers as covered, which would say System has what it doesn't; and leaving them missing, which kept
+  the MachO module's file format and the standard library's answers in the work list for good.
+- **M1c** (`6b6c307`): `[Mach-O file format]` (`wrap = no`), with every Mach-O name swift-build's extraction finds,
+  and LC_MAIN and LC_SYMTAB from its tests' marker; `[Mach-O architecture names]` (`wrap = no`), mach-o/utils.h's
+  three functions, libdyld's (`MachO.dyld.utils`); `[ar archive header]` (`swift` and `wrap = no`: the header's
+  fields read from the archive's bytes, with section 40's alternative, `CInterop.ArchiveHeader`, in its note as
+  rejected); a shared note in `[termination]` for swift-build's abort; and off_t out of `[C scalar types]`, into an
+  entry of its own that the derivation decides (section 42). The Mach-O entries take mapping.ini's header rule for
+  `mach-o/*`, dynamic loading; ar.h has none, and takes C libraries, beside SQLite.
+- **M1d** (`1c054a2`): platforms.py's Darwin `canImport` set now has Darwin.ar, Darwin.C, MachO, MachO.dyld.utils,
+  os.log and os.signpost, each true on macOS 26 (checked with `swiftc -typecheck`, as are Darwin.uuid and
+  MachO.dyld). Foundation.Process and Foundation.NSTask, which the ecosystem's clones also test for, are false there
+  and stay out; the comment says so.
+- The runs showed two more mapping fixes. `[fts]` cited DirectoryWalk's path initializer without the `options:`
+  that the foundation-gaps lane added, so every package reported it as cited but missing on the tip (`3e4e890`; the
+  entry stayed covered through its other declarations). And with os.log and os.signpost true, swift-build's
+  OSLogPrivacy and WasmKit's OSSignposter and OSSignpostIntervalState join `[os_log and signposts]` (`d5137df`).
+
+Finding: importing the tool's scripts from a Python harness without PYTHONDONTWRITEBYTECODE left an untracked
+`scripts/__pycache__`, and check.sh counts any untracked file under the tool as a dirty tool. The first two runs,
+`4b7e79411e68-aa87d610` and `3e4e8900f8cf-ed65a0b5`, are stored as dirty, so they can't be verified. Python ignored
+the stale bytecode, whose sources were newer, so their results stand; section 44's runs are clean reruns.
+
+## 42. CInterop.Offset and SystemConfig.maxAtomicPipeWriteBytes: `12c5ac9`
+
+Row M1e, as section 40 designed it, in new files, since another lane is editing the existing ones:
+
+- `CInterop.Offset` is C's off_t, as `CInterop.Time` is time_t, for code whose own API names it: swift-build's
+  DispatchIO offsets (SWBDispatch.swift:22). It's on every platform, as System's internal `_COffT` is, and its doc
+  gives the widths: Int64 on Darwin and WASI, Int on Linux and Android, Int32 on Windows. Rejected: `Int64` alone,
+  which 64-bit Linux's off_t isn't.
+- `SystemConfig.maxAtomicPipeWriteBytes: Int` is the headers' PIPE_BUF (512 on Darwin, 4096 on Linux), for
+  swift-docc's out-of-process resolver (OutOfProcessReferenceResolver.swift:16). It sits beside `maxFileNameBytes`
+  and has the name of the pathconf name, `PathName.maxAtomicPipeWriteBytes` (_PC_PIPE_BUF), as section 3's limits do:
+  `value(.maxAtomicPipeWriteBytes, for: pipe)` is a pipe's own limit. Gated `!os(Windows) && !os(WASI)`, as
+  CompileTimeLimits.swift is.
+
+Tests: OffsetAndPipeLimitTest checks the alias against off_t (and Int64 on Darwin, Int on Linux), PIPE_BUF against
+POSIX's least (512) and Darwin's 512, and a pipe's fpathconf limit against the constant on Darwin and Linux.
+Linux, Windows and WASI are unbuilt here.
+
+## 43. PThread cancellation: `4b7e794`
+
+Row P3a, as section 40 designed it:
+
+- `PThread.ID.cancel() throws(Errno)` wraps pthread_cancel, on the ID, since swift-distributed-actors cancels a
+  detached thread; not `noasync`.
+- `PThread.testCancellation()` wraps pthread_testcancel, and `PThread.withCancellationDisabled(_:)` wraps
+  pthread_setcancelstate; both are `noasync` with Darwin's own message, "Use Task cancellation instead". The scope is
+  `rethrows`, with `R: ~Copyable`, as UnfairLock's `withLock` is, and restores the state it found (enabled, or
+  disabled by an enclosing scope) however its body ends. pthread_setcancelstate fails only for a state other than
+  the two it's given, so the scope doesn't throw of its own.
+- The docs say that a cancelled thread ends at its next cancellation point (System's blocking calls among them,
+  `open` and `close` included) as `PThread.exit()` ends it: no `defer` runs, what the stack holds leaks, and a lock
+  it holds stays locked.
+- Rejected, as designed: asynchronous cancellation, a bare enable/disable toggle, and a method on the owner. Not on
+  Android. Open, as designed: a join can't tell a cancelled thread from one that returned.
+- pthread_cancel's and pthread_setcancelstate's mocks return error numbers; pthread_testcancel has none.
+
+Tests (PThreadCancellationTests.swift), none waiting for time:
+- The designed one: a thread cancelled inside the scope finishes it, through a pipe read that blocks until after the
+  cancel, and ends at `testCancellation()`, not after it.
+- A thread blocked in a pipe read, with cancellation enabled, ends there. A thread-specific value's destructor reports
+  the end, waited for up to the hang guard; after that, a byte ends the read, so a broken cancel fails the test
+  instead of hanging it.
+- The scope restores the states it found, nested and after a throw, and an uncancelled thread runs on.
+- The mocks. `stress.sh` ran the new tests 20 times under CPU load, all passing.
+
+Finding: System's read, which retries EINTR, doesn't hide a cancel on Darwin: a thread blocked in it ends there.
+
+The full suite, before any change (`6a9833f`) and after the last change to Sources (`4b7e794`): XCTest 565 tests, 4
+skipped (dup3, pipe2 twice, the controlling terminal), 0 failures, then 570, the same 4 skipped, 0 failures;
+swift-testing 496 tests in 80 suites, passed, then 500 in 81, passed.
+
+## 44. The queues after the rows, the new markers, and no fourth batch: `cddd4d2`
+
+- The popular set's queue is empty (run `cddd4d209dce-0e679bef`): pthread_cancel is covered, and swift-homomorphic-encryption's
+  `Comment` went with P3b's skip.
+- The toolchain's queue is still empty (run `cddd4d209dce-c62022b2`). M1d brought swift-build's ar.h names into it, which
+  `[ar archive header]` answers as the standard library's, and off_t, the standard library's before, is covered by
+  `CInterop.Offset`. The run exits with check.sh's status 2, as before: the audited packages' names that no mapping
+  entry has are the same as in run `a3a634eb2b19-06a7ddd5`.
+- popular.tsv doesn't need a fourth batch now. The three batches' queues were short and one package each (sections
+  38 to 40), the third's is empty, and the swift-server and swiftlang lists they came from are used up. A fourth
+  would reach app-side packages, whose OS use comes mostly through Foundation, which the queue sets apart.
+  Alternative, if wanted: the Swift Package Index's most-depended-on packages outside those lists.
+- **The new markers.** status.py reads swift-foundation at `no-darwin`, where the foundation lanes continue
+  (`STATUS_BRANCHES`, by default `swift-foundation=no-darwin`). The foundation-walk lane's three markers there are
+  for Foundation's framework build, which can import only the SDK's System, and system-next has each: DynamicLibrary
+  (dlopen with `.noLoad` and `.first`, dlsym, dlclose), `_dyld_image_count` (`DynamicLibrary.loadedImageCount`), and
+  `CInterop.POSIXErrorCode`. Nothing is left for System to add; they wait for an OS whose SDK ships System 199. The
+  first marker names System's DynamicLibrary, which the parser read as a C name, so DynamicLibrary joins
+  `SWIFT_NAMES` and an `ANSWERED` entry covers the phrase. The packages-5 lane's sourcekit-lsp migration
+  (`cb2881c5`) left no markers. Its one ask, a `_SystemPackageForPlugin` product so that sourcekit-lsp's plugins don't
+  each carry a SystemPackage, is Package.swift's, outside this lane's files.
+
+## 45. The `_version: 346` gates: System's own build reads the version
+
+swift-foundation's package build warns "cannot find user version number for module 'Darwin'; version number
+ignored" on `#if canImport(Darwin, _version: 346)` (its REPORT.md, foundation-walk, Findings). System's own build
+doesn't ignore it:
+
+- A clean, verbose build of SystemPackage (`swift build --target SystemPackage -v`, a fresh scratch path) has no such
+  warning, with Xcode's Swift 6.2 or with the 6.5-dev snapshot that Foundation builds with (`org.swift.65202609211a`,
+  `--build-system native`).
+- A probe in a scratch copy of System, an `#error` under `canImport(Darwin, _version: 9999)` and another under
+  `canImport(Darwin) && !canImport(Darwin, _version: 346)`, compiles with both toolchains, with System as the root
+  package and as a client's dependency, and the same probe compiles in the client, whose module imports no Darwin.
+  The version is read and compared: 346 is true and 9999 false (the SDK's Darwin interface says 347.0.12).
+- So the ten gate lines stay as they are: there's no miscompile. Alternative, noted: a plain `canImport(Darwin)`,
+  which needs the macOS 26 SDK (the package needs it already) and can't warn.
+- Foundation's warning didn't reproduce outside its build: not standalone, not with its flags (`-library-level api`,
+  MemberImportVisibility, ImportMacroAliases, AccessLevelOnImport, BuiltinModule), and not in a module that reaches
+  Darwin's headers only through a C target. Its cause is still open, and Foundation's.
+- The same condition gates code the brief didn't list, with the same answer: AttributeLists/VolumeCapabilities.swift
+  (397 and 479), AttributeLists/Attribute.swift:408, and Sources/Samples/Beneath.swift:17.
+
+## 46. Utilities/linux/build.sh --quiet: `43b1859`
+
+With `--quiet`, a run writes its output only to the log and prints its two `==` lines, then a summary, then the
+exit status line. The summary has the number of distinct error lines and the first 40 of them, and for `test`, the
+totals and the failing tests' lines: swift-testing's lines with ✘, but its total, and XCTest's error lines under
+Tests/, which have a line number but no column. An error line is a line with `error:`, but not the `` | `- error: ``
+annotation under a diagnostic's source excerpt, which would count each error twice. Each list keeps the log's
+order, drops repeats, and takes `/code/` out of paths. The default output is unchanged, and README.md documents the
+option.
+
+Checks, with no containers here: `bash -n`; the summary functions run over ../linux-logs (a clean run, build
+errors, a crash, and failures in both test frameworks); and both scripts, before and after, run with a stand-in
+`container` that replays a recorded log. Their default outputs are identical but for the date, and the quiet run's
+log holds the whole output.
+
+## 47. STATUS.md's platform imports: `cddd4d2`
+
+STATUS.md's new section 4 tracks the long-term goal: no library of the repositories that update-checkout clones
+for the main scheme imports a platform C module (Darwin, Glibc, Musl, Bionic, Android, WASILibc, ucrt, WinSDK, CRT,
+visualc), in any form, on any platform. swift-system and swift are left out. Each repository of
+`../ecosystem/scheme-main.tsv` is read at its migrated clone's branch in `../adopters` (migrate-darwin;
+swift-foundation's no-darwin; wasmkit, llbuild and swiftpm under their adopters' names), else at its ecosystem
+clone's HEAD, else it's *not cloned*. A per-repository table gives the Swift files that import one, per module and
+per kind, and a module-by-kind table the totals. The counts are there, not here.
+
+- The scan is lexical: ecosystem.py's survey pattern, now `import_of(modules)` so that both use it, widened to the
+  ten modules, over each file with comments and strings blanked, since a fixture in a string literal isn't an
+  import. It doesn't evaluate `#if`, and METHOD says so: an import under `#if os(Windows)` counts as one outside any
+  condition does.
+- Kinds are by path: a nested package (under a directory, below the root, with its own Package.swift) first, then
+  tests (a test directory anywhere in the path: Tests, IntegrationTests, Fixtures, unittests and the like), then
+  library (under a top-level Sources, Source, src, srcs, lib or products, outside a `.docc` catalog), else other
+  (benchmarks, examples, tools, plugins, docs, utilities, and the root's manifest).
+- Rejected: the manifests' targets, as the Adoption section uses them, which needs every clone's manifest evaluated
+  (swift-foundation's needs a newer compiler than 6.2) and says nothing of nested packages; and platforms.py's `#if`
+  evaluation, which answers what one platform's build compiles, not whether any does.
+- `--branch-for` (`STATUS_BRANCHES`) sets a package's migration branch for the adoption and gaps sections too, whose
+  header names it when it isn't the default; `STATUS_ECOSYSTEM` points at the clones.

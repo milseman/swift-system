@@ -87,6 +87,7 @@ target_sources(SystemPackage PRIVATE
 target_sources(SystemPackage PRIVATE
   Events/EventCounter.swift
   Events/EventPoll.swift
+  Events/FileWatcher.swift
   Events/IntervalTimer.swift
   Events/KernelEvent.swift
   Events/KernelQueue.swift
@@ -102,9 +103,11 @@ target_sources(SystemPackage PRIVATE
   ExtendedAttributes/ExtendedAttributes.swift)
 target_sources(SystemPackage PRIVATE
   FileCopying/FileClone.swift
+  FileCopying/FileContentsClone.swift
   FileCopying/FileCopy.swift
   FileCopying/FileCopyState.swift
   Internals/Constants+FileCopying.swift
+  Internals/Syscalls+FileContentsClone.swift
   Internals/Syscalls+FileCopying.swift)
 target_sources(SystemPackage PRIVATE
   FilePath/FilePath.swift
@@ -146,10 +149,12 @@ endif()
 target_sources(SystemPackage PRIVATE
   Internals/Backcompat.swift
   Internals/CInterop+Accessors.swift
+  Internals/CInterop+Offset.swift
   Internals/CInterop.swift
   Internals/Constants+DynamicLoading.swift
   Internals/Constants+Events.swift
   Internals/Constants+ExtendedAttributes.swift
+  Internals/Constants+FileWatcher.swift
   Internals/Constants+MemoryMapping.swift
   Internals/Constants+NetworkInterfaces.swift
   Internals/Constants+StatFS.swift
@@ -164,6 +169,7 @@ target_sources(SystemPackage PRIVATE
   Internals/Syscalls+Environment.swift
   Internals/Syscalls+Events.swift
   Internals/Syscalls+ExtendedAttributes.swift
+  Internals/Syscalls+FileWatcher.swift
   Internals/Syscalls+MemoryMapping.swift
   Internals/Syscalls+NetworkInterfaces.swift
   Internals/Syscalls+PathsAndFiles.swift
@@ -182,6 +188,7 @@ target_sources(SystemPackage PRIVATE
   LibProc/ProcessPaths.swift)
 target_sources(SystemPackage PRIVATE
   Internals/Constants+Limits.swift
+  Limits/CompileTimeLimits+Pipes.swift
   Limits/CompileTimeLimits.swift)
 target_sources(SystemPackage PRIVATE
   MachCPU/MachCPUType.swift)
@@ -296,7 +303,8 @@ target_sources(SystemPackage PRIVATE
 target_sources(SystemPackage PRIVATE
   Internals/Syscalls+SmallGaps.swift
   TemporaryFiles/UniqueFilesWithPermissions.swift
-  TemporaryFiles/UniqueFilesWithSuffix.swift)
+  TemporaryFiles/UniqueFilesWithSuffix.swift
+  TemporaryFiles/UnnamedTemporaryFiles.swift)
 target_sources(SystemPackage PRIVATE
   Terminal/BaudRate.swift
   Terminal/ControlCharacters.swift
@@ -309,10 +317,12 @@ target_sources(SystemPackage PRIVATE
   Terminal/TerminalWindowSize.swift)
 target_sources(SystemPackage PRIVATE
   Internals/Constants+Threads.swift
+  Internals/Syscalls+ThreadCancellation.swift
   Internals/Syscalls+Threads.swift
   Threads/CInterop+Threads.swift
   Threads/PThread.swift
   Threads/PThreadAttributes.swift
+  Threads/PThreadCancellation.swift
   Threads/PThreadCondition.swift
   Threads/PThreadCPUSet.swift
   Threads/PThreadID.swift
@@ -343,6 +353,21 @@ target_sources(SystemPackage PRIVATE
   UnfairLock/UnfairLock.swift)
 target_sources(SystemPackage PRIVATE
   VectoredIO/VectoredIO.swift)
+target_sources(SystemPackage PRIVATE
+  Win32/Win32.swift
+  Win32/Win32Constants.swift
+  Win32/Win32Error.swift
+  Win32/Win32FileDescriptorBridge.swift
+  Win32/Win32FileHandle.swift
+  Win32/Win32FileIO.swift
+  Win32/Win32FileType.swift
+  Win32/Win32FinalPath.swift
+  Win32/Win32HandleOperations.swift
+  Win32/Win32Locking.swift
+  Win32/Win32Open.swift
+  Win32/Win32SecurityDescriptor.swift
+  Win32/Win32Syscalls.swift
+  Win32/Win32VolumeInformation.swift)
 target_link_libraries(SystemPackage PUBLIC
   CSystem)
 

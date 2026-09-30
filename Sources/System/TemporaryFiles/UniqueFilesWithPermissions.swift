@@ -13,13 +13,21 @@
 // mkstemp's 0600 followed by fchmod, the permissions pass through the
 // creation mask, as open's do.
 //
-// Only on Darwin for now: glibc's and OpenBSD's linkers warn at every link
-// of a program that calls mktemp, so those platforms would want the name
-// made another way, such as from getentropy.
+// On Linux and Android, System makes the name itself, from the standard
+// library's random numbers: glibc's linker warns at every link of a program
+// that calls mktemp. (So does OpenBSD's, which isn't here.)
+
+#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
 
 #if SYSTEM_PACKAGE_DARWIN
-
 import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif canImport(Musl)
+import Musl
+#elseif canImport(Android)
+import Android
+#endif
 
 @available(System 199, *)
 extension FilePath {
@@ -56,9 +64,13 @@ extension FilePath {
   /// setting them afterward, with ``FileDescriptor/setPermissions(_:retryOnInterrupt:)``,
   /// doesn't apply the creation mask.
   ///
+  /// On Linux and Android, this method makes the name itself,
+  /// with letters and digits, as `mktemp` does:
+  /// glibc's linker warns about every program that calls `mktemp`.
+  ///
   /// The corresponding C functions are `mktemp`, which makes the name,
   /// and `open`, which creates the file.
-  /// - Note: Only available on Darwin.
+  /// - Note: Only available on Darwin, Linux, and Android.
   @_alwaysEmitIntoClient
   public func makeUniqueFile(
     options: FileDescriptor.OpenOptions = [],
@@ -94,7 +106,7 @@ extension FilePath {
   ///
   /// The corresponding C functions are `mktemp`, which makes the name,
   /// and `openat`, which creates the file.
-  /// - Note: Only available on Darwin.
+  /// - Note: Only available on Darwin, Linux, and Android.
   @_alwaysEmitIntoClient
   public func makeUniqueFile(
     relativeTo directory: FileDescriptor,
@@ -156,7 +168,7 @@ extension FilePath {
       var attempts = 1
       while true {
         var fd: CInt = -1
-        if system_mktemp(name) != nil {
+        if _makeTemplateName(name) {
           if let directory {
             fd = system_openat(directory.rawValue, template, flags, permissions.rawValue)
           } else {
@@ -174,6 +186,26 @@ extension FilePath {
       }
     }
   }
+
+  /// Replaces the `X`s that end `name`, as `mktemp` does: on Darwin with
+  /// `mktemp`, and elsewhere with letters and digits from the standard
+  /// library's system random number generator. Returns whether it made a
+  /// name.
+  @usableFromInline
+  internal static func _makeTemplateName(_ name: UnsafeMutablePointer<CChar>) -> Bool {
+    #if SYSTEM_PACKAGE_DARWIN
+    return system_mktemp(name) != nil
+    #else
+    let characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789".utf8
+    var generator = SystemRandomNumberGenerator()
+    var end = system_strlen(name)
+    while end > 0 && name[end - 1] == CChar(UInt8(ascii: "X")) {
+      end -= 1
+      name[end] = CChar(bitPattern: characters.randomElement(using: &generator)!)
+    }
+    return true
+    #endif
+  }
 }
 
-#endif // SYSTEM_PACKAGE_DARWIN
+#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)

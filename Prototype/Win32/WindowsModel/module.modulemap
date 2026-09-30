@@ -1,0 +1,9 @@
+module WinSDK {
+  header "WinSDK.h"
+  export *
+}
+
+module ucrt {
+  header "ucrt.h"
+  export *
+}

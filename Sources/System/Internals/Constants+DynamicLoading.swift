@@ -49,4 +49,9 @@ internal var _RTLD_NODELETE: CInt { RTLD_NODELETE }
 internal var _RTLD_FIRST: CInt { RTLD_FIRST }
 #endif
 
+#if os(Linux) && canImport(Glibc)
+@_alwaysEmitIntoClient
+internal var _RTLD_DEEPBIND: CInt { RTLD_DEEPBIND }
+#endif
+
 #endif // !os(Windows) && !os(WASI)

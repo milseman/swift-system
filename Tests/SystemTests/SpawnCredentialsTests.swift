@@ -13,10 +13,16 @@
 // its own user and group, so the real spawns use those, and the errors
 // come from asking for more.
 
-#if SYSTEM_PACKAGE_DARWIN
+#if SYSTEM_PACKAGE_DARWIN || os(Linux)
 
 import XCTest
+#if SYSTEM_PACKAGE_DARWIN
 import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif canImport(Musl)
+import Musl
+#endif
 
 #if SYSTEM_PACKAGE
 @testable import SystemPackage
@@ -115,19 +121,31 @@ final class SpawnCredentialsTest: XCTestCase {
     // Close-on-exec but `plain`. A close-on-exec descriptor that the actions
     // use only as a source is closed when the program starts: the pipe's
     // write end, a duplicate's source, and a working directory; so is one
-    // duplicated onto itself, which on Darwin keeps its flag.
+    // duplicated onto itself, which on Darwin keeps its flag, where glibc's
+    // posix_spawn clears it, as POSIX.1-2024 has it.
+    // `inherit` is Darwin's (posix_spawn_file_actions_addinherit_np), so
+    // elsewhere `inherited` is closed, as any close-on-exec descriptor is.
     func actions(_ writer: FileDescriptor) -> [SpawnFileAction] {
-      [
+      var actions: [SpawnFileAction] = [
         .duplicate(writer, as: .standardOutput),
         .setWorkingDirectory(directory),
         .duplicate(same, as: same),
-        .inherit(inherited),
+      ]
+      #if SYSTEM_PACKAGE_DARWIN
+      actions.append(.inherit(inherited))
+      #endif
+      actions += [
         .close(closed),
         .duplicate(replaced, as: .standardInput),
         .duplicate(plain, as: replaced),
       ]
+      return actions
     }
+    #if SYSTEM_PACKAGE_DARWIN
     let expected = ["inherited", "replaced", "plain"]
+    #else
+    let expected = ["same", "replaced", "plain"]
+    #endif
     XCTAssertEqual(
       try descriptorsOpen(among: descriptors) { arguments, writer in
         try ProcessID.spawn("/bin/sh", arguments: arguments, fileActions: actions(writer))
@@ -149,9 +167,11 @@ final class SpawnCredentialsTest: XCTestCase {
       }, [])
   }
 
+  #if SYSTEM_PACKAGE_DARWIN
   /// C file actions can't be read, so a close-on-exec descriptor among
   /// `fileActionDescriptors` stays open in the program unless the actions
   /// close it, or the attributes close what the actions don't install.
+  /// (On Linux the descriptors are unused, and exec closes them.)
   func testCValuesKeepTheDescriptorsTheyUse() throws {
     func spawn(
       _ arguments: [String], _ writer: FileDescriptor, closing: Bool,
@@ -175,6 +195,7 @@ final class SpawnCredentialsTest: XCTestCase {
         try spawn($0, $1, closing: false, attributes: SpawnAttributes(flags: .closeOnExecByDefault))
       }, [])
   }
+  #endif
 
   /// Arguments and an environment as C arrays, whose bytes needn't be UTF-8,
   /// with System's file actions and with C values.
@@ -209,11 +230,17 @@ final class SpawnCredentialsTest: XCTestCase {
     XCTAssertThrowsError(
       try ProcessID.spawn("/nonexistent/program", arguments: ["program"], credentials: ownCredentials)
     ) { XCTAssertEqual($0 as? Errno, .noSuchFileOrDirectory) }
-    // A file action's descriptor that isn't open.
+    // A file action's descriptor that isn't open. glibc's posix_spawn
+    // ignores closing one, so on Linux it's a duplicate's source.
+    #if SYSTEM_PACKAGE_DARWIN
+    let badAction = SpawnFileAction.close(FileDescriptor(rawValue: 1000))
+    #else
+    let badAction = SpawnFileAction.duplicate(FileDescriptor(rawValue: 1000), as: .standardInput)
+    #endif
     XCTAssertThrowsError(
       try ProcessID.spawn(
         "/bin/sh", arguments: ["sh", "-c", "exit 0"],
-        fileActions: [.close(FileDescriptor(rawValue: 1000))], credentials: ownCredentials)
+        fileActions: [badAction], credentials: ownCredentials)
     ) { XCTAssertEqual($0 as? Errno, .badFileDescriptor) }
   }
 
@@ -250,7 +277,11 @@ final class SpawnCredentialsTest: XCTestCase {
     try writer.close()
     XCTAssertEqual(try readAll(reader), "raw\n")
     XCTAssertEqual(try child.wait(), .exited(6))
+    #if SYSTEM_PACKAGE_DARWIN
     XCTAssertEqual(flags.rawValue & CShort(POSIX_SPAWN_SETEXEC), 0)
+    #else
+    _ = flags
+    #endif
 
     // Without C values.
     let other = try ProcessID.spawn(
@@ -285,15 +316,20 @@ final class SpawnCredentialsTest: XCTestCase {
 
       var calls: [(String, [AnyHashable])] = []
       while let entry = mocking.trace.dequeue() { calls.append((entry.name, entry.arguments)) }
-      // The mock records the optional credentials as optionals. First, the
-      // parent reads the flags of 5, a duplicate's source (the mock's are
-      // clear, so no close is added), but not of 6, which an action closes.
+      // The mock records the optional credentials as optionals. First, on
+      // Darwin, the parent reads the flags of 5, a duplicate's source (the
+      // mock's are clear, so no close is added), but not of 6, which an
+      // action closes; Linux adds no closes.
       let none: AnyHashable = Optional<UInt32>.none
       let noGroups: AnyHashable = Optional<[UInt32]>.none
+      #if SYSTEM_PACKAGE_DARWIN
+      let flagReads: [(String, [AnyHashable])] = [("fcntl", [CInt(5), F_GETFD])]
+      #else
+      let flagReads: [(String, [AnyHashable])] = []
+      #endif
       XCTAssertEqual(
-        calls.map(\.0), ["fcntl"] + Array(repeating: "spawn_with_credentials", count: 4))
-      XCTAssertEqual(calls.map(\.1), [
-        [CInt(5), F_GETFD],
+        calls.map(\.0), flagReads.map(\.0) + Array(repeating: "spawn_with_credentials", count: 4))
+      XCTAssertEqual(calls.map(\.1), flagReads.map(\.1) + [
         ["/bin/true", false, Optional(user.rawValue), Optional(group.rawValue), Optional([UInt32(12)]),
          [CInt(5), CInt(6)]],
         ["true", true, none, none, noGroups, [CInt]()],
@@ -305,4 +341,4 @@ final class SpawnCredentialsTest: XCTestCase {
   #endif
 }
 
-#endif // SYSTEM_PACKAGE_DARWIN
+#endif // SYSTEM_PACKAGE_DARWIN || os(Linux)

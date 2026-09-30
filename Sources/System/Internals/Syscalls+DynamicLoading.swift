@@ -49,8 +49,7 @@ internal func system_dlerror() -> UnsafeMutablePointer<CChar>? {
 
 #if SYSTEM_PACKAGE_DARWIN
 // dladdr reports no error; it returns 0 when no loaded image contains the
-// address. glibc declares it only with _GNU_SOURCE, which its Swift module
-// doesn't define, so it's Darwin's for now.
+// address.
 internal func system_dladdr(
   _ address: UnsafeRawPointer
 ) -> (path: UnsafePointer<CChar>, base: UnsafeRawPointer?,
@@ -59,6 +58,22 @@ internal func system_dladdr(
   guard dladdr(address, &info) != 0, let path = info.dli_fname else { return nil }
   return (path, info.dli_fbase.map(UnsafeRawPointer.init),
           info.dli_sname, info.dli_saddr.map(UnsafeRawPointer.init))
+}
+#elseif os(Linux) || os(Android)
+// glibc declares dladdr, and Dl_info, only with _GNU_SOURCE, which its Swift
+// module doesn't define, so CSystem's shim returns Dl_info's fields.
+internal func system_dladdr(
+  _ address: UnsafeRawPointer
+) -> (path: UnsafePointer<CChar>, base: UnsafeRawPointer?,
+      symbol: UnsafePointer<CChar>?, symbolAddress: UnsafeRawPointer?)? {
+  var path: UnsafePointer<CChar>? = nil
+  var base: UnsafeMutableRawPointer? = nil
+  var symbol: UnsafePointer<CChar>? = nil
+  var symbolAddress: UnsafeMutableRawPointer? = nil
+  guard csystem_dladdr(address, &path, &base, &symbol, &symbolAddress) != 0,
+        let path
+  else { return nil }
+  return (path, base.map(UnsafeRawPointer.init), symbol, symbolAddress.map(UnsafeRawPointer.init))
 }
 #endif
 

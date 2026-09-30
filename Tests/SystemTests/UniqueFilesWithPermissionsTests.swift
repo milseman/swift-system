@@ -11,10 +11,18 @@
 // open or openat with O_EXCL). XCTest, since they set the process's
 // creation mask.
 
-#if SYSTEM_PACKAGE_DARWIN
+#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
 
 import XCTest
+#if SYSTEM_PACKAGE_DARWIN
 import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif canImport(Musl)
+import Musl
+#elseif canImport(Android)
+import Android
+#endif
 
 #if SYSTEM_PACKAGE
 @testable import SystemPackage
@@ -94,7 +102,7 @@ final class UniqueFilesWithPermissionsTest: XCTestCase {
     }
   }
 
-  #if ENABLE_MOCKING
+  #if ENABLE_MOCKING && SYSTEM_PACKAGE_DARWIN
   private func entries(_ mocking: MockingDriver) -> [(String, [AnyHashable])] {
     var result: [(String, [AnyHashable])] = []
     while let entry = mocking.trace.dequeue() { result.append((entry.name, entry.arguments)) }
@@ -164,4 +172,4 @@ final class UniqueFilesWithPermissionsTest: XCTestCase {
   #endif
 }
 
-#endif // SYSTEM_PACKAGE_DARWIN
+#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)

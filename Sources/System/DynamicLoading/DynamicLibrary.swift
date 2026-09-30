@@ -139,6 +139,20 @@ extension DynamicLibrary {
     @_alwaysEmitIntoClient
     public static var first: OpenOptions { OpenOptions(rawValue: _RTLD_FIRST) }
     #endif
+
+    #if os(Linux) && canImport(Glibc)
+    /// Makes the library, and the libraries it depends on,
+    /// use their own symbols before any of the same names already loaded.
+    ///
+    /// Libraries that bundle their own copy of a common library,
+    /// such as the Swift runtime or LLVM, load this way
+    /// to keep calling their copy.
+    ///
+    /// The corresponding C constant is `RTLD_DEEPBIND`.
+    /// - Note: Only available on Linux with glibc.
+    @_alwaysEmitIntoClient
+    public static var deepBind: OpenOptions { OpenOptions(rawValue: _RTLD_DEEPBIND) }
+    #endif
   }
 }
 
@@ -317,14 +331,14 @@ extension DynamicLibrary {
   }
 }
 
-#if SYSTEM_PACKAGE_DARWIN
+#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
 @available(System 199, *)
 extension DynamicLibrary {
   /// Where an address is among the loaded libraries:
   /// the library that contains it, and the nearest symbol at or below it.
   ///
   /// The corresponding C type is `Dl_info`.
-  /// - Note: Only available on Darwin.
+  /// - Note: Only available on Darwin, Linux, and Android.
   public struct SymbolInfo: Hashable {
     /// The path of the library, or of the program, that contains the address,
     /// as the dynamic loader loaded it.
@@ -369,8 +383,12 @@ extension DynamicLibrary {
   /// To find the library that contains the calling code,
   /// pass the address of one of its functions.
   ///
+  /// On Linux the loader finds only exported symbols,
+  /// and for an address in a statically linked program,
+  /// such as one built with Musl, it finds no library.
+  ///
   /// The corresponding C function is `dladdr`.
-  /// - Note: Only available on Darwin.
+  /// - Note: Only available on Darwin, Linux, and Android.
   @_alwaysEmitIntoClient
   public static func symbolInfo(containing address: UnsafeRawPointer) -> SymbolInfo? {
     _symbolInfo(containing: address)

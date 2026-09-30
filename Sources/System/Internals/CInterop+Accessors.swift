@@ -41,10 +41,24 @@ import Android
 
 @available(System 199, *)
 extension CInterop {
+  #if canImport(Glibc)
+  // Named through Glibc's module, as CInterop.SignalSet is: CSystem's
+  // headers declare timespec too (<sys/types.h>, <sys/epoll.h>), and Swift
+  // attributes the type to the module whose copy it loads first. This file
+  // imports CSystem, and SystemPackage's first use of timespec can come
+  // through this alias (ClockTime's currentTimeSpec()); unqualified, it
+  // loads CSystem's copy, and then a client can't read tv_sec without
+  // importing CSystem (Tests/MemberImportVisibility/TimespecProbe.swift).
+  /// A time, in seconds and nanoseconds.
+  ///
+  /// The corresponding C type is `struct timespec`.
+  public typealias TimeSpec = Glibc.timespec
+  #else
   /// A time, in seconds and nanoseconds.
   ///
   /// The corresponding C type is `struct timespec`.
   public typealias TimeSpec = timespec
+  #endif
 }
 
 @available(System 199, *)
@@ -142,10 +156,19 @@ extension CInterop.TimeSpec {
 
 @available(System 199, *)
 extension CInterop {
+  #if canImport(Glibc)
+  // Named through Glibc's module, for the reason TimeSpec is: CSystem's
+  // <sys/types.h> declares timeval too, through <sys/select.h>.
+  /// A time, in seconds and microseconds.
+  ///
+  /// The corresponding C type is `struct timeval`.
+  public typealias TimeVal = Glibc.timeval
+  #else
   /// A time, in seconds and microseconds.
   ///
   /// The corresponding C type is `struct timeval`.
   public typealias TimeVal = timeval
+  #endif
 }
 
 @available(System 199, *)
