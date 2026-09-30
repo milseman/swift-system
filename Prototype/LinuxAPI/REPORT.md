@@ -17,10 +17,15 @@ interface at Swift's default API level (21), and said otherwise.
   batch's Linux check (below) passed at `eabcd46`, but batch 8's pipe
   expectation, fixed in `08c79ad`.
 - Next: section 1.4's list is done within this lane's files but for
-  `clone3`, which System won't wrap (section 3). What's left is section 4
-  (SystemSockets: vsock, UDP offload; Tests/MemberImportVisibility), or a
-  new pass over section 1.4 against the adopters' current branches.
-  `copy_file_range` turned out not to be needed on Linux (2.8).
+  `clone3`, which System won't wrap (section 3). A second pass (2026-09-30)
+  over the C calls in swift-nio's, swift-subprocess's and
+  swift-foundation's files that import a Linux C module found nothing new
+  that's System's to wrap: what's left there is the adopters' own
+  migration (System already answers them), their own wrappers' names,
+  FreeBSD's branches, and ICU. What's left for System is section 4
+  (SystemSockets: vsock, UDP offload; Tests/MemberImportVisibility), and
+  section 3's other-lane test failures. `copy_file_range` turned out not
+  to be needed on Linux (2.8).
 - This lane owns `Sources/System/**`, `Sources/CSystem`, `Tests/SystemTests`
   and this report, not SystemSockets or its tests: socket API (vsock, UDP
   offload) goes to section 4, with a patch where one is written.
