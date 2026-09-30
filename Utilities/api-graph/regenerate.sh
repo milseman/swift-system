@@ -28,6 +28,10 @@
 #   API_GRAPH_ADOPTER_BUILDS    build (default): build a migration whose index
 #                        isn't cached; reuse: any cached index of the commit,
 #                        no builds; none: lexical only
+#   API_GRAPH_ADOPTER_VALIDATE  declarations (default): a migration's index
+#                        cached against another System tree is reused if every
+#                        System declaration it names is unchanged; interface:
+#                        if System's whole public interface is; tree: never
 #   API_GRAPH_CACHE      the adopters' cached indexes (default
 #                        .build/api-graph-cache)
 #   API_GRAPH_MIN_FREE_GB  don't start an adopter build with less free disk
@@ -296,9 +300,9 @@ if [ -n "$ADOPTERS$ECOSYSTEM" ]; then
   adopters=(--graph "$WORK/graph.json" --repo "$REPO" --head "$HEAD_COMMIT"
     --head-src "$WORK/head/src" --base-src "$WORK/base/src" --head-scan "$WORK/head/scan.json"
     --base-scan "$WORK/base/scan.json" --cnames "$WORK/cnames.json" --work "$WORK" --cache "$CACHE"
-    --out "$WORK/adopters.json"
+    --out "$WORK/adopters.json" --symbolgraphs "$DELTA/symbolgraphs/head"
     --branch "${API_GRAPH_ADOPTER_BRANCH:-migrate-darwin}" --builds "${API_GRAPH_ADOPTER_BUILDS:-build}"
-    --min-free-gb "${API_GRAPH_MIN_FREE_GB:-15}")
+    --validate "${API_GRAPH_ADOPTER_VALIDATE:-declarations}" --min-free-gb "${API_GRAPH_MIN_FREE_GB:-15}")
   if [ -n "$ADOPTERS" ]; then adopters+=(--adopters "$ADOPTERS"); fi
   if [ -n "$ECOSYSTEM" ]; then adopters+=(--ecosystem "$ECOSYSTEM"); fi
   if [ -n "$COVERAGE_RESULTS" ]; then adopters+=(--coverage-results "$COVERAGE_RESULTS"); fi

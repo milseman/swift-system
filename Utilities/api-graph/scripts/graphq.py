@@ -217,6 +217,10 @@ class Graph:
 
 # ---------------------------------------------------------------- commands
 
+def md_cell(text):
+    return text.replace("|", "\\|").replace("\n", " ")
+
+
 def link_text(g, kind, arrow, other, detail):
     txt = f"{kind:<18} {arrow} {g.label(other)}"
     if isinstance(detail, dict):
@@ -616,6 +620,19 @@ def summary_md(doc, diff_file=None):
         mig = f"`{ad['branch']}` @ `{ad['commit'][:10]}` ({ad['resolution']})" if ad else "—"
         dat = f"{be['role']} `{be['commit'][:10]}` ({be['source']}, {be['extraction']})" if be else "—"
         L.append(f"| `{p['name']}` | {mig} | {n_use} | {dat} |")
+    migs = [p for p in sorted(pk, key=lambda p: p["key"]) if p.get("adopted")]
+    if migs:
+        L += ["", "## The migrations' indexes", "",
+              "Whether each migration's index was reused (built against this System tree), revalidated (built "
+              "against another, and every System declaration it names is unchanged) or rebuilt, and why.", "",
+              "| Package | Index | Why | Build |", "|---|---|---|---|"]
+        for p in migs:
+            b = p["adopted"].get("build") or {}
+            built = f"{b.get('status')}, {b['seconds']} s" if b.get("seconds") is not None else b.get("status", "—")
+            if b.get("cached"):
+                built += f", against `{(b.get('builtAgainst') or '')[:10]}`"
+            L.append(f"| `{p['name']}` | {b.get('decision') or '—'} | {md_cell(b.get('decisionReason') or '')} "
+                     f"| {built} |")
     L += ["", "## Querying it", "", "```sh",
           "python3 Utilities/api-graph/scripts/graphq.py show 'PThread.Mutex.lock()'",
           "python3 Utilities/api-graph/scripts/graphq.py type ProcessID --members --sites",

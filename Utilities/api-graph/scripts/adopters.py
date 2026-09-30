@@ -16,8 +16,13 @@ Two kinds of use sites, for every node of graph.json:
                    (Utilities/adopter-coverage/packages/*.ini) with an index
                    store. The store's references to a node's USR are its
                    sites. The references are cached by package commit,
-                   System tree, toolchain and settings, and the build is
-                   deleted as soon as it's read.
+                   toolchain, settings and path dependencies, with the
+                   System tree they were built against and a fingerprint
+                   of each System declaration they name; against another
+                   System tree, they're revalidated (reused when every one
+                   of those declarations is unchanged in the head commit's
+                   symbol graphs) or rebuilt. The build is deleted as soon
+                   as it's read.
                  - Lexical elsewhere: files the build doesn't compile (tests,
                    or everything, when the build fails), and added lines in
                    `#if` branches Darwin doesn't take. Names are matched on
@@ -46,9 +51,12 @@ Usage: adopters.py --graph graph.json --repo DIR --head COMMIT
                    --head-src DIR --base-src DIR --head-scan F --base-scan F
                    --cnames cnames.json
                    --work DIR --cache DIR --out adopters.json
+                   [--symbolgraphs DIR] [--validate declarations|interface|tree]
                    [--adopters DIR] [--ecosystem DIR] [--coverage-results DIR]
                    [--branch migrate-darwin] [--builds build|reuse|none]
                    [--rebuild] [--min-free-gb 15] [--only KEY,...]
+  --symbolgraphs is api-delta's symbol graphs of the head commit
+  (symbolgraphs/head), what cached indexes are revalidated against.
 """
 
 import sys
@@ -305,17 +313,106 @@ def tree_of(repo, commit):
     return "-".join(t[:12] for t in out)
 
 
+# ---------------------------------------------------------------- System's declarations, for revalidation
+
+class SystemDeclarations:
+    """System's public declarations at the head commit, by USR, from
+    api-delta's symbol graphs of it (graph.json has only the delta): what a
+    cached index built against another System commit is revalidated
+    against. A declaration's fingerprint covers what decides how a client's
+    use of it compiles: its declaration fragments (the signature, default
+    arguments and attributes included), availability, SPI, access, generic
+    signature and extension constraints, and a type's conformances. Doc
+    comments and source locations don't count."""
+
+    # A property's or subscript's accessor, which the index records beside
+    # the property: `...Sivg` (getter) for `...Sivp`, `...SivgZ` for a
+    # static one; setters, modify, read, observers, addressors likewise.
+    ACCESSOR = re.compile(r"^(.*[vi])(?:[gsGwWrMixybz]|[al][uOop])(Z?)$")
+
+    def __init__(self, sg_dir):
+        self.fingerprint, self.name = {}, {}
+        symbols, rels = {}, []
+        for path in sorted(glob.glob(os.path.join(sg_dir, "*.symbols.json"))):
+            d = load_json(path)
+            for s in d.get("symbols", []):
+                symbols[s["identifier"]["precise"]] = s
+            rels += d.get("relationships", [])
+        # A conformance an extension declares belongs to the extended type.
+        extended = {r["source"]: r["target"] for r in rels if r["kind"] == "extensionTo"}
+        conformances = collections.defaultdict(list)
+        for r in rels:
+            if r["kind"] in ("conformsTo", "inheritsFrom"):
+                conformances[extended.get(r["source"], r["source"])].append(
+                    [r["kind"], r["target"], r.get("swiftConstraints")])
+        for usr, s in symbols.items():
+            if s["kind"]["identifier"] == "swift.extension":
+                continue
+            facts = {"kind": s["kind"]["identifier"],
+                     "declaration": [[f.get("kind"), f.get("spelling"), f.get("preciseIdentifier")]
+                                     for f in s.get("declarationFragments", [])],
+                     "availability": s.get("availability"), "spi": s.get("spi", False),
+                     "access": s.get("accessLevel"), "generics": s.get("swiftGenerics"),
+                     "extension": s.get("swiftExtension"),
+                     "conformances": sorted(conformances.get(usr, []), key=json.dumps)}
+            self.fingerprint[usr] = hashlib.sha1(json.dumps(facts, sort_keys=True).encode()).hexdigest()[:16]
+            self.name[usr] = ".".join(s.get("pathComponents") or [usr])
+        # The whole public interface, for --validate interface.
+        self.interface = hashlib.sha1(json.dumps(sorted(self.fingerprint.items())).encode()).hexdigest()[:16]
+
+    def owner(self, usr):
+        """The System declaration a referenced USR stands for: itself, or
+        the property whose accessor it is; None when it isn't System's (an
+        adopter's own extension member, or a declaration whose signature
+        only mentions a System type)."""
+        if usr in self.fingerprint:
+            return usr
+        m = self.ACCESSOR.match(usr)
+        if m and m.group(1) + "p" + m.group(2) in self.fingerprint:
+            return m.group(1) + "p" + m.group(2)
+        return None
+
+    def referenced(self, files):
+        """{usr: [fingerprint, name]} for the System declarations an index's
+        references name, explicitly or implicitly."""
+        out = {}
+        for f in files.values():
+            for _line, _col, usr, _flags in f["references"]:
+                o = self.owner(usr)
+                if o and o not in out:
+                    out[o] = [self.fingerprint[o], self.name[o]]
+        return out
+
+    def check(self, recorded):
+        """Of the declarations a cached index recorded, the names of those
+        whose fingerprint changed, and of those that are gone."""
+        changed, gone = [], []
+        for usr, (fp, name) in sorted(recorded.items(), key=lambda kv: kv[1][1]):
+            now = self.fingerprint.get(usr)
+            if now is None:
+                gone.append(name)
+            elif now != fp:
+                changed.append(name)
+        return changed, gone
+
+
+def some(names, n=3):
+    return ", ".join(f"`{x}`" for x in names[:n]) + (f" and {len(names) - n} more" if len(names) > n else "")
+
+
 # ---------------------------------------------------------------- indexed builds
 
 class Builder:
-    def __init__(self, a, pkgs, compiler):
+    def __init__(self, a, pkgs, compiler, decls):
         self.a = a
         self.pkgs = pkgs
         self.compiler = compiler
+        self.decls = decls
         self.pathdeps = coverage_module("pathdeps")
         self.package = coverage_module("package")
         self.settings_files = coverage_package_files()
         self.system_tree = tree_of(a.repo, a.head)
+        self.system_manifest = git(a.repo, "rev-parse", f"{a.head}:Package.swift").strip()
         self.system_export = None
 
     def settings(self, pkg):
@@ -341,7 +438,8 @@ class Builder:
 
     def dep_keys(self, repo, commit, seen):
         """What a commit's path dependencies are, from its manifests in git:
-        swift-system's tree, another clone's commit, or a plain path."""
+        swift-system (whose commit the cached index records, not the key),
+        another clone's commit, or a plain path."""
         keys = []
         listing = git(repo, "ls-tree", "--name-only", commit) or ""
         for name in sorted(x for x in listing.split("\n") if re.match(r"^Package(@swift-[\d.]+)?\.swift$", x)):
@@ -350,7 +448,7 @@ class Builder:
                 rel = m.group(2)
                 target = rel if os.path.isabs(rel) else os.path.normpath(os.path.join(repo, rel))
                 if self.is_system(target):
-                    keys.append(f"swift-system@{self.system_tree}")
+                    keys.append("swift-system")
                     continue
                 top = toplevel(target) if os.path.isdir(target) else None
                 if top:
@@ -375,7 +473,7 @@ class Builder:
                 rel = m.group(2)
                 target = rel if os.path.isabs(rel) else os.path.normpath(os.path.join(checkout, rel))
                 if self.is_system(target):
-                    keys.append(f"swift-system@{self.system_tree}")
+                    keys.append("swift-system")
                     return m.group(1) + json.dumps(self.system())
                 top = toplevel(target) if os.path.isdir(target) else None
                 if top:
@@ -397,8 +495,47 @@ class Builder:
                 open(manifest, "w", encoding="utf-8").write(new)
         return keys
 
-    def index(self, pkg):
-        """{status, files, symbols, build}, from the cache or a build."""
+    def system_block(self, files):
+        """What a cached index records of the System it was built against:
+        the commit and tree, the manifest, and the fingerprints of the System
+        declarations its references name."""
+        return {"commit": self.a.head, "tree": self.system_tree, "manifest": self.system_manifest,
+                "interface": self.decls.interface if self.decls else None,
+                "declarations": self.decls.referenced(files) if self.decls else None}
+
+    def invalid(self, d):
+        """Why a cached index built against another System tree doesn't hold
+        for this run's, or None when it does (revalidated)."""
+        s = d["system"]
+        since = f"since {s['commit'][:10]}"
+        if d["status"] != "indexed":
+            return (f"its build failed{' partway' if d['status'] == 'partial' else ''} against System at "
+                    f"{s['commit'][:10]}, which has changed")
+        if self.a.validate == "tree":
+            return f"System's sources changed {since} (API_GRAPH_ADOPTER_VALIDATE=tree)"
+        if s.get("manifest") != self.system_manifest:
+            return f"System's Package.swift changed {since}"
+        if self.decls is None:
+            return "no symbol graphs of the head commit to revalidate against"
+        if self.a.validate == "interface":
+            return None if s.get("interface") == self.decls.interface else \
+                f"System's public interface changed {since} (API_GRAPH_ADOPTER_VALIDATE=interface)"
+        if s.get("declarations") is None:
+            return "its build recorded no System declarations"
+        changed, gone = self.decls.check(s["declarations"])
+        if not changed and not gone:
+            return None
+        n = len(s["declarations"])
+        return (f"of its {n} System declarations, " + "; ".join(
+            x for x in (f"{len(changed)} changed {since} ({some(changed)})" if changed else "",
+                        f"{len(gone)} {'is' if len(gone) == 1 else 'are'} gone ({some(gone)})" if gone else "") if x))
+
+    def plan(self, pkg):
+        """Whether a migration's cached index serves this run, and why:
+        {decision, reason, entry, key, ...}. The decision is `reused` (built
+        against this System tree), `revalidated` (built against another one,
+        and every System declaration its references name is unchanged), or
+        `rebuild`."""
         a = self.a
         info = pkg["adopters"]
         s = self.settings(pkg)
@@ -406,31 +543,89 @@ class Builder:
         swift_exec = os.environ.get(exec_var) or (newest_toolchain() if s.get("build-hint") else None)
         settings_text = json.dumps({k: s.get(k) for k in ("build-targets", "build-flags", "unset-env")},
                                    sort_keys=True)
-        # The key: everything the build depends on but the local path
-        # dependencies, which only an export shows; those are added below.
-        base_key = [info["commit"], self.system_tree, self.compiler, swift_exec or "", settings_text, READER_VERSION,
-                    self.dep_keys(info["path"], info["commit"], set())]
+        # The key: everything the build depends on but System, whose tree
+        # and declarations the entry records instead. An earlier version of
+        # this tool keyed on System's tree; its entries are still read.
+        deps = self.dep_keys(info["path"], info["commit"], set())
+        key = [info["commit"], self.compiler, swift_exec or "", settings_text, READER_VERSION, deps]
+        legacy = [info["commit"], self.system_tree, self.compiler, swift_exec or "", settings_text, READER_VERSION,
+                  sorted(set(f"swift-system@{self.system_tree}" if k == "swift-system" else k for k in deps))]
+        plan = {"key": key, "deps": deps, "settings": s, "swiftExec": swift_exec, "entry": None,
+                "decision": "rebuild", "reason": "no cached index of this commit"}
         cache_dir = os.path.join(a.cache, pkg["key"])
-        # A cached index whose key matches; with --builds reuse, the latest of this commit.
-        cached = None
-        for p in sorted(glob.glob(os.path.join(cache_dir, info["commit"] + "-*.json.gz")), key=os.path.getmtime):
+        entries = []
+        for p in sorted(glob.glob(os.path.join(cache_dir, info["commit"] + "-*.json.gz")),
+                        key=os.path.getmtime, reverse=True):
             try:
-                d = load_json(p)
+                entries.append((p, load_json(p)))
             except (OSError, ValueError):
                 continue
-            if d.get("baseKey") == json.loads(json.dumps(base_key)) or a.builds == "reuse":
-                cached = d
-        if cached and not a.rebuild:
-            cached["build"]["cached"] = True
+
+        def use(d, decision, reason):
+            plan.update(entry=d, decision=decision, reason=reason)
+            return plan
+
+        if a.rebuild:
+            plan["reason"] = "--rebuild"
+            return plan
+        if a.builds == "reuse" and entries:
+            return use(entries[0][1], "reused", "the latest cached index of this commit (--builds reuse)")
+        mine = [d for _p, d in entries if d.get("baseKey") == json.loads(json.dumps(key)) and d.get("system")]
+        for d in mine:
+            if d["system"]["tree"] == self.system_tree:
+                return use(d, "reused", f"built against this System tree, at {d['system']['commit'][:10]}")
+        for _p, d in entries:
+            if d.get("baseKey") == json.loads(json.dumps(legacy)):
+                # The previous version's entry for this very tree: record the
+                # declarations it names now, as its own build would have.
+                d = dict(d, baseKey=key, system=self.system_block(d["files"]))
+                self.store(pkg, d)
+                return use(d, "reused", "built against this System tree, by the previous version of this tool")
+        reasons = []
+        for d in mine:
+            why = self.invalid(d)
+            if why is None:
+                n = len(d["system"].get("declarations") or {})
+                return use(d, "revalidated", f"built against System at {d['system']['commit'][:10]}; "
+                                             f"its {n} System declarations are unchanged")
+            reasons.append(why)
+        if reasons:
+            plan["reason"] = reasons[0]
+        elif any("system" not in d for _p, d in entries):
+            plan["reason"] = "cached by the previous version of this tool, which keyed on System's tree"
+        elif entries:
+            plan["reason"] = "the cached indexes of this commit are for other settings, toolchains or dependencies"
+        return plan
+
+    def store(self, pkg, result):
+        """File a cache entry: one per package commit, key and System tree."""
+        cache_dir = os.path.join(self.a.cache, pkg["key"])
+        os.makedirs(cache_dir, exist_ok=True)
+        name = (pkg["adopters"]["commit"] + "-" + hashlib.sha1(json.dumps(result["baseKey"]).encode()).hexdigest()[:12]
+                + "-" + result["system"]["tree"] + ".json.gz")
+        with gzip.open(os.path.join(cache_dir, name), "wt", encoding="utf-8") as f:
+            json.dump(result, f)
+
+    def index(self, pkg, plan):
+        """{status, files, symbols, build}, from the cache or a build."""
+        a = self.a
+        info = pkg["adopters"]
+        s, swift_exec, base_key = plan["settings"], plan["swiftExec"], plan["key"]
+        if plan["entry"] is not None:
+            cached = plan["entry"]
+            cached["build"] = dict(cached["build"], cached=True, decision=plan["decision"],
+                                   decisionReason=plan["reason"],
+                                   builtAgainst=(cached.get("system") or {}).get("commit"))
             return cached
         if a.builds != "build":
             return {"status": "not built", "files": {}, "symbols": {},
-                    "build": {"status": "not built", "reason": f"--builds {a.builds}", "settings": s["file"]}}
+                    "build": {"status": "not built", "reason": f"--builds {a.builds}", "settings": s["file"],
+                              "decision": "not built", "decisionReason": plan["reason"]}}
         free = shutil.disk_usage(a.work if os.path.isdir(a.work) else os.path.dirname(a.work)).free / 2 ** 30
         if free < a.min_free_gb:
             return {"status": "not built", "files": {}, "symbols": {},
                     "build": {"status": "not built", "reason": f"{free:.1f} GiB free, under {a.min_free_gb}",
-                              "settings": s["file"]}}
+                              "settings": s["file"], "decision": "not built", "decisionReason": plan["reason"]}}
         w = os.path.join(a.work, "adopters", pkg["key"])
         shutil.rmtree(w, ignore_errors=True)
         os.makedirs(w)
@@ -498,14 +693,33 @@ class Builder:
                       "swiftExec": swift_exec, "compiler": self.compiler, "settings": s["file"],
                       "pathDependencies": notes, "records": n_records, "date": datetime.date.today().isoformat(),
                       "logTail": tail if status != "indexed" else [], "cached": False},
+            "system": self.system_block(files),
         }
-        os.makedirs(cache_dir, exist_ok=True)
-        name = info["commit"] + "-" + hashlib.sha1(json.dumps(base_key).encode()).hexdigest()[:12] + ".json.gz"
-        with gzip.open(os.path.join(cache_dir, name), "wt", encoding="utf-8") as f:
-            json.dump(result, f)
+        self.store(pkg, result)
         # The build is scratch: gone as soon as it's read (SwiftPM's is several GB).
         shutil.rmtree(w, ignore_errors=True)
+        result["build"] = dict(result["build"], decision="rebuilt", decisionReason=plan["reason"],
+                               builtAgainst=a.head)
         return result
+
+
+def follow_dependencies(plans, pkgs):
+    """A revalidated index whose build compiled another migration (a path
+    dependency on its clone, at its branch) holds only if that migration's
+    does too: the dependency's sources were compiled against System as
+    well, and its own references are what its plan checked."""
+    by_dep = {f"{pkgs[k]['adopters']['dir']}@{pkgs[k]['adopters']['commit']}": k for k in plans}
+    moved = True
+    while moved:
+        moved = False
+        for p in plans.values():
+            if p["decision"] != "revalidated":
+                continue
+            dep = next((by_dep[d] for d in p["deps"] if by_dep.get(d) and plans[by_dep[d]]["decision"] == "rebuild"),
+                       None)
+            if dep:
+                p.update(decision="rebuild", entry=None, reason=f"its path dependency {dep} is rebuilt")
+                moved = True
 
 
 # ---------------------------------------------------------------- #if, three-valued
@@ -1114,6 +1328,8 @@ def main():
     ap.add_argument("--branch", default="migrate-darwin")
     ap.add_argument("--builds", choices=("build", "reuse", "none"), default="build")
     ap.add_argument("--rebuild", action="store_true")
+    ap.add_argument("--symbolgraphs", help="api-delta's symbol graphs of the head commit (symbolgraphs/head)")
+    ap.add_argument("--validate", choices=("declarations", "interface", "tree"), default="declarations")
     ap.add_argument("--min-free-gb", type=float, default=15)
     ap.add_argument("--only", default="")
     a = ap.parse_args()
@@ -1142,7 +1358,14 @@ def main():
     os.makedirs(a.cache, exist_ok=True)
     matcher = LexicalMatcher(nodes, base_names, library_names(a.cache, compiler))
     conds = Conditions()
-    builder = Builder(a, pkgs, compiler)
+    decls = None
+    if a.symbolgraphs and glob.glob(os.path.join(a.symbolgraphs, "*.symbols.json")):
+        decls = SystemDeclarations(a.symbolgraphs)
+    builder = Builder(a, pkgs, compiler, decls)
+    # Every migration's plan first, since one whose build compiles another
+    # migration is revalidated only with it.
+    plans = {k: builder.plan(p) for k, p in sorted(pkgs.items()) if (p["adopters"] or {}).get("migrated")}
+    follow_dependencies(plans, pkgs)
 
     adopted_sites, hunks = [], {}
     by_node_adopted = collections.defaultdict(list)
@@ -1168,7 +1391,7 @@ def main():
                         "--src-prefix=a/", "--dst-prefix=b/", "--find-renames", "-U3", base, commit) if base else ""
         diff = parse_diff(diff_text)
         swift_changed = sorted(f for f in diff if f.endswith(".swift"))
-        idx = builder.index(p)
+        idx = builder.index(p, plans[key])
         indexed = set(idx["files"])
         symbols = idx["symbols"]
         own = declared_names(co)
@@ -1272,9 +1495,9 @@ def main():
             "seconds": round(time.time() - t0),
         }
         co.close()
-        print(f"adopters: {key}: {resolution} ({idx['build'].get('status')}"
-              f"{', cached' if idx['build'].get('cached') else ''}"
-              f"{': ' + idx['build']['reason'] if idx['build'].get('reason') else ''}); "
+        b = idx["build"]
+        print(f"adopters: {key}: {b.get('decision')} ({b.get('decisionReason')}); {resolution} ({b.get('status')}"
+              f"{': ' + b['reason'] if b.get('reason') else ''}); "
               f"{n_precise} precise and {n_lexical} lexical sites, {n_qualifier} qualifiers, "
               f"{round(time.time() - t0)} s", flush=True)
 
@@ -1372,9 +1595,13 @@ def main():
         print(f"adopters: {rec['key']}: would benefit at {commit[:10]} ({source}, {extraction}): "
               f"{len(used)} interfaces, {n_sites} sites", flush=True)
 
+    decisions = collections.Counter((r["adopted"]["build"] or {}).get("decision") for r in pkg_out if r["adopted"])
     json.dump({
         "meta": {"branch": a.branch, "adopters": a.adopters, "ecosystem": a.ecosystem,
                  "coverageResults": a.coverage_results, "headCommit": a.head, "systemTree": builder.system_tree,
+                 "systemManifest": builder.system_manifest, "validate": a.validate,
+                 "systemDeclarations": len(decls.fingerprint) if decls else None,
+                 "decisions": dict(sorted(decisions.items())),
                  "swift": compiler, "builds": a.builds, "date": datetime.date.today().isoformat(),
                  "seconds": round(time.time() - t_start)},
         "packages": pkg_out,
@@ -1384,7 +1611,8 @@ def main():
     }, open(a.out, "w"), indent=0)
     na = sum(1 for r in pkg_out if r["adopted"])
     nb = sum(1 for r in pkg_out if r["benefit"])
-    print(f"adopters: {len(pkg_out)} packages ({na} migrated, {nb} with interface data), "
+    print(f"adopters: {len(pkg_out)} packages ({na} migrated: "
+          f"{', '.join(f'{n} {d}' for d, n in sorted(decisions.items()))}; {nb} with interface data), "
           f"{len(adopted_sites)} adopted sites on {len(by_node_adopted)} declarations, "
           f"{len(benefit_sites)} would-benefit sites on {len(by_node_benefit)} declarations, "
           f"{round(time.time() - t_start)} s -> {a.out}")
