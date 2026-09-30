@@ -1,19 +1,21 @@
 # Status: System's API and its adopters
 
-Generated 2026-09-29 by `Utilities/adopter-coverage/status.sh`, from commits only; rerun it rather than editing this file. How each figure is made, and what it can't see, is in [How this is computed](#how-this-is-computed).
+Generated 2026-09-30 by `Utilities/adopter-coverage/status.sh`, from commits only; rerun it rather than editing this file. How each figure is made, and what it can't see, is in [How this is computed](#how-this-is-computed).
 
-- **System**: `coverage` @ `145df6bd` (adopter-coverage: popular.tsv's third batch, from swift-distributed-actors), which doesn't contain `system-next` @ `3fc3ca3f` (Merge branch 'utilities' into system-next); 25 commit(s) of `coverage` aren't in `system-next`.
-- **API delta**: `main` @ `1b452c29` → `HEAD` @ `145df6bd`.
+- **System**: `coverage-3` @ `cddd4d20` (status.sh: section 4, the toolchain repositories' platform imports; swift-foundation on no-darwin), which contains `system-next` @ `6a9833fd` (Merge branch 'coverage-2' into system-next); 9 commit(s) of `coverage-3` aren't in `system-next`.
+- **API delta**: `main` @ `1b452c29` → `HEAD` @ `cddd4d20`.
 - **Adopters** (`../adopters`, branch `migrate-darwin`, against its merge base with `main`):
   - WasmKit @ `4917e060`, base `1e9c513d`
   - indexstore-db @ `cc966b89`, base `441ead77`
+  - sourcekit-lsp @ `cb2881c5`, base `045c18e9`
   - swift-argument-parser @ `0fbda276`, base `1021ac8c`
   - swift-async-algorithms @ `bd5f6f44`, base `789dcf1f`
-  - swift-build @ `56ad2d97`, base `f4685a11`
+  - swift-build @ `56ad2d97`, base `f4685a11` (uncommitted changes in the checkout aren't counted)
   - swift-certificates @ `0df6bd14`, base `ff86b924`
-  - swift-docc @ `6b1bfaa1`, base `f37d9a7f`
+  - swift-corelibs-xctest @ `80a3f954`, base `80a3f954` (no commits beyond the merge base yet)
+  - swift-docc @ `ad021e35`, base `f37d9a7f`
   - swift-driver @ `ddb51ccd`, base `15cf6766`
-  - swift-foundation @ `763e42cd`, base `6669273a`
+  - swift-foundation @ `ef3c5667` (branch `no-darwin`), base `6669273a`
   - swift-llbuild @ `f7a0650b`, base `54a6aca5`
   - swift-log @ `4d6d77fe`, base `9c9acde6`
   - swift-nio @ `e1623fbf`, base `feaf4ac5`
@@ -30,15 +32,15 @@ Copied verbatim from `Utilities/api-delta/regenerate.sh` (`BASE_REF=main`, `HEAD
 
 ## Summary
 
-- **3171 added, 0 removed, 0 changed** declarations in the macOS symbol graphs.
-  - SystemPackage: +2587 (448 → 3035 public symbols).
+- **3186 added, 0 removed, 0 changed** declarations in the macOS symbol graphs.
+  - SystemPackage: +2602 (448 → 3050 public symbols).
   - SystemSockets: +584 (0 → 584 public symbols). SystemSockets is a new module; it doesn't exist on `main`.
 - Availability of the additions:
-  - System 199: 3134
+  - System 199: 3148
   - System 199 + explicit OS floor: 26
   - System 0.0.1 + explicit OS floor: 8
+  - System 0.0.1: 2
   - System 1.7.0: 2
-  - System 0.0.1: 1
 - The source scan finds these new public declarations, which the macOS graphs can't show:
   - 410 compiled only on other platforms;
   - 237 new `@available(*, unavailable, renamed:)` stubs;
@@ -48,7 +50,7 @@ Copied verbatim from `Utilities/api-delta/regenerate.sh` (`BASE_REF=main`, `HEAD
 - 0 public declarations hidden from the graphs were removed.
 - No public declaration is conditional on `ENABLE_MOCKING` or `DEBUG`, so a release build has the same public API as the debug graphs.
 - Cross-check with `swift-api-digester`, which dumps every declaration, implicit ones included:
-  - SystemPackage: +2902 / -0 declarations, which is the graphs' +2587 plus 310 implicit ones; explicit declarations it has that the graphs don't: `_opaque_pthread_cond_t.initializer`, `_opaque_pthread_mutex_t.errorCheckingInitializer`, `_opaque_pthread_mutex_t.initializer`, `_opaque_pthread_mutex_t.recursiveInitializer`, `_opaque_pthread_rwlock_t.initializer`; it has every graph addition; `-diagnose-sdk` reports no breaking changes.
+  - SystemPackage: +2920 / -0 declarations, which is the graphs' +2602 plus 313 implicit ones; explicit declarations it has that the graphs don't: `_opaque_pthread_cond_t.initializer`, `_opaque_pthread_mutex_t.errorCheckingInitializer`, `_opaque_pthread_mutex_t.initializer`, `_opaque_pthread_mutex_t.recursiveInitializer`, `_opaque_pthread_rwlock_t.initializer`; it has every graph addition; `-diagnose-sdk` reports no breaking changes.
   - SystemSockets: +657 / -0 declarations, which is the graphs' +584 plus 72 implicit ones; explicit declarations it has that the graphs don't: `SocketAddress._withUnsafeMutablePointer(_:)`; it has every graph addition.
 - Nothing was removed or changed: no public declaration left the graphs or the source scan. The *changed* check compares declaration text (including default arguments), availability, conformances, generic and extension constraints, and access level, and pairs symbols by path when a signature change alters the USR.
 
@@ -60,7 +62,7 @@ Each row is a top-level type, and nested types count toward it: `FilePath.Resolu
 |---|---|---:|---:|---:|---|
 | SystemPackage | [`BaudRate`](#systempackage-baudrate) | 26 | 0 | 0 | S199 ×26 |
 | SystemPackage | [`BrokenDownTime`](#systempackage-brokendowntime) | 29 | 0 | 0 | S199 ×29 |
-| SystemPackage | [`CInterop`](#systempackage-cinterop) | 45 | 0 | 0 | S199 ×45 |
+| SystemPackage | [`CInterop`](#systempackage-cinterop) | 46 | 0 | 0 | S199 ×46 |
 | SystemPackage | [`CLocale`](#systempackage-clocale) | 32 | 0 | 0 | S199 ×32 |
 | SystemPackage | [`CString`](#systempackage-cstring) | 8 | 0 | 0 | S199 ×8 |
 | SystemPackage | [`CType`](#systempackage-ctype) | 15 | 0 | 0 | S199 ×15 |
@@ -71,11 +73,11 @@ Each row is a top-level type, and nested types count toward it: `FilePath.Resolu
 | SystemPackage | [`ControlCharacters`](#systempackage-controlcharacters) | 8 | 0 | 0 | S199 ×8 |
 | SystemPackage | [`ControlFlags`](#systempackage-controlflags) | 20 | 0 | 0 | S199 ×20 |
 | SystemPackage | [`DirectoryStream`](#systempackage-directorystream) | 15 | 0 | 0 | S199 ×15 |
-| SystemPackage | [`DirectoryWalk`](#systempackage-directorywalk) | 21 | 0 | 0 | S199 ×21 |
+| SystemPackage | [`DirectoryWalk`](#systempackage-directorywalk) | 29 | 0 | 0 | S199 ×29 |
 | SystemPackage | [`DiskQuota`](#systempackage-diskquota) | 17 | 0 | 0 | S199 ×17 |
-| SystemPackage | [`DynamicLibrary`](#systempackage-dynamiclibrary) | 32 | 0 | 0 | S199 ×32 |
+| SystemPackage | [`DynamicLibrary`](#systempackage-dynamiclibrary) | 33 | 0 | 0 | S199 ×33 |
 | SystemPackage | [`Entropy`](#systempackage-entropy) | 7 | 0 | 0 | S199 ×7 |
-| SystemPackage | [`Errno`](#systempackage-errno) | 4 | 0 | 0 | S199 ×3, S0.0.1 ×1 |
+| SystemPackage | [`Errno`](#systempackage-errno) | 5 | 0 | 0 | S199 ×3, S0.0.1 ×2 |
 | SystemPackage | [`ExitStatus`](#systempackage-exitstatus) | 6 | 0 | 0 | S199 ×6 |
 | SystemPackage | [`ExtendedAttributeName`](#systempackage-extendedattributename) | 3 | 0 | 0 | S199 ×3 |
 | SystemPackage | [`ExtendedAttributeOptions`](#systempackage-extendedattributeoptions) | 5 | 0 | 0 | S199 ×5 |
@@ -104,7 +106,7 @@ Each row is a top-level type, and nested types count toward it: `FilePath.Resolu
 | SystemPackage | [`OutputFlags`](#systempackage-outputflags) | 34 | 0 | 0 | S199 ×34 |
 | SystemPackage | [`OwnedFD`](#systempackage-ownedfd) | 30 | 0 | 0 | S199 ×30 |
 | SystemPackage | [`POSIXErrorCode (extends _DarwinFoundation1)`](#systempackage-posixerrorcode-extends-darwinfoundation1) | 2 | 0 | 0 | S199 ×2 |
-| SystemPackage | [`PThread`](#systempackage-pthread) | 125 | 0 | 0 | S199 ×125 |
+| SystemPackage | [`PThread`](#systempackage-pthread) | 128 | 0 | 0 | S199 ×128 |
 | SystemPackage | [`ProcessEnvironment`](#systempackage-processenvironment) | 7 | 0 | 0 | S199 ×7 |
 | SystemPackage | [`ProcessID`](#systempackage-processid) | 218 | 0 | 0 | S199 ×218 |
 | SystemPackage | [`ProcessPriority`](#systempackage-processpriority) | 8 | 0 | 0 | S199 ×8 |
@@ -119,7 +121,7 @@ Each row is a top-level type, and nested types count toward it: `FilePath.Resolu
 | SystemPackage | [`SpawnFileAction`](#systempackage-spawnfileaction) | 9 | 0 | 0 | S199 ×9 |
 | SystemPackage | [`Stat`](#systempackage-stat) | 2 | 0 | 0 | S1.7.0 ×2 |
 | SystemPackage | [`StatFS`](#systempackage-statfs) | 27 | 0 | 0 | S199 ×27 |
-| SystemPackage | [`SystemConfig`](#systempackage-systemconfig) | 72 | 0 | 0 | S199 ×72 |
+| SystemPackage | [`SystemConfig`](#systempackage-systemconfig) | 73 | 0 | 0 | S199 ×73 |
 | SystemPackage | [`SystemControl`](#systempackage-systemcontrol) | 72 | 0 | 0 | S199 ×72 |
 | SystemPackage | [`SystemIdentity`](#systempackage-systemidentity) | 10 | 0 | 0 | S199 ×10 |
 | SystemPackage | [`TerminalAttributes`](#systempackage-terminalattributes) | 44 | 0 | 0 | S199 ×44 |
@@ -154,7 +156,7 @@ Each row is a top-level type, and nested types count toward it: `FilePath.Resolu
 | SystemSockets | [`sockaddr_storage (extends Darwin)`](#systemsockets-sockaddr-storage-extends-darwin) | 3 | 0 | 0 | S199 ×3 |
 | SystemSockets | [`sockaddr_un (extends Darwin)`](#systemsockets-sockaddr-un-extends-darwin) | 5 | 0 | 0 | S199 ×5 |
 | SystemSockets | [`sockaddr_vm (extends Darwin)`](#systemsockets-sockaddr-vm-extends-darwin) | 5 | 0 | 0 | S199 ×5 |
-| **Total** | | **3171** | **0** | **0** | |
+| **Total** | | **3186** | **0** | **0** | |
 
 # 2. Adoption
 
@@ -164,13 +166,15 @@ Swift files of each package's own targets (from its manifest; not nested package
 |---|---:|---:|---:|---:|---:|---:|---:|
 | WasmKit | 333 | 14 → 0 | 0 | 0 → 1 | 0 | — | 0 (0) → 1 (1) |
 | indexstore-db | 73 | 1 → 0 | 1 → 0 | 0 | 0 | — | 0 (0) |
+| sourcekit-lsp | 444 | 8 → 0 | 0 | 0 | 0 | — | 0 (0) |
 | swift-argument-parser | 166 | 1 → 0 | 0 | 0 → 1 | 0 | 1 → 0 | 0 (0) → 1 (1) |
 | swift-async-algorithms | 146 | 2 → 0 | 0 | 0 | 0 | 1 → 0 | 0 (0) |
 | swift-build | 1058 | 2 → 0 | 1 → 0 | 0 → 10 | 0 | — | 0 (0) → 17 (12) |
 | swift-certificates | 133 | 2 → 0 | 0 | 0 → 1 | 0 | 3 → 0 | 0 (0) → 1 (1) |
+| swift-corelibs-xctest | 34 | 1 | 0 | 0 | 0 | — | 0 (0) |
 | swift-docc | 888 | 3 → 0 | 1 → 0 | 0 → 1 | 0 | — | 0 (0) → 1 (1) |
 | swift-driver | 195 | 11 → 0 | 1 → 0 | 0 | 0 | — | 0 (0) |
-| swift-foundation | 431 | 33 → 0 | 1 → 0 | 0 → 3 | 3 | 7 → 0 | 0 (0) → 4 (3) |
+| swift-foundation | 431 | 33 → 0 | 1 → 0 | 0 | 3 | 7 → 0 | 0 (0) → 3 (2) |
 | swift-llbuild | 19 | 0 | 5 → 0 | 0 | 0 | — | 0 (0) |
 | swift-log | 30 | 5 → 0 | 0 | 0 → 2 | 0 | 1 → 0 | 0 (0) → 3 (2) |
 | swift-nio | 479 | 41 → 0 | 3 → 0 | 0 | 0 | — | 0 (0) |
@@ -180,7 +184,9 @@ Swift files of each package's own targets (from its manifest; not nested package
 | swift-syntax | 586 | 2 → 0 | 0 | 0 → 2 | 0 | 3 → 0 | 0 (0) → 3 (2) |
 | swift-tools-protocols | 232 | 2 → 0 | 0 | 0 | 0 | — | 0 (0) |
 | swift-tools-support-core | 124 | 0 | 1 → 0 | 0 → 2 | 0 | 14 → 5 | 0 (0) → 2 (2) |
-| **All** | 5885 | 141 → 0 | 16 → 0 | 0 → 24 | 3 | | 0 (0) → 35 (27) |
+| **All** | 6363 | 150 → 1 | 16 → 0 | 0 → 21 | 3 | | 0 (0) → 34 (26) |
+
+Files whose imports aren't narrow yet: swift-corelibs-xctest: `Sources/XCTest/Public/XCTestMain.swift` (whole module).
 
 ## Copied from the packages' reports
 
@@ -202,6 +208,10 @@ Verbatim, not rerun: each package's own test totals (at the start, and the lates
     `swiftUnitDescription`, `swiftFileWithSingleSymbol`). For example, the Swift 6.2 compiler doesn't
     record the access-control symbol property (`swiftAccessControlInternal`) that main's tests expect.
   ```
+
+**sourcekit-lsp**
+
+- No MIGRATION.md or REPORT.md with test totals at this commit.
 
 **swift-argument-parser**
 
@@ -258,6 +268,10 @@ Verbatim, not rerun: each package's own test totals (at the start, and the lates
   | Darwin names reached through Foundation's or XCTest's re-export | 3: `X509/Verifier/ServerIdentityPolicy.swift` (`in_addr`, `in6_addr`, `inet_pton`, `AF_INET*`, `memcmp`); `X509Tests/IPAddressTests.swift` (`in_addr`, `in6_addr`, `inet_pton`, `AF_INET*`); `X509Tests/TimeTests.swift` (`gmtime_r`, `tm`, `time_t`) | 0 |
   ```
 
+**swift-corelibs-xctest**
+
+- No MIGRATION.md or REPORT.md with test totals at this commit.
+
 **swift-docc**
 
 - MIGRATION.md, tests (lines 64, 65, 66):
@@ -281,20 +295,20 @@ Verbatim, not rerun: each package's own test totals (at the start, and the lates
 
 **swift-foundation**
 
-- MIGRATION.md, tests (lines 129, 131, 161):
+- MIGRATION.md, tests (lines 139, 141, 177):
 
   ```text
   | Step | Result |
   | Baseline | 1701 tests in 128 suites passed (34 skipped) |
-  | tzfile.h's paths | 1701 tests in 128 suites passed |
+  | POSIXError deprecations (no-darwin) | 1701 tests in 128 suites passed |
   ```
 
-- MIGRATION.md, re-exports (lines 59, 61, 88):
+- MIGRATION.md, re-exports (lines 65, 67, 98):
 
   ```text
   | | FoundationEssentials: whole module | scoped only (SYSTEM-GAP) | through a re-export | FoundationInternationalization | Tests |
   | At start (`21c6d01f`) | 25 | 0 | 7 | 1 | 8 |
-  | After tzfile.h's paths (`FilePath.timeZoneDirectory`, `defaultTimeZoneFile`) | 0 | 3 | 0 | 0 | 0 |
+  | After re-exports again (no-darwin: `os` imported by name in the package build; the shims' `export *` tried, not changed) | 0 | 0 | 0 | 0 | 0 |
   ```
 
 - REPORT.md, tests (lines 14, 172):
@@ -419,117 +433,101 @@ Verbatim, not rerun: each package's own test totals (at the start, and the lates
 
 # 3. Gaps
 
-Every `SYSTEM-GAP:` marker in the packages' sources at the commits above: 35 markers in 27 files, of which 0 are outside the packages' targets. Each marker's text is read for the C interfaces it names (see [How this is computed](#how-this-is-computed)); a marker that names none is counted under its phrase, with the Darwin names imported under it deciding its status. Status is against System at `145df6bd`:
+Every `SYSTEM-GAP:` marker in the packages' sources at the commits above: 34 markers in 26 files, of which 0 are outside the packages' targets. Each marker's text is read for the C interfaces it names (see [How this is computed](#how-this-is-computed)); a marker that names none is counted under its phrase, with the Darwin names imported under it deciding its status. Status is against System at `cddd4d20`:
 
-- **missing**: System documents none of it (or only some: *k of n*).
+- **missing**: System documents none of it (or only some: *k of n*), and `mapping.ini` has no answer outside System for it.
 - **covered**: a System declaration's doc comment names it as the corresponding C interface, a CInterop alias names it, or, for `X members`, System gives `CInterop` alias of `X` Swift-named accessors. The marker is stale, or the package hasn't adopted the API yet. *Not yet in `system-next`* means only this branch has it.
 - **unread**: the marker names no C interface, nothing is imported under it, and no `ANSWERED` entry speaks for it; read the marker.
+- **standard library**: System doesn't name it, and its entry in `mapping.ini` gives the standard library's answer (`swift`), shown with the entry's name.
+- **not System's**: System doesn't name it, and its entry in `mapping.ini` is marked `wrap = no`: another module's or library's interface, such as the MachO module's file format, which System doesn't wrap.
+
+The last two are answers outside System, read from `mapping.ini` at System's commit as the Darwin queue of `ecosystem.sh report` reads them; they aren't in the work list below.
 
 A family marked *(provisional)* is a C-library layer above the OS (math, stdio, locales, string.h and ctype.h) that System wraps provisionally, in `Sources/System/Provisional/`, since it may move to the standard library; it counts like everything else.
 
-Interfaces: 29 missing, 69 covered, 1 unread, 99 in all.
+Interfaces: 47 covered, 7 standard library, 25 not System's, 79 in all.
 
 | # | Interface | Status | Files | Packages | Family |
 |---:|---|---|---:|---|---|
-| 1 | `dlerror` | covered (doc comment; not yet in `system-next`) | 2 | swift-build, swift-tools-support-core | dynamic loader |
-| 2 | `cpu_subtype_t` | covered (doc comment; not yet in `system-next`) | 2 | swift-build | mach/machine.h CPU types |
-| 3 | `CPU_TYPE_ARM64` | covered (doc comment; not yet in `system-next`) | 2 | swift-build | mach/machine.h CPU types |
-| 4 | `cpu_type_t` | covered (doc comment; not yet in `system-next`) | 2 | swift-build | mach/machine.h CPU types |
-| 5 | `CPU_TYPE_X86_64` | covered (doc comment; not yet in `system-next`) | 2 | swift-build | mach/machine.h CPU types |
-| 6 | `FTS_D` | covered (by DirectoryWalk) | 2 | swift-foundation | fts |
-| 7 | `FTS_DP` | covered (by DirectoryWalk) | 2 | swift-foundation | fts |
-| 8 | `fts_info` | covered (by DirectoryWalk) | 2 | swift-foundation | fts |
-| 9 | `fts_path` | covered (by DirectoryWalk) | 2 | swift-foundation | fts |
-| 10 | `FTSENT` | covered (by DirectoryWalk) | 2 | swift-foundation | fts |
-| 11 | `load_command` | missing | 2 | swift-build | Mach-O file structures |
-| 12 | MacTypes OSStatus | missing | 2 | swift-build | MacTypes OSStatus |
-| 13 | `memcmp` | covered (doc comment) | 2 | swift-syntax | string.h |
-| 14 | `segment_command` | missing | 2 | swift-build | Mach-O file structures |
-| 15 | `XATTR_FINDERINFO_NAME` | covered (doc comment; not yet in `system-next`) | 2 | swift-build | extended attributes |
-| 16 | `XATTR_RESOURCEFORK_NAME` | covered (doc comment; not yet in `system-next`) | 2 | swift-build | extended attributes |
-| 17 | `abort` | missing | 1 | swift-build | abort |
-| 18 | adding a file action to C file actions | covered (doc comment; not yet in `system-next`) | 1 | swift-subprocess | posix_spawn |
-| 19 | `AR_EFMT1` | missing | 1 | swift-build | ar.h archive headers |
-| 20 | `ar_hdr` | missing | 1 | swift-build | ar.h archive headers |
-| 21 | `ar_size` | missing | 1 | swift-build | ar.h archive headers |
-| 22 | `build_version_command` | missing | 1 | swift-build | build_version_command |
-| 23 | C-string arguments for the C-values spawns | covered (by ProcessID.spawn's C-array forms with C values) | 1 | swift-subprocess | C-string arguments for the C-values spawns |
-| 24 | `constants` | missing | 1 | swift-build | constants |
-| 25 | `CPU_ARCH_ABI64` | covered (doc comment; not yet in `system-next`) | 1 | swift-build | mach/machine.h CPU types |
-| 26 | `CPU_SUBTYPE_MASK` | covered (doc comment; not yet in `system-next`) | 1 | swift-build | mach/machine.h CPU types |
-| 27 | `CPU_TYPE_ANY` | covered (doc comment; not yet in `system-next`) | 1 | swift-build | mach/machine.h CPU types |
-| 28 | `CPU_TYPE_ARM` | covered (doc comment; not yet in `system-next`) | 1 | swift-build | mach/machine.h CPU types |
-| 29 | `CPU_TYPE_I386` | covered (doc comment; not yet in `system-next`) | 1 | swift-build | mach/machine.h CPU types |
-| 30 | `CPU_TYPE_X86` | covered (doc comment; not yet in `system-next`) | 1 | swift-build | mach/machine.h CPU types |
-| 31 | `dirent` | covered (doc comment; not yet in `system-next`) | 1 | swift-tools-support-core | dirent |
-| 32 | `Dl_info` | covered (doc comment; not yet in `system-next`) | 1 | swift-build | Dl_info |
-| 33 | `dladdr` | covered (doc comment; not yet in `system-next`) | 1 | swift-build | dynamic loader |
-| 34 | `dli_fname` | covered (doc comment; not yet in `system-next`) | 1 | swift-build | dli_fname |
-| 35 | `dlopen` | covered (doc comment) | 1 | swift-build | dynamic loader |
-| 36 | `dylib` | missing | 1 | swift-build | dylib |
-| 37 | `dylib_command` | missing | 1 | swift-build | dylib_command |
-| 38 | `EX_USAGE` | covered (doc comment) | 1 | swift-argument-parser | sysexits |
-| 39 | `fat_arch` | missing | 1 | swift-build | fat_arch |
-| 40 | `fat_arch_64` | missing | 1 | swift-build | fat_arch_64 |
-| 41 | `fat_header` | missing | 1 | swift-build | fat_header |
-| 42 | `fdopen` | covered (doc comment) | 1 | swift-log | C stdio streams |
-| 43 | `fflush` | covered (doc comment) | 1 | swift-log | C stdio streams |
-| 44 | `FILE` | covered (doc comment) | 1 | swift-log | C stdio streams |
-| 45 | `flockfile` | covered (doc comment) | 1 | swift-log | C stdio streams |
-| 46 | `FTS` | covered (by DirectoryWalk) | 1 | swift-foundation | fts |
-| 47 | `fts_close` | covered (by DirectoryWalk) | 1 | swift-foundation | fts |
-| 48 | `FTS_DEFAULT` | covered (by DirectoryWalk) | 1 | swift-foundation | fts |
-| 49 | `fts_dev` | covered (by DirectoryWalk) | 1 | swift-foundation | fts |
-| 50 | `FTS_DNR` | covered (by DirectoryWalk) | 1 | swift-foundation | fts |
-| 51 | `FTS_ERR` | covered (by DirectoryWalk) | 1 | swift-foundation | fts |
-| 52 | `fts_errno` | covered (by DirectoryWalk) | 1 | swift-foundation | fts |
-| 53 | `FTS_F` | covered (by DirectoryWalk) | 1 | swift-foundation | fts |
-| 54 | `fts_ino` | covered (by DirectoryWalk) | 1 | swift-foundation | fts |
-| 55 | `fts_level` | covered (by DirectoryWalk) | 1 | swift-foundation | fts |
-| 56 | `fts_name` | covered (by DirectoryWalk) | 1 | swift-foundation | fts |
-| 57 | `fts_namelen` | covered (by DirectoryWalk) | 1 | swift-foundation | fts |
-| 58 | `FTS_NOCHDIR` | covered (by DirectoryWalk) | 1 | swift-foundation | fts |
-| 59 | `FTS_NS` | covered (by DirectoryWalk) | 1 | swift-foundation | fts |
-| 60 | `fts_open` | covered (by DirectoryWalk) | 1 | swift-foundation | fts |
-| 61 | `FTS_PHYSICAL` | covered (by DirectoryWalk) | 1 | swift-foundation | fts |
-| 62 | `fts_read` | covered (by DirectoryWalk) | 1 | swift-foundation | fts |
-| 63 | `fts_set` | covered (by DirectoryWalk) | 1 | swift-foundation | fts |
-| 64 | `FTS_SKIP` | covered (by DirectoryWalk) | 1 | swift-foundation | fts |
-| 65 | `FTS_SL` | covered (by DirectoryWalk) | 1 | swift-foundation | fts |
-| 66 | `FTS_SLNONE` | covered (by DirectoryWalk) | 1 | swift-foundation | fts |
-| 67 | `funlockfile` | covered (doc comment) | 1 | swift-log | C stdio streams |
-| 68 | `fwrite` | covered (doc comment) | 1 | swift-log | C stdio streams |
-| 69 | `getiopolicy_np` | covered (doc comment; not yet in `system-next`) | 1 | swift-build | getiopolicy_np |
-| 70 | `gmtime_r` | covered (doc comment) | 1 | swift-certificates | calendar time |
-| 71 | `IOPOL_SCOPE_PROCESS` | covered (doc comment; not yet in `system-next`) | 1 | swift-build | IOPOL_SCOPE_PROCESS |
-| 72 | `localtime` | covered (as `localtime_r`) | 1 | swift-log | calendar time |
-| 73 | Mach-O load_command (its member cmd) | unread | 1 | swift-build | Mach-O load_command (its member cmd) |
-| 74 | `mach_header` | missing | 1 | swift-build | mach_header |
-| 75 | `mach_header_64` | missing | 1 | swift-build | mach_header_64 |
-| 76 | `macho_arch_name_for_cpu_type` | missing | 1 | swift-build | mach-o/utils.h |
-| 77 | `macho_arch_name_for_mach_header` | missing | 1 | swift-build | mach-o/utils.h |
-| 78 | `macho_cpu_type_for_arch_name` | missing | 1 | swift-build | mach-o/utils.h |
-| 79 | `off_t` | missing | 1 | swift-build | off_t |
-| 80 | `PIPE_BUF` | missing | 1 | swift-docc | limits.h |
-| 81 | `POSIXErrorCode` | covered (doc comment) | 1 | swift-foundation | POSIXErrorCode |
-| 82 | readlinkat into a caller's buffer (System's readSymbolicLink returns a FilePath, which dro | covered (doc comment) | 1 | WasmKit | readlinkat into a caller's buffer (System's readSymbolicLink returns a FilePath, which dro |
-| 83 | `rpath_command` | missing | 1 | swift-build | rpath_command |
-| 84 | `RTLD_FIRST` | covered (doc comment) | 1 | swift-build | dynamic loader |
-| 85 | `RTLD_LAZY` | covered (doc comment) | 1 | swift-build | dynamic loader |
-| 86 | `SARMAG` | missing | 1 | swift-build | ar.h archive headers |
-| 87 | `section` | missing | 1 | swift-build | section |
-| 88 | `section_64` | missing | 1 | swift-build | section_64 |
-| 89 | `segment_command_64` | missing | 1 | swift-build | segment_command_64 |
-| 90 | `setvbuf` | covered (doc comment) | 1 | swift-log | C stdio streams |
-| 91 | `stdout` | covered (doc comment) | 1 | swift-log | C stdio streams |
-| 92 | `strftime` | covered (doc comment) | 1 | swift-log | calendar time |
-| 93 | `time` | covered (as `clock_gettime`) | 1 | swift-log | calendar time |
-| 94 | `time_t` | covered (doc comment) | 1 | swift-certificates | calendar time |
-| 95 | `tm` | covered (doc comment) | 1 | swift-certificates | calendar time |
-| 96 | `tolower` | covered (doc comment) | 1 | swift-build | ctype.h |
-| 97 | `uuid_command` | missing | 1 | swift-build | uuid_command |
-| 98 | `version_min_command` | missing | 1 | swift-build | version_min_command |
-| 99 | `vm_prot_t` | missing | 1 | swift-build | Mach virtual memory |
+| 1 | `load_command` | not System's ([Mach-O file format]) | 3 | swift-build | Mach-O |
+| 2 | `dlerror` | covered (doc comment) | 2 | swift-build, swift-tools-support-core | dynamic loader |
+| 3 | `cpu_subtype_t` | covered (doc comment) | 2 | swift-build | mach/machine.h CPU types |
+| 4 | `CPU_TYPE_ARM64` | covered (doc comment) | 2 | swift-build | mach/machine.h CPU types |
+| 5 | `cpu_type_t` | covered (doc comment) | 2 | swift-build | mach/machine.h CPU types |
+| 6 | `CPU_TYPE_X86_64` | covered (doc comment) | 2 | swift-build | mach/machine.h CPU types |
+| 7 | `memcmp` | covered (doc comment) | 2 | swift-syntax | string.h |
+| 8 | `OSStatus` | standard library ([MacTypes]: Int32 for OSStatus, UInt16 for UniChar, and Bool for DarwinBoolean and Boolean) | 2 | swift-build | MacTypes |
+| 9 | `segment_command` | not System's ([Mach-O file format]) | 2 | swift-build | Mach-O file structures |
+| 10 | `XATTR_FINDERINFO_NAME` | covered (doc comment) | 2 | swift-build | extended attributes |
+| 11 | `XATTR_RESOURCEFORK_NAME` | covered (doc comment) | 2 | swift-build | extended attributes |
+| 12 | `_dyld_image_count` | covered (doc comment) | 1 | swift-foundation | _dyld_image_count |
+| 13 | `abort` | standard library ([termination]: fatalError(_:file:line:)) | 1 | swift-build | abort |
+| 14 | adding a file action to C file actions | covered (doc comment) | 1 | swift-subprocess | posix_spawn |
+| 15 | `AR_EFMT1` | standard library ([ar archive header]: the header's fields, read from the archive's bytes: ar_hdr is 60 bytes of text (ar_name …) | 1 | swift-build | ar.h archive headers |
+| 16 | `ar_hdr` | standard library ([ar archive header]: the header's fields, read from the archive's bytes: ar_hdr is 60 bytes of text (ar_name …) | 1 | swift-build | ar.h archive headers |
+| 17 | `ar_size` | standard library ([ar archive header]: the header's fields, read from the archive's bytes: ar_hdr is 60 bytes of text (ar_name …) | 1 | swift-build | ar.h archive headers |
+| 18 | `build_version_command` | not System's ([Mach-O file format]) | 1 | swift-build | build_version_command |
+| 19 | C-string arguments for the C-values spawns | covered (by ProcessID.spawn's C-array forms with C values) | 1 | swift-subprocess | C-string arguments for the C-values spawns |
+| 20 | `CPU_ARCH_ABI64` | covered (doc comment) | 1 | swift-build | mach/machine.h CPU types |
+| 21 | `CPU_SUBTYPE_MASK` | covered (doc comment) | 1 | swift-build | mach/machine.h CPU types |
+| 22 | `CPU_TYPE_ANY` | covered (doc comment) | 1 | swift-build | mach/machine.h CPU types |
+| 23 | `CPU_TYPE_ARM` | covered (doc comment) | 1 | swift-build | mach/machine.h CPU types |
+| 24 | `CPU_TYPE_I386` | covered (doc comment) | 1 | swift-build | mach/machine.h CPU types |
+| 25 | `CPU_TYPE_X86` | covered (doc comment) | 1 | swift-build | mach/machine.h CPU types |
+| 26 | `dirent` | covered (doc comment) | 1 | swift-tools-support-core | dirent |
+| 27 | `Dl_info` | covered (doc comment) | 1 | swift-build | Dl_info |
+| 28 | `dladdr` | covered (doc comment) | 1 | swift-build | dynamic loader |
+| 29 | `dli_fname` | covered (doc comment) | 1 | swift-build | dli_fname |
+| 30 | `dlopen` | covered (doc comment) | 1 | swift-build | dynamic loader |
+| 31 | `dylib` | not System's ([Mach-O file format]) | 1 | swift-build | dylib |
+| 32 | `dylib_command` | not System's ([Mach-O file format]) | 1 | swift-build | dylib_command |
+| 33 | `DynamicLibrary` | covered (by DynamicLibrary) | 1 | swift-foundation | DynamicLibrary |
+| 34 | `EX_USAGE` | covered (doc comment) | 1 | swift-argument-parser | sysexits |
+| 35 | `fat_arch` | not System's ([Mach-O file format]) | 1 | swift-build | fat_arch |
+| 36 | `fat_arch_64` | not System's ([Mach-O file format]) | 1 | swift-build | fat_arch_64 |
+| 37 | `FAT_CIGAM` | not System's ([Mach-O file format]) | 1 | swift-build | constants |
+| 38 | `FAT_CIGAM_64` | not System's ([Mach-O file format]) | 1 | swift-build | constants |
+| 39 | `fat_header` | not System's ([Mach-O file format]) | 1 | swift-build | fat_header |
+| 40 | `fdopen` | covered (doc comment) | 1 | swift-log | C stdio streams |
+| 41 | `fflush` | covered (doc comment) | 1 | swift-log | C stdio streams |
+| 42 | `FILE` | covered (doc comment) | 1 | swift-log | C stdio streams |
+| 43 | `flockfile` | covered (doc comment) | 1 | swift-log | C stdio streams |
+| 44 | `funlockfile` | covered (doc comment) | 1 | swift-log | C stdio streams |
+| 45 | `fwrite` | covered (doc comment) | 1 | swift-log | C stdio streams |
+| 46 | `getiopolicy_np` | covered (doc comment) | 1 | swift-build | getiopolicy_np |
+| 47 | `gmtime_r` | covered (doc comment) | 1 | swift-certificates | calendar time |
+| 48 | `IOPOL_SCOPE_PROCESS` | covered (doc comment) | 1 | swift-build | IOPOL_SCOPE_PROCESS |
+| 49 | `LC_MAIN` | not System's ([Mach-O file format]) | 1 | swift-build | constants |
+| 50 | `LC_SEGMENT` | not System's ([Mach-O file format]) | 1 | swift-build | constants |
+| 51 | `LC_SEGMENT_64` | not System's ([Mach-O file format]) | 1 | swift-build | constants |
+| 52 | `LC_SYMTAB` | not System's ([Mach-O file format]) | 1 | swift-build | constants |
+| 53 | `localtime` | covered (as `localtime_r`) | 1 | swift-log | calendar time |
+| 54 | `mach_header` | not System's ([Mach-O file format]) | 1 | swift-build | mach_header |
+| 55 | `mach_header_64` | not System's ([Mach-O file format]) | 1 | swift-build | mach_header_64 |
+| 56 | `macho_arch_name_for_cpu_type` | not System's ([Mach-O architecture names]) | 1 | swift-build | mach-o/utils.h |
+| 57 | `macho_arch_name_for_mach_header` | not System's ([Mach-O architecture names]) | 1 | swift-build | mach-o/utils.h |
+| 58 | `macho_cpu_type_for_arch_name` | not System's ([Mach-O architecture names]) | 1 | swift-build | mach-o/utils.h |
+| 59 | `off_t` | covered (doc comment; not yet in `system-next`) | 1 | swift-build | off_t |
+| 60 | `PIPE_BUF` | covered (doc comment; not yet in `system-next`) | 1 | swift-docc | limits.h |
+| 61 | `POSIXErrorCode` | covered (doc comment) | 1 | swift-foundation | POSIXErrorCode |
+| 62 | readlinkat into a caller's buffer (System's readSymbolicLink returns a FilePath, which dro | covered (doc comment) | 1 | WasmKit | readlinkat into a caller's buffer (System's readSymbolicLink returns a FilePath, which dro |
+| 63 | `rpath_command` | not System's ([Mach-O file format]) | 1 | swift-build | rpath_command |
+| 64 | `RTLD_FIRST` | covered (doc comment) | 1 | swift-build | dynamic loader |
+| 65 | `RTLD_LAZY` | covered (doc comment) | 1 | swift-build | dynamic loader |
+| 66 | `SARMAG` | standard library ([ar archive header]: the header's fields, read from the archive's bytes: ar_hdr is 60 bytes of text (ar_name …) | 1 | swift-build | ar.h archive headers |
+| 67 | `section` | not System's ([Mach-O file format]) | 1 | swift-build | section |
+| 68 | `section_64` | not System's ([Mach-O file format]) | 1 | swift-build | section_64 |
+| 69 | `segment_command_64` | not System's ([Mach-O file format]) | 1 | swift-build | segment_command_64 |
+| 70 | `setvbuf` | covered (doc comment) | 1 | swift-log | C stdio streams |
+| 71 | `stdout` | covered (doc comment) | 1 | swift-log | C stdio streams |
+| 72 | `strftime` | covered (doc comment) | 1 | swift-log | calendar time |
+| 73 | `time` | covered (as `clock_gettime`) | 1 | swift-log | calendar time |
+| 74 | `time_t` | covered (doc comment) | 1 | swift-certificates | calendar time |
+| 75 | `tm` | covered (doc comment) | 1 | swift-certificates | calendar time |
+| 76 | `tolower` | covered (doc comment) | 1 | swift-build | ctype.h |
+| 77 | `uuid_command` | not System's ([Mach-O file format]) | 1 | swift-build | uuid_command |
+| 78 | `version_min_command` | not System's ([Mach-O file format]) | 1 | swift-build | version_min_command |
+| 79 | `vm_prot_t` | standard library ([C scalar types]: Int, UInt, Int64, UInt8 ... and Swift's C type aliases (CInt, CChar, CLong ...), and …) | 1 | swift-build | Mach virtual memory |
 
 ## Missing, by family
 
@@ -537,63 +535,35 @@ The missing interfaces above, grouped, largest first: the order to fill them in.
 
 | # | Family | Files | Packages | Interfaces |
 |---:|---|---:|---|---|
-| 1 | Mach-O file structures | 2 | swift-build | `load_command`, `segment_command` |
-| 2 | MacTypes OSStatus | 2 | swift-build | MacTypes OSStatus |
-| 3 | abort | 1 | swift-build | `abort` |
-| 4 | ar.h archive headers | 1 | swift-build | `AR_EFMT1`, `ar_hdr`, `ar_size`, `SARMAG` |
-| 5 | build_version_command | 1 | swift-build | `build_version_command` |
-| 6 | constants | 1 | swift-build | `constants` |
-| 7 | dylib | 1 | swift-build | `dylib` |
-| 8 | dylib_command | 1 | swift-build | `dylib_command` |
-| 9 | fat_arch | 1 | swift-build | `fat_arch` |
-| 10 | fat_arch_64 | 1 | swift-build | `fat_arch_64` |
-| 11 | fat_header | 1 | swift-build | `fat_header` |
-| 12 | limits.h | 1 | swift-docc | `PIPE_BUF` |
-| 13 | Mach virtual memory | 1 | swift-build | `vm_prot_t` |
-| 14 | mach-o/utils.h | 1 | swift-build | `macho_arch_name_for_cpu_type`, `macho_arch_name_for_mach_header`, `macho_cpu_type_for_arch_name` |
-| 15 | mach_header | 1 | swift-build | `mach_header` |
-| 16 | mach_header_64 | 1 | swift-build | `mach_header_64` |
-| 17 | off_t | 1 | swift-build | `off_t` |
-| 18 | rpath_command | 1 | swift-build | `rpath_command` |
-| 19 | section | 1 | swift-build | `section` |
-| 20 | section_64 | 1 | swift-build | `section_64` |
-| 21 | segment_command_64 | 1 | swift-build | `segment_command_64` |
-| 22 | uuid_command | 1 | swift-build | `uuid_command` |
-| 23 | version_min_command | 1 | swift-build | `version_min_command` |
 
 ## Markers that name no C interface
 
-- swift-build: `Tests/SWBBuildSystemTests/MergeableLibrariesBuildOperationTests.swift:23`: Mach-O load_command (its member cmd)
+- swift-foundation: `Sources/FoundationEssentials/AttributedString/AttributeScope.swift:68`: DynamicLibrary, in the framework build (not built here): dlopen with RTLD_NOLOAD \| RTLD_FIRST, dlsym and dlclose are system-next's DynamicLibrary(_:options: [.noLoad, .first]), address(of:), close() a
 - swift-subprocess: `Sources/Subprocess/Platforms/Subprocess+Darwin.swift:618`: C-string arguments for the C-values spawns. System's ProcessID.spawn with cFileActions: and cAttributes:, with or without credentials:, takes the arguments and environment only
 
 ## Where
 
 <details><summary>Each interface's markers (package: file:line)</summary>
 
+- `load_command` (not System's): swift-build: `Sources/SWBUtil/MachO.swift:16`; swift-build: `Tests/SWBBuildSystemTests/MergeableLibrariesBuildOperationTests.swift:23`; swift-build: `Tests/SWBUtilTests/MachOTests.swift:20`
 - `dlerror` (covered): swift-build: `Sources/SWBUtil/Library.swift:19`; swift-tools-support-core: `Sources/TSCUtility/dlopen.swift:20`
 - `cpu_subtype_t` (covered): swift-build: `Sources/SWBUtil/Architecture.swift:18`; swift-build: `Sources/SWBUtil/MachO.swift:69`
 - `CPU_TYPE_ARM64` (covered): swift-build: `Sources/SWBUtil/Architecture.swift:18`; swift-build: `Sources/SWBUtil/MachO.swift:69`
 - `cpu_type_t` (covered): swift-build: `Sources/SWBUtil/Architecture.swift:18`; swift-build: `Sources/SWBUtil/MachO.swift:69`
 - `CPU_TYPE_X86_64` (covered): swift-build: `Sources/SWBUtil/Architecture.swift:18`; swift-build: `Sources/SWBUtil/MachO.swift:69`
-- `FTS_D` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:120`; swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
-- `FTS_DP` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:120`; swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
-- `fts_info` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:120`; swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
-- `fts_path` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:120`; swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
-- `FTSENT` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:120`; swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
-- `load_command` (missing): swift-build: `Sources/SWBUtil/MachO.swift:16`; swift-build: `Tests/SWBUtilTests/MachOTests.swift:20`
-- MacTypes OSStatus (missing): swift-build: `Sources/SWBUtil/Error.swift:21`; swift-build: `Sources/SWBUtil/PbxCp.swift:21`
 - `memcmp` (covered): swift-syntax: `Sources/SwiftCompilerPluginMessageHandling/JSON/JSONDecoding.swift:16`; swift-syntax: `Sources/SwiftSyntax/SyntaxText.swift:15`; swift-syntax: `Sources/SwiftSyntax/SyntaxText.swift:27`
-- `segment_command` (missing): swift-build: `Sources/SWBUtil/MachO.swift:16`; swift-build: `Tests/SWBUtilTests/MachOTests.swift:20`
+- `OSStatus` (standard library): swift-build: `Sources/SWBUtil/Error.swift:21`; swift-build: `Sources/SWBUtil/PbxCp.swift:21`
+- `segment_command` (not System's): swift-build: `Sources/SWBUtil/MachO.swift:16`; swift-build: `Tests/SWBUtilTests/MachOTests.swift:20`
 - `XATTR_FINDERINFO_NAME` (covered): swift-build: `Sources/SWBUtil/PbxCp.swift:23`; swift-build: `Tests/SWBUtilTests/PBXCpTests.swift:18`
 - `XATTR_RESOURCEFORK_NAME` (covered): swift-build: `Sources/SWBUtil/PbxCp.swift:23`; swift-build: `Tests/SWBUtilTests/PBXCpTests.swift:18`
-- `abort` (missing): swift-build: `Sources/SwiftBuild/SWBBuildServiceConnection.swift:23`
+- `_dyld_image_count` (covered): swift-foundation: `Sources/FoundationEssentials/AttributedString/AttributeScope.swift:69`
+- `abort` (standard library): swift-build: `Sources/SwiftBuild/SWBBuildServiceConnection.swift:23`
 - adding a file action to C file actions (covered): swift-subprocess: `Tests/SubprocessTests/DarwinTests.swift:15`
-- `AR_EFMT1` (missing): swift-build: `Sources/SWBUtil/MachO.swift:76`
-- `ar_hdr` (missing): swift-build: `Sources/SWBUtil/MachO.swift:76`
-- `ar_size` (missing): swift-build: `Sources/SWBUtil/MachO.swift:76`
-- `build_version_command` (missing): swift-build: `Sources/SWBUtil/MachO.swift:16`
+- `AR_EFMT1` (standard library): swift-build: `Sources/SWBUtil/MachO.swift:76`
+- `ar_hdr` (standard library): swift-build: `Sources/SWBUtil/MachO.swift:76`
+- `ar_size` (standard library): swift-build: `Sources/SWBUtil/MachO.swift:76`
+- `build_version_command` (not System's): swift-build: `Sources/SWBUtil/MachO.swift:16`
 - C-string arguments for the C-values spawns (covered): swift-subprocess: `Sources/Subprocess/Platforms/Subprocess+Darwin.swift:618`
-- `constants` (missing): swift-build: `Tests/SWBUtilTests/MachOTests.swift:20`
 - `CPU_ARCH_ABI64` (covered): swift-build: `Sources/SWBUtil/Architecture.swift:18`
 - `CPU_SUBTYPE_MASK` (covered): swift-build: `Sources/SWBUtil/Architecture.swift:18`
 - `CPU_TYPE_ANY` (covered): swift-build: `Sources/SWBUtil/Architecture.swift:18`
@@ -605,60 +575,45 @@ The missing interfaces above, grouped, largest first: the order to fill them in.
 - `dladdr` (covered): swift-build: `Sources/SWBUtil/Library.swift:26`
 - `dli_fname` (covered): swift-build: `Sources/SWBUtil/Library.swift:26`
 - `dlopen` (covered): swift-build: `Sources/SWBUtil/Library.swift:19`
-- `dylib` (missing): swift-build: `Sources/SWBUtil/MachO.swift:16`
-- `dylib_command` (missing): swift-build: `Sources/SWBUtil/MachO.swift:16`
+- `dylib` (not System's): swift-build: `Sources/SWBUtil/MachO.swift:16`
+- `dylib_command` (not System's): swift-build: `Sources/SWBUtil/MachO.swift:16`
+- `DynamicLibrary` (covered): swift-foundation: `Sources/FoundationEssentials/AttributedString/AttributeScope.swift:68`
 - `EX_USAGE` (covered): swift-argument-parser: `Sources/ArgumentParser/Utilities/Platform.swift:25`
-- `fat_arch` (missing): swift-build: `Sources/SWBUtil/MachO.swift:16`
-- `fat_arch_64` (missing): swift-build: `Sources/SWBUtil/MachO.swift:16`
-- `fat_header` (missing): swift-build: `Sources/SWBUtil/MachO.swift:16`
+- `fat_arch` (not System's): swift-build: `Sources/SWBUtil/MachO.swift:16`
+- `fat_arch_64` (not System's): swift-build: `Sources/SWBUtil/MachO.swift:16`
+- `FAT_CIGAM` (not System's): swift-build: `Tests/SWBUtilTests/MachOTests.swift:20`
+- `FAT_CIGAM_64` (not System's): swift-build: `Tests/SWBUtilTests/MachOTests.swift:20`
+- `fat_header` (not System's): swift-build: `Sources/SWBUtil/MachO.swift:16`
 - `fdopen` (covered): swift-log: `Tests/LoggingTests/StreamLogHandlerTest.swift:22`
 - `fflush` (covered): swift-log: `Tests/LoggingTests/StreamLogHandlerTest.swift:22`
 - `FILE` (covered): swift-log: `Sources/Logging/Handlers/StreamLogHandler.swift:17`
 - `flockfile` (covered): swift-log: `Tests/LoggingTests/StreamLogHandlerTest.swift:22`
-- `FTS` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:120`
-- `fts_close` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:120`
-- `FTS_DEFAULT` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
-- `fts_dev` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:120`
-- `FTS_DNR` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
-- `FTS_ERR` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
-- `fts_errno` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
-- `FTS_F` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
-- `fts_ino` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:120`
-- `fts_level` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
-- `fts_name` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:120`
-- `fts_namelen` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:120`
-- `FTS_NOCHDIR` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
-- `FTS_NS` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
-- `fts_open` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:120`
-- `FTS_PHYSICAL` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
-- `fts_read` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:120`
-- `fts_set` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:120`
-- `FTS_SKIP` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:120`
-- `FTS_SL` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
-- `FTS_SLNONE` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:18`
 - `funlockfile` (covered): swift-log: `Tests/LoggingTests/StreamLogHandlerTest.swift:22`
 - `fwrite` (covered): swift-log: `Tests/LoggingTests/StreamLogHandlerTest.swift:22`
 - `getiopolicy_np` (covered): swift-build: `Sources/SWBUtil/ProcessInfo.swift:24`
 - `gmtime_r` (covered): swift-certificates: `Tests/X509Tests/TimeTests.swift:19`
 - `IOPOL_SCOPE_PROCESS` (covered): swift-build: `Sources/SWBUtil/ProcessInfo.swift:24`
+- `LC_MAIN` (not System's): swift-build: `Tests/SWBUtilTests/MachOTests.swift:20`
+- `LC_SEGMENT` (not System's): swift-build: `Tests/SWBUtilTests/MachOTests.swift:20`
+- `LC_SEGMENT_64` (not System's): swift-build: `Tests/SWBUtilTests/MachOTests.swift:20`
+- `LC_SYMTAB` (not System's): swift-build: `Tests/SWBUtilTests/MachOTests.swift:20`
 - `localtime` (covered): swift-log: `Sources/Logging/Handlers/StreamLogHandler.swift:23`
-- Mach-O load_command (its member cmd) (unread): swift-build: `Tests/SWBBuildSystemTests/MergeableLibrariesBuildOperationTests.swift:23`
-- `mach_header` (missing): swift-build: `Sources/SWBUtil/MachO.swift:16`
-- `mach_header_64` (missing): swift-build: `Sources/SWBUtil/MachO.swift:16`
-- `macho_arch_name_for_cpu_type` (missing): swift-build: `Sources/SWBUtil/Architecture.swift:29`
-- `macho_arch_name_for_mach_header` (missing): swift-build: `Sources/SWBUtil/Architecture.swift:29`
-- `macho_cpu_type_for_arch_name` (missing): swift-build: `Sources/SWBUtil/Architecture.swift:29`
-- `off_t` (missing): swift-build: `Sources/SWBUtil/SWBDispatch.swift:22`
-- `PIPE_BUF` (missing): swift-docc: `Sources/SwiftDocC/Infrastructure/External Data/OutOfProcessReferenceResolver.swift:16`
-- `POSIXErrorCode` (covered): swift-foundation: `Sources/FoundationEssentials/Error/ErrorCodes+POSIX.swift:20`; swift-foundation: `Sources/FoundationEssentials/Error/ErrorCodes+POSIX.swift:21`
+- `mach_header` (not System's): swift-build: `Sources/SWBUtil/MachO.swift:16`
+- `mach_header_64` (not System's): swift-build: `Sources/SWBUtil/MachO.swift:16`
+- `macho_arch_name_for_cpu_type` (not System's): swift-build: `Sources/SWBUtil/Architecture.swift:29`
+- `macho_arch_name_for_mach_header` (not System's): swift-build: `Sources/SWBUtil/Architecture.swift:29`
+- `macho_cpu_type_for_arch_name` (not System's): swift-build: `Sources/SWBUtil/Architecture.swift:29`
+- `off_t` (covered): swift-build: `Sources/SWBUtil/SWBDispatch.swift:22`
+- `PIPE_BUF` (covered): swift-docc: `Sources/SwiftDocC/Infrastructure/External Data/OutOfProcessReferenceResolver.swift:16`
+- `POSIXErrorCode` (covered): swift-foundation: `Sources/FoundationEssentials/Error/ErrorCodes+POSIX.swift:20`
 - readlinkat into a caller's buffer (System's readSymbolicLink returns a FilePath, which dro (covered): WasmKit: `Sources/WASI/Platform/PAL/PALFileDescriptor.swift:7`
-- `rpath_command` (missing): swift-build: `Sources/SWBUtil/MachO.swift:16`
+- `rpath_command` (not System's): swift-build: `Sources/SWBUtil/MachO.swift:16`
 - `RTLD_FIRST` (covered): swift-build: `Sources/SWBUtil/Library.swift:19`
 - `RTLD_LAZY` (covered): swift-build: `Sources/SWBUtil/Library.swift:19`
-- `SARMAG` (missing): swift-build: `Sources/SWBUtil/MachO.swift:76`
-- `section` (missing): swift-build: `Sources/SWBUtil/MachO.swift:16`
-- `section_64` (missing): swift-build: `Sources/SWBUtil/MachO.swift:16`
-- `segment_command_64` (missing): swift-build: `Sources/SWBUtil/MachO.swift:16`
+- `SARMAG` (standard library): swift-build: `Sources/SWBUtil/MachO.swift:76`
+- `section` (not System's): swift-build: `Sources/SWBUtil/MachO.swift:16`
+- `section_64` (not System's): swift-build: `Sources/SWBUtil/MachO.swift:16`
+- `segment_command_64` (not System's): swift-build: `Sources/SWBUtil/MachO.swift:16`
 - `setvbuf` (covered): swift-log: `Tests/LoggingTests/StreamLogHandlerTest.swift:22`
 - `stdout` (covered): swift-log: `Sources/Logging/Handlers/StreamLogHandler.swift:17`
 - `strftime` (covered): swift-log: `Sources/Logging/Handlers/StreamLogHandler.swift:23`
@@ -666,11 +621,90 @@ The missing interfaces above, grouped, largest first: the order to fill them in.
 - `time_t` (covered): swift-certificates: `Tests/X509Tests/TimeTests.swift:19`
 - `tm` (covered): swift-certificates: `Tests/X509Tests/TimeTests.swift:19`
 - `tolower` (covered): swift-build: `Sources/SWBUtil/Headermap.swift:15`
-- `uuid_command` (missing): swift-build: `Sources/SWBUtil/MachO.swift:16`
-- `version_min_command` (missing): swift-build: `Sources/SWBUtil/MachO.swift:16`
-- `vm_prot_t` (missing): swift-build: `Sources/SWBUtil/MachO.swift:69`
+- `uuid_command` (not System's): swift-build: `Sources/SWBUtil/MachO.swift:16`
+- `version_min_command` (not System's): swift-build: `Sources/SWBUtil/MachO.swift:16`
+- `vm_prot_t` (standard library): swift-build: `Sources/SWBUtil/MachO.swift:69`
 
 </details>
+
+# 4. Platform imports
+
+The goal: no library of the repositories that swift's update-checkout clones for the main scheme imports a platform C module (Darwin, Glibc, Musl, Bionic, Android, WASILibc, ucrt, WinSDK, CRT, visualc) in any form, on any platform. Each repository is read at its migrated clone in `../adopters`, on its migration branch (as in *Adopters* above), else at its clone in `../ecosystem` as it is, else it's *not cloned*. Left out: swift (the compiler, the runtime, and the platform modules' own overlays); swift-system (System itself, whose imports are what it wraps). Each cell is the number of Swift files of that kind that import any of the modules, then how many import each; a file under `#if` branches for several platforms counts once per module. Kinds are by path (see [How this is computed](#how-this-is-computed)): *library* is under `Sources` (or `src`, `lib`, `products`), *tests* under a test directory, *other* the rest (benchmarks, examples, tools, plugins, docs, utilities), and a *nested package* is under a directory with its own `Package.swift`.
+
+| Repository | Read at | Library | Tests | Other | Nested packages | Files |
+|---|---|---|---|---|---|---:|
+| boringssl | not cloned | | | | | |
+| brotli | not cloned | | | | | |
+| cmake | not cloned | | | | | |
+| cmark | `../ecosystem/cmark` @ `0c8947bb` | — | — | — | — | 0 |
+| curl | not cloned | | | | | |
+| indexstore-db | `../adopters/indexstore-db` `migrate-darwin` @ `cc966b89` | 4 (Android 1, WinSDK 4, CRT 1) | — | — | — | 4 |
+| libxml2 | not cloned | | | | | |
+| llbuild | `../adopters/swift-llbuild` `migrate-darwin` @ `f7a0650b` | 5 (Glibc 5, Musl 5, Bionic 4, Android 1, ucrt 5, WinSDK 5) | 2 (WinSDK 2) | — | — | 7 |
+| llvm-project | not cloned | | | | | |
+| mimalloc | not cloned | | | | | |
+| ninja | not cloned | | | | | |
+| sourcekit-lsp | `../adopters/sourcekit-lsp` `migrate-darwin` @ `cb2881c5` | 16 (Glibc 9, Musl 9, Bionic 7, Android 4, WinSDK 7, CRT 8) | 3 (Android 2, WinSDK 2) | — | — | 19 |
+| swift-argument-parser | `../adopters/swift-argument-parser` `migrate-darwin` @ `0fbda276` | 2 (Darwin 1, Glibc 2, Musl 2, Bionic 1, Android 1, WASILibc 1, WinSDK 2, CRT 1) | — | — | — | 2 |
+| swift-asn1 | `../ecosystem/swift-asn1` @ `a54383ad` | — | — | — | — | 0 |
+| swift-async-algorithms | `../adopters/swift-async-algorithms` `migrate-darwin` @ `bd5f6f44` | 2 (Glibc 2, Musl 2, Bionic 2, WinSDK 1) | — | — | — | 2 |
+| swift-atomics | `../ecosystem/swift-atomics` @ `0442cb5a` | — | — | — | — | 0 |
+| swift-build | `../adopters/swift-build` `migrate-darwin` @ `56ad2d97` | 18 (Darwin 9, Glibc 1, Musl 1, Android 1, ucrt 1, WinSDK 9, CRT 1) | 3 (Darwin 1, WinSDK 2) | — | — | 21 |
+| swift-certificates | `../adopters/swift-certificates` `migrate-darwin` @ `0df6bd14` | 3 (Glibc 3, Musl 3, Bionic 1, Android 2, WASILibc 1, ucrt 1, WinSDK 3) | 2 (Darwin 1, Android 1) | — | — | 5 |
+| swift-collections | `../ecosystem/swift-collections` @ `c11818f3` | — | — | — | — | 0 |
+| swift-corelibs-blocksruntime | not cloned | | | | | |
+| swift-corelibs-foundation | `../ecosystem/swift-corelibs-foundation` @ `6f21ccf1` | 25 (Darwin 9, Glibc 11, Musl 7, Bionic 7, Android 12, WASILibc 6, WinSDK 16, CRT 5) | 7 (Darwin 2, Glibc 2, Android 7, WinSDK 3, CRT 1) | — | — | 32 |
+| swift-corelibs-libdispatch | not cloned | | | | | |
+| swift-corelibs-xctest | `../adopters/swift-corelibs-xctest` `migrate-darwin` @ `80a3f954` | 1 (Darwin 1, Glibc 1) | — | — | — | 1 |
+| swift-crypto | `../ecosystem/swift-crypto` @ `d79c573e` | 2 (Android 2, WinSDK 1) | — | — | — | 2 |
+| swift-docc | `../adopters/swift-docc` `migrate-darwin` @ `ad021e35` | 5 (Darwin 1, Glibc 1, Musl 1, WinSDK 3, CRT 1) | 2 (Glibc 1, ucrt 1, WinSDK 1) | — | — | 7 |
+| swift-docc-render-artifact | not cloned | | | | | |
+| swift-docc-symbolkit | `../ecosystem/swift-docc-symbolkit` @ `e9a4c0f2` | — | — | — | — | 0 |
+| swift-driver | `../adopters/swift-driver` `migrate-darwin` @ `ddb51ccd` | 8 (Glibc 6, Musl 6, Bionic 3, Android 3, ucrt 1, WinSDK 5, CRT 3) | 5 (Glibc 5, Musl 5, CRT 5) | — | — | 13 |
+| swift-experimental-string-processing | `../ecosystem/swift-experimental-string-processing` @ `db4678c7` | 1 (Darwin 1, Glibc 1) | — | — | — | 1 |
+| swift-format | `../ecosystem/swift-format` @ `b15dd59f` | 3 (Android 1, WinSDK 2) | — | — | — | 3 |
+| swift-foundation | `../adopters/swift-foundation` `no-darwin` @ `ef3c5667` | 31 (Darwin 3, Glibc 23, Musl 23, Bionic 8, Android 14, WASILibc 21, ucrt 5, WinSDK 24, CRT 10) | 8 (Glibc 8, Musl 6, Bionic 2, Android 6, WASILibc 5, ucrt 1, WinSDK 1, CRT 6) | — | 2 (Darwin 2, Glibc 2) | 41 |
+| swift-foundation-icu | `../ecosystem/swift-foundation-icu` @ `e8538d25` | — | — | — | 1 (Darwin 1) | 1 |
+| swift-installer-scripts | not cloned | | | | | |
+| swift-integration-tests | not cloned | | | | | |
+| swift-llvm-bindings | `../ecosystem/swift-llvm-bindings` @ `c1fffb92` | — | — | — | — | 0 |
+| swift-lmdb | `../ecosystem/swift-lmdb` @ `866bc256` | — | — | — | — | 0 |
+| swift-log | `../adopters/swift-log` `migrate-darwin` @ `4d6d77fe` | 3 (Darwin 1, Glibc 3, Musl 3, Bionic 1, Android 3, WASILibc 3, ucrt 1, WinSDK 1, CRT 2) | 3 (Darwin 1, Glibc 2, Android 2, WinSDK 3) | — | — | 6 |
+| swift-markdown | `../ecosystem/swift-markdown` @ `392b73b8` | — | — | — | — | 0 |
+| swift-nio | `../adopters/swift-nio` `migrate-darwin` @ `e1623fbf` | 60 (Glibc 40, Musl 39, Bionic 18, Android 18, WASILibc 17, ucrt 16, WinSDK 30) | 21 (Glibc 5, Bionic 1, Android 7, ucrt 6, WinSDK 12) | — | 2 (Glibc 2, Musl 1) | 83 |
+| swift-numerics | `../ecosystem/swift-numerics` @ `0a5bc040` | — | — | — | — | 0 |
+| swift-sdk-generator | `../adopters/swift-sdk-generator` `migrate-darwin` @ `5956672b` | 1 (Glibc 1) | 1 (Glibc 1, Musl 1, Bionic 1, Android 1, WASILibc 1) | — | — | 2 |
+| swift-stress-tester | not cloned | | | | | |
+| swift-subprocess | `../adopters/swift-subprocess` `migrate-darwin` @ `d6b58669` | 16 (Glibc 12, Musl 10, Bionic 4, Android 6, WinSDK 10) | 10 (Darwin 1, Glibc 7, Musl 7, Bionic 3, Android 4, WinSDK 6) | — | — | 26 |
+| swift-syntax | `../adopters/swift-syntax` `migrate-darwin` @ `961f0b72` | 3 (Darwin 2, Glibc 2, Musl 2, Bionic 1, Android 1) | — | 1 (Darwin 1) | 3 (Glibc 1, Musl 1, Android 1, WinSDK 2, CRT 1) | 7 |
+| swift-testing | `../ecosystem/swift-testing` @ `ea850751` | 10 (WinSDK 10) | 1 (WinSDK 1) | — | — | 11 |
+| swift-toolchain-sarif | `../ecosystem/swift-toolchain-sarif` @ `d611f23a` | — | — | — | — | 0 |
+| swift-toolchain-sqlite | `../ecosystem/swift-toolchain-sqlite` @ `c0ecc1e0` | — | — | — | — | 0 |
+| swift-tools-protocols | `../adopters/swift-tools-protocols` `migrate-darwin` @ `18e8a9f9` | 3 (Glibc 1, Musl 1, Android 1, WinSDK 3) | 2 (Android 2, WinSDK 2) | — | — | 5 |
+| swift-tools-support-core | `../adopters/swift-tools-support-core` `migrate-darwin` @ `1ad4129f` | 8 (Darwin 2, Glibc 1, Musl 1, Android 1, WinSDK 5, CRT 2) | — | — | — | 8 |
+| swift-xcode-playground-support | not cloned | | | | | |
+| swiftpm | `../adopters/swift-package-manager` `migrate-darwin` @ `dbe05ec1` | 15 (Glibc 4, Musl 3, Bionic 1, Android 9, ucrt 2, WinSDK 11, CRT 1) | — | — | 1 (Darwin 1, Glibc 1, Musl 1, Android 1, ucrt 1) | 16 |
+| wasi-libc | not cloned | | | | | |
+| wasmkit | `../adopters/WasmKit` `migrate-darwin` @ `4917e060` | 14 (Darwin 1, Glibc 12, Musl 12, Android 10, WASILibc 8, ucrt 6, WinSDK 5) | 3 (Glibc 3, Musl 2, ucrt 1) | — | 1 (Darwin 1, Glibc 1, WASILibc 1) | 18 |
+| zlib | not cloned | | | | | |
+
+37 repositories read; 25 import a platform module in library code: indexstore-db, llbuild, sourcekit-lsp, swift-argument-parser, swift-async-algorithms, swift-build, swift-certificates, swift-corelibs-foundation, swift-corelibs-xctest, swift-crypto, swift-docc, swift-driver, swift-experimental-string-processing, swift-format, swift-foundation, swift-log, swift-nio, swift-sdk-generator, swift-subprocess, swift-syntax, swift-testing, swift-tools-protocols, swift-tools-support-core, swiftpm, wasmkit.
+
+All repositories, files by module and kind:
+
+| Module | Library | Tests | Other | Nested packages | All |
+|---|---:|---:|---:|---:|---:|
+| Darwin | 31 | 6 | 1 | 5 | 43 |
+| Glibc | 141 | 34 | 0 | 7 | 182 |
+| Musl | 130 | 21 | 0 | 3 | 154 |
+| Bionic | 58 | 7 | 0 | 0 | 65 |
+| Android | 91 | 32 | 0 | 2 | 125 |
+| WASILibc | 57 | 6 | 0 | 1 | 64 |
+| ucrt | 38 | 9 | 0 | 1 | 48 |
+| WinSDK | 157 | 35 | 0 | 2 | 194 |
+| CRT | 35 | 12 | 0 | 1 | 48 |
+| visualc | 0 | 0 | 0 | 0 | 0 |
+| **Any** | 259 | 73 | 1 | 10 | 343 |
 
 # How this is computed
 
@@ -733,6 +767,14 @@ api-delta's last run, and a few seconds when they haven't.
   add an action to C file actions that other code built). This sees what System documents, not whether the API
   fits the adopter's use: a partial wrapper counts as covered, and an API whose doc comments don't name the C
   interface counts as missing.
+- **Answers outside System** come from `mapping.ini` at System's commit, and only for names System doesn't name at
+  all (not for one it names while a marker asks for more): a name in an entry with a `swift` answer is *standard
+  library*, and a name in an entry marked `wrap = no` is *not System's*, the `swift` answer first, as the Darwin
+  queue of `ecosystem.sh report` decides them. `X members` takes X's entry. An interface whose uncovered names all
+  have an answer takes the first kind among them, and the table gives the entries. Such interfaces aren't in the
+  work list; *covered* is still only what System's sources document, and a `status` in mapping.ini changes nothing
+  here. Rejected: counting them as covered, which would say System has what it doesn't; and leaving them missing,
+  which kept the MachO module's file format and the standard library's answers in the work list for good.
 - **Provisional families** (libm, C stdio, locale and xlocale, string.h and ctype.h, numeric conversion) are a
   fixed list in `scripts/status.py`, matched by name or by the name's SDK module in adopter-coverage's stored
   vocabulary when there is one. They're C-library layers above the OS that System wraps provisionally, in
@@ -740,3 +782,17 @@ api-delta's last run, and a few seconds when they haven't.
   only groups them in the work list.
 - **Families** group the ranked interfaces for the work list: the provisional families, then a fixed map of
   name patterns to System's clusters, else the marker's phrase, else the name itself.
+- **Platform imports** (section 4) are lexical, like ecosystem.py's survey: each Swift file, with comments and
+  string literals blanked, is matched against the survey's import pattern (`import_of` in `scripts/ecosystem.py`),
+  widened to Darwin, Glibc, Musl, Bionic, Android, WASILibc, ucrt, WinSDK, CRT and visualc, in every form: the whole
+  module, a submodule, one declaration, with `@_exported` or another attribute, and with an access modifier. It
+  doesn't evaluate `#if`: an import under `#if os(Linux)` counts as Glibc's, since the goal is none on any
+  platform. Each repository of `scheme-main.tsv` is read at a commit: its migrated clone's migration branch (the
+  adopters' branch, or its `--branch-for` override: swift-foundation's `no-darwin`), else the ecosystem clone's
+  HEAD. A file's kind is by its path: in a nested package if a directory above it, below the root, has a
+  `Package.swift`; else tests if a directory in its path is a test directory (`Tests`, `IntegrationTests`,
+  `Fixtures`, `unittests` and the like); else library under a top-level `Sources`, `Source`, `src`, `srcs`, `lib`
+  or `products`, outside a `.docc` catalog; else other. Rejected: the manifests' targets, as the Adoption section
+  uses them, which needs every clone's manifest evaluated (swift-foundation's needs a newer compiler than 6.2)
+  and says nothing of nested packages; and platforms.py's `#if` evaluation, which answers what one platform's
+  build compiles, not whether any does.
