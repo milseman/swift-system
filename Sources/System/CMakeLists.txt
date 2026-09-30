@@ -349,6 +349,7 @@ target_sources(SystemPackage PRIVATE
   Win32/Win32Error.swift
   Win32/Win32FileDescriptorBridge.swift
   Win32/Win32FileHandle.swift
+  Win32/Win32FileType.swift
   Win32/Win32HandleOperations.swift
   Win32/Win32Open.swift
   Win32/Win32SecurityDescriptor.swift

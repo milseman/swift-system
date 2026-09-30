@@ -10,8 +10,8 @@ kept inside `#if os(Windows)`; its tests are Windows-only and haven't run.
 Darwin, before any change (`6a9833f`): XCTest 565 tests (4 skipped), swift-testing 496 tests in 80 suites, all
 passing. After each commit: the same, since every new file compiles to nothing on Darwin.
 
-**Resume here:** SYS-0010 and SYS-0011 are done (sections 1 and 2). Next is SYS-0012, the file type, then
-SYS-0013 to SYS-0016 in order, each a commit of its own; then the adopter ranking.
+**Resume here:** SYS-0010 to SYS-0012 are done (sections 1 to 3). Next is SYS-0013, file I/O, then SYS-0014 to
+SYS-0016; then the adopter ranking.
 
 ## How it was checked
 
@@ -117,7 +117,7 @@ A Windows run must check:
 
 Next: SYS-0011.
 
-## 2. SYS-0011: Win32.FileHandle and Win32.DirectoryHandle: this commit
+## 2. SYS-0011: Win32.FileHandle and Win32.DirectoryHandle: `965ca6a`
 
 What: `Win32FileHandle.swift` (the two owners), `Win32Open.swift` (opening, its option types, and path
 canonicalization), `Win32SecurityDescriptor.swift`, `Win32HandleOperations.swift` (duplication, reopening,
@@ -205,6 +205,23 @@ A Windows run must check:
   console (-2); `HANDLE_FLAG_PROTECT_FROM_CLOSE`; `reopen` of a directory beyond opening one.
 
 Next: SYS-0012.
+
+## 3. SYS-0012: Win32.FileType: this commit
+
+What: `Win32FileType.swift`: `Win32.FileType` (`disk`, `character`, `pipe`, `unknown`, both initializers) and
+`FileHandle.fileType()`, which calls `SetLastError(ERROR_SUCCESS)`, then `GetFileType`, and throws only if
+`FILE_TYPE_UNKNOWN` comes with a code.
+
+Follows the draft exactly. `FILE_TYPE_REMOTE` isn't vended; `DirectoryHandle` has no `fileType()`.
+
+Darwin tests: unchanged. Windows tests: `Win32FileTypeTests`.
+
+A Windows run must check: a disk file, with and without access rights (`testDiskFile`); `NUL`
+(`testCharacterDevice`); both ends of a `CreatePipe` pipe (`testPipe`); `CONOUT$` (skipped without a console); and
+`\\.\MountPointManager` giving `.unknown` with no error, as the draft observed (skipped if it can't be opened
+without elevation).
+
+Next: SYS-0013.
 
 ## 9. Findings
 
