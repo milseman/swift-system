@@ -422,7 +422,14 @@ extension ProcessID {
     attributes: SpawnAttributes,
     credentials: SpawnCredentials
   ) -> Result<ProcessID, Errno> {
+    #if SYSTEM_PACKAGE_DARWIN
     let closes = SpawnFileAction._closesOfCloseOnExecSources(fileActions)
+    #else
+    // posix_spawn applies the actions before exec closes the close-on-exec
+    // descriptors, which already gives the program what a spawn without
+    // credentials would.
+    let closes: [SpawnFileAction] = []
+    #endif
     return SpawnFileAction._withUnsafeFileActions(fileActions + closes) { cFileActions in
       attributes._withUnsafeAttributes(extraFlags: 0) { cAttributes in
         _spawn(

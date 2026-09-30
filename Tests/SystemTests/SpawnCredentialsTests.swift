@@ -121,7 +121,8 @@ final class SpawnCredentialsTest: XCTestCase {
     // Close-on-exec but `plain`. A close-on-exec descriptor that the actions
     // use only as a source is closed when the program starts: the pipe's
     // write end, a duplicate's source, and a working directory; so is one
-    // duplicated onto itself, which on Darwin keeps its flag.
+    // duplicated onto itself, which on Darwin keeps its flag, where glibc's
+    // posix_spawn clears it, as POSIX.1-2024 has it.
     // `inherit` is Darwin's (posix_spawn_file_actions_addinherit_np), so
     // elsewhere `inherited` is closed, as any close-on-exec descriptor is.
     func actions(_ writer: FileDescriptor) -> [SpawnFileAction] {
@@ -143,7 +144,7 @@ final class SpawnCredentialsTest: XCTestCase {
     #if SYSTEM_PACKAGE_DARWIN
     let expected = ["inherited", "replaced", "plain"]
     #else
-    let expected = ["replaced", "plain"]
+    let expected = ["same", "replaced", "plain"]
     #endif
     XCTAssertEqual(
       try descriptorsOpen(among: descriptors) { arguments, writer in
@@ -315,15 +316,20 @@ final class SpawnCredentialsTest: XCTestCase {
 
       var calls: [(String, [AnyHashable])] = []
       while let entry = mocking.trace.dequeue() { calls.append((entry.name, entry.arguments)) }
-      // The mock records the optional credentials as optionals. First, the
-      // parent reads the flags of 5, a duplicate's source (the mock's are
-      // clear, so no close is added), but not of 6, which an action closes.
+      // The mock records the optional credentials as optionals. First, on
+      // Darwin, the parent reads the flags of 5, a duplicate's source (the
+      // mock's are clear, so no close is added), but not of 6, which an
+      // action closes; Linux adds no closes.
       let none: AnyHashable = Optional<UInt32>.none
       let noGroups: AnyHashable = Optional<[UInt32]>.none
+      #if SYSTEM_PACKAGE_DARWIN
+      let flagReads: [(String, [AnyHashable])] = [("fcntl", [CInt(5), F_GETFD])]
+      #else
+      let flagReads: [(String, [AnyHashable])] = []
+      #endif
       XCTAssertEqual(
-        calls.map(\.0), ["fcntl"] + Array(repeating: "spawn_with_credentials", count: 4))
-      XCTAssertEqual(calls.map(\.1), [
-        [CInt(5), F_GETFD],
+        calls.map(\.0), flagReads.map(\.0) + Array(repeating: "spawn_with_credentials", count: 4))
+      XCTAssertEqual(calls.map(\.1), flagReads.map(\.1) + [
         ["/bin/true", false, Optional(user.rawValue), Optional(group.rawValue), Optional([UInt32(12)]),
          [CInt(5), CInt(6)]],
         ["true", true, none, none, noGroups, [CInt]()],
