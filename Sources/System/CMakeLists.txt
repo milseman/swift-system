@@ -311,10 +311,12 @@ target_sources(SystemPackage PRIVATE
   Terminal/TerminalWindowSize.swift)
 target_sources(SystemPackage PRIVATE
   Internals/Constants+Threads.swift
+  Internals/Syscalls+ThreadCancellation.swift
   Internals/Syscalls+Threads.swift
   Threads/CInterop+Threads.swift
   Threads/PThread.swift
   Threads/PThreadAttributes.swift
+  Threads/PThreadCancellation.swift
   Threads/PThreadCondition.swift
   Threads/PThreadCPUSet.swift
   Threads/PThreadID.swift
