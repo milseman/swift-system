@@ -7,8 +7,10 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-// The Linux side of SmallGapsTest and SmallDarwinGapsTest: unique files with
-// a suffix (mkostemps), dladdr, and glibc's RTLD_DEEPBIND.
+// The Linux side of SmallGapsTest, SmallDarwinGapsTest and PThreadMutexTests'
+// static initializers: unique files with a suffix (mkostemps), dladdr,
+// glibc's RTLD_DEEPBIND, O_SYNC and O_DSYNC, and the default pthread
+// initializers.
 
 #if os(Linux) || os(Android)
 
@@ -83,6 +85,65 @@ final class SmallLinuxGapsTest: XCTestCase {
     XCTAssertNotNil(info.libraryAddress)
     // An address that no library contains.
     XCTAssertNil(DynamicLibrary.symbolInfo(containing: UnsafeRawPointer(bitPattern: 0x10)!))
+  }
+
+  /// O_SYNC includes O_DSYNC on Linux, and F_SETFL can't change either.
+  func testSynchronizedIO() throws {
+    #if arch(x86_64) || arch(arm64)
+    XCTAssertEqual(FileDescriptor.OpenOptions.sync.rawValue, 0o4010000)
+    XCTAssertEqual(FileDescriptor.OpenOptions.dataSync.rawValue, 0o10000)
+    #endif
+    try withTemporaryFilePath(basename: "testSynchronizedIO") { dir in
+      let path = dir.appending("file")
+      let sync = try FileDescriptor.open(
+        path, .writeOnly, options: [.create, .sync], permissions: .ownerReadWrite)
+      defer { try? sync.close() }
+      XCTAssertTrue(try sync.statusFlags().contains(.sync))
+      XCTAssertTrue(try sync.statusFlags().contains(.dataSync))
+      let dataSync = try FileDescriptor.open(path, .writeOnly, options: .dataSync)
+      defer { try? dataSync.close() }
+      XCTAssertTrue(try dataSync.statusFlags().contains(.dataSync))
+      XCTAssertFalse(try dataSync.statusFlags().contains(.sync))
+      // Linux's F_SETFL ignores both flags.
+      try dataSync.setStatusFlags(try dataSync.statusFlags().union(.sync))
+      XCTAssertFalse(try dataSync.statusFlags().contains(.sync))
+      try dataSync.writeAll("synchronized".utf8)
+    }
+  }
+
+  /// The default initializers are all zero bytes, and make C objects that
+  /// work without an init call.
+  func testStaticInitializers() {
+    func isZero<T>(_ value: T) -> Bool {
+      withUnsafeBytes(of: value) { $0.allSatisfy { $0 == 0 } }
+    }
+    XCTAssertTrue(isZero(CInterop.PThreadMutex.initializer))
+    XCTAssertTrue(isZero(CInterop.PThreadCondition.initializer))
+    XCTAssertTrue(isZero(CInterop.PThreadReadWriteLock.initializer))
+
+    let mutex = UnsafeMutablePointer<CInterop.PThreadMutex>.allocate(capacity: 1)
+    defer { mutex.deallocate() }
+    mutex.initialize(to: .initializer)
+    XCTAssertEqual(pthread_mutex_trylock(mutex), 0)
+    XCTAssertEqual(pthread_mutex_trylock(mutex), EBUSY)
+    XCTAssertEqual(pthread_mutex_unlock(mutex), 0)
+    XCTAssertEqual(pthread_mutex_destroy(mutex), 0)
+
+    let condition = UnsafeMutablePointer<CInterop.PThreadCondition>.allocate(capacity: 1)
+    defer { condition.deallocate() }
+    condition.initialize(to: .initializer)
+    XCTAssertEqual(pthread_cond_signal(condition), 0)
+    XCTAssertEqual(pthread_cond_destroy(condition), 0)
+
+    let lock = UnsafeMutablePointer<CInterop.PThreadReadWriteLock>.allocate(capacity: 1)
+    defer { lock.deallocate() }
+    lock.initialize(to: .initializer)
+    XCTAssertEqual(pthread_rwlock_rdlock(lock), 0)
+    XCTAssertEqual(pthread_rwlock_rdlock(lock), 0)
+    XCTAssertEqual(pthread_rwlock_trywrlock(lock), EBUSY)
+    XCTAssertEqual(pthread_rwlock_unlock(lock), 0)
+    XCTAssertEqual(pthread_rwlock_unlock(lock), 0)
+    XCTAssertEqual(pthread_rwlock_destroy(lock), 0)
   }
 
   #if canImport(Glibc)

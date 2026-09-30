@@ -10,10 +10,13 @@ interface at Swift's default API level (21), and said otherwise.
 
 ## Resume here
 
-- State: inventory (section 1) and batches 1 to 5 (sections 2.1 to 2.5)
-  committed.
-- Next: batch 6 in the plan (section 1.5): the three default pthread
-  initializers (swift-sdk-generator), and `O_SYNC` and `O_DSYNC`.
+- State: inventory (section 1) and batches 1 to 6 (sections 2.1 to 2.6)
+  committed: the small widenings in the plan are done.
+- Next: the larger items (section 1.5, item 7), each its own batch, in
+  adopter order: `readPassphrase` on Linux (SwiftPM), `SpawnCredentials`
+  on Linux (Subprocess), inotify (TSC), `copy_file_range` and `FICLONE`
+  (Foundation, NIO), `clone3` (Subprocess). Each needs a design first;
+  section 1.2 has the C interfaces.
 - This lane owns `Sources/System/**`, `Sources/CSystem`, `Tests/SystemTests`
   and this report, not SystemSockets or its tests: socket API (vsock, UDP
   offload) goes to section 4, with a patch where one is written.
@@ -76,6 +79,11 @@ later; a log goes to `../linux-logs/`.
      `shims.c`, `RTLD_DEEPBIND` from Glibc's module) and 4 XCTest tests to
      pass. `testSymbolInfo` names the symbol `getpid` or `__getpid`; say
      which, and the library path, if it fails.
+6. Batch 6 (the default pthread initializers, `O_SYNC`, `O_DSYNC`):
+   - `Utilities/linux/build.sh test -- --filter SmallLinuxGapsTest`: now 6
+     XCTest tests, the new ones `testStaticInitializers` and
+     `testSynchronizedIO`. The latter checks that Linux's `F_SETFL` ignores
+     `O_SYNC`, as the man page says; if it fails there, the doc is wrong.
 
 ## Baseline (Darwin)
 
@@ -220,7 +228,7 @@ In the ranking's order, each small enough to review alone:
    `symbolInfo(containing:)` (`dladdr`); TSC and swift-driver:
    `RTLD_DEEPBIND` on glibc (done, section 2.5).
 6. swift-sdk-generator: the three default pthread initializers; `O_SYNC`
-   and `O_DSYNC`.
+   and `O_DSYNC` (done, section 2.6).
 7. Larger, later: `readPassphrase` on Linux (SwiftPM), `SpawnCredentials` on
    Linux (Subprocess), inotify (TSC), `copy_file_range` and `FICLONE`
    (Foundation, NIO), `clone3` (Subprocess).
@@ -465,6 +473,34 @@ Tests:
   true and the shims stubbed.
 - Darwin, after: XCTest 565 tests, 4 skipped, 0 failures; swift-testing 498
   tests in 81 suites passed (no new Darwin tests).
+
+### 2.6 Batch 6: the default pthread initializers, `O_SYNC` and `O_DSYNC`
+
+- `CInterop.PThreadMutex.initializer`, `PThreadCondition.initializer` and
+  `PThreadReadWriteLock.initializer` widen to Linux and Android, where
+  `PTHREAD_MUTEX_INITIALIZER`, `PTHREAD_COND_INITIALIZER` and
+  `PTHREAD_RWLOCK_INITIALIZER` are all zero bytes in glibc, Musl and
+  Bionic, so each is the C type's zero value. swift-sdk-generator's
+  non-Darwin branch uses `PTHREAD_MUTEX_INITIALIZER`. The error-checking
+  and recursive initializers stay Darwin's: glibc and Bionic have them only
+  as `_NP` macros that set a kind field, and Musl has none. Rejected:
+  setting glibc's `__data.__kind`, an implementation detail Musl lays out
+  differently.
+- `FileDescriptor.OpenOptions.sync` and `.dataSync`, and the `StatusFlags`
+  pair, widen to Linux and Android (`O_SYNC`, `O_DSYNC`, in every C
+  library's module). No adopter needs them; they're here because the C
+  interface is the same. Linux's `O_SYNC` includes `O_DSYNC`'s bit, and its
+  `F_SETFL` ignores both, which the docs say.
+
+Tests (`SmallLinuxGapsTests.swift`, XCTest): the initializers are zero
+bytes and make a mutex, a condition variable and a read-write lock that
+work without an init call (the Darwin test's checks, without the
+error-checking and recursive mutexes); the flags' values on x86_64 and
+arm64, `O_SYNC` reported with `O_DSYNC`, and `F_SETFL` leaving `O_SYNC`
+off. Typechecked on Darwin in a scratch copy.
+
+Darwin, after: XCTest 565 tests, 4 skipped, 0 failures; swift-testing 498
+tests in 81 suites passed (no new Darwin tests).
 
 ## 3. Findings
 
