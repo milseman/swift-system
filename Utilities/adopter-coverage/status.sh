@@ -4,9 +4,11 @@
 # adopters in ../adopters have moved off the Darwin module on their
 # migrate-darwin branches (against each branch's merge base with main), and
 # every SYSTEM-GAP marker they have, by interface, with what System covers
-# now. It's cheap enough to rerun after every merge: api-delta runs again
-# only when System's sources changed since its last run, and each package
-# manifest is evaluated once. See README.md in this directory.
+# now (or, for what it doesn't, the standard library's answer or another
+# module's, from mapping.ini). It's cheap enough to rerun after every
+# merge: api-delta runs again only when System's sources changed since its
+# last run, and each package manifest is evaluated once. See README.md in
+# this directory.
 #
 #   Utilities/adopter-coverage/status.sh
 #

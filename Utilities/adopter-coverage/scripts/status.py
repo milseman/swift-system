@@ -7,9 +7,10 @@ Usage: status.py --repo DIR --adopters DIR --api-delta DIR --out FILE
                  [--branch migrate-darwin] [--base main] [--system-next system-next]
                  [--vocab FILE] [--cache DIR] [--date YYYY-MM-DD] [--dump-markers]
 
-Only commits are read, all through git: System's HEAD and its integration
-branch, and each package's migration branch and that branch's merge base
-with the package's base branch. A package's targets come from `swift package
+Only commits are read, all through git: System's HEAD (its sources, and
+mapping.ini for the answers outside System) and its integration branch, and
+each package's migration branch and that branch's merge base with the
+package's base branch. A package's targets come from `swift package
 dump-package` run on its manifests at the commit, cached by the manifests'
 blob ids. Two things are copied from each package's MIGRATION.md or
 REPORT.md, verbatim and labeled as copied: the test totals, and the count of
@@ -41,6 +42,7 @@ sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, "..", "..", "api-delta", "scripts"))
 from scan_sources import strip_comments_and_strings  # noqa: E402
 
+import check  # noqa: E402
 import platforms  # noqa: E402
 
 SOURCE_EXTENSIONS = (".swift", ".c", ".h", ".cpp", ".hpp", ".m", ".mm")
@@ -225,6 +227,11 @@ class SystemNames:
         for m in DOC_SENTENCE.finditer(text):
             self.names.update(TICKED.findall(m.group(1)))
 
+    def unnamed(self, name):
+        """Whether System doesn't name the interface at all: not covered,
+        and not named while a marker asks for more (STILL_NEEDED)."""
+        return self.covers(name) == (False, "")
+
     def covers(self, name):
         """(covered, how) for a gap interface's name."""
         for pattern, ask in self.still_needed:
@@ -247,6 +254,51 @@ class SystemNames:
             if other in self.names:
                 return True, f"as `{other}`"
         return False, ""
+
+
+# ---------------------------------------------------------------- answers outside System
+
+# What mapping.ini, at System's commit, answers for names System doesn't
+# name: an entry with a `swift` answer is the standard library's, and one
+# marked `wrap = no` is another module's or library's (the MachO module's
+# file format, a framework's), not System's to wrap. The `swift` answer
+# comes first, as in ecosystem.py's Darwin queue. Neither makes a name
+# covered: that stays what System's sources document.
+MAPPING = "Utilities/adopter-coverage/mapping.ini"
+OUTSIDE = ("standard library", "not System's")
+
+
+def outside_answers(repo, commit, scratch):
+    """{C name: (kind, how)} from mapping.ini at `commit`, read through a
+    copy in `scratch`, since check.py's reader takes a path."""
+    spec = f"{commit}:{MAPPING}"
+    text = read_blobs(repo, [spec]).get(spec)
+    if text is None:
+        return {}
+    os.makedirs(scratch, exist_ok=True)
+    path = os.path.join(scratch, "mapping.ini")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(text)
+    _, entries, _ = check.load_mapping(path)
+    out = {}
+    for e in entries:
+        if e["hand"] == "ignore":
+            continue
+        if e["swift"]:
+            swift = e["swift"] if len(e["swift"]) <= 90 else e["swift"][:90].rsplit(" ", 1)[0].rstrip(",;:") + " …"
+            answer = ("standard library", f"[{e['id']}]: {swift}")
+        elif e["wrap"] == "no":
+            answer = ("not System's", f"[{e['id']}]")
+        else:
+            continue
+        for s in e["symbols"]:
+            out.setdefault(s, answer)
+    return out
+
+
+def outside_answer(name, answers):
+    """The answer for one gap name; `X members` is X's."""
+    return answers.get(name[:-len(" members")] if name.endswith(" members") else name)
 
 
 # ---------------------------------------------------------------- provisional families
@@ -1023,7 +1075,9 @@ def main():
     nxt = commit_of(a.repo, a.system_next)
     sys_head = SystemNames(a.repo, head)
     sys_next = SystemNames(a.repo, nxt) if nxt and nxt != head else sys_head
+    answers = outside_answers(a.repo, head, a.cache)
     dirty = git(a.repo, "status", "--porcelain", "--", *SYSTEM_SOURCES, "Package.swift").strip()
+    dirty_mapping = git(a.repo, "status", "--porcelain", "--", MAPPING).strip()
 
     # The packages: each git checkout in the adopters directory with the branch.
     packages = []
@@ -1075,6 +1129,8 @@ def main():
       f"of `{branch}` aren't in `{a.system_next}`.")
     if dirty:
         w("  Uncommitted changes to System's sources aren't counted.")
+    if dirty_mapping:
+        w("  Uncommitted changes to mapping.ini aren't counted.")
     w(f"- **API delta**: `{meta['baseRef']}` @ `{short(meta['baseCommit'])}` → `{meta['headRef']}` @ "
       f"`{short(meta['headCommit'])}`" + (" (api-delta's last run; nothing it reads has changed since)"
                                          if meta["headCommit"] != head else "") + ".")
@@ -1211,6 +1267,14 @@ def main():
             late = [n for n in names if not sys_next.covers(n)[0]]
             how = sys_head.covers(names[0])[1] if len(names) == 1 else f"all {len(names)} names"
             return "covered", how + (f"; not yet in `{a.system_next}`" if late else "")
+        # Names System doesn't name at all may have an answer outside it;
+        # when every one has, the interface takes the first kind among them.
+        rest = [n for n in names if n not in covered]
+        found = [outside_answer(n, answers) for n in rest] if all(sys_head.unnamed(n) for n in rest) else []
+        if found and all(found):
+            kind = next(k for k in OUTSIDE if any(f[0] == k for f in found))
+            how = "; ".join(dict.fromkeys(f[1] for f in found if f[0] == kind))
+            return kind, how + (f"; {len(covered)} of {len(names)} names covered by System" if covered else "")
         if covered:
             return "missing", f"{len(covered)} of {len(names)} names covered"
         asks = [how for how in (sys_head.covers(n)[1] for n in names) if how.startswith("named, but")]
@@ -1221,12 +1285,13 @@ def main():
         st, how = status(iface, g)
         pkgs = {n for n, _ in g["files"]}
         # A covered interface keeps its own family: memcmp is System's Memory's,
-        # not a provisional string.h wrapper. A phrase takes its names' family,
-        # when they share one.
+        # not a provisional string.h wrapper; so does one answered outside
+        # System. A phrase takes its names' family, when they share one.
+        provisional = st not in ("covered",) + OUTSIDE
         if iface != g["phrase"]:
-            fam = family_of(iface, g["phrase"], vocab, provisional=st != "covered")
+            fam = family_of(iface, g["phrase"], vocab, provisional=provisional)
         else:
-            shared = {family_of(n, None, vocab, provisional=st != "covered") for n in g["names"]}
+            shared = {family_of(n, None, vocab, provisional=provisional) for n in g["names"]}
             fam = shared.pop() if len(shared) == 1 and not (shared & set(g["names"])) else g["phrase"]
         rows.append((len(g["files"]), len(pkgs), iface, fam, st, how, sorted(pkgs), g))
     rows.sort(key=lambda r: (-r[0], -r[1], r[2].lower()))
@@ -1241,20 +1306,28 @@ def main():
       "none is counted under its phrase, with the Darwin names imported under it deciding its status. "
       f"Status is against System at `{short(head)}`:")
     w("")
-    w("- **missing**: System documents none of it (or only some: *k of n*).")
+    w("- **missing**: System documents none of it (or only some: *k of n*), and `mapping.ini` has no answer "
+      "outside System for it.")
     w("- **covered**: a System declaration's doc comment names it as the corresponding C interface, a CInterop "
       "alias names it, or, for `X members`, System gives `CInterop` alias of `X` Swift-named accessors. The "
       "marker is stale, or the package hasn't adopted the API yet." +
       (f" *Not yet in `{a.system_next}`* means only this branch has it." if sys_next is not sys_head else ""))
     w("- **unread**: the marker names no C interface, nothing is imported under it, and no `ANSWERED` entry "
       "speaks for it; read the marker.")
+    w("- **standard library**: System doesn't name it, and its entry in `mapping.ini` gives the standard "
+      "library's answer (`swift`), shown with the entry's name.")
+    w("- **not System's**: System doesn't name it, and its entry in `mapping.ini` is marked `wrap = no`: another "
+      "module's or library's interface, such as the MachO module's file format, which System doesn't wrap.")
+    w("")
+    w("The last two are answers outside System, read from `mapping.ini` at System's commit as the Darwin queue of "
+      "`ecosystem.sh report` reads them; they aren't in the work list below.")
     w("")
     counts = collections.Counter(r[4] for r in rows)
     w("A family marked *(provisional)* is a C-library layer above the OS (math, stdio, locales, string.h and "
       "ctype.h) that System wraps provisionally, in `Sources/System/Provisional/`, since it may move to the "
       "standard library; it counts like everything else.")
     w("")
-    w("Interfaces: " + ", ".join(f"{counts[k]} {k}" for k in ("missing", "covered", "unread")
+    w("Interfaces: " + ", ".join(f"{counts[k]} {k}" for k in ("missing", "covered", "unread") + OUTSIDE
                                  if counts[k]) + f", {len(rows)} in all.")
     w("")
     w("| # | Interface | Status | Files | Packages | Family |")
@@ -1376,6 +1449,14 @@ api-delta's last run, and a few seconds when they haven't.
   add an action to C file actions that other code built). This sees what System documents, not whether the API
   fits the adopter's use: a partial wrapper counts as covered, and an API whose doc comments don't name the C
   interface counts as missing.
+- **Answers outside System** come from `mapping.ini` at System's commit, and only for names System doesn't name at
+  all (not for one it names while a marker asks for more): a name in an entry with a `swift` answer is *standard
+  library*, and a name in an entry marked `wrap = no` is *not System's*, the `swift` answer first, as the Darwin
+  queue of `ecosystem.sh report` decides them. `X members` takes X's entry. An interface whose uncovered names all
+  have an answer takes the first kind among them, and the table gives the entries. Such interfaces aren't in the
+  work list; *covered* is still only what System's sources document, and a `status` in mapping.ini changes nothing
+  here. Rejected: counting them as covered, which would say System has what it doesn't; and leaving them missing,
+  which kept the MachO module's file format and the standard library's answers in the work list for good.
 - **Provisional families** (libm, C stdio, locale and xlocale, string.h and ctype.h, numeric conversion) are a
   fixed list in `scripts/status.py`, matched by name or by the name's SDK module in adopter-coverage's stored
   vocabulary when there is one. They're C-library layers above the OS that System wraps provisionally, in
