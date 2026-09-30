@@ -36,12 +36,17 @@ COMPILER_VERSION = (6, 2)
 # swift-corelibs-foundation provides FoundationNetworking and FoundationXML
 # off Darwin. Modules only Apple's internal builds have (Foundation's
 # `_FoundationDarwinExtras`, `C.unistd`, `CoreFoundation_Private.CFLocale`)
-# are imported nowhere.
+# are imported nowhere. The macOS SDK's submodules that packages test for
+# are listed as well (`canImport(Darwin.ar)` is swift-build's archive
+# reader); `Foundation.Process` and `Foundation.NSTask`, which packages also
+# test for, are false on macOS 26.
 _EVERYWHERE = {"Synchronization", "Testing"}
 _CORELIBS = {"Dispatch", "Foundation", "FoundationEssentials", "FoundationNetworking", "FoundationXML"}
 SWIFT_ENV = {
-    "Darwin":  {"os": {"macOS"}, "import": {"Darwin", "Darwin.uuid", "Dispatch", "Foundation", "System", "ObjectiveC",
-                                           "os", "Security", "Combine", "CoreFoundation"} | _EVERYWHERE,
+    "Darwin":  {"os": {"macOS"}, "import": {"Darwin", "Darwin.ar", "Darwin.C", "Darwin.uuid", "Dispatch",
+                                           "Foundation", "System", "ObjectiveC", "os", "os.log", "os.signpost",
+                                           "MachO", "MachO.dyld.utils", "Security", "Combine",
+                                           "CoreFoundation"} | _EVERYWHERE,
                 "arch": {"arm64", "x86_64"}},
     "Linux":   {"os": {"Linux"}, "import": {"Glibc"} | _CORELIBS | _EVERYWHERE,
                 "arch": {"x86_64", "arm64", "arm", "i386"}},

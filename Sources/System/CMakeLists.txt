@@ -146,6 +146,7 @@ endif()
 target_sources(SystemPackage PRIVATE
   Internals/Backcompat.swift
   Internals/CInterop+Accessors.swift
+  Internals/CInterop+Offset.swift
   Internals/CInterop.swift
   Internals/Constants+DynamicLoading.swift
   Internals/Constants+Events.swift
@@ -182,6 +183,7 @@ target_sources(SystemPackage PRIVATE
   LibProc/ProcessPaths.swift)
 target_sources(SystemPackage PRIVATE
   Internals/Constants+Limits.swift
+  Limits/CompileTimeLimits+Pipes.swift
   Limits/CompileTimeLimits.swift)
 target_sources(SystemPackage PRIVATE
   MachCPU/MachCPUType.swift)
@@ -309,10 +311,12 @@ target_sources(SystemPackage PRIVATE
   Terminal/TerminalWindowSize.swift)
 target_sources(SystemPackage PRIVATE
   Internals/Constants+Threads.swift
+  Internals/Syscalls+ThreadCancellation.swift
   Internals/Syscalls+Threads.swift
   Threads/CInterop+Threads.swift
   Threads/PThread.swift
   Threads/PThreadAttributes.swift
+  Threads/PThreadCancellation.swift
   Threads/PThreadCondition.swift
   Threads/PThreadCPUSet.swift
   Threads/PThreadID.swift
