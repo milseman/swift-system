@@ -14,6 +14,7 @@ Utilities/linux/build.sh test -- --filter EventPollTests
 Utilities/linux/build.sh build -- --target SystemTests
 Utilities/linux/build.sh run -- system-samples platform process
 Utilities/linux/build.sh --user 1000:1000 test        # unprivileged
+Utilities/linux/build.sh --quiet test                 # the output only in the log, and a summary
 Utilities/linux/build.sh shell                        # bash in the container
 ```
 
@@ -30,12 +31,25 @@ The package directory is mounted at `/code`, and each run starts a new container
 | `--cpus <count>` | the tool's | The container's CPUs. |
 | `--scratch <path>` | `.build/linux-<tag>` | SwiftPM's scratch path, relative to the package. |
 | `--log <path>` | `.build/linux-<tag>-<action>.log` | The log, which also gets a line with the date and command. A test run ends with XCTest's and swift-testing's totals. |
+| `--quiet` | off | Writes the output only to the log, and prints a summary instead (below). |
 
 - `<tag>` is the image's tag, such as `6.2-noble`, with `-amd64` for amd64, so each image and architecture builds into a scratch path of its own. Another image keeps its name: `swiftlang/swift:nightly-main-noble` is `swiftlang-swift-nightly-main-noble`.
 - Each worktree has its own `.build`, so lanes don't share a scratch path. Two runs of one image in one worktree do, and SwiftPM's lock makes the second wait.
 - Files that the container writes appear on the host as yours, whether it runs as root or as `--user`.
 - If `container` says its API server isn't running, start it with `container system start`.
 - Exit status: the swift command's.
+
+With `--quiet`, the run prints only its two `==` lines (the image and command, and the log's path), then a summary
+of the log, and the exit status line; the log is the same as without it. The summary:
+
+- the number of distinct error lines, and the first 40 of them. An error line is a line with `error:`, but not the
+  `` | `- error: `` annotation under a diagnostic's source excerpt;
+- for `test`, XCTest's and swift-testing's totals, as without `--quiet`, and the failing tests' lines:
+  swift-testing's lines with ✘ (each issue, failed test and failed suite, but not its total) and XCTest's
+  failures, its `error:` lines for files under `Tests/`, which have a line number but no column.
+
+Each list keeps the log's order, drops repeats, and takes the mount's `/code/` out of paths, so a path is relative
+to the package. A long XCTest message shows only its first line.
 
 ## What it has checked
 

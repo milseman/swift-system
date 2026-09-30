@@ -24,6 +24,9 @@
 #   --scratch <path>   SwiftPM's scratch path, relative to the package
 #                      (default .build/linux-<tag>)
 #   --log <path>       the log (default .build/linux-<tag>-<action>.log)
+#   --quiet            write the output only to the log, and print a summary:
+#                      the distinct error lines (the first 40), a test run's
+#                      totals and failing tests, and the exit status
 #
 # <tag> is the image's tag, such as 6.2-noble, with -amd64 for amd64, so
 # each image and architecture builds into its own scratch path. The package
@@ -44,6 +47,7 @@ memory=8G
 cpus=""
 scratch=""
 log=""
+quiet=""
 action=build
 extra=()
 
@@ -58,6 +62,7 @@ while [ $# -gt 0 ]; do
     --cpus) cpus="$2"; shift 2 ;;
     --scratch) scratch="$2"; shift 2 ;;
     --log) log="$2"; shift 2 ;;
+    --quiet) quiet=1; shift ;;
     -h|--help) usage; exit 0 ;;
     build|build-tests|test|run|shell) action="$1"; shift ;;
     --) shift; extra=("$@"); break ;;
@@ -96,21 +101,60 @@ esac
 # ${extra[@]+...} because bash 3.2 treats an empty array as unset.
 command+=(${extra[@]+"${extra[@]}"})
 
+# A test run's totals in a log: XCTest's, then swift-testing's.
+totals() {
+  grep -E "^[[:space:]]+Executed [0-9]+ tests?," "$1" | tail -1 | sed 's/^[[:space:]]*/== XCTest: /' || true
+  grep -E "Test run with [0-9]+ tests?" "$1" | tail -1 | sed 's/^/== swift-testing: /' || true
+}
+
+# --quiet's summary of a log. Error lines are the diagnostics' own lines,
+# not the `| `- error:` annotations of their source excerpts, and failing
+# tests are swift-testing's lines with a cross, but its total, and XCTest's
+# error lines under Tests/, which have no column. Each list is in the log's
+# order, with repeats dropped and the mount's /code/ taken out of paths.
+summarize() {
+  local file="$1" action="$2" errors failing count
+  errors="$(grep -a 'error:' "$file" | grep -a -v -E '^[[:space:]]*\|' | sed 's|/code/||g' \
+    | awk '!seen[$0]++' || true)"
+  count=0
+  [ -n "$errors" ] && count="$(printf '%s\n' "$errors" | wc -l | tr -d ' ')"
+  echo "== $count distinct error lines$([ "$count" -gt 40 ] && echo ', the first 40:')"
+  # sed, not head, reads its whole input, so printf never gets a SIGPIPE.
+  [ -n "$errors" ] && printf '%s\n' "$errors" | sed -n '1,40p'
+  [ "$action" = test ] || return 0
+  totals "$file"
+  failing="$(grep -a -E '✘|^/code/Tests/[^:]*:[0-9]+: error:' "$file" | grep -a -v '✘ Test run with' \
+    | sed 's|/code/||g' | awk '!seen[$0]++' || true)"
+  count=0
+  [ -n "$failing" ] && count="$(printf '%s\n' "$failing" | wc -l | tr -d ' ')"
+  echo "== $count failing-test lines"
+  [ -n "$failing" ] && printf '%s\n' "$failing"
+  return 0
+}
+
 mkdir -p "$ROOT/$(dirname "$log")"
 echo "== $image ($arch): ${command[*]}"
 echo "== log: $log"
 set +e
-{
-  echo "== $(date '+%Y-%m-%d %H:%M:%S') $image ($arch): ${command[*]}"
-  "${run[@]}" "$image" "${command[@]}" 2>&1
-} | tee "$ROOT/$log"
-status=${PIPESTATUS[0]}
+if [ -n "$quiet" ]; then
+  {
+    echo "== $(date '+%Y-%m-%d %H:%M:%S') $image ($arch): ${command[*]}"
+    "${run[@]}" "$image" "${command[@]}" 2>&1
+  } > "$ROOT/$log"
+  status=$?
+else
+  {
+    echo "== $(date '+%Y-%m-%d %H:%M:%S') $image ($arch): ${command[*]}"
+    "${run[@]}" "$image" "${command[@]}" 2>&1
+  } | tee "$ROOT/$log"
+  status=${PIPESTATUS[0]}
+fi
 set -e
 
-if [ "$action" = test ]; then
-  # XCTest's totals, then swift-testing's.
-  grep -E "^[[:space:]]+Executed [0-9]+ tests?," "$ROOT/$log" | tail -1 | sed 's/^[[:space:]]*/== XCTest: /' || true
-  grep -E "Test run with [0-9]+ tests?" "$ROOT/$log" | tail -1 | sed 's/^/== swift-testing: /' || true
+if [ -n "$quiet" ]; then
+  summarize "$ROOT/$log" "$action"
+elif [ "$action" = test ]; then
+  totals "$ROOT/$log"
 fi
 echo "== exit status $status; log: $log"
 exit "$status"
