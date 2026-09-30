@@ -10,10 +10,18 @@
 // Reading a passphrase. XCTest, since the real reads replace the process's
 // standard input with a pipe.
 
-#if SYSTEM_PACKAGE_DARWIN
+#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
 
 import XCTest
+#if SYSTEM_PACKAGE_DARWIN
 import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif canImport(Musl)
+import Musl
+#elseif canImport(Android)
+import Android
+#endif
 
 #if SYSTEM_PACKAGE
 @testable import SystemPackage
@@ -89,7 +97,7 @@ final class ReadPassphraseTest: XCTestCase {
     }
   }
 
-  #if ENABLE_MOCKING
+  #if ENABLE_MOCKING && SYSTEM_PACKAGE_DARWIN
   func testCalls() throws {
     try MockingDriver.withMockingEnabled { mocking in
       XCTAssertEqual(try TerminalDescriptor.readPassphrase(prompt: "Password: "), "")
@@ -127,4 +135,4 @@ final class ReadPassphraseTest: XCTestCase {
   #endif
 }
 
-#endif // SYSTEM_PACKAGE_DARWIN
+#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
