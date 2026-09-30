@@ -353,6 +353,21 @@ target_sources(SystemPackage PRIVATE
   UnfairLock/UnfairLock.swift)
 target_sources(SystemPackage PRIVATE
   VectoredIO/VectoredIO.swift)
+target_sources(SystemPackage PRIVATE
+  Win32/Win32.swift
+  Win32/Win32Constants.swift
+  Win32/Win32Error.swift
+  Win32/Win32FileDescriptorBridge.swift
+  Win32/Win32FileHandle.swift
+  Win32/Win32FileIO.swift
+  Win32/Win32FileType.swift
+  Win32/Win32FinalPath.swift
+  Win32/Win32HandleOperations.swift
+  Win32/Win32Locking.swift
+  Win32/Win32Open.swift
+  Win32/Win32SecurityDescriptor.swift
+  Win32/Win32Syscalls.swift
+  Win32/Win32VolumeInformation.swift)
 target_link_libraries(SystemPackage PUBLIC
   CSystem)
 
