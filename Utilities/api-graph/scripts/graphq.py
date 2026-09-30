@@ -631,8 +631,15 @@ def summary_md(doc, diff_file=None):
             built = f"{b.get('status')}, {b['seconds']} s" if b.get("seconds") is not None else b.get("status", "—")
             if b.get("cached"):
                 built += f", against `{(b.get('builtAgainst') or '')[:10]}`"
+            elif b.get("start"):
+                built += f", {b['start']}"
             L.append(f"| `{p['name']}` | {b.get('decision') or '—'} | {md_cell(b.get('decisionReason') or '')} "
-                     f"| {built} |")
+                     f"| {md_cell(built)} |")
+        builds = (doc["meta"].get("adopterMeta") or {}).get("buildDirectories")
+        if builds:
+            L += ["", f"The build directories, in `{builds['dir']}`, take {builds['totalMB'] / 1024:.1f} GB: "
+                      f"{len(builds['packagesMB'])} packages' and System's export, each as measured after its "
+                      "last build."]
     L += ["", "## Querying it", "", "```sh",
           "python3 Utilities/api-graph/scripts/graphq.py show 'PThread.Mutex.lock()'",
           "python3 Utilities/api-graph/scripts/graphq.py type ProcessID --members --sites",

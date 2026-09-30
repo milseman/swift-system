@@ -92,7 +92,9 @@ def read_store(store_path, root, keep, definitions_too=True):
     `keep(usr, rel, is_c)` accepts: {rel: {"module", "references": [[line,
     col, usr, flags]]}}, the symbols' names and kinds, their definition
     sites, and every file under root the store has a record for (a file the
-    build compiled), whether or not anything in it was kept."""
+    build compiled), whether or not anything in it was kept. A record of a
+    file that's gone is skipped: a store an incremental build kept still
+    has the units of files since deleted."""
     root = os.path.realpath(root) + os.sep
     lib = load_library()
     callback = bind(lib)
@@ -117,7 +119,7 @@ def read_store(store_path, root, keep, definitions_too=True):
         def on_dependency(_ctx, dep, module=module):
             if lib.indexstore_unit_dependency_get_kind(dep) == DEP_RECORD:
                 path = os.path.realpath(text(lib.indexstore_unit_dependency_get_filepath(dep)))
-                if path.startswith(root):
+                if path.startswith(root) and os.path.exists(path):
                     records[text(lib.indexstore_unit_dependency_get_name(dep))] = (path[len(root):], module)
             return True
 

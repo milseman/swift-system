@@ -21,8 +21,10 @@ Two kinds of use sites, for every node of graph.json:
                    of each System declaration they name; against another
                    System tree, they're revalidated (reused when every one
                    of those declarations is unchanged in the head commit's
-                   symbol graphs) or rebuilt. The build is deleted as soon
-                   as it's read.
+                   symbol graphs) or rebuilt. With --builds-dir, each
+                   migration's export and build are kept, the export updated
+                   in place, so a rebuild is incremental; else the build is
+                   deleted as soon as it's read.
                  - Lexical elsewhere: files the build doesn't compile (tests,
                    or everything, when the build fails), and added lines in
                    `#if` branches Darwin doesn't take. Names are matched on
@@ -52,11 +54,14 @@ Usage: adopters.py --graph graph.json --repo DIR --head COMMIT
                    --cnames cnames.json
                    --work DIR --cache DIR --out adopters.json
                    [--symbolgraphs DIR] [--validate declarations|interface|tree]
+                   [--builds-dir DIR]
                    [--adopters DIR] [--ecosystem DIR] [--coverage-results DIR]
                    [--branch migrate-darwin] [--builds build|reuse|none]
                    [--rebuild] [--min-free-gb 15] [--only KEY,...]
   --symbolgraphs is api-delta's symbol graphs of the head commit
   (symbolgraphs/head), what cached indexes are revalidated against.
+  --builds-dir keeps a build directory per migration, and System's export,
+  for the next build to be incremental.
 """
 
 import sys
@@ -67,6 +72,7 @@ import argparse  # noqa: E402
 import bisect  # noqa: E402
 import collections  # noqa: E402
 import datetime  # noqa: E402
+import fcntl  # noqa: E402
 import glob  # noqa: E402
 import gzip  # noqa: E402
 import hashlib  # noqa: E402
@@ -75,6 +81,7 @@ import json  # noqa: E402
 import os  # noqa: E402
 import re  # noqa: E402
 import shutil  # noqa: E402
+import stat  # noqa: E402
 import subprocess  # noqa: E402
 import time  # noqa: E402
 
@@ -171,6 +178,123 @@ def export(repo, commit, dest):
     os.makedirs(dest, exist_ok=True)
     archive = subprocess.run(["git", "-C", repo, "archive", commit], capture_output=True, check=True).stdout
     subprocess.run(["tar", "-x", "-C", dest], input=archive, check=True)
+
+
+def same_file(a, b):
+    """Whether two paths hold the same file: links with one target, or
+    regular files with one content and executable bit."""
+    try:
+        sa, sb = os.lstat(a), os.lstat(b)
+    except OSError:
+        return False
+    if stat.S_ISLNK(sa.st_mode) or stat.S_ISLNK(sb.st_mode):
+        return stat.S_ISLNK(sa.st_mode) and stat.S_ISLNK(sb.st_mode) and os.readlink(a) == os.readlink(b)
+    if not (stat.S_ISREG(sa.st_mode) and stat.S_ISREG(sb.st_mode)) or sa.st_size != sb.st_size \
+            or (sa.st_mode & 0o111) != (sb.st_mode & 0o111):
+        return False
+    with open(a, "rb") as fa, open(b, "rb") as fb:
+        while True:
+            x = fa.read(1 << 20)
+            if x != fb.read(1 << 20):
+                return False
+            if not x:
+                return True
+
+
+def make_dir(path):
+    """os.makedirs, removing a file or link where the path needs a directory."""
+    p = path
+    while not (os.path.isdir(p) and not os.path.islink(p)):
+        if os.path.lexists(p):
+            os.unlink(p)
+            break
+        p = os.path.dirname(p)
+    os.makedirs(path, exist_ok=True)
+
+
+def sync_export(repo, commit, dest, transform=None, keep=("Package.resolved",)):
+    """Make dest what `export` would, in place: the commit is exported
+    beside it, `transform(stage)` edits that (the manifests' path
+    dependencies), and only the files that differ are moved in, so the rest
+    keep their modification times and a build of dest is incremental. What
+    the commit doesn't have is removed, except the root files in `keep`
+    (the Package.resolved SwiftPM writes when the commit has none).
+    Returns (files written, entries removed)."""
+    stage = dest.rstrip("/") + ".stage"
+    shutil.rmtree(stage, ignore_errors=True)
+    os.makedirs(stage)
+    archive = subprocess.run(["git", "-C", repo, "archive", commit], capture_output=True, check=True).stdout
+    # -m: a file moved in is dated now, newer than any build of what it replaces.
+    subprocess.run(["tar", "-x", "-m", "-C", stage], input=archive, check=True)
+    if transform:
+        transform(stage)
+    written = removed = 0
+    wanted = set()
+    for root, dirs, files in os.walk(stage):
+        rel = os.path.relpath(root, stage)
+        rel = "" if rel == "." else rel
+        links = [d for d in dirs if os.path.islink(os.path.join(root, d))]
+        dirs[:] = [d for d in dirs if d not in links]
+        wanted.update(os.path.join(rel, d) for d in dirs)
+        for name in files + links:
+            r = os.path.join(rel, name)
+            wanted.add(r)
+            src, dst = os.path.join(stage, r), os.path.join(dest, r)
+            if same_file(src, dst):
+                continue
+            make_dir(os.path.dirname(dst))
+            if os.path.isdir(dst) and not os.path.islink(dst):
+                shutil.rmtree(dst)
+            os.replace(src, dst)
+            written += 1
+    for root, dirs, files in os.walk(dest):
+        rel = os.path.relpath(root, dest)
+        rel = "" if rel == "." else rel
+        for d in list(dirs):
+            if os.path.join(rel, d) not in wanted:
+                p_ = os.path.join(root, d)
+                if os.path.islink(p_):
+                    os.unlink(p_)
+                else:
+                    shutil.rmtree(p_)
+                dirs.remove(d)
+                removed += 1
+        for name in files:
+            if os.path.join(rel, name) not in wanted and not (rel == "" and name in keep):
+                os.unlink(os.path.join(root, name))
+                removed += 1
+    shutil.rmtree(stage)
+    return written, removed
+
+
+TOOLS_NOTE = "tools version lowered to %d.%d"
+
+
+def lower_tools_version(package_dir):
+    """Lower each manifest's tools version that's newer than this toolchain's
+    (SWIFT_VERSION) to it; True if any was."""
+    changed = False
+    for manifest in glob.glob(os.path.join(package_dir, "Package*.swift")):
+        t = open(manifest, encoding="utf-8").read()
+        m = re.match(r"// swift-tools-version: *(\d+)(?:\.(\d+))?", t)
+        if m and (int(m.group(1)), int(m.group(2) or 0)) > SWIFT_VERSION:
+            t = re.sub(r"^// swift-tools-version: *[0-9.]+", "// swift-tools-version:%d.%d" % SWIFT_VERSION, t)
+            open(manifest, "w", encoding="utf-8").write(t)
+            changed = True
+    return changed
+
+
+def manifest_digest(package_dir):
+    """A digest of a package's manifests, as its build reads them."""
+    h = hashlib.sha1()
+    for p in sorted(glob.glob(os.path.join(package_dir, "Package*.swift"))):
+        h.update(os.path.basename(p).encode() + b"\0" + open(p, "rb").read() + b"\0")
+    return h.hexdigest()[:16]
+
+
+def disk_kb(path):
+    code, out = run(["du", "-sk", path])
+    return int(out.split()[0]) if out.strip() else None
 
 
 class Commit:
@@ -413,6 +537,9 @@ class Builder:
         self.settings_files = coverage_package_files()
         self.system_tree = tree_of(a.repo, a.head)
         self.system_manifest = git(a.repo, "rev-parse", f"{a.head}:Package.swift").strip()
+        # Persistent build directories, one per migration, or None: a
+        # scratch build per migration, deleted once read.
+        self.builds = a.builds_dir
         self.system_export = None
 
     def settings(self, pkg):
@@ -424,11 +551,33 @@ class Builder:
         s["file"] = os.path.relpath(p, UTILITIES) if p else None
         return s
 
+    def put(self, repo, commit, dest, transform):
+        """Export a commit into dest and let transform edit it: in place,
+        writing only what changed, when builds persist; else afresh."""
+        if self.builds:
+            sync_export(repo, commit, dest, transform)
+        else:
+            export(repo, commit, dest)
+            transform(dest)
+
     def system(self):
+        """The export of System's head commit that every build's manifest
+        points at: with persistent builds, one under the builds directory,
+        updated in place, so a build against it recompiles only what the
+        change reaches; else one in the scratch directory."""
         if not self.system_export:
-            dest = os.path.join(self.a.work, "system", "swift-system")
-            if not os.path.isfile(os.path.join(dest, "Package.swift")):
-                export(self.a.repo, self.a.head, dest)
+            if self.builds:
+                dest = os.path.join(self.builds, "system", "swift-system")
+                state_path = os.path.join(self.builds, "system", "state.json")
+                state = load_json(state_path) if os.path.exists(state_path) else {}
+                if state.get("commit") != self.a.head or not os.path.isfile(os.path.join(dest, "Package.swift")):
+                    sync_export(self.a.repo, self.a.head, dest)
+                    with open(state_path, "w") as f:
+                        json.dump({"commit": self.a.head, "tree": self.system_tree}, f)
+            else:
+                dest = os.path.join(self.a.work, "system", "swift-system")
+                if not os.path.isfile(os.path.join(dest, "Package.swift")):
+                    export(self.a.repo, self.a.head, dest)
             self.system_export = dest
         return self.system_export
 
@@ -464,7 +613,8 @@ class Builder:
     def rewrite(self, export_dir, checkout, deps_dir, seen, notes):
         """Point the export's path dependencies at commits: swift-system at the
         head commit's export, another clone at an export of its migration
-        branch (or its HEAD). Returns the keys the build depends on."""
+        branch (or its HEAD). Returns the keys the build depends on; `seen`
+        gets the exports it made."""
         keys = []
         for manifest in sorted(glob.glob(os.path.join(export_dir, "Package*.swift"))):
             text = open(manifest, encoding="utf-8").read()
@@ -482,8 +632,10 @@ class Builder:
                     keys.append(f"{os.path.basename(target)}@{commit}")
                     if dest not in seen:
                         seen.add(dest)
-                        export(top, commit, dest)
-                        keys.extend(self.rewrite(dest, target, deps_dir, seen, notes))
+                        sub_keys = []
+                        self.put(top, commit, dest, lambda stage: sub_keys.extend(
+                            self.rewrite(stage, target, deps_dir, seen, notes)))
+                        keys.extend(sub_keys)
                         notes.append(f"{rel} -> {os.path.basename(target)} at {commit[:10]}")
                     return m.group(1) + json.dumps(dest)
                 notes.append(f"{rel}: not a clone; left as {target}")
@@ -551,6 +703,7 @@ class Builder:
         legacy = [info["commit"], self.system_tree, self.compiler, swift_exec or "", settings_text, READER_VERSION,
                   sorted(set(f"swift-system@{self.system_tree}" if k == "swift-system" else k for k in deps))]
         plan = {"key": key, "deps": deps, "settings": s, "swiftExec": swift_exec, "entry": None,
+                "config": {"compiler": self.compiler, "swiftExec": swift_exec, "settings": settings_text},
                 "decision": "rebuild", "reason": "no cached index of this commit"}
         cache_dir = os.path.join(a.cache, pkg["key"])
         entries = []
@@ -621,23 +774,73 @@ class Builder:
             return {"status": "not built", "files": {}, "symbols": {},
                     "build": {"status": "not built", "reason": f"--builds {a.builds}", "settings": s["file"],
                               "decision": "not built", "decisionReason": plan["reason"]}}
-        free = shutil.disk_usage(a.work if os.path.isdir(a.work) else os.path.dirname(a.work)).free / 2 ** 30
+        where = self.builds or a.work
+        free = shutil.disk_usage(where if os.path.isdir(where) else os.path.dirname(where)).free / 2 ** 30
         if free < a.min_free_gb:
             return {"status": "not built", "files": {}, "symbols": {},
                     "build": {"status": "not built", "reason": f"{free:.1f} GiB free, under {a.min_free_gb}",
                               "settings": s["file"], "decision": "not built", "decisionReason": plan["reason"]}}
-        w = os.path.join(a.work, "adopters", pkg["key"])
-        shutil.rmtree(w, ignore_errors=True)
-        os.makedirs(w)
+        if self.builds:
+            # Kept: the export is updated in place and the build is incremental.
+            w = os.path.join(self.builds, pkg["key"])
+        else:
+            w = os.path.join(a.work, "adopters", pkg["key"])
+            shutil.rmtree(w, ignore_errors=True)
+        os.makedirs(w, exist_ok=True)
         # The export's directory is named as the clone's is: a root package's
         # identity is its directory's name, and it has to match the package's
         # own when the package is also a dependency (swift-argument-parser is
         # swift-system's).
         src, build, log = os.path.join(w, info["dir"]), os.path.join(w, "build"), os.path.join(w, "build.log")
+        deps_dir, state_path = os.path.join(w, "deps"), os.path.join(w, "state.json")
+        state = {}
+        if self.builds and os.path.exists(state_path):
+            try:
+                state = load_json(state_path)
+            except ValueError:
+                pass
         t0 = time.time()
-        export(info["path"], info["commit"], src)
-        notes = []
-        self.rewrite(src, info["path"], os.path.join(w, "deps"), set(), notes)
+        open(log, "w").close()
+        self.system()
+        # Re-exported only when the commit or a path dependency's commit
+        # moved: SwiftPM then rebuilds only what the changed files reach.
+        notes, lowered = list(state.get("notes") or []), bool(state.get("lowered"))
+        if not (state.get("commit") == info["commit"] and state.get("deps") == plan["deps"]
+                and os.path.isfile(os.path.join(src, "Package.swift"))):
+            notes, seen = [], set()
+
+            def transform(stage):
+                self.rewrite(stage, info["path"], deps_dir, seen, notes)
+                if lowered and lower_tools_version(stage):
+                    notes.append(TOOLS_NOTE % SWIFT_VERSION)
+            self.put(info["path"], info["commit"], src, transform)
+            for d in sorted(os.listdir(deps_dir)) if os.path.isdir(deps_dir) else []:
+                if os.path.join(deps_dir, d) not in seen:
+                    shutil.rmtree(os.path.join(deps_dir, d), ignore_errors=True)   # a dependency it dropped
+        # A build directory is started over when what it was built with
+        # changed: another compiler or settings, or another manifest (the
+        # targets may differ), whose index units would otherwise linger.
+        start = "cold"
+        if os.path.isdir(build):
+            if not state:
+                start = "cold: no record of how the build directory was built"
+            elif state.get("config") != plan["config"]:
+                start = "cold: the compiler or the build settings changed"
+            elif state.get("manifest") != manifest_digest(src):
+                start = "cold: the package's manifest changed"
+            else:
+                start = "incremental"
+            if start != "incremental":
+                shutil.rmtree(build)
+        if start == "incremental":
+            # SwiftPM plans a build again when a root package's files come or
+            # go, or its manifest changes, but not when a path dependency's
+            # files do (System's, when the head commit adds or removes one): the
+            # old plan would name a file that's gone, or leave out a new one. A
+            # manifest dated now makes it plan again.
+            now = time.time()
+            for manifest in glob.glob(os.path.join(src, "Package*.swift")):
+                os.utime(manifest, (now, now))
         env = dict(os.environ)
         for v in s.get("unset-env", []):
             env.pop(v, None)
@@ -650,13 +853,10 @@ class Builder:
         status, reason = "indexed", None
         if targets == [":libraries"]:
             code, out = run(["swift", "package", *swiftpm, *flags, "dump-package"], env=env)
-            if code != 0:
+            if code != 0 and lower_tools_version(src):
                 # A manifest for newer tools than these reads with its tools version lowered.
-                for manifest in glob.glob(os.path.join(src, "Package*.swift")):
-                    t = open(manifest, encoding="utf-8").read()
-                    t = re.sub(r"^// swift-tools-version: *[0-9.]+", "// swift-tools-version:%d.%d" % SWIFT_VERSION, t)
-                    open(manifest, "w", encoding="utf-8").write(t)
-                notes.append("tools version lowered to %d.%d" % SWIFT_VERSION)
+                lowered = True
+                notes.append(TOOLS_NOTE % SWIFT_VERSION)
                 code, out = run(["swift", "package", *swiftpm, *flags, "dump-package"], env=env)
             targets = self.package.library_roots(s, json.loads(out)) if code == 0 else []
             if code != 0:
@@ -685,10 +885,11 @@ class Builder:
         elif status == "indexed":
             status, reason = "failed", "the build left no index store"
         tail = open(log, encoding="utf-8", errors="replace").read().split("\n")[-30:] if os.path.exists(log) else []
+        seconds = round(time.time() - t0)
         result = {
             "baseKey": base_key, "status": status,
             "files": files, "symbols": symbols,
-            "build": {"status": status, "reason": reason, "seconds": round(time.time() - t0),
+            "build": {"status": status, "reason": reason, "seconds": seconds, "start": start,
                       "targets": built_targets, "requestedTargets": targets, "flags": flags,
                       "swiftExec": swift_exec, "compiler": self.compiler, "settings": s["file"],
                       "pathDependencies": notes, "records": n_records, "date": datetime.date.today().isoformat(),
@@ -696,8 +897,17 @@ class Builder:
             "system": self.system_block(files),
         }
         self.store(pkg, result)
-        # The build is scratch: gone as soon as it's read (SwiftPM's is several GB).
-        shutil.rmtree(w, ignore_errors=True)
+        if self.builds:
+            kb = disk_kb(w)
+            with open(state_path, "w") as f:
+                json.dump({"commit": info["commit"], "deps": plan["deps"], "config": plan["config"],
+                           "manifest": manifest_digest(src), "lowered": lowered, "notes": notes,
+                           "system": a.head, "status": status, "seconds": seconds, "start": start, "kb": kb,
+                           "date": datetime.date.today().isoformat()}, f, indent=1)
+            result["build"]["diskMB"] = round(kb / 1024) if kb else None
+        else:
+            # A scratch build: gone as soon as it's read (SwiftPM's is several GB).
+            shutil.rmtree(w, ignore_errors=True)
         result["build"] = dict(result["build"], decision="rebuilt", decisionReason=plan["reason"],
                                builtAgainst=a.head)
         return result
@@ -1330,10 +1540,12 @@ def main():
     ap.add_argument("--rebuild", action="store_true")
     ap.add_argument("--symbolgraphs", help="api-delta's symbol graphs of the head commit (symbolgraphs/head)")
     ap.add_argument("--validate", choices=("declarations", "interface", "tree"), default="declarations")
+    ap.add_argument("--builds-dir", help="persistent build directories, one per migration")
     ap.add_argument("--min-free-gb", type=float, default=15)
     ap.add_argument("--only", default="")
     a = ap.parse_args()
     a.work, a.cache = os.path.abspath(a.work), os.path.abspath(a.cache)
+    a.builds_dir = os.path.abspath(a.builds_dir) if a.builds_dir and a.builds == "build" else None
     t_start = time.time()
 
     g = load_json(a.graph)
@@ -1362,6 +1574,15 @@ def main():
     if a.symbolgraphs and glob.glob(os.path.join(a.symbolgraphs, "*.symbols.json")):
         decls = SystemDeclarations(a.symbolgraphs)
     builder = Builder(a, pkgs, compiler, decls)
+    if a.builds_dir:
+        # One run at a time per builds directory; the lock goes with the process.
+        os.makedirs(a.builds_dir, exist_ok=True)
+        lock = open(os.path.join(a.builds_dir, ".lock"), "w")
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            print(f"adopters: waiting for another run to finish with {a.builds_dir}", flush=True)
+            fcntl.flock(lock, fcntl.LOCK_EX)
     # Every migration's plan first, since one whose build compiles another
     # migration is revalidated only with it.
     plans = {k: builder.plan(p) for k, p in sorted(pkgs.items()) if (p["adopters"] or {}).get("migrated")}
@@ -1596,12 +1817,31 @@ def main():
               f"{len(used)} interfaces, {n_sites} sites", flush=True)
 
     decisions = collections.Counter((r["adopted"]["build"] or {}).get("decision") for r in pkg_out if r["adopted"])
+    build_dirs = None
+    if a.builds_dir and os.path.isdir(a.builds_dir):
+        # Each build directory's size, as measured after its last build.
+        per = {}
+        for d in sorted(os.listdir(a.builds_dir)):
+            sp = os.path.join(a.builds_dir, d, "state.json")
+            if d != "system" and os.path.isfile(sp):
+                try:
+                    per[d] = load_json(sp).get("kb")
+                except ValueError:
+                    per[d] = None
+        system_kb = disk_kb(os.path.join(a.builds_dir, "system")) or 0
+        build_dirs = {"dir": a.builds_dir,
+                      "packagesMB": {k: round(v / 1024) if v else None for k, v in per.items()},
+                      "systemMB": round(system_kb / 1024),
+                      "totalMB": round((sum(v for v in per.values() if v) + system_kb) / 1024)}
+        top = sorted(((v, k) for k, v in build_dirs["packagesMB"].items() if v), reverse=True)[:3]
+        print(f"adopters: build directories in {a.builds_dir}: {build_dirs['totalMB'] / 1024:.1f} GB for {len(per)} "
+              f"packages (the largest: {', '.join(f'{k} {v / 1024:.1f} GB' for v, k in top)})", flush=True)
     json.dump({
         "meta": {"branch": a.branch, "adopters": a.adopters, "ecosystem": a.ecosystem,
                  "coverageResults": a.coverage_results, "headCommit": a.head, "systemTree": builder.system_tree,
                  "systemManifest": builder.system_manifest, "validate": a.validate,
                  "systemDeclarations": len(decls.fingerprint) if decls else None,
-                 "decisions": dict(sorted(decisions.items())),
+                 "decisions": dict(sorted(decisions.items())), "buildDirectories": build_dirs,
                  "swift": compiler, "builds": a.builds, "date": datetime.date.today().isoformat(),
                  "seconds": round(time.time() - t_start)},
         "packages": pkg_out,
