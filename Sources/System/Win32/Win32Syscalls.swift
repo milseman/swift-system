@@ -167,4 +167,58 @@ internal func system__setmode(_ fd: CInt, _ mode: CInt) -> CInt {
   return _setmode(fd, mode)
 }
 
+// MARK: - File I/O
+
+internal func system_ReadFile(
+  _ hFile: HANDLE,
+  _ lpBuffer: UnsafeMutableRawPointer?,
+  _ nNumberOfBytesToRead: DWORD,
+  _ lpNumberOfBytesRead: UnsafeMutablePointer<DWORD>,
+  _ lpOverlapped: UnsafeMutablePointer<OVERLAPPED>?
+) -> Bool {
+  ReadFile(hFile, lpBuffer, nNumberOfBytesToRead, lpNumberOfBytesRead, lpOverlapped)
+}
+
+internal func system_WriteFile(
+  _ hFile: HANDLE,
+  _ lpBuffer: UnsafeRawPointer?,
+  _ nNumberOfBytesToWrite: DWORD,
+  _ lpNumberOfBytesWritten: UnsafeMutablePointer<DWORD>,
+  _ lpOverlapped: UnsafeMutablePointer<OVERLAPPED>?
+) -> Bool {
+  WriteFile(hFile, lpBuffer, nNumberOfBytesToWrite, lpNumberOfBytesWritten, lpOverlapped)
+}
+
+internal func system_SetFilePointerEx(
+  _ hFile: HANDLE,
+  _ liDistanceToMove: LARGE_INTEGER,
+  _ lpNewFilePointer: UnsafeMutablePointer<LARGE_INTEGER>?,
+  _ dwMoveMethod: DWORD
+) -> Bool {
+  SetFilePointerEx(hFile, liDistanceToMove, lpNewFilePointer, dwMoveMethod)
+}
+
+internal func system_FlushFileBuffers(_ hFile: HANDLE) -> Bool {
+  FlushFileBuffers(hFile)
+}
+
+internal func system_GetFileSizeEx(
+  _ hFile: HANDLE, _ lpFileSize: UnsafeMutablePointer<LARGE_INTEGER>
+) -> Bool {
+  GetFileSizeEx(hFile, lpFileSize)
+}
+
+internal func system_SetEndOfFile(_ hFile: HANDLE) -> Bool {
+  SetEndOfFile(hFile)
+}
+
+internal func system_SetFileInformationByHandle(
+  _ hFile: HANDLE,
+  _ FileInformationClass: FILE_INFO_BY_HANDLE_CLASS,
+  _ lpFileInformation: UnsafeMutableRawPointer,
+  _ dwBufferSize: DWORD
+) -> Bool {
+  SetFileInformationByHandle(hFile, FileInformationClass, lpFileInformation, dwBufferSize)
+}
+
 #endif // os(Windows)

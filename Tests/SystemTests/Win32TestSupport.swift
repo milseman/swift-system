@@ -114,4 +114,16 @@ internal func win32RawExists(_ path: FilePath) -> Bool {
   path.withPlatformString { GetFileAttributesW($0) != INVALID_FILE_ATTRIBUTES }
 }
 
+// MARK: - File I/O
+
+/// Runs `body` with a byte span of `bytes`.
+///
+/// `Array.span` needs a recent Apple OS, so this spells the span the way the
+/// FileDescriptor span tests do.
+internal func withRawSpan<R>(
+  _ bytes: [UInt8], _ body: (RawSpan) throws -> R
+) rethrows -> R {
+  try bytes.withUnsafeBytes { try body(RawSpan(_unsafeBytes: $0)) }
+}
+
 #endif // os(Windows)

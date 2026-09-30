@@ -10,8 +10,8 @@ kept inside `#if os(Windows)`; its tests are Windows-only and haven't run.
 Darwin, before any change (`6a9833f`): XCTest 565 tests (4 skipped), swift-testing 496 tests in 80 suites, all
 passing. After each commit: the same, since every new file compiles to nothing on Darwin.
 
-**Resume here:** SYS-0010 to SYS-0012 are done (sections 1 to 3). Next is SYS-0013, file I/O, then SYS-0014 to
-SYS-0016; then the adopter ranking.
+**Resume here:** SYS-0010 to SYS-0013 are done (sections 1 to 4). Next is SYS-0014, byte-range locking, then
+SYS-0015 and SYS-0016; then the adopter ranking.
 
 ## How it was checked
 
@@ -206,7 +206,7 @@ A Windows run must check:
 
 Next: SYS-0012.
 
-## 3. SYS-0012: Win32.FileType: this commit
+## 3. SYS-0012: Win32.FileType: `2f455fd`
 
 What: `Win32FileType.swift`: `Win32.FileType` (`disk`, `character`, `pipe`, `unknown`, both initializers) and
 `FileHandle.fileType()`, which calls `SetLastError(ERROR_SUCCESS)`, then `GetFileType`, and throws only if
@@ -222,6 +222,64 @@ A Windows run must check: a disk file, with and without access rights (`testDisk
 without elevation).
 
 Next: SYS-0013.
+
+## 4. SYS-0013: file I/O: this commit
+
+What: `Win32FileIO.swift` and the *File I/O* sections of the syscall and constant files.
+- `read(fromAbsoluteOffset:into:)` for `MutableRawSpan`, `MutableSpan<UInt8>`, `OutputRawSpan` and
+  `OutputSpan<UInt8>`: one `ReadFile`, with an `OVERLAPPED` offset for a non-`nil` offset.
+- `readFully(fromAbsoluteOffset:into:)` for the same four: a loop that ends at a full span, at a zero-byte read,
+  or at the first short read of a disk file. An output span's count grows with each read, even if a later one
+  throws.
+- `write(_:toAbsoluteOffset:)` and `write(draining:toAbsoluteOffset:)`: a loop, ending with `incompleteTransfer`
+  when a `WriteFile` succeeds without writing. `append(_:)` and `append(draining:)`: one `WriteFile` at an
+  `OVERLAPPED` offset of all ones, `incompleteTransfer` if it's short. The draining forms drop what was written
+  from the span, whether they return or throw.
+- `SeekOrigin`, `currentOffset()`, `seek(to:)`, `seek(offset:from:)` (`SetFilePointerEx`); `flush()`
+  (`FlushFileBuffers`); `size()` (`GetFileSizeEx`); `resizeToCurrentOffset()` (`SetEndOfFile`); `resize(to:)`
+  (`SetFileInformationByHandle` with `FileEndOfFileInfo`).
+
+Follows the draft:
+- Reads never throw `ERROR_HANDLE_EOF`, `ERROR_BROKEN_PIPE` or `ERROR_PIPE_NOT_CONNECTED`; they return 0.
+  `ERROR_MORE_DATA` is a short read for `read` and a partial transfer that continues for `readFully`. A read that
+  succeeds with zero bytes and `ERROR_OPERATION_ABORTED` (Ctrl+C in a console) throws `operationAborted`; the
+  last error is cleared before each `ReadFile`, so a stale code can't cause it.
+- Negative offsets are rejected before the call, since -1 and -2 are `OVERLAPPED` sentinels. `read` rejects a
+  span above `DWORD.max` bytes; `readFully` and `write` split one; `append` rejects one.
+- An empty span still calls `ReadFile` or `WriteFile` once.
+
+Chooses where the draft is open, or departs:
+- **The split size**: the draft says a sector multiple, not which. It's `0xFFFF0000`, the largest multiple of 64
+  KiB a `DWORD` holds, for every handle, so offsets and addresses stay aligned for sectors up to 64 KiB.
+- **`seek(to:)` and `resize(to:)` check for a negative value themselves** (`negativeSeek`, `invalidParameter`).
+  The draft says the Win32 layer rejects them "mostly"; checking first makes the documented error hold on a pipe
+  or console too.
+- **An offset whose transfer would pass `Int64.max`** is rejected with `invalidParameter`; the draft doesn't say.
+  Wrapping would reach the sentinels, and trapping would take the process down.
+- **`GetFileType` is called only at a `readFully`'s first short read**, where the draft calls it with the loop; a
+  read that fills the span never needs it.
+- `read`'s doc comment says which codes it absorbs.
+
+Darwin tests: unchanged. Windows tests: `Win32FileIOTests`.
+
+A Windows run must check:
+- `testWriteThenReadEachSpanKind`: every read overload.
+- `testPositionalTransfersMoveTheFilePointer`: a read at offset 2 of 4 bytes leaves the pointer at 6, and a write
+  at 0 of 2 leaves it at 2, unlike `pread` and `pwrite`.
+- `testEndOfFile` (0 at the pointer's end, 0 past the end, and a short `readFully`), `testNegativeValuesAreRejected`,
+  `testOversizedSpansAreRejected` (without touching the span's memory), `testAppend`, `testDrainingWrite`,
+  `testSizeAndResize` (zeros when extending, the pointer unmoved), `testDuplicatesShareTheFilePointer` (and a
+  reopened handle doesn't), `testLentHandleSharesTheDescriptorsFilePointer`.
+- Pipes: `testPipeReads` (a short read, then `readFully` and `read` ending at 0 after the writer closes),
+  `testWritingToAPipeWithNoReader` (`noData`, where POSIX says EPIPE), and
+  `testNonblockingPipeWriteIsIncomplete`: a `PIPE_NOWAIT` server's 1 MiB write writes nothing and throws
+  `incompleteTransfer`, and `append(draining:)` leaves the span whole. This relies on the draft's observation that
+  such a write takes nothing when the span doesn't fit.
+- `testNonBufferedFullRead`: `noBuffering` with sector-aligned memory, offset and length.
+- Not covered: the Ctrl+C path, message-mode pipes (`ERROR_MORE_DATA`), a serial port's write time-out, and spans
+  over 4 GiB.
+
+Next: SYS-0014.
 
 ## 9. Findings
 

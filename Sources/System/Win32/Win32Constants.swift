@@ -58,4 +58,9 @@ internal var _SDDL_REVISION_1: DWORD { 1 }
 @_alwaysEmitIntoClient
 internal var _win32MaxPath: Int { 260 }
 
+// MARK: - File I/O
+
+@_alwaysEmitIntoClient
+internal var _FILE_TYPE_DISK: DWORD { 0x1 }
+
 #endif // os(Windows)
