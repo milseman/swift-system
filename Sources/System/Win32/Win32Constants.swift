@@ -79,4 +79,18 @@ internal var _FILE_NAME_NORMALIZED: DWORD { 0x0 }
 @_alwaysEmitIntoClient
 internal var _FILE_NAME_OPENED: DWORD { 0x8 }
 
+// MARK: - Processes and waiting
+
+@_alwaysEmitIntoClient
+internal var _INFINITE: DWORD { 0xFFFF_FFFF }
+
+@_alwaysEmitIntoClient
+internal var _WAIT_FAILED: DWORD { 0xFFFF_FFFF }
+
+@_alwaysEmitIntoClient
+internal var _WAIT_OBJECT_0: DWORD { 0x0 }
+
+@_alwaysEmitIntoClient
+internal var _WAIT_TIMEOUT: DWORD { 0x102 }
+
 #endif // os(Windows)

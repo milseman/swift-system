@@ -13,8 +13,10 @@ passing. After each commit: the same, since every new file compiles to nothing o
 The windows-2 lane (sections 11 on, base system-next at `4365f83`) applies patches P1 and P2 of section 10, then
 adds API for the adopters' top Windows gaps of section 8, in its order, checked the same way.
 
-**Resume here:** windows-api's parts are done (sections 1 to 10). windows-2: P1 and P2 are applied (section 11).
-Next: processes, the first gap of section 8.
+**Resume here:** windows-api's parts are done (sections 1 to 10). windows-2: P1 and P2 are applied (section 11);
+processes have `ProcessID` and `Win32.ProcessHandle` (section 12). Next: creating processes (`CreateProcessW`), then
+the rest of section 8's gaps in order. Findings and patches for other lanes' files are the last two sections;
+patch P3 (the CMake source list) grows with each new file.
 
 ## How it was checked
 
@@ -651,3 +653,119 @@ A Windows run must check:
 - `Win32OverlongPathTests`: both opens throw, and neither traps. `FileDescriptor.open` should throw ENOENT (the C
   runtime's mapping of `ERROR_FILENAME_EXCED_RANGE`, from whichever call fails); the test checks only that it's an
   `Errno`, and a Windows run should record which one.
+
+## 12. Processes: `ProcessID` on Windows and `Win32.ProcessHandle`: this commit
+
+The first gap of section 8: 12 packages, 27 files. The names most of those files use are `GetCurrentProcess`
+(10 files), `TerminateProcess` (7), `OpenProcess` and `WaitForSingleObject` (6 each), `GetCurrentProcessId` (4) and
+`GetExitCodeProcess` (3); `CreateProcessW` is in 2, and is the next commit.
+
+What:
+- `ProcessIDWindows.swift`: `CInterop.ProcessID`, a `DWORD`, and `ProcessID` on Windows, with `current`
+  (`GetCurrentProcessId`).
+- `Win32Process.swift`: `Win32.ProcessAccess`, with the 13 process-specific rights, the five standard ones, `all`
+  and `maximumAllowed`; and `Win32.ProcessHandle`, an owner like the file handles (`init?(unsafelyAdopting:)`,
+  `unsafeRawHandle`, `relinquish()`, `close()`, a deinit that closes). On it: `current` (`GetCurrentProcess`),
+  `open(_:access:inheritable:)` (`OpenProcess`), `processID()` (`GetProcessId`), `waitForExit()` and
+  `waitForExit(timeout:)` (`WaitForSingleObject`), `exitCode()` (`GetExitCodeProcess`), `terminate(exitCode:)`
+  (`TerminateProcess`), and `duplicate(access:inheritable:)`, `isInheritable()` and `setInheritable(_:)`.
+- `Win32Wait.swift`: the internal wait, for this and the owners to come. A `Duration` rounds up to whole
+  milliseconds; a time-out longer than `INFINITE - 1` milliseconds (49.7 days) waits in parts.
+
+Which API: **Win32, and `ProcessID` shared.**
+- A Windows process is a kernel object reached through handles: no fork, no reaping, no signals, no process
+  groups, and any handle with the rights can wait or read the exit code. `ChildProcess`, `ExitStatus`,
+  `sendSignal` and `RawSpawn` model none of that, so this is Win32 API in the drafts' style, and owned only: a
+  process handle's value is reusable after it closes, as a file handle's is.
+- A process ID is the same concept as POSIX's, spelled `DWORD` rather than `pid_t`, so it shares `ProcessID`, as
+  `Next/Vision.md` allows. `ProcessID.parent` isn't there: Win32 has no call for it (it takes
+  `NtQueryInformationProcess` or a Toolhelp snapshot), and Windows doesn't reparent, so the ID can already name
+  another process. The rest of `ProcessID`'s POSIX API (waiting, signals, process groups) has no Windows concept;
+  exiting does, and is a candidate below.
+
+Design calls, with the alternatives rejected:
+- **`current` is a computed property** that returns an owner of the pseudo handle. Closing that handle does
+  nothing, so the owner is harmless. Rejected: a `static let`, as `OwnedFD`'s standard streams are, which would
+  forbid closing it but needs a lazy global and can't be `@_alwaysEmitIntoClient`; and duplicating a real handle
+  on each access.
+- **`init?(unsafelyAdopting:)` rejects only `NULL`**, the failure value of `OpenProcess`. `(HANDLE)-1` is the
+  pseudo handle, so rejecting it, as `FileHandle` does, would refuse `GetCurrentProcess()`.
+- **`exitCode()` waits with a zero time-out first**, so it needs `.synchronize` and `.queryLimitedInformation`,
+  as Rust's `try_wait` does. Rejected: `GetExitCodeProcess` alone, which reports `STILL_ACTIVE` (259) for a
+  running process, so a process that exits with 259 would look alive; and waiting only when the code is 259,
+  which makes the rights a call needs depend on the process's exit code.
+- **`access` has no default.** An open fails if any requested right is denied, and each adopter asks for what it
+  uses (`PROCESS_TERMINATE`, `SYNCHRONIZE`, `PROCESS_QUERY_INFORMATION`, `PROCESS_SET_INFORMATION`). The
+  PlatformEnum stand-in's default, `[.synchronize, .queryLimitedInformation, .terminate]`, fails for a process the
+  caller may watch but not end.
+- **`processID()` is a throwing method**, since `GetProcessId` needs a query right. Rejected: storing the ID in
+  the owner, which doubles it and can't be done for an adopted handle without a query right.
+- **Two waits**, `waitForExit()` and `waitForExit(timeout:) -> Bool`, rather than an optional time-out whose
+  result is always `true` without one. A time-out of zero or less polls.
+- **Exit codes are `DWORD`.** Open: a `Win32.ExitCode` with names for the NTSTATUS codes a crash reports
+  (`0xC0000005`, `0xC000013A`), or sharing POSIX's `ProcessID.ExitCode`, a `CInt` with `<sysexits.h>`'s codes.
+- **No handle protocol.** SYS-0011 rejected a `Win32.Handle` protocol until a third handle type appeared; this is
+  the third, and it repeats `duplicate`, `isInheritable` and `setInheritable` a third time. Left open: a `~Copyable`
+  protocol for those, `close`, and `unsafeRawHandle`, with waiting as its next member.
+- **Not wrapped**, though an adopter uses each: `SetPriorityClass` (sourcekit-lsp), `K32GetProcessMemoryInfo`
+  (swift-docc), `IsProcessInJob` and `GetProcessHandleCount` (swift-subprocess), `RegisterWaitForSingleObject`
+  (swift-build, swift-subprocess), and exiting the calling process with a `Never` result: `current.terminate`
+  covers the adopters' `TerminateProcess(GetCurrentProcess(), code)` but returns `Void`. A Windows
+  `ProcessID.exit(_:)` and `exitImmediately(_:)`, over the UCRT's `exit` and `TerminateProcess`, are the
+  candidates.
+
+Tests: `Win32ProcessTests`, XCTest, Windows-only. Children are started with raw `CreateProcessW`
+(`win32RawSpawn` in `Win32TestSupport.swift`), so the tests don't depend on System's process creation: `cmd.exe
+/c exit N` for exit codes, and `ping.exe -n 60 127.0.0.1` for a child that runs until it's ended. The millisecond
+rounding also ran on macOS, copied into a scratch program.
+
+A Windows run must check:
+- `testConstantsMatchTheSDK` (`PROCESS_ALL_ACCESS` is spelled from its parts, in case the compound macro doesn't
+  import) and `testInternalConstantsMatchTheSDK`.
+- `testCurrentProcessID`; `testCurrentProcessHandle`: the pseudo handle's ID, no exit code, a 1 ms wait that times
+  out, and a close that does nothing; `testDuplicatingTheCurrentProcess`: a real handle, and a
+  `.synchronize`-only duplicate that can't read the ID.
+- `testOpeningByID`; `testOpenFailures`: IDs 0 and `0xFFFFFFFC` give `invalidParameter`.
+- `testExitCodeOfAChild`: 42, and the exited process's ID still opens it while a handle is open;
+  `testExitCodeKeepsAll32Bits`: `cmd /c exit -1073741510` gives `0xC000013A`.
+- `testTerminate`: before, the wait times out and there's no exit code; after, 99 from both handles, and a second
+  `terminate` gives `accessDenied`, as documented. `testAccessRightsAreChecked`: which operations each right
+  allows, and that the exit code needs both rights. `testNonpositiveTimeoutsCheckWithoutWaiting`,
+  `testInheritance`, `testAdoption`.
+- Not covered: ending the calling process, waits beyond 49.7 days, and a process of another user, where
+  `queryLimitedInformation` is granted and `queryInformation` isn't.
+
+## 13. windows-2: findings
+
+- **The PlatformEnum samples' Windows arms now reach System's `Win32.ProcessHandle`** (the stand-ins compile only
+  with `SIMULATE_PLATFORMS`), and differ from it: `Platform.Process` reads `processID` as a property, where
+  System's is `processID()`, a throwing method, and its wait opens a process with `.synchronize` alone and then
+  reads the exit code, which System's `exitCode()` refuses with `accessDenied`, as `GetExitCodeProcess` would.
+  Those files are the platform-enum lane's.
+
+## 14. windows-2: patches for files outside the lane
+
+**P3, `Sources/System/CMakeLists.txt`: list the lane's new sources.** CI's CMake job fails when a SwiftPM source is
+missing from the list. Kept current with each commit; it applies to this branch with `git apply`.
+
+```diff
+--- a/Sources/System/CMakeLists.txt
++++ b/Sources/System/CMakeLists.txt
+@@ -355,4 +355,5 @@
+   VectoredIO/VectoredIO.swift)
+ target_sources(SystemPackage PRIVATE
++  Win32/ProcessIDWindows.swift
+   Win32/Win32.swift
+   Win32/Win32Constants.swift
+@@ -366,7 +367,9 @@
+   Win32/Win32Locking.swift
+   Win32/Win32Open.swift
++  Win32/Win32Process.swift
+   Win32/Win32SecurityDescriptor.swift
+   Win32/Win32Syscalls.swift
+-  Win32/Win32VolumeInformation.swift)
++  Win32/Win32VolumeInformation.swift
++  Win32/Win32Wait.swift)
+ target_link_libraries(SystemPackage PUBLIC
+   CSystem)
+```

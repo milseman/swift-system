@@ -409,3 +409,72 @@ typedef enum _FILE_INFORMATION_CLASS : int {
 
 #define FILE_SYNCHRONOUS_IO_ALERT 0x00000010
 #define FILE_SYNCHRONOUS_IO_NONALERT 0x00000020
+
+// processthreadsapi.h, synchapi.h, winbase.h, winnt.h: processes and waiting
+
+#define PROCESS_TERMINATE 0x0001
+#define PROCESS_CREATE_THREAD 0x0002
+#define PROCESS_VM_OPERATION 0x0008
+#define PROCESS_VM_READ 0x0010
+#define PROCESS_VM_WRITE 0x0020
+#define PROCESS_DUP_HANDLE 0x0040
+#define PROCESS_CREATE_PROCESS 0x0080
+#define PROCESS_SET_QUOTA 0x0100
+#define PROCESS_SET_INFORMATION 0x0200
+#define PROCESS_QUERY_INFORMATION 0x0400
+#define PROCESS_SUSPEND_RESUME 0x0800
+#define PROCESS_QUERY_LIMITED_INFORMATION 0x1000
+#define PROCESS_SET_LIMITED_INFORMATION 0x2000
+#define STANDARD_RIGHTS_REQUIRED 0x000F0000
+#define PROCESS_ALL_ACCESS (STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | 0xFFFF)
+
+#define WAIT_OBJECT_0 0
+#define WAIT_ABANDONED 0x80
+#define WAIT_TIMEOUT 258
+#define WAIT_FAILED 0xFFFFFFFF
+#define STILL_ACTIVE 259
+
+#define CREATE_SUSPENDED 0x00000004
+#define CREATE_NO_WINDOW 0x08000000
+
+typedef BYTE *LPBYTE;
+
+typedef struct _STARTUPINFOW {
+  DWORD cb;
+  LPWSTR lpReserved;
+  LPWSTR lpDesktop;
+  LPWSTR lpTitle;
+  DWORD dwX;
+  DWORD dwY;
+  DWORD dwXSize;
+  DWORD dwYSize;
+  DWORD dwXCountChars;
+  DWORD dwYCountChars;
+  DWORD dwFillAttribute;
+  DWORD dwFlags;
+  WORD wShowWindow;
+  WORD cbReserved2;
+  LPBYTE lpReserved2;
+  HANDLE hStdInput;
+  HANDLE hStdOutput;
+  HANDLE hStdError;
+} STARTUPINFOW, *LPSTARTUPINFOW;
+
+typedef struct _PROCESS_INFORMATION {
+  HANDLE hProcess;
+  HANDLE hThread;
+  DWORD dwProcessId;
+  DWORD dwThreadId;
+} PROCESS_INFORMATION, *PPROCESS_INFORMATION, *LPPROCESS_INFORMATION;
+
+BOOL CreateProcessW(LPCWSTR lpApplicationName, LPWSTR lpCommandLine,
+                    LPSECURITY_ATTRIBUTES lpProcessAttributes,
+                    LPSECURITY_ATTRIBUTES lpThreadAttributes, BOOL bInheritHandles,
+                    DWORD dwCreationFlags, LPVOID lpEnvironment,
+                    LPCWSTR lpCurrentDirectory, LPSTARTUPINFOW lpStartupInfo,
+                    LPPROCESS_INFORMATION lpProcessInformation);
+HANDLE OpenProcess(DWORD dwDesiredAccess, BOOL bInheritHandle, DWORD dwProcessId);
+DWORD GetProcessId(HANDLE Process);
+BOOL GetExitCodeProcess(HANDLE hProcess, LPDWORD lpExitCode);
+BOOL TerminateProcess(HANDLE hProcess, UINT uExitCode);
+DWORD WaitForSingleObject(HANDLE hHandle, DWORD dwMilliseconds);

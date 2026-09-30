@@ -276,4 +276,34 @@ internal func system_GetFinalPathNameByHandleW(
   GetFinalPathNameByHandleW(hFile, lpszFilePath, cchFilePath, dwFlags)
 }
 
+// MARK: - Processes
+
+internal func system_GetCurrentProcessId() -> DWORD {
+  GetCurrentProcessId()
+}
+
+internal func system_OpenProcess(
+  _ dwDesiredAccess: DWORD, _ bInheritHandle: Bool, _ dwProcessId: DWORD
+) -> HANDLE? {
+  OpenProcess(dwDesiredAccess, bInheritHandle, dwProcessId)
+}
+
+internal func system_GetProcessId(_ Process: HANDLE) -> DWORD {
+  GetProcessId(Process)
+}
+
+internal func system_GetExitCodeProcess(
+  _ hProcess: HANDLE, _ lpExitCode: UnsafeMutablePointer<DWORD>
+) -> Bool {
+  GetExitCodeProcess(hProcess, lpExitCode)
+}
+
+internal func system_TerminateProcess(_ hProcess: HANDLE, _ uExitCode: UINT) -> Bool {
+  TerminateProcess(hProcess, uExitCode)
+}
+
+internal func system_WaitForSingleObject(_ hHandle: HANDLE, _ dwMilliseconds: DWORD) -> DWORD {
+  WaitForSingleObject(hHandle, dwMilliseconds)
+}
+
 #endif // os(Windows)

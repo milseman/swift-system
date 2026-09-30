@@ -126,4 +126,40 @@ internal func withRawSpan<R>(
   try bytes.withUnsafeBytes { try body(RawSpan(_unsafeBytes: $0)) }
 }
 
+// MARK: - Processes
+
+/// A child process that `win32RawSpawn(_:suspended:)` started, as the raw
+/// handles and ID that `CreateProcessW` reports. The caller closes both
+/// handles.
+internal struct Win32TestChild {
+  internal var process: HANDLE
+  internal var thread: HANDLE
+  internal var id: DWORD
+}
+
+/// Starts `commandLine` with raw Win32 calls: no window, no inherited
+/// handles, and the calling process's environment and current directory.
+internal func win32RawSpawn(
+  _ commandLine: String, suspended: Bool = false
+) -> Result<Win32TestChild, Win32.Error> {
+  var startupInfo = STARTUPINFOW()
+  startupInfo.cb = DWORD(MemoryLayout<STARTUPINFOW>.size)
+  var information = PROCESS_INFORMATION()
+  let flags = DWORD(0x0800_0000) | (suspended ? DWORD(0x4) : 0)  // CREATE_NO_WINDOW, CREATE_SUSPENDED
+  // CreateProcessW can write to its command line, so it gets a copy.
+  var command = Array(commandLine.utf16) + [0]
+  let succeeded = command.withUnsafeMutableBufferPointer { command in
+    CreateProcessW(
+      nil, command.baseAddress, nil, nil, false, flags, nil, nil, &startupInfo, &information)
+  }
+  guard succeeded else { return .failure(Win32.Error(GetLastError())) }
+  return .success(
+    Win32TestChild(
+      process: information.hProcess, thread: information.hThread, id: information.dwProcessId))
+}
+
+/// A command line for a child that runs for about a minute unless it's
+/// ended, and needs no console input.
+internal var win32LongRunningCommand: String { "ping.exe -n 60 127.0.0.1" }
+
 #endif // os(Windows)
