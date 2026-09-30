@@ -30,6 +30,11 @@ section 4 tracks the platform imports (section 47). Nothing is uncommitted. Open
 sqlite-nio's extraction takes minutes on each run, scanning its vendored SQLite; a `skip.CSQLite` would speed runs,
 but would drop SQLite's OS use from the package's table.
 
+Left for Michael: this worktree's `.build` is deleted, but the permission classifier refused the deletion of the
+lane's files in the temporary directory (`/var/folders/8l/z1y20ccj5g1087mk50sbcznr0000gn/T/`): SwiftPM's
+`_Users_milseman_development_base_dir_system-next_coverage-3_*.lock` files from check.sh's package builds, and
+`coverage-3-baseline.log` and `coverage-3-after.log`, the test runs' logs.
+
 The toolchain's queue has been empty since run `a3a634eb2b19-06a7ddd5` (section 37), and popular.tsv's three
 batches' queues since sections 38, 39 and 44. What follows is the toolchain's work, all done.
 
