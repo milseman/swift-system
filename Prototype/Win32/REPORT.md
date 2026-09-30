@@ -10,8 +10,8 @@ kept inside `#if os(Windows)`; its tests are Windows-only and haven't run.
 Darwin, before any change (`6a9833f`): XCTest 565 tests (4 skipped), swift-testing 496 tests in 80 suites, all
 passing. After each commit: the same, since every new file compiles to nothing on Darwin.
 
-**Resume here:** SYS-0010 to SYS-0013 are done (sections 1 to 4). Next is SYS-0014, byte-range locking, then
-SYS-0015 and SYS-0016; then the adopter ranking.
+**Resume here:** SYS-0010 to SYS-0014 are done (sections 1 to 5). Next is SYS-0015, volume information, then
+SYS-0016; then the adopter ranking.
 
 ## How it was checked
 
@@ -223,7 +223,7 @@ without elevation).
 
 Next: SYS-0013.
 
-## 4. SYS-0013: file I/O: this commit
+## 4. SYS-0013: file I/O: `1c2a12b`
 
 What: `Win32FileIO.swift` and the *File I/O* sections of the syscall and constant files.
 - `read(fromAbsoluteOffset:into:)` for `MutableRawSpan`, `MutableSpan<UInt8>`, `OutputRawSpan` and
@@ -281,6 +281,38 @@ A Windows run must check:
 
 Next: SYS-0014.
 
+## 5. SYS-0014: byte-range locking: this commit
+
+What: `Win32Locking.swift`: `Win32.LockMode` (`shared`, `exclusive`), and on `FileHandle`,
+`withLock(byteRange:mode:_:)` (`noasync`) and `withLockIfAvailable(byteRange:mode:_:)`, each with a typed overload
+and a `@_disfavoredOverload` untyped one, over `LockFileEx` and `UnlockFileEx`.
+
+Follows the draft: `byteRange` defaults to `0...`, locking offset 0 for `Int64.max` bytes; an empty range runs
+`body` without calling `LockFileEx`; a negative bound throws `invalidParameter`; the range resolves with
+`relative(to:)` over an internal collection of `0..<Int64.max` whose `index(after:)` saturates, so `0...Int64.max`
+doesn't trap; the unlock names the locked range exactly; `body`'s error wins over the unlock's, and an unlock
+error after a successful `body` is thrown; `withLockIfAvailable` returns `nil` only for `ERROR_LOCK_VIOLATION`
+under `LOCKFILE_FAIL_IMMEDIATELY`.
+
+Departs from the draft: its mechanism and its promise disagree for two range types. The standard library's
+`PartialRangeUpTo.relative(to:)` and `PartialRangeThrough.relative(to:)` make `0..<upperBound` (or
+`0..<upperBound + 1`), which traps for a negative bound before System can reject it, and `...(-1)` becomes the
+empty `0..<0`. So those two types are checked for a negative upper bound first. Another type conforming to
+`RangeExpression` with a negative bound can still trap inside its own `relative(to:)`.
+
+Darwin tests: unchanged. Windows tests: `Win32LockingTests`, which use two opens of one file, so two file objects,
+as another process would have.
+
+A Windows run must check: `testExclusiveLocksAreMandatory` (the other handle's read of the range fails with
+`lockViolation`, outside it succeeds, and the locking handle can read); `testLockIfAvailable` (overlapping `nil`,
+disjoint locked); `testSharedLocks` (shared with shared, not with exclusive, and a write through the locking
+handle fails, as the draft says); `testWholeFileByDefault` (the default range covers bytes past the end);
+`testEmptyRangeDoesNotLock` (on a pipe, where `LockFileEx` fails with `invalidFunction`, which a non-empty range
+shows); `testNegativeBoundsAreRejected` (all five forms); `testRangesClosedAtTheLastOffset`;
+`testBodyErrorsWinAndTheRangeIsUnlocked`.
+
+Next: SYS-0015.
+
 ## 9. Findings
 
 - **Errno's `~=` must be disfavored too** (P1). Until then, even System's own code can't match a `Win32.Error`
@@ -299,6 +331,7 @@ Next: SYS-0014.
   `Win32` would shadow System's, and its `FileDescriptor` extensions (`TranslationMode`, `init(adopting:)`,
   `withWin32HandleIfAvailable`) would overlap System's.
 - **`_MAX_PATH` is the UCRT's** (`stdlib.h`), so the internal constant is `_win32MaxPath`.
+- **SYS-0014's range resolution traps** for `..<(-1)` and `...(-2)` (section 5).
 
 ## 10. Patches for files outside the lane
 

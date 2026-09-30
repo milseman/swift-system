@@ -63,4 +63,12 @@ internal var _win32MaxPath: Int { 260 }
 @_alwaysEmitIntoClient
 internal var _FILE_TYPE_DISK: DWORD { 0x1 }
 
+// MARK: - Byte-range locking
+
+@_alwaysEmitIntoClient
+internal var _LOCKFILE_EXCLUSIVE_LOCK: DWORD { 0x0000_0002 }
+
+@_alwaysEmitIntoClient
+internal var _LOCKFILE_FAIL_IMMEDIATELY: DWORD { 0x0000_0001 }
+
 #endif // os(Windows)

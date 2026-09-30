@@ -221,4 +221,30 @@ internal func system_SetFileInformationByHandle(
   SetFileInformationByHandle(hFile, FileInformationClass, lpFileInformation, dwBufferSize)
 }
 
+// MARK: - Byte-range locking
+
+internal func system_LockFileEx(
+  _ hFile: HANDLE,
+  _ dwFlags: DWORD,
+  _ dwReserved: DWORD,
+  _ nNumberOfBytesToLockLow: DWORD,
+  _ nNumberOfBytesToLockHigh: DWORD,
+  _ lpOverlapped: UnsafeMutablePointer<OVERLAPPED>
+) -> Bool {
+  LockFileEx(
+    hFile, dwFlags, dwReserved, nNumberOfBytesToLockLow, nNumberOfBytesToLockHigh,
+    lpOverlapped)
+}
+
+internal func system_UnlockFileEx(
+  _ hFile: HANDLE,
+  _ dwReserved: DWORD,
+  _ nNumberOfBytesToUnlockLow: DWORD,
+  _ nNumberOfBytesToUnlockHigh: DWORD,
+  _ lpOverlapped: UnsafeMutablePointer<OVERLAPPED>
+) -> Bool {
+  UnlockFileEx(
+    hFile, dwReserved, nNumberOfBytesToUnlockLow, nNumberOfBytesToUnlockHigh, lpOverlapped)
+}
+
 #endif // os(Windows)
