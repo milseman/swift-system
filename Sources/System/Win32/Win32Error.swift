@@ -411,7 +411,7 @@ extension Win32.Error {
   /// Matches a `Win32.Error` pattern against an untyped error, as `Errno`'s
   /// operator does.
   ///
-  /// This operator is `@_disfavoredOverload`, and `Errno`'s must be too.
+  /// This operator is `@_disfavoredOverload`, as `Errno`'s is.
   /// Where both types name a code (`fileExists`, `fileTooLarge`,
   /// `notSupported`, `brokenPipe`, and `noData`), a pattern such as
   /// `catch .fileExists` is ambiguous with both operators favored. With only

@@ -118,8 +118,8 @@ public struct Errno: RawRepresentable, Error, Hashable, Codable { // mirrors: So
 }
 
 extension Errno {
-  // As shipped: not @_disfavoredOverload.
   @_alwaysEmitIntoClient
+  @_disfavoredOverload
   public static func ~=(_ lhs: Errno, _ rhs: Error) -> Bool { // mirrors: Sources/System/Errno.swift
     guard let value = rhs as? Errno else { return false }
     return lhs == value

@@ -137,6 +137,10 @@ final class Win32ErrorTests: XCTestCase {
     XCTAssertTrue(catchesImplicitSharingViolation())
   }
 
+  func testTypedCatchOfASharedName() {
+    XCTAssertTrue(catchesImplicitFileExists())
+  }
+
   func testErrnoApproximation() {
     // The C runtime's _dosmaperr table, as `_mapWindowsErrorToErrno` has it.
     XCTAssertEqual(Errno(approximating: .fileNotFound), .noSuchFileOrDirectory)
@@ -175,6 +179,17 @@ private func catchesImplicitSharingViolation() -> Bool {
   do throws(Win32.Error) {
     throw .sharingViolation
   } catch .sharingViolation {
+    return true
+  } catch {
+    return false
+  }
+}
+
+@available(System 199, *)
+private func catchesImplicitFileExists() -> Bool {
+  do throws(Win32.Error) {
+    throw .fileExists
+  } catch .fileExists {
     return true
   } catch {
     return false
