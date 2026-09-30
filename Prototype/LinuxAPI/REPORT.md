@@ -10,13 +10,14 @@ interface at Swift's default API level (21), and said otherwise.
 
 ## Resume here
 
-- State: inventory (section 1) and batches 1 to 6 (sections 2.1 to 2.6)
-  committed: the small widenings in the plan are done.
+- State: inventory (section 1) and batches 1 to 7 (sections 2.1 to 2.7)
+  committed: the small widenings in the plan are done, and Foundation's
+  `makeUniqueFile(options:permissions:)`.
 - Next: the larger items (section 1.5, item 7), each its own batch, in
-  adopter order: `readPassphrase` on Linux (SwiftPM), `SpawnCredentials`
-  on Linux (Subprocess), inotify (TSC), `copy_file_range` and `FICLONE`
-  (Foundation, NIO), `clone3` (Subprocess). Each needs a design first;
-  section 1.2 has the C interfaces.
+  adopter order: `copy_file_range` and `FICLONE` (Foundation, NIO),
+  `SpawnCredentials` on Linux (Subprocess), `readPassphrase` on Linux
+  (SwiftPM), inotify (TSC), `clone3` (Subprocess). Each needs a design
+  first; section 1.2 has the C interfaces.
 - This lane owns `Sources/System/**`, `Sources/CSystem`, `Tests/SystemTests`
   and this report, not SystemSockets or its tests: socket API (vsock, UDP
   offload) goes to section 4, with a patch where one is written.
@@ -84,6 +85,13 @@ later; a log goes to `../linux-logs/`.
      XCTest tests, the new ones `testStaticInitializers` and
      `testSynchronizedIO`. The latter checks that Linux's `F_SETFL` ignores
      `O_SYNC`, as the man page says; if it fails there, the doc is wrong.
+7. Batch 7 (unique files with permissions):
+   - `Utilities/linux/build.sh test -- --filter UniqueFilesWithPermissions`:
+     6 XCTest tests, the 4 real ones from `UniqueFilesWithPermissionsTest`
+     (now built on Linux) and the 2 mock ones in
+     `UniqueFilesWithPermissionsLinuxTest`. With `--user 1000:1000` too, to
+     be sure the creation-mask test holds for an unprivileged user.
+   - The link should print no `mktemp` warning: say if one appears.
 
 ## Baseline (Darwin)
 
@@ -501,6 +509,39 @@ off. Typechecked on Darwin in a scratch copy.
 
 Darwin, after: XCTest 565 tests, 4 skipped, 0 failures; swift-testing 498
 tests in 81 suites passed (no new Darwin tests).
+
+### 2.7 Batch 7: unique files with permissions (swift-foundation)
+
+- `FilePath.makeUniqueFile(options:permissions:)` and
+  `makeUniqueFile(relativeTo:options:permissions:)` widen to Linux and
+  Android. Foundation's `Data+Writing.swift` calls them on Darwin; its
+  Linux branch calls `mktemp` itself (silencing the deprecation) and then
+  `open` or `openat` with `O_CREAT | O_EXCL` and the mode.
+- On Linux and Android, System makes the name without `mktemp`, whose use
+  glibc's linker warns about in every program that links it (why the file
+  said Darwin only): `_makeTemplateName` replaces the trailing `X`s, as
+  `mktemp` does, with letters and digits from the standard library's
+  `SystemRandomNumberGenerator`. The rest (the six-`X` check, `O_EXCL`,
+  100 attempts, the `EINTR` rule) is shared. Rejected: `getentropy`
+  through a shim, which is what the generator already reads, with an API
+  level check on Android; `mkstemp` and `fchmod`, which skips the creation
+  mask, the reason this API exists.
+- OpenBSD, whose linker warns too, stays out.
+
+Tests:
+
+- `UniqueFilesWithPermissionsTests.swift`'s gate widens to Linux and
+  Android for its four real tests, and its mock tests, which expect
+  `mktemp` calls, stay Darwin's.
+- `Tests/SystemTests/UniqueFilesWithPermissionsLinuxTests.swift` (Linux and
+  Android, with mocking): the traces have only `open` and `openat`, with
+  made names (the prefix, then six letters or digits) and the flags and
+  mode; retries after `EEXIST` up to the limit, and after `EINTR` only
+  when asked; no call for a bad template.
+- Both ran on Darwin in a scratch copy with `_makeTemplateName` taking the
+  Linux branch: the 2 mock tests and the 4 real ones passed.
+- Darwin, after: XCTest 565 tests, 4 skipped, 0 failures; swift-testing 498
+  tests in 81 suites passed (the Darwin mock and real tests unchanged).
 
 ## 3. Findings
 
