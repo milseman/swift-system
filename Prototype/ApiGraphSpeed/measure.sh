@@ -1,17 +1,17 @@
 #!/bin/bash
 # One timed regenerate.sh run for the api-graph-speed measurements, reading
 # the inputs pin.sh pinned. The tool is copied first, from a commit's
-# Utilities, a directory's or the working tree's, so the working tree can
-# change while it runs. regenerate.sh's output goes to a log, each line
-# prefixed with the seconds since the start; summarize.sh then writes
-# summary.txt: the wall time, the load average (sampled each minute) and
-# each step's start.
+# Utilities or the working tree's, so the working tree can change while it
+# runs. regenerate.sh's output goes to a log, each line prefixed with the
+# seconds since the start; summarize.sh then writes summary.txt: the wall
+# time, the load average (sampled each minute) and each step's start.
 #
-#   Prototype/ApiGraphSpeed/measure.sh NAME [TOOL]
-#     TOOL: a commit whose Utilities to run, or a directory holding a copy of
-#     Utilities (default: the working tree's)
+#   Prototype/ApiGraphSpeed/measure.sh NAME [COMMIT] [VAR=value ...]
+#     COMMIT: the commit whose Utilities to run (default: the working tree's)
+#     VAR=value: settings, as in the environment, so that every run's command
+#     starts with this script (one permission rule covers them)
 #
-# Environment:
+# Settings (VAR=value or the environment):
 #   BASE_REF, HEAD_REF  default 1b452c2 and 3f9f9e1, the lane's measurements'
 #   SPEED_PINNED        pin.sh's directory (default ${TMPDIR}api-graph-speed)
 #   SPEED_DIR           default .build/speed; the run goes in runs/NAME
@@ -24,8 +24,16 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd -P)"
 ROOT="$(cd "$HERE/../.." && pwd -P)"
-NAME="${1:?usage: measure.sh NAME [TOOL]}"
-TOOL_ARG="${2:-}"
+NAME="${1:?usage: measure.sh NAME [COMMIT] [VAR=value ...]}"
+shift
+COMMIT=""
+if [ $# -gt 0 ] && [[ "$1" != *=* ]]; then COMMIT="$1"; shift; fi
+for setting in "$@"; do
+  case "$setting" in
+    BASE_REF=*|HEAD_REF=*|SPEED_*=*|API_GRAPH_*=*) export "$setting" ;;
+    *) echo "error: not a setting: $setting" >&2; exit 1 ;;
+  esac
+done
 PINNED="${SPEED_PINNED:-${TMPDIR:-/tmp/}api-graph-speed}"
 PINNED="${PINNED%/}"
 SPEED="${SPEED_DIR:-$ROOT/.build/speed}"
@@ -35,12 +43,9 @@ RUN="$SPEED/runs/$NAME"
 rm -rf "$RUN"
 mkdir -p "$RUN/tool"
 cp "$HERE/summarize.sh" "$RUN/summarize.sh"
-if [ -n "$TOOL_ARG" ] && [ -d "$TOOL_ARG/Utilities" ]; then
-  cp -R "$TOOL_ARG/Utilities" "$RUN/tool/"
-  tool="$TOOL_ARG"
-elif [ -n "$TOOL_ARG" ]; then
-  git -C "$ROOT" archive "$TOOL_ARG" Utilities | tar -x -C "$RUN/tool"
-  tool="$TOOL_ARG"
+if [ -n "$COMMIT" ]; then
+  git -C "$ROOT" archive "$COMMIT" Utilities | tar -x -C "$RUN/tool"
+  tool="$COMMIT"
 else
   cp -R "$ROOT/Utilities" "$RUN/tool/"
   tool="working tree at $(git -C "$ROOT" rev-parse --short HEAD)"
