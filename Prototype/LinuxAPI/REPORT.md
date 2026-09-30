@@ -642,6 +642,10 @@ Linux (swift:6.2-noble, arm64, as root), full runs:
   run, 5 skipped, 6 failures; swift-testing 459 tests in 77 suites, 7
   issues. The failures are listed in section 3.
 - `08c79ad`, `--filter FileContentsCloneTest`: 2 XCTest tests pass.
+- `4f776e5` (`../linux-logs/linux-api-4f776e5-noble-test.log`): XCTest 458
+  run, 5 skipped, 5 failures; swift-testing 459 tests in 77 suites, 7
+  issues. Every failure is one of section 3's, in other lanes' tests; this
+  lane's tests all pass.
 
 Darwin, after: XCTest 565 tests, 4 skipped, 0 failures; swift-testing 498
 tests in 81 suites passed.
