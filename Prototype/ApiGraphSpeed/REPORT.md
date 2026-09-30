@@ -1,101 +1,168 @@
 # api-graph-speed: regenerate.sh fast after a System change
 
-Lane `api-graph-speed`, base `3f9f9e1` (system-next). Owns `Utilities/api-graph/` and this report.
+Lane `api-graph-speed`, base `3f9f9e1` (system-next), merged with system-next `6a9833f` at `943c479`. Owns `Utilities/api-graph/` and `Prototype/ApiGraphSpeed/`.
 
 ## Resume here
 
-Stopped 2026-09-29 on a quota warning, partway through step 1.
+Stopped 2026-09-30, waiting for permission to run: the auto mode classifier denied two of the lane's runs, and every remaining step needs runs of that kind.
 
-**Committed:** only this report. No step is committed.
+**Committed:**
+- `943c479`: the merge of system-next `6a9833f` (coverage-2: `Utilities/adopter-coverage` and `Prototype/Status` only). It touched none of this lane's files, so it went in over the uncommitted step 1 work, without a WIP commit.
+- `f12d631`: step 1, and the measurement tools `pin.sh`, `measure.sh`, `summarize.sh` and `compare.py`.
+- `ae57686`: step 2, and `check_builds.py`.
 
-**In progress (uncommitted in the working tree): step 1, validating cached indexes.** The code is finished but hasn't run end to end.
-- `scripts/adopters.py`:
-  - `SystemDeclarations` fingerprints each public declaration in api-delta's head symbol graphs (`symbolgraphs/head`), by USR. A fingerprint covers the declaration fragments, availability, SPI, access, generics, extension constraints, and a type's conformances. An accessor USR maps to its property.
-  - `Builder.plan` sets each migration's decision (`reused`, `revalidated` or `rebuild`) and the reason. `invalid` holds the checks, `system_block` is what an entry records about the System it was built against, and `store` writes one entry per commit, key and tree.
-  - `follow_dependencies`: a migration that compiles another migration is revalidated only if that one is too.
-  - `index(pkg, plan)`, the one-line log per migration, and `meta.decisions`.
-  - The cache key no longer includes System's tree (`swift-system` rather than `swift-system@<tree>`). Entries from the old tool for the same tree are reused and upgraded with fingerprints.
-- `regenerate.sh`: passes `--symbolgraphs "$DELTA/symbolgraphs/head"`, and `--validate` from `API_GRAPH_ADOPTER_VALIDATE` (`declarations`, the default, `interface` or `tree`).
-- `scripts/graphq.py`: `GRAPH.md` gets a section, "The migrations' indexes" (decision, why, build).
-- `README.md`: the new variable, and revalidation under Adopters. `scripts/method.md`: decision 19 rewritten, decision 37 added (what validation can't see, and the rejected alternatives), and an entry in "Where it's wrong".
+**Uncommitted in the working tree:** step 3, parallel builds (`adopters.py`, `regenerate.sh`, `README.md`, `method.md` decision 39). It passes `bash -n`, `py_compile` and pyflakes, but it has never run.
 
-**Checked so far:**
-- `bash -n` and a Python compile of the edited scripts.
-- `plan()` offline, against a copy of the baseline run's cache and 3f9f9e1's symbol graphs:
-  - Old entries for the same tree were reused and upgraded.
-  - Entries for eee1da2's tree were rebuilt, with the reason "cached by the previous version of this tool, which keyed on System's tree".
-- The fingerprints cover every System-prefixed USR the 18 cached indexes reference, except the adopters' own extension members (NIO's `FileDescriptor.readChunk`, swift-build's `closeAfter`, Subprocess's `openDevNull`, …). That exception is intended.
-- Against eee1da2's entries, one real change turned up: swift-foundation's `DirectoryWalk.init(_:path:order:opening:)` is gone in 3f9f9e1, so validation would rebuild swift-foundation after foundation-gaps.
-- `swift test` hasn't been run yet, neither before nor after. I held it back so it wouldn't compete with the baseline run. My changes are Python, shell and docs only.
+**Denied** ("Blocked by fast classifier"). I didn't retry either one in another form:
+1. The b run for step 1: `API_GRAPH_KEEP_WORK=1 Prototype/ApiGraphSpeed/measure.sh b1-step1 .build/speed/tools/step1`, with a copy of the step 1 tool in `.build`.
+2. A rerun of `python3 Prototype/ApiGraphSpeed/check_builds.py .build/speed/check-builds`, after I tightened its checks, to check the fix below.
 
-**Next:**
-1. Finish step 1:
-   - Pin the adopters and run the baseline, as described under the measurement setup below. That rebuilds the old-format cache for 3f9f9e1.
-   - `b1`: the new tool on 3f9f9e1 with that cache. Expect all 18 migrations reused and upgraded.
-   - `c1`: a scratch commit on this branch that changes one comment under `Sources`, then reverted. Expect all 18 revalidated.
-   - Compare the snapshot's `usedBy` and `calls` links, with their sites, against the baseline's. Run `swift test`. Commit.
-2. Step 2 (not started). Persistent builds under a new `API_GRAPH_BUILDS` (default `.build/api-graph-builds`, kept apart from the small cache):
-   - `sync_export(repo, commit, dest, transform)`: `git archive` into a stage beside `dest`, apply the manifest rewrites (and the tools-version lowering, if the state records it; lower only when newer), then move in only the files that differ. Remove files the commit doesn't have, but keep a root `Package.resolved`.
-   - A `state.json` per package: commit, dependency commits, compiler, settings, lowered, notes. Re-export only when the commit or the dependencies change. Wipe the build directory when the compiler, the settings or the root manifest change, because stale index units would otherwise remain.
-   - `read_store` should skip units whose main file is gone.
-   - One System export, `<builds>/system/swift-system`, synced under a lock.
-   - Report each package's disk use (`du`) and the total.
-3. Step 3 (not started):
-   - Work out all the plans first, then run a `ThreadPoolExecutor` of `API_GRAPH_ADOPTER_JOBS` (default 4) over the builds, longest first by the newest cache entry's `build.seconds`, packages with no entry first.
-   - Each worker builds and extracts its sites. Merge the per-package sites and hunks in sorted key order, so the output stays deterministic, and print one line per migration.
-   - Give each worker its own `Conditions()`, since its parser state isn't thread-safe.
-4. The measurements the lane asks for (a to d), plus an incremental forced rebuild (`API_GRAPH_ADOPTER_VALIDATE=tree` on the scratch commit) to show what step 2 buys.
+Runs of the same kind went through earlier in the session: `measure.sh a-old HEAD` (the 23-minute baseline) and the first `check_builds.py` run. To go on, the user has to allow these runs: say so, or add a Bash permission rule for `Prototype/ApiGraphSpeed/measure.sh` and `check_builds.py`.
 
-**Measurement setup** (deleted at stop; recreate it like this):
-- Why pin: `../adopters` is live. sourcekit-lsp and swift-corelibs-xctest were cloned into it at 14:42 during this session. So pin the adopters:
-  - Run `git clone --no-checkout` of each clone into `${TMPDIR}api-graph-speed/adopters/<dir>`.
-  - `git remote set-url origin` to the original clone's origin URL.
-  - `update-ref` each of its local branches.
-  - Check that each copy's merge base matches the original's.
-- Keep the path the same: cache keys contain the path dependencies' absolute paths, so a moved adopters directory misses the cache too.
-- Refs: `BASE_REF=1b452c2`, `HEAD_REF=3f9f9e1`. `API_GRAPH_SNAPSHOTS` should point at a store of your own (the shared `../api-graph-snapshots` must not be touched).
-- Run the old tool from a `git archive` of `Utilities` inside this worktree's `.build`, so the working tree can change while it runs.
-- `migrate-darwin` tips at the time: indexstore-db cc966b8901, swift-argument-parser 0fbda2766c, swift-async-algorithms bd5f6f4447, swift-build 56ad2d9772, swift-certificates 0df6bd14aa, swift-docc 6b1bfaa1fa, swift-driver ddb51ccd98, swift-foundation 763e42cd4a, swift-llbuild f7a0650b70, swift-log 4d6d77fe5c, swift-nio e1623fbfbe, swift-package-manager dbe05ec1e6, swift-sdk-generator 5956672b0e, swift-subprocess d6b586691b, swift-syntax 961f0b7231, swift-tools-protocols 18e8a9f93f, swift-tools-support-core 1ad4129f6c, WasmKit 4917e060cb. sourcekit-lsp and swift-corelibs-xctest had no migration commits.
+**Next, once they're allowed:**
+1. Rerun `check_builds.py DIR` and expect every check to pass. That includes the build against the other System commit, which failed before the fix.
+2. b and c for step 1:
+   - `measure.sh b1 f12d631`: 3f9f9e1 with the baseline's cache. Expect all 18 migrations reused, and their entries upgraded.
+   - Commit a scratch change to one comment under `Sources` on this branch. Run `HEAD_REF=<scratch> measure.sh c1 f12d631` and expect all 18 revalidated. Then revert the scratch commit with a new commit.
+   - Run `compare.py .build/speed/runs/a-old/out/graph.json.gz <run>/out/graph.json.gz` for each run.
+3. Step 2:
+   - A cold run with `ae57686` and a fresh `API_GRAPH_CACHE`, which fills `.build/speed/builds`.
+   - Then `API_GRAPH_ADOPTER_VALIDATE=tree HEAD_REF=<scratch>`, a forced rebuild that is incremental. That's what step 2 buys. Report the builds directory's size.
+4. Step 3:
+   - Commit it after a run passes.
+   - (d): the cold case with `API_GRAPH_ADOPTER_JOBS=4`, then `=18`. Each needs a fresh cache and builds directory.
+   - (b) and (c) with the final tool. Then update the README's "Run time" section.
+5. At the stop, delete `.build/speed` and `${TMPDIR}api-graph-speed`. The exception is a persistent builds directory: keep it, and say where it is and how big.
 
-**Baseline (a, old tool):** 29 min 9 s wall. Details are under "Step 1, measurements" below.
+**Kept for those runs** (scratch; delete it all if the lane stops here):
+- `.build/speed/cache`: the baseline's old-format entries for 3f9f9e1's tree, which b1 upgrades.
+- `.build/speed/runs/a-old/out`: the baseline's output and snapshot, which `compare.py` compares against.
+- `.build/speed/snapshots`.
+- `${TMPDIR}api-graph-speed`: the pinned inputs, as APFS clones that take almost no disk. The cache keys hold the pinned adopters' absolute paths, so a pin made anywhere else would miss the cache.
 
-**Disk:** no persistent build directories exist yet (step 2 isn't started). `.build` and the scratch directory were deleted at stop.
+## Measurement setup
 
-## Step 1: validate cached indexes instead of keying on System's tree (in progress)
+- `pin.sh` copies what the runs read from outside the repository into `${TMPDIR}api-graph-speed`:
+  - each adopters clone's git directory, as APFS clones, so refs, reflogs, the shallow boundary and the origin URL come along;
+  - APFS clones of `../ecosystem` and `../coverage-results`.
 
-**What.**
+  It then checks each copy's refs, HEAD and migration merge base against the original.
+  - On 2026-09-30 the 18 `migrate-darwin` tips were the ones the previous session recorded.
+  - sourcekit-lsp and swift-corelibs-xctest still have no migration commits.
+  - `../ecosystem` and `../coverage-results` had changed since 2026-09-29 noon, which is why they're pinned too.
+- `measure.sh NAME [TOOL]`:
+  - It copies the tool from a commit (`git archive`) or a directory, then runs it with the pinned inputs, a cache, builds directory and snapshot store under `.build/speed`, `BASE_REF=1b452c2` and `HEAD_REF=3f9f9e1`.
+  - regenerate.sh's output goes to `runs/NAME/regenerate.log`, each line stamped with seconds since the start. The load average is sampled every minute.
+  - `summarize.sh` writes `summary.txt`.
+  - The body is one bash block, so editing the script during a run can't change the run. An edit during the baseline broke its summary step, not the run itself, and that summary was rebuilt from the log.
+- The Sources and manifest of 3f9f9e1 and of system-next's tip, 6a9833f, are the same.
+
+## Step 1: validate cached indexes instead of keying on System's tree (committed `f12d631`; b and c pending)
+
+**What:**
 - The cache key no longer includes System's tree.
-- Each entry records the System commit and tree it was built against, System's manifest blob, and a fingerprint and name for each System declaration its references name.
-- On a different tree, an entry is revalidated if the build succeeded, the manifest is unchanged, and every recorded fingerprint is unchanged. Otherwise the migration is rebuilt, and the reason lists the changed and gone declarations.
+- Each entry records the System commit, tree and manifest it was built against, and a fingerprint and name for each System declaration its references name.
+- On another tree, an entry is revalidated when three things hold: its build succeeded, the manifest is unchanged, and every recorded fingerprint is unchanged. Otherwise the migration is rebuilt, and the reason lists what changed or is gone.
+- The old tool's entries for the same tree are reused and upgraded.
 
-**Design calls:** `scripts/method.md`, decisions 19 and 37.
-- The source is api-delta's symbol graphs, which cover the whole public API. graph.json only has the delta.
+**Design calls:** see `scripts/method.md`, decisions 19 and 37.
+- The declarations come from api-delta's symbol graphs, since graph.json holds only the delta.
 - A failed build is rebuilt whenever System moves.
-- A manifest change forces a rebuild, since a platform or product change isn't in the symbol graphs.
-- A path dependency on another migration is revalidated only if that migration is.
-- Entries are kept per tree, so alternating between two heads doesn't thrash the cache.
-- Rejected alternatives:
-  - A whole-interface hash as the default. It would rebuild every migration on almost any merge. It's kept as the `interface` option.
-  - Overload-set checks. A possible next step.
-  - Lexical name matching.
-  - Trusting the cache unchecked. That's `--builds reuse`.
+- A manifest change means a rebuild.
+- A migration whose build compiles another migration is revalidated only with it.
+- Entries are kept per tree.
+- Rejected:
+  - a whole-interface hash as the default (it's kept as `interface`);
+  - overload-set checks (a possible next step);
+  - lexical name matching;
+  - trusting the cache unchecked (`--builds reuse` does that).
 
-**Measurements:** only the baseline so far.
-- (a) with the old tool: 3f9f9e1 with eee1da2's cache and the pinned adopters. `time regenerate.sh` took 29 min 9 s wall (user 59 min 40 s, sys 12 min 34 s). The adopters step was 1570 s of that. All 18 migrations were rebuilt cold, one after another, since the tree changed.
-- The machine was shared: the load average was 11 to 19 at the start and 15 to 45 at the end, from other lanes' builds. That's why this is slower than the 23 minutes measured earlier on eee1da2.
-- The run exited 0, so it doubles as the "before" api-graph check.
-- (b), (c) and (d) haven't been measured.
+**Fixed in review this session:**
+- The reason given for a failed build.
+- A `--builds reuse` hit on an old-format entry, which has no System block.
+- Decision 36's "Rejected" line, which sat under decision 37.
 
-**Findings:**
-- The adopters' own extension members on System types, such as `s:13SystemPackage14FileDescriptorV5NIOFSE…`, carry System-prefixed USRs. System's symbol graphs don't have them, so they're treated as not System's.
-- Implicit accessor references map to their properties.
+**Measurements:**
+- (a), the old tool: 3f9f9e1, with an empty cache (every migration rebuilt, as with eee1da2's cache), on the pinned inputs.
+  - 1375.8 s wall (22 min 56 s); user 3416 s, sys 696 s.
+  - The adopters step took 1252 s of that: 18 builds, one after another, from 13 s (swift-log) to 182 s (swift-foundation).
+  - Load: 28.7 at the start. The one-minute averages, sampled each minute, had a median of 44.5 (min 23.7, max 90.7, mean 47.4).
+  - The previous session's (a), with eee1da2's cache, took 29 min 9 s at a load of 11 to 45.
+  - It exited 0, so it's also the "before" api-graph check.
+- (b) and (c): pending (denied).
 
-**Next:** see "Resume here".
+## Step 2: persistent per-adopter build directories (committed `ae57686`)
 
-## Step 2: persistent per-adopter build directories (not started)
+**What:**
+- `API_GRAPH_BUILDS` (default `.build/api-graph-builds`) holds, per migration:
+  - the export of its commit;
+  - the exports of the clones its path dependencies name;
+  - SwiftPM's scratch directory;
+  - the last build's log;
+  - `state.json`: commit, dependencies, compiler and settings, the manifest digest, the tools-version lowering, the size.
+- System's export (`system/swift-system`) is shared.
+- Re-exports and the build directory:
+  - A package is re-exported only when its commit or a dependency's commit moves, and System's export only when the head commit moves.
+  - `sync_export` stages a fresh `git archive`, rewrites the manifests in the stage, and moves in only the files that differ, dated now.
+  - The build directory starts over when the compiler, the settings or the manifest changes.
+- `read_store` skips records of files that are gone.
+- A lock makes one run at a time build in a builds directory.
+- Setting `API_GRAPH_BUILDS` empty keeps the old scratch builds.
 
-Design notes are under "Resume here", item 2.
+**Design calls:** see `method.md`, decision 38.
+- Rejected:
+  - the builds under the cache directory;
+  - fresh exports into a kept build directory (every file would look changed);
+  - `git worktree` checkouts of the clones, which would write into the clones' repositories;
+  - one export of each dependency clone shared by every package that builds it.
+- The tools-version lowering now applies only to manifests newer than the toolchain. The old code set every manifest to 6.2 when `dump-package` failed, which raised older ones too. In the baseline only WasmKit was lowered, and it declares 6.3, so today's migrations build the same.
 
-## Step 3: parallel adopter builds (not started)
+**Finding: SwiftPM doesn't plan an incremental build again when a path dependency's files come or go.**
+- Its package-structure check covers only the root packages' targets.
+- Against a System commit without a file the last build compiled, the build failed with "couldn't build …/SystemPackage.build/sources because of missing inputs".
+- A file System adds would be left out of the build silently.
+- The fix is to date the root manifests now before an incremental build, which makes SwiftPM plan again. Its check is the denied rerun.
 
-Design notes are under "Resume here", item 3.
+**Check** (`check_builds.py`, first run; the load at its start was 17.5, 26.9 and 34.7 over 1, 5 and 15 minutes). The references were the same in every build that indexed. The two build directories took 583 MB.
+
+| Build | swift-log | swift-driver |
+|---|---|---|
+| cold, kept | 16 s | 49 s |
+| again, nothing changed | 2 s | 4 s |
+| System at 3f9f9e1's first parent (6 files under `Sources` differ) | failed, missing inputs | failed, missing inputs |
+| back to 3f9f9e1 | 9 s | 12 s |
+| cold, scratch (as before) | 17 s | 50 s |
+
+## Step 3: parallel adopter builds (uncommitted; never run)
+
+**What:**
+- Every plan is made first.
+- A `ThreadPoolExecutor` then runs `API_GRAPH_ADOPTER_JOBS` workers (default 4, `--jobs`). The builds go first, longest first by the newest cache entry's `build.seconds`, with packages that have no entry ahead of them. The cached indexes follow.
+- Each worker:
+  - builds or reads one migration's index;
+  - finds its sites with `migration_sites`, the old loop body, using its own `Conditions()`;
+  - prints one line when it finishes.
+- Sites and hunks are merged in key order, so adopters.json doesn't depend on which build finishes first.
+- Index stores are read one at a time, and log lines are written whole.
+- System's export is synced before the workers start.
+
+**Design calls:** see `method.md`, decision 39.
+- Rejected:
+  - processes rather than threads;
+  - ordering the builds by the migrations' path dependencies (each build compiles its own exports);
+  - limiting each build's `-j` (not tried).
+- A known gap: the free-disk check runs at each build's start, so builds running at once can together take the disk below the minimum.
+
+## Tests
+
+- `swift build && swift test` before: XCTest ran 565 tests with 4 skipped and 0 failures; swift-testing ran 496 tests in 80 suites, all passed.
+- After, with steps 1 and 2 committed and step 3 in the working tree: the same. The lane changes no Swift.
+- Script checks:
+  - `bash -n`, `py_compile` and pyflakes. pyflakes caught a duplicated `builds` key in adopters.json's meta, which would have dropped the build directories' sizes. It was fixed before the step 2 commit, and the key is now `buildDirectories`.
+  - `sync_export` against a scratch repository. Unchanged files kept their dates. It handled changed, removed and relinked files, a file that became a directory and back, and a cleared executable bit, and it kept `Package.resolved`.
+  - `check_builds.py`, as above.
+
+## Findings
+
+- SwiftPM's incremental builds and path dependencies: see step 2.
+- The adopters' own extension members on System types, such as `s:13SystemPackage14FileDescriptorV5NIOFSE…`, carry System-prefixed USRs, but System's symbol graphs don't list them, so revalidation treats them as not System's. Implicit accessor references map to their properties.
