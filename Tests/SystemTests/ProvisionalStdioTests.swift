@@ -181,7 +181,9 @@ final class ProvisionalStdioTest: XCTestCase {
     try reader.setStatusFlags(.nonBlocking)
     let stream = try FileStream.open(writer, mode: "w")
     defer { try? stream.close() }
-    let storage = UnsafeMutableRawBufferPointer.allocate(byteCount: 64, alignment: 1)
+    // glibc writes a stream's first write straight to its descriptor
+    // when the buffer is smaller than 128 bytes.
+    let storage = UnsafeMutableRawBufferPointer.allocate(byteCount: 256, alignment: 1)
     defer { storage.deallocate() }
     try stream.setBuffering(.line, buffer: storage)
     let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 16, alignment: 1)

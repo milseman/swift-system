@@ -480,12 +480,16 @@ final class IORingTests: XCTestCase {
         var observed: [(context: UInt64, result: Int32, flags: UInt32)] = []
         // The cancel posts a completion of its own under a different context,
         // and the two may land apart, so this waits for completions until
-        // the poll's own arrives. (A catch-all ends the wait, since the
-        // compiler can crash on a pattern catch.)
-        waiting: while terminal == nil {
-            do {
-                let completion = try ring.blockingConsumeCompletion(
-                    timeout: .seconds(hangGuardSeconds))
+        // the poll's own arrives. The ring's descriptor is readable while a
+        // completion is waiting, which tryConsumeCompletion() then returns
+        // as it is: blockingConsumeCompletion() would throw the poll's
+        // result, ECANCELED, and drop its flags.
+        let ringDescriptor = FileDescriptor(rawValue: ring.ringDescriptor)
+        while terminal == nil {
+            let events = try ringDescriptor.poll(
+                for: .readable, timeout: .seconds(hangGuardSeconds))
+            if events.isEmpty { break }
+            while let completion = ring.tryConsumeCompletion() {
                 observed.append(
                     (
                         completion.context,
@@ -496,8 +500,6 @@ final class IORingTests: XCTestCase {
                 if completion.context == context {
                     terminal = (completion.result, completion.flags)
                 }
-            } catch {
-                break waiting
             }
         }
         XCTAssertNotNil(

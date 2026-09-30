@@ -60,10 +60,18 @@ private struct ProcessPriorityTests {
   @available(System 199, *)
   @Test func adjustingTheCallersPriority() async {
     await #expect(processExitsWith: .success) {
-      let before = try ProcessPriority.current(for: .process(.current))
+      #if SYSTEM_PACKAGE_DARWIN
+      let caller = ProcessPriority.Target.process(.current)
+      #else
+      // Linux's nice values are threads', and nice changes the calling
+      // thread's. The process's ID names its main thread, and this body
+      // runs on another; 0 names the calling thread.
+      let caller = ProcessPriority.Target.process(ProcessID(rawValue: 0))
+      #endif
+      let before = try ProcessPriority.current(for: caller)
       let after = try ProcessPriority.adjust(by: 3)
       guard after == min(before + 3, 19),
-        try ProcessPriority.current(for: .process(.current)) == after
+        try ProcessPriority.current(for: caller) == after
       else { exit(1) }
       // A nice value past the limit clamps to it.
       guard try ProcessPriority.adjust(by: 1000) == 19 || getuid() == 0 else { exit(2) }
