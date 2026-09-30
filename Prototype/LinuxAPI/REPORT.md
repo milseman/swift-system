@@ -10,9 +10,12 @@ interface at Swift's default API level (21), and said otherwise.
 
 ## Resume here
 
-- State: inventory (section 1) and batches 1 to 8 (sections 2.1 to 2.8)
-  committed: the small widenings in the plan are done, and Foundation's
-  `makeUniqueFile(options:permissions:)` and `FICLONE`.
+- State: inventory (section 1) and batches 1 to 9 (sections 2.1 to 2.9)
+  committed. Batch 9 made system-next's code build on Linux: SystemPackage,
+  the MemberImportVisibility probes and SystemTests all build, and the tests
+  run; the failures left are other lanes' tests (section 3). Every earlier
+  batch's Linux check (below) passed at `eabcd46`, but batch 8's pipe
+  expectation, fixed in `08c79ad`.
 - Next: the larger items (section 1.5, item 7), each its own batch, in
   adopter order: `SpawnCredentials` on Linux (Subprocess), `readPassphrase`
   on Linux (SwiftPM), inotify (TSC), `clone3` (Subprocess). Each needs a
@@ -22,16 +25,24 @@ interface at Swift's default API level (21), and said otherwise.
   and this report, not SystemSockets or its tests: socket API (vsock, UDP
   offload) goes to section 4, with a patch where one is written.
 - Before each batch: read the newest log in `../linux-logs/`; compile errors
-  in System come first. The only log so far, `6a9833f-noble-test.log`, is
-  empty: the container service wasn't running (`XPC connection error`), so
-  nothing was built.
-- After each batch: add its commands to "For the Linux run", and update this
-  section.
+  in System come first.
+- The lane runs the Linux build itself now, with the one command it's
+  allowed (the build.sh line that writes
+  `../linux-logs/linux-api-<commit>-noble-test.log` and prints the distinct
+  errors, totals and failures), optionally with `-- --filter <Suite>`. It
+  works from this sandbox.
+- After each batch: run its Linux check, record the totals under the batch,
+  and update this section.
 
 ## For the Linux run
 
 Each check is run from this worktree (`../linux-api`) at the batch's commit or
-later; a log goes to `../linux-logs/`.
+later; a log goes to `../linux-logs/`. Items 1 to 8 ran at `eabcd46`, as
+root on swift:6.2-noble arm64, in the full run
+(`../linux-logs/linux-api-eabcd46-noble-test.log`): every one passed but
+item 8's pipe check, fixed and rerun at `08c79ad`. Not run: the
+`--user 1000:1000` variants, which the lane's command doesn't take, and
+musl.
 
 1. Batch 1 (O_TMPFILE, AT_EMPTY_PATH, the I/O vector limit):
    - `Utilities/linux/build.sh test -- --filter "UnnamedTemporaryFileTests|IOVectorLimitTests"`,
@@ -581,7 +592,96 @@ Linux condition made true.
 Darwin, after: XCTest 565 tests, 4 skipped, 0 failures; swift-testing 498
 tests in 81 suites passed (no new Darwin tests).
 
+### 2.9 Batch 9: system-next's Linux build
+
+The first Linux log of this branch (`linux-api-0af1510-noble-test.log`)
+failed to build SystemPackage, in system-next's code. Layers, each a
+commit and a run:
+
+1. `51c160b`, as asked: `import CSystem` beside Glibc, Musl and Android in
+   `Timeouts.swift`, `ProcessTimer.swift` and
+   `Syscalls+TimersAndPriority.swift`, where timespec's and timeval's
+   members were CSystem's; `Syscalls+Memory.swift`'s duplicate
+   `system_fclose` removed (Syscalls+Provisional.swift's, with the mocking
+   hook, stays); `@preconcurrency import` of Glibc, Musl and Android in
+   `Constants+Provisional.swift` for the mutable `stdin`, `stdout` and
+   `stderr` (rejected: `nonisolated(unsafe)` copies). SystemPackage built;
+   the MemberImportVisibility probes didn't: a client couldn't read
+   `stat.st_atim.tv_sec` (`TimespecProbe.swift`, `EventsProbe.swift`), the
+   regression 0741e13 had fixed.
+2. `e8e4698`: a wrong theory, that the first module loaded owns the types,
+   and so importing Glibc before CSystem in `BrokenDownTime.swift`, the
+   first file in path order. Same failures; reverted in the next layer.
+3. `3b77940`: the cause. `ClockTime.swift`, new since dfe83cb (the last
+   Linux build), is the first file whose interface names timespec,
+   through `CInterop.TimeSpec`, and `CInterop+Accessors.swift` (also new)
+   declared that alias with an unqualified `timespec` in a file that
+   imports CSystem, so the first copy Swift loaded was CSystem's. At
+   dfe83cb the first was `IntervalTimer.swift`, which imports only Glibc.
+   The fix is `CInterop.SignalSet`'s: on glibc, `TimeSpec = Glibc.timespec`
+   and `TimeVal = Glibc.timeval`. The probes then built.
+4. `eabcd46`: SystemTests' four Linux-only spellings: `UTIME_NOW` and
+   `UTIME_OMIT` (expressions Swift can't import; the test compares their
+   values), glibc's `__priority_which` for `getpriority`, Darwin's
+   `closeOnExecByDefault` in a flags round trip (`createSession`
+   elsewhere), and the Glibc overlay's `timespec(Duration)`, which this
+   target doesn't find on Linux (below). Everything built and the tests
+   ran.
+5. `08c79ad`: batch 8's test, which expected `EINVAL` from a pipe source;
+   Linux checks the mounts first, so it's `EXDEV`, and the doc says the rule
+   is one mount.
+
+Layer 1's imports aren't needed once layer 3 fixes the cause: 0741e13 had
+removed such imports so that SystemPackage's own build would fail again
+if CSystem ever owned these types. They stay, as asked; the probe target
+catches a regression for clients either way. Open: removing them again.
+
+Linux (swift:6.2-noble, arm64, as root), full runs:
+
+- `eabcd46` (`../linux-logs/linux-api-eabcd46-noble-test.log`): XCTest 458
+  run, 5 skipped, 6 failures; swift-testing 459 tests in 77 suites, 7
+  issues. The failures are listed in section 3.
+- `08c79ad`, `--filter FileContentsCloneTest`: 2 XCTest tests pass.
+
+Darwin, after: XCTest 565 tests, 4 skipped, 0 failures; swift-testing 498
+tests in 81 suites passed.
+
 ## 3. Findings
+
+- **Linux test failures at `eabcd46`, in other lanes' tests** (Tests/SystemTests;
+  diagnoses from the log, not fixed here, since they're changes to those
+  tests' logic rather than gates):
+  - Running as root, which the container does and the lane's command can't
+    change, breaks tests that assume an unprivileged user: four
+    DirectoryWalk tests (`DirectoryWalkVisitsTests.swift:86` and `:149`,
+    `DirectoryWalkBoundedTests.swift:87`,
+    `DirectoryWalkRootAndStatusTests.swift:155`) expect `getuid() != 0`
+    rather than skipping as root; `ProcessPriorityTests.swift:62` expects
+    lowering the nice value to fail, which root may do.
+  - `ProcessCredentialsTests.swift:69` (`aUsersGroups`): Linux's
+    `getgroups` doesn't add the effective group, as Darwin's does, so root's
+    group 0 isn't in the list read back.
+  - `ProvisionalMathTests.swift:42`: glibc's `cbrt(-27.0)` isn't exactly
+    -3 (glibc's cbrt isn't correctly rounded).
+  - `ProcessTimerTests.swift:63`: a timer set to 100,000 s reads back
+    100,000.004 s: Linux rounds the CPU-time timers up to the scheduler
+    tick (4 ms at 250 Hz), so the read-back can exceed what was set.
+  - `ProvisionalStdioTests.swift:190` and `:196` (`testBuffering`): a
+    `setvbuf` that the test expects to throw doesn't, and a line comes out
+    unbuffered: glibc's buffering rules differ from Darwin's.
+  - `IORingTests.swift:503` (`testPollAddMultiShotRearmsAcrossEvents`): no
+    terminal completion for a cancelled multishot poll on Linux 6.18.
+- **The Glibc overlay's `timespec(Duration)` isn't found in SystemTests on
+  Linux** (likely cause, unconfirmed): several of the target's files import
+  CSystem, so this compile can take CSystem's copy of timespec, and the
+  overlay's conversion extends its own. Clients that don't import CSystem
+  aren't affected (the probes pass), but any SystemPackage file that names
+  a doubly declared C type unqualified, in a file that imports CSystem, can
+  flip that type's owner again. The durable fix is for CSystem's headers
+  not to declare glibc's types at all; one way, untried: in
+  `CSystemLinux.h`, `#pragma clang module import SwiftGlibc` under
+  `#if defined(__swift__) && defined(__GLIBC__)`, so that its includes of
+  `<sys/types.h>` and `<sys/epoll.h>` find those headers already included.
 
 - The decisions doc (`claude/system-next-decisions.md`) isn't in this
   checkout or its neighbors; only `../Claude outputs/decisions-triage.md`,
