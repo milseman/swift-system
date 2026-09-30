@@ -28,4 +28,34 @@ internal var _FORMAT_MESSAGE_FROM_SYSTEM: DWORD { 0x0000_1000 }
 @_alwaysEmitIntoClient
 internal var _FORMAT_MESSAGE_IGNORE_INSERTS: DWORD { 0x0000_0200 }
 
+// MARK: - Handles
+
+@_alwaysEmitIntoClient
+internal var _DUPLICATE_SAME_ACCESS: DWORD { 0x0000_0002 }
+
+@_alwaysEmitIntoClient
+internal var _FACILITY_WIN32: DWORD { 7 }
+
+@_alwaysEmitIntoClient
+internal var _FILE_FLAG_OVERLAPPED: DWORD { 0x4000_0000 }
+
+@_alwaysEmitIntoClient
+internal var _FILE_SYNCHRONOUS_IO_ALERT: ULONG { 0x0000_0010 }
+
+@_alwaysEmitIntoClient
+internal var _FILE_SYNCHRONOUS_IO_NONALERT: ULONG { 0x0000_0020 }
+
+@_alwaysEmitIntoClient
+internal var _FILE_TYPE_UNKNOWN: DWORD { 0x0 }
+
+@_alwaysEmitIntoClient
+internal var _HANDLE_FLAG_INHERIT: DWORD { 0x0000_0001 }
+
+@_alwaysEmitIntoClient
+internal var _SDDL_REVISION_1: DWORD { 1 }
+
+// MAX_PATH. The C runtime's own `_MAX_PATH` has the same value.
+@_alwaysEmitIntoClient
+internal var _win32MaxPath: Int { 260 }
+
 #endif // os(Windows)

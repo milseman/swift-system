@@ -10,10 +10,8 @@ kept inside `#if os(Windows)`; its tests are Windows-only and haven't run.
 Darwin, before any change (`6a9833f`): XCTest 565 tests (4 skipped), swift-testing 496 tests in 80 suites, all
 passing. After each commit: the same, since every new file compiles to nothing on Darwin.
 
-**Resume here:** SYS-0010 is done (section 1). Next is SYS-0011, file handles: the code for all seven drafts was
-written and compiled together in the harness before this commit, so each later commit adds one draft's files, its
-sections of `Win32Syscalls.swift`, `Win32Constants.swift` and `Win32TestSupport.swift`, its tests, and its CMake
-lines. The adopter ranking (part 2) comes after SYS-0016.
+**Resume here:** SYS-0010 and SYS-0011 are done (sections 1 and 2). Next is SYS-0012, the file type, then
+SYS-0013 to SYS-0016 in order, each a commit of its own; then the adopter ranking.
 
 ## How it was checked
 
@@ -69,7 +67,7 @@ lines. The adopter ranking (part 2) comes after SYS-0016.
 - **Files beyond the lane's list**: `Prototype/Win32/check-windows.sh` with `WindowsModel/`, and
   `survey-windows-imports.py` (section 8). They're the means of checking this report; nothing else uses them.
 
-## 1. SYS-0010: the Win32 namespace and Win32.Error: this commit
+## 1. SYS-0010: the Win32 namespace and Win32.Error: `bcfc566`
 
 What: `Sources/System/Win32/Win32.swift` and `Win32Error.swift`.
 - `@frozen public enum Win32 {}`, the namespace.
@@ -119,10 +117,113 @@ A Windows run must check:
 
 Next: SYS-0011.
 
+## 2. SYS-0011: Win32.FileHandle and Win32.DirectoryHandle: this commit
+
+What: `Win32FileHandle.swift` (the two owners), `Win32Open.swift` (opening, its option types, and path
+canonicalization), `Win32SecurityDescriptor.swift`, `Win32HandleOperations.swift` (duplication, reopening,
+inheritance), `Win32FileDescriptorBridge.swift`, and the *Handles* sections of `Win32Syscalls.swift` and
+`Win32Constants.swift`.
+- `FileHandle` and `DirectoryHandle`: `~Copyable`, `@frozen @safe`, owning one `HANDLE`, with
+  `@unsafe init?(unsafelyAdopting:)` (nil for `NULL` and `INVALID_HANDLE_VALUE`), `@unsafe unsafeRawHandle`,
+  `@unsafe consuming relinquish()`, `consuming close() throws(Win32.Error)` (`CloseHandle`), and a deinit that
+  closes and drops the error.
+- `FileHandle.open` and `openOrCreate` (with `OpenOrCreateResult`), and `DirectoryHandle.open`, all over
+  `CreateFileW`, with the draft's parameters and defaults: share read, write and delete; `.openExisting`; not
+  inheritable. `DirectoryHandle.open` adds `FILE_FLAG_BACKUP_SEMANTICS`, then checks `FileStandardInfo`'s
+  `Directory` and throws `notADirectory` after closing the handle.
+- `AccessMask` (generic, standard and specific rights, with both spellings of the four directory rights, and
+  `maximumAllowed`), `ShareMode`, `CreationDisposition`, `FileFlags` (with `overlapped` unavailable), and
+  `FileAttributes`.
+- `SecurityDescriptor`: owner of a `LocalAlloc`ed descriptor, `init(sddl:)` over
+  `ConvertStringSecurityDescriptorToSecurityDescriptorW` with `SDDL_REVISION_1`, adoption, and `relinquish()`.
+- `duplicate(access:inheritable:)` (`DuplicateHandle`, `DUPLICATE_SAME_ACCESS` for `nil`), `reopen` (`ReOpenFile`;
+  a directory's adds `FILE_FLAG_BACKUP_SEMANTICS`), `isInheritable()` and `setInheritable(_:)`
+  (`GetHandleInformation`, `SetHandleInformation`), on both types.
+- `FileDescriptor.withWin32HandleIfAvailable(_:)`, `FileDescriptor.init(adopting:translation:append:)` and
+  `FileDescriptor.TranslationMode`.
+
+Follows the draft:
+- Every open rejects `FILE_FLAG_OVERLAPPED` with `invalidParameter` before calling `CreateFileW`, checked on the
+  combined flags and attributes, so the bit can't arrive through `FileAttributes(rawValue:)` either; `reopen`
+  rejects it too. `init?(unsafelyAdopting:)` doesn't check, as drafted.
+- `openOrCreate` reads `ERROR_ALREADY_EXISTS` from the last error of a successful `CreateFileW`.
+- Paths: `GetFullPathNameW`, then `PathAllocCanonicalize` with `PATHCCH_ALLOW_LONG_PATHS`, as `FileDescriptor`
+  does; a path that begins with `\\?\` or `\\.\` is passed through untouched. A failed `HRESULT` becomes its
+  `FACILITY_WIN32` code, or, in another facility, its bit pattern, which Windows reads as an `HRESULT` wherever it
+  expects a system error code.
+- `withWin32HandleIfAvailable`: `_get_osfhandle` between two calls to `_set_thread_local_invalid_parameter_handler`
+  (a handler that returns, then the previous one); `nil` for -1 and -2 (`_NO_CONSOLE_FILENO`); `nil` for an
+  overlapped handle, found with `NtQueryInformationFile(FileModeInformation)` (neither `FILE_SYNCHRONOUS_IO_ALERT`
+  nor `FILE_SYNCHRONOUS_IO_NONALERT`). The lent `FileHandle` is relinquished on every path.
+- `init(adopting:)` consumes the handle and closes it on any failure; `FILE_TYPE_UNKNOWN` throws `invalidArgument`
+  before `_open_osfhandle`; `.wideText` opens binary and then calls `_setmode`.
+
+Departs from the draft, or chooses where it's open:
+- **Owned only.** The decisions doc makes unowned copyable types the main ones and owners a layer on top, with
+  Windows `HANDLE` as the named open exception. This follows the drafts: no copyable `RawFileHandle`, since a
+  closed handle's value can be reused for an overlapped handle, on which the synchronous I/O isn't memory-safe
+  (SYS-0011, *A copyable RawFileHandle beneath FileHandle*). The lent handle of `withWin32HandleIfAvailable` is the
+  nearest thing to a borrowed one. A raw type plus an owner stays possible later: the owners store a bare
+  `HANDLE`.
+- **`@unchecked Sendable`.** The draft says `Sendable`; `HANDLE` and `PSECURITY_DESCRIPTOR` are unsafe pointers,
+  which aren't, and each type owns its pointer uniquely. Clients see a `Sendable` type.
+- **NtQueryInformationFile is looked up at run time**, with `GetModuleHandleW(L"ntdll.dll")` and
+  `GetProcAddress`, as swift-subprocess and swift-foundation call ntdll: the WinSDK module map links no ntdll, and
+  linking it would mean editing `Package.swift` and CMake. The `@convention(c)` cast is right on x64 and ARM64,
+  which have one calling convention; 32-bit x86 would need `__stdcall`. A query that fails (a handle that isn't a
+  file object) also returns `nil`.
+- **Path canonicalization is new**, not `withCanonicalPathRepresentation`: that one throws untyped `Errno` and
+  canonicalizes `\\?\` paths. It also skips `PathAllocCanonicalize` for a resolved path that begins with `\\.\`,
+  as `FileDescriptor`'s does and the draft doesn't mention: a DOS device name such as `NUL` resolves to
+  `\\.\NUL`, which `PathAllocCanonicalize` would mangle. It retries `GetFullPathNameW` when the current directory
+  changes between the sizing call and the real one, where the old code throws (or traps; see section 9).
+- **Translation modes beyond `.wideText`**: any raw value other than `_O_TEXT` and `_O_BINARY` opens binary and is
+  applied with `_setmode`, so `TranslationMode(rawValue: _O_U16TEXT)` works too.
+- Small additions: an internal initializer for `OpenOrCreateResult`; if SDDL parsing succeeds without a
+  descriptor, it throws the last error.
+
+Darwin tests: unchanged. Windows tests: `Win32FileHandleTests`, one mock test among them.
+
+A Windows run must check:
+- Opening: `testOpenOrCreateReportsWhetherTheFileExisted` (existed false, then true, and `overwriteExisting`
+  truncates), `testOpenFailures` (fileNotFound, pathNotFound, fileExists, and accessDenied for a directory without
+  backup semantics), `testExclusiveShareMode` (sharingViolation), `testDefaultShareModeAllowsDeletion`,
+  `testMetadataOnlyOpen`, `testOverlappedIsRejected` (and that no file was created), `testDevicePaths` (`NUL` and
+  `\\.\NUL`), and `testLongAndVerbatimPaths` (a path longer than MAX_PATH, and a `\\?\` one).
+- `testDirectoryHandle`: a file gives notADirectory, and the handle it opened is closed (an exclusive open
+  succeeds after).
+- `testDuplicateAndReopen`, `testInheritance`, `testRelinquish`, `testAdoptionRejectsSentinels`.
+- `testSecurityDescriptor` and `testTemplateFile` (the template's hidden attribute reaches the new file, as the
+  draft says; if Windows doesn't copy it, the test is wrong, not the API).
+- The bridges: `testAdoptingIntoADescriptor`, `testTextTranslation` (`\n` written as `\r\n`),
+  `testWideTextTranslation` (`_setmode` applied: the newline expands in UTF-16), `testAppendingDescriptor`,
+  `testAdoptingAnUnclassifiedHandleFails` (an event handle gives EINVAL), `testLendingADescriptorsHandle`,
+  `testLendingFromInvalidDescriptors` (descriptors -1 and 12345 return nil and don't terminate the process), and
+  the mock test `testAdoptingPassesTheCRuntimeFlags` (`_open_osfhandle` gets `_O_BINARY | _O_APPEND`, then
+  `_setmode` gets `_O_WTEXT`).
+- Not covered by a test: `nil` for a socket descriptor (needs Winsock) and for a standard descriptor with no
+  console (-2); `HANDLE_FLAG_PROTECT_FROM_CLOSE`; `reopen` of a directory beyond opening one.
+
+Next: SYS-0012.
+
 ## 9. Findings
 
 - **Errno's `~=` must be disfavored too** (P1). Until then, even System's own code can't match a `Win32.Error`
   with an implicit-member pattern of a shared name, so it compares codes with `==`.
+- **The Windows path code traps on failure.** In `FilePathWindows.swift`, `HRESULT_CODE`, `HRESULT_FACILITY` and
+  `WIN32_FROM_HRESULT` convert a failed (negative) `HRESULT` with `DWORD(hr)`, which traps: a failing
+  `PathAllocCanonicalize`, such as for a path over 32,767 characters, crashes `FileDescriptor.open` instead of
+  throwing. `withCanonicalPathRepresentation` also forms `1..<dwLength`, which traps when `GetFullPathNameW`
+  fails and returns 0. Patch P2. swift-foundation's `WinSDK+Extensions.swift` has the same `DWORD(hr)` (and
+  shifts the wrong way for the facility).
+- **ntdll isn't linked.** The WinSDK module map has `winternl.h` but no `link "ntdll"`; System code that calls the
+  NT API must look it up, or `Package.swift` and CMake must link ntdll.
+- **The Samples stand-ins don't clash.** `Sources/Samples/Platforms/StandIns/Win32*.swift` are compiled only with
+  `SIMULATE_PLATFORMS`, and a real Windows build of the platform samples now reaches this API. In a simulated
+  build on Windows, not a configuration anyone builds (the stand-ins run over POSIX), the Samples module's own
+  `Win32` would shadow System's, and its `FileDescriptor` extensions (`TranslationMode`, `init(adopting:)`,
+  `withWin32HandleIfAvailable`) would overlap System's.
+- **`_MAX_PATH` is the UCRT's** (`stdlib.h`), so the internal constant is `_win32MaxPath`.
 
 ## 10. Patches for files outside the lane
 
@@ -160,4 +261,35 @@ private func catchesImplicitFileExists() -> Bool {
     return false
   }
 }
+```
+
+**P2, `Sources/System/FilePath/FilePathWindows.swift`: don't trap on a failed HRESULT or a failed
+`GetFullPathNameW`.** Not compiled here (the file is Windows-only); the conversions match `_win32Error(fromHRESULT:)`
+in `Win32Open.swift`, which the harness compiles.
+
+```diff
+     let dwLength: DWORD = GetFullPathNameW(self, 0, nil, nil)
++    guard dwLength > 0 else {
++      throw Errno(rawValue: _mapWindowsErrorToErrno(GetLastError()))
++    }
+     return try withUnsafeTemporaryAllocation(of: WCHAR.self, capacity: Int(dwLength)) { pwszFullPath in
+@@
+ @inline(__always)
+ fileprivate func HRESULT_CODE(_ hr: HRESULT) -> DWORD {
+-    DWORD(hr) & 0xffff
++    DWORD(bitPattern: hr) & 0xffff
+ }
+
+ @inline(__always)
+ fileprivate func HRESULT_FACILITY(_ hr: HRESULT) -> DWORD {
+-    DWORD(hr >> 16) & 0x1fff
++    (DWORD(bitPattern: hr) >> 16) & 0x1fff
+ }
+@@
+     if HRESULT_FACILITY(hr) == FACILITY_WIN32 {
+         return HRESULT_CODE(hr)
+     }
+-    return DWORD(hr)
++    return DWORD(bitPattern: hr)
+ }
 ```

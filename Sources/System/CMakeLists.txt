@@ -347,6 +347,11 @@ target_sources(SystemPackage PRIVATE
   Win32/Win32.swift
   Win32/Win32Constants.swift
   Win32/Win32Error.swift
+  Win32/Win32FileDescriptorBridge.swift
+  Win32/Win32FileHandle.swift
+  Win32/Win32HandleOperations.swift
+  Win32/Win32Open.swift
+  Win32/Win32SecurityDescriptor.swift
   Win32/Win32Syscalls.swift)
 target_link_libraries(SystemPackage PUBLIC
   CSystem)
