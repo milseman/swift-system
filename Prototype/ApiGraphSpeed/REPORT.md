@@ -1,37 +1,53 @@
 # api-graph-speed: regenerate.sh fast after a System change
 
-Lane `api-graph-speed`, base `3f9f9e1` (system-next), merged with system-next `6a9833f` at `943c479`. Owns `Utilities/api-graph/` and `Prototype/ApiGraphSpeed/`.
+Lane `api-graph-speed`, base `3f9f9e1` (system-next), merged with system-next `6a9833f` at `943c479` and `4365f83` at `2c474b4`. Owns `Utilities/api-graph/` and `Prototype/ApiGraphSpeed/`.
 
 ## Resume here
 
-Stopped 2026-09-30, waiting for permission to run: the auto mode classifier denied two of the lane's runs, and every remaining step needs runs of that kind.
+Stopped 2026-09-30, waiting for a permission rule. The auto mode classifier denied the lane's runs twice before Michael approved them in chat, and denied b1 again after he did: the classifier goes by permission rules, not by the conversation. Every remaining step needs these runs.
 
 **Committed:**
 - `943c479`: the merge of system-next `6a9833f` (coverage-2: `Utilities/adopter-coverage` and `Prototype/Status` only). It touched none of this lane's files, so it went in over the uncommitted step 1 work, without a WIP commit.
 - `f12d631`: step 1, and the measurement tools `pin.sh`, `measure.sh`, `summarize.sh` and `compare.py`.
 - `ae57686`: step 2, and `check_builds.py`.
+- `279c229`: the scratch commit for c, which rewords one comment in `Syscalls.swift`, so its Sources differ from 3f9f9e1's by that line. `cdb9e87` reverts it. The measurements keep using `279c229` as a head commit.
+- `2c474b4`: the merge of system-next `4365f83` (windows-api and others, which change Sources). It came after the scratch commit, so that commit's Sources are still 3f9f9e1's plus one comment. Its Utilities changes don't touch anything the api-graph tool reads: `derive.py`, `check.py`, `pathdeps.py`, `package.py` and `packages/` are unchanged.
+- `e4a2730`: `measure.sh NAME [COMMIT] [VAR=value ...]`. Settings go as arguments, so that every run's command starts with the script.
 
 **Uncommitted in the working tree:** step 3, parallel builds (`adopters.py`, `regenerate.sh`, `README.md`, `method.md` decision 39). It passes `bash -n`, `py_compile` and pyflakes, but it has never run.
 
-**Denied** ("Blocked by fast classifier"). I didn't retry either one in another form:
-1. The b run for step 1: `API_GRAPH_KEEP_WORK=1 Prototype/ApiGraphSpeed/measure.sh b1-step1 .build/speed/tools/step1`, with a copy of the step 1 tool in `.build`.
-2. A rerun of `python3 Prototype/ApiGraphSpeed/check_builds.py .build/speed/check-builds`, after I tightened its checks, to check the fix below.
+**Denied** ("Blocked by fast classifier"). None of these was retried in another form:
+1. `API_GRAPH_KEEP_WORK=1 Prototype/ApiGraphSpeed/measure.sh b1-step1 .build/speed/tools/step1`: the b run for step 1, with a copy of the step 1 tool in `.build`.
+2. `python3 Prototype/ApiGraphSpeed/check_builds.py .build/speed/check-builds`: the rerun that checks the step 2 fix.
+3. After the approval in chat, `Prototype/ApiGraphSpeed/measure.sh b1 f12d631`.
 
-Runs of the same kind went through earlier in the session: `measure.sh a-old HEAD` (the 23-minute baseline) and the first `check_builds.py` run. To go on, the user has to allow these runs: say so, or add a Bash permission rule for `Prototype/ApiGraphSpeed/measure.sh` and `check_builds.py`.
+Earlier in the session, `measure.sh a-old HEAD` (the 23-minute baseline) and the first `check_builds.py` run went through. The runs need allow rules, which are the user's to add, in this worktree's `.claude/settings.local.json` (ignored by git):
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "Bash(Prototype/ApiGraphSpeed/measure.sh:*)",
+      "Bash(python3 Prototype/ApiGraphSpeed/check_builds.py:*)",
+      "Bash(python3 Prototype/ApiGraphSpeed/compare.py:*)"
+    ]
+  }
+}
+```
 
 **Next, once they're allowed:**
-1. Rerun `check_builds.py DIR` and expect every check to pass. That includes the build against the other System commit, which failed before the fix.
-2. b and c for step 1:
-   - `measure.sh b1 f12d631`: 3f9f9e1 with the baseline's cache. Expect all 18 migrations reused, and their entries upgraded.
-   - Commit a scratch change to one comment under `Sources` on this branch. Run `HEAD_REF=<scratch> measure.sh c1 f12d631` and expect all 18 revalidated. Then revert the scratch commit with a new commit.
-   - Run `compare.py .build/speed/runs/a-old/out/graph.json.gz <run>/out/graph.json.gz` for each run.
+1. `python3 Prototype/ApiGraphSpeed/check_builds.py .build/speed/check-builds`. Expect every check to pass, including the build against the other System commit, which failed before the fix.
+2. b and c for step 1, then the comparison with the baseline's snapshot:
+   - `measure.sh b1 f12d631`: 3f9f9e1 with the baseline's cache. Expect all 18 reused, and their entries upgraded.
+   - `measure.sh c1 f12d631 HEAD_REF=279c229`: expect all 18 revalidated.
+   - `compare.py .build/speed/runs/a-old/out/graph.json.gz .build/speed/runs/<run>/out/graph.json.gz` for each run.
 3. Step 2:
-   - A cold run with `ae57686` and a fresh `API_GRAPH_CACHE`, which fills `.build/speed/builds`.
-   - Then `API_GRAPH_ADOPTER_VALIDATE=tree HEAD_REF=<scratch>`, a forced rebuild that is incremental. That's what step 2 buys. Report the builds directory's size.
-4. Step 3:
-   - Commit it after a run passes.
-   - (d): the cold case with `API_GRAPH_ADOPTER_JOBS=4`, then `=18`. Each needs a fresh cache and builds directory.
-   - (b) and (c) with the final tool. Then update the README's "Run time" section.
+   - `measure.sh s2-cold ae57686 API_GRAPH_CACHE=<fresh>`, which fills `.build/speed/builds`.
+   - Then `measure.sh s2-incr ae57686 API_GRAPH_CACHE=<same> API_GRAPH_ADOPTER_VALIDATE=tree HEAD_REF=279c229`: a forced rebuild, incremental. That's what step 2 buys. Report the builds directory's size.
+4. Step 3, the working tree's tool:
+   - The cold case with `API_GRAPH_ADOPTER_JOBS=4`, then `=18`, each with a fresh cache and builds directory. Commit step 3 after the first one passes.
+   - Then (b), nothing changed, and (c), `HEAD_REF=279c229`.
+   - Update the README's "Run time".
 5. At the stop, delete `.build/speed` and `${TMPDIR}api-graph-speed`. The exception is a persistent builds directory: keep it, and say where it is and how big.
 
 **Kept for those runs** (scratch; delete it all if the lane stops here):
