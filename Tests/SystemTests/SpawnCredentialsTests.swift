@@ -13,10 +13,16 @@
 // its own user and group, so the real spawns use those, and the errors
 // come from asking for more.
 
-#if SYSTEM_PACKAGE_DARWIN
+#if SYSTEM_PACKAGE_DARWIN || os(Linux)
 
 import XCTest
+#if SYSTEM_PACKAGE_DARWIN
 import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif canImport(Musl)
+import Musl
+#endif
 
 #if SYSTEM_PACKAGE
 @testable import SystemPackage
@@ -149,9 +155,11 @@ final class SpawnCredentialsTest: XCTestCase {
       }, [])
   }
 
+  #if SYSTEM_PACKAGE_DARWIN
   /// C file actions can't be read, so a close-on-exec descriptor among
   /// `fileActionDescriptors` stays open in the program unless the actions
   /// close it, or the attributes close what the actions don't install.
+  /// (On Linux the descriptors are unused, and exec closes them.)
   func testCValuesKeepTheDescriptorsTheyUse() throws {
     func spawn(
       _ arguments: [String], _ writer: FileDescriptor, closing: Bool,
@@ -175,6 +183,7 @@ final class SpawnCredentialsTest: XCTestCase {
         try spawn($0, $1, closing: false, attributes: SpawnAttributes(flags: .closeOnExecByDefault))
       }, [])
   }
+  #endif
 
   /// Arguments and an environment as C arrays, whose bytes needn't be UTF-8,
   /// with System's file actions and with C values.
@@ -209,11 +218,17 @@ final class SpawnCredentialsTest: XCTestCase {
     XCTAssertThrowsError(
       try ProcessID.spawn("/nonexistent/program", arguments: ["program"], credentials: ownCredentials)
     ) { XCTAssertEqual($0 as? Errno, .noSuchFileOrDirectory) }
-    // A file action's descriptor that isn't open.
+    // A file action's descriptor that isn't open. glibc's posix_spawn
+    // ignores closing one, so on Linux it's a duplicate's source.
+    #if SYSTEM_PACKAGE_DARWIN
+    let badAction = SpawnFileAction.close(FileDescriptor(rawValue: 1000))
+    #else
+    let badAction = SpawnFileAction.duplicate(FileDescriptor(rawValue: 1000), as: .standardInput)
+    #endif
     XCTAssertThrowsError(
       try ProcessID.spawn(
         "/bin/sh", arguments: ["sh", "-c", "exit 0"],
-        fileActions: [.close(FileDescriptor(rawValue: 1000))], credentials: ownCredentials)
+        fileActions: [badAction], credentials: ownCredentials)
     ) { XCTAssertEqual($0 as? Errno, .badFileDescriptor) }
   }
 
@@ -250,7 +265,11 @@ final class SpawnCredentialsTest: XCTestCase {
     try writer.close()
     XCTAssertEqual(try readAll(reader), "raw\n")
     XCTAssertEqual(try child.wait(), .exited(6))
+    #if SYSTEM_PACKAGE_DARWIN
     XCTAssertEqual(flags.rawValue & CShort(POSIX_SPAWN_SETEXEC), 0)
+    #else
+    _ = flags
+    #endif
 
     // Without C values.
     let other = try ProcessID.spawn(
@@ -305,4 +324,4 @@ final class SpawnCredentialsTest: XCTestCase {
   #endif
 }
 
-#endif // SYSTEM_PACKAGE_DARWIN
+#endif // SYSTEM_PACKAGE_DARWIN || os(Linux)

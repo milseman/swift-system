@@ -250,6 +250,21 @@ extern int csystem_recvmmsg(int fd, void *msgvec, unsigned int vlen, int flags, 
 // masks, which Swift can't import; see shims.c. `locale` is a locale_t,
 // untyped so that this header needn't include <locale.h> (see the top of
 // this file).
+// Starts a child that runs a program with other credentials, which
+// posix_spawn can't set, as Darwin's version in CSystemDarwin.h does, with
+// its arguments: from a thread whose own credentials it sets first (the
+// supplementary groups unless group_count is -1, the group and the user
+// unless NULL), with posix_spawn or posix_spawnp. The descriptors are
+// unused. Returns 0 and sets *pid, or returns the error number of the step
+// that failed. See shims.c and SpawnCredentials.swift.
+int csystem_spawn_with_credentials(
+    int *pid, const char *path, int search_path,
+    const void *file_actions, const void *attributes,
+    char *const arguments[], char *const environment[],
+    const unsigned int *user, const unsigned int *group,
+    int group_count, const unsigned int *groups,
+    int descriptor_count, const int *descriptors);
+
 extern double csystem_strtod_l(const char *string, char **end, void *locale);
 extern float csystem_strtof_l(const char *string, char **end, void *locale);
 int _system_get_LC_ALL_MASK(void);

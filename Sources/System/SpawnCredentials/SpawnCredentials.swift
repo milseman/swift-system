@@ -18,12 +18,23 @@
 // spawn's exec would close. A failure comes back to the parent through a
 // close-on-exec pipe.
 //
-// Only on Darwin, the one platform with POSIX_SPAWN_SETEXEC; elsewhere the
-// child would have to apply the file actions and attributes itself.
+// On Linux, which has no POSIX_SPAWN_SETEXEC, a thread's credentials are
+// its own, and a child gets those of the thread that spawns it: so the shim
+// sets the credentials of a thread of its own, with the raw system calls,
+// which change only that thread's, and spawns the program from it with
+// posix_spawn. Elsewhere, the child would have to apply the file actions
+// and attributes itself. Not on Android, whose posix_spawn is from API
+// level 28.
+
+#if SYSTEM_PACKAGE_DARWIN || os(Linux)
 
 #if SYSTEM_PACKAGE_DARWIN
-
 import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif canImport(Musl)
+import Musl
+#endif
 
 /// The credentials for a child to run with:
 /// the user and groups it runs as.
@@ -32,7 +43,7 @@ import Darwin
 /// with the calling process's credential.
 /// Changing to another user or group usually takes root privileges.
 ///
-/// - Note: Only available on Darwin.
+/// - Note: Only available on Darwin and Linux.
 @frozen
 @available(System 199, *)
 public struct SpawnCredentials: Hashable, Sendable {
@@ -116,6 +127,17 @@ extension ProcessID {
   /// that has close-on-exec set,
   /// unless an action closes it, replaces it, or lets the child inherit it.
   ///
+  /// On Linux, which has no `POSIX_SPAWN_SETEXEC`, this method doesn't fork:
+  /// Linux keeps credentials per thread, and a child gets the credentials
+  /// of the thread that spawns it,
+  /// so it sets the credentials of a thread of its own,
+  /// with the system calls that change only that thread's,
+  /// and spawns the program from it with `posix_spawn`,
+  /// which applies `fileActions` and `attributes` as it always does;
+  /// the process's other threads keep their credentials.
+  /// The close-on-exec descriptors need nothing there,
+  /// and the rest of this paragraph and the next are about Darwin.
+  ///
   /// Between the fork and the program, the child runs only C code
   /// that's safe after a fork, and none of the calling process's
   /// signal handlers.
@@ -130,8 +152,10 @@ extension ProcessID {
   /// exits or closes it.
   ///
   /// The corresponding C functions are `fork`, `setgroups`, `setgid`,
-  /// `setuid`, and `posix_spawn`.
-  /// - Note: Only available on Darwin.
+  /// `setuid`, and `posix_spawn`;
+  /// on Linux, the `setgroups`, `setresgid` and `setresuid` system calls,
+  /// on a thread of the method's own, and `posix_spawn`.
+  /// - Note: Only available on Darwin and Linux.
   @_alwaysEmitIntoClient
   public static func spawn(
     _ path: FilePath,
@@ -156,7 +180,7 @@ extension ProcessID {
   ///
   /// The corresponding C functions are `fork`, `setgroups`, `setgid`,
   /// `setuid`, and `posix_spawnp`.
-  /// - Note: Only available on Darwin.
+  /// - Note: Only available on Darwin and Linux.
   @_alwaysEmitIntoClient
   public static func spawn(
     searchingPathFor file: FilePath,
@@ -195,8 +219,10 @@ extension ProcessID {
   /// See ``spawn(_:arguments:environment:fileActions:attributes:credentials:)-(FilePath,_,_,_,_,_)``.
   ///
   /// The corresponding C functions are `fork`, `setgroups`, `setgid`,
-  /// `setuid`, and `posix_spawn`.
-  /// - Note: Only available on Darwin.
+  /// `setuid`, and `posix_spawn`;
+  /// on Linux, the `setgroups`, `setresgid` and `setresuid` system calls,
+  /// on a thread of the method's own, and `posix_spawn`.
+  /// - Note: Only available on Darwin and Linux.
   @_alwaysEmitIntoClient
   public static func spawn(
     _ path: UnsafePointer<CChar>,
@@ -254,9 +280,16 @@ extension ProcessID {
   /// even with `POSIX_SPAWN_SETEXEC`.
   /// See ``spawn(_:arguments:environment:fileActions:attributes:credentials:)-(FilePath,_,_,_,_,_)``.
   ///
+  /// On Linux, `fileActionDescriptors` is unused: `posix_spawn` applies
+  /// the actions before the program starts and closes the close-on-exec
+  /// descriptors, so the program gets the ones a spawn without credentials
+  /// would.
+  ///
   /// The corresponding C functions are `fork`, `setgroups`, `setgid`,
-  /// `setuid`, and `posix_spawn`.
-  /// - Note: Only available on Darwin.
+  /// `setuid`, and `posix_spawn`;
+  /// on Linux, the `setgroups`, `setresgid` and `setresuid` system calls,
+  /// on a thread of the method's own, and `posix_spawn`.
+  /// - Note: Only available on Darwin and Linux.
   @_alwaysEmitIntoClient
   public static func spawn(
     _ path: FilePath,
@@ -283,7 +316,7 @@ extension ProcessID {
   ///
   /// The corresponding C functions are `fork`, `setgroups`, `setgid`,
   /// `setuid`, and `posix_spawnp`.
-  /// - Note: Only available on Darwin.
+  /// - Note: Only available on Darwin and Linux.
   @_alwaysEmitIntoClient
   public static func spawn(
     searchingPathFor file: FilePath,
@@ -341,8 +374,10 @@ extension ProcessID {
   /// See ``spawn(_:arguments:environment:cFileActions:cAttributes:credentials:fileActionDescriptors:)-(FilePath,_,_,_,_,_,_)``.
   ///
   /// The corresponding C functions are `fork`, `setgroups`, `setgid`,
-  /// `setuid`, and `posix_spawn`.
-  /// - Note: Only available on Darwin.
+  /// `setuid`, and `posix_spawn`;
+  /// on Linux, the `setgroups`, `setresgid` and `setresuid` system calls,
+  /// on a thread of the method's own, and `posix_spawn`.
+  /// - Note: Only available on Darwin and Linux.
   @_alwaysEmitIntoClient
   public static func spawn(
     _ path: UnsafePointer<CChar>,
@@ -507,4 +542,4 @@ extension SpawnFileAction {
   }
 }
 
-#endif // SYSTEM_PACKAGE_DARWIN
+#endif // SYSTEM_PACKAGE_DARWIN || os(Linux)
