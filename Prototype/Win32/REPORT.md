@@ -1,4 +1,4 @@
-# The windows-api lane
+# The windows-api and windows-2 lanes
 
 System's Win32 namespace, from the drafts in `../win32-drafts/` (SYS-0010 to SYS-0016), in their order: the
 `Win32` namespace and `Win32.Error`, file handles, file types, file I/O, byte-range locking, volume information,
@@ -10,10 +10,11 @@ kept inside `#if os(Windows)`; its tests are Windows-only and haven't run.
 Darwin, before any change (`6a9833f`): XCTest 565 tests (4 skipped), swift-testing 496 tests in 80 suites, all
 passing. After each commit: the same, since every new file compiles to nothing on Darwin.
 
-**Resume here:** both parts are done: the seven drafts (sections 1 to 7) and the adopter ranking (section 8).
-Nothing is in progress. What's left needs a Windows machine or other lanes' files: a Windows run of the tests
-(each section's last list), and patches P1 and P2 (section 10). This worktree's `.build` and the lane's scratch
-output under `$TMPDIR` are deleted.
+The windows-2 lane (sections 11 on, base system-next at `4365f83`) applies patches P1 and P2 of section 10, then
+adds API for the adopters' top Windows gaps of section 8, in its order, checked the same way.
+
+**Resume here:** windows-api's parts are done (sections 1 to 10). windows-2: P1 and P2 are applied (section 11).
+Next: processes, the first gap of section 8.
 
 ## How it was checked
 
@@ -623,3 +624,30 @@ Both patches apply to `6a9833f` with `git apply`.
  }
  #endif
 ```
+
+## 11. windows-2: patches P1 and P2: `037de61`, this commit
+
+What:
+- **P1** (`037de61`), as section 10 has it: `@_disfavoredOverload` on `Errno.~=` in `Errno.swift`, and
+  `testTypedCatchOfASharedName` in `Win32ErrorTests`. `Win32.Error.~=`'s doc comment and the harness's `Errno`
+  stand-in follow.
+- **P2** (this commit), section 10's diff applied with `git apply`: in `FilePathWindows.swift`,
+  `withCanonicalPathRepresentation` throws when the sizing `GetFullPathNameW` returns 0, and `HRESULT_CODE`,
+  `HRESULT_FACILITY` and `WIN32_FROM_HRESULT` convert with `DWORD(bitPattern:)`. A new test file,
+  `Win32OverlongPathTests.swift`, opens a path of 40,007 characters through `FileDescriptor.open` and
+  `Win32.FileHandle.open`.
+
+Checks:
+- Darwin, before (`4365f83`) and after each commit: XCTest 571 tests (5 skipped), swift-testing 502 tests in 82
+  suites, all passing. `check-windows.sh` passes before and after.
+- `Prototype/Verify/V16f_error_patterns.swift`, rerun with Swift 6.2: with only Win32's operator disfavored,
+  `win32Typed` prints `other`, which is the new test failing; with both, every form matches.
+- P2's region of `FilePathWindows.swift` isn't in the harness, so it was compiled once in a scratch copy: the
+  function and the three helpers, against `WindowsModel` plus `S_OK` and System's own `ERROR_SUCCESS` overlay
+  constant. It compiles.
+
+A Windows run must check:
+- `testTypedCatchOfASharedName`.
+- `Win32OverlongPathTests`: both opens throw, and neither traps. `FileDescriptor.open` should throw ENOENT (the C
+  runtime's mapping of `ERROR_FILENAME_EXCED_RANGE`, from whichever call fails); the test checks only that it's an
+  `Errno`, and a Windows run should record which one.
