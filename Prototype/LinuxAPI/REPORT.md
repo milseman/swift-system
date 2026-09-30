@@ -109,11 +109,13 @@ musl.
      `EOPNOTSUPP`, which the test accepts after checking `EINVAL` for a
      pipe and `EBADF` for a read-only destination. To see a clone work,
      run it on Btrfs or XFS with reflinks, if there's one to mount.
-9. Batch 10 (`readPassphrase`): `--filter ReadPassphrase`, 5 XCTest tests;
-   passed at `7f99387`.
-10. Batch 11 (`FileWatcher`): `--filter FileWatcherTest`, 4 XCTest tests;
+9. Batch 9 (system-next's Linux build): the full run; section 2.9 has
+   each layer's run.
+10. Batch 10 (`readPassphrase`): `--filter ReadPassphrase`, 5 XCTest tests;
+    passed at `7f99387`.
+11. Batch 11 (`FileWatcher`): `--filter FileWatcherTest`, 4 XCTest tests;
     passed at `1c3e1c5`.
-11. Batch 12 (`SpawnCredentials`): `--filter SpawnCredentials`, 9 XCTest
+12. Batch 12 (`SpawnCredentials`): `--filter SpawnCredentials`, 9 XCTest
     tests run (1 skipped as root) at `c5fface`, among them
     `testAnotherUsersChild`, which needs root: the child ran as 1234:5678
     with group 4242, and the parent's credentials stayed its own.
