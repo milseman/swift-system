@@ -31,13 +31,21 @@ import Android
 #error("Unsupported Platform")
 #endif
 
+// A pointer to a C stream. wasi-libc's FILE is an incomplete type, which
+// Swift imports only as a pointer, OpaquePointer.
+#if os(WASI)
+@usableFromInline internal typealias _CFilePointer = OpaquePointer
+#else
+@usableFromInline internal typealias _CFilePointer = UnsafeMutablePointer<FILE>
+#endif
+
 #if ENABLE_MOCKING
 // What a mocked fopen or fdopen returns: an address no stream is at.
-internal var _mockStream: UnsafeMutablePointer<FILE> {
-  UnsafeMutablePointer<FILE>(bitPattern: 0x5710)!
+internal var _mockStream: _CFilePointer {
+  _CFilePointer(bitPattern: 0x5710)!
 }
 
-private func _mockStreamResult(_ result: CInt) -> UnsafeMutablePointer<FILE>? {
+private func _mockStreamResult(_ result: CInt) -> _CFilePointer? {
   result == -1 ? nil : _mockStream
 }
 #endif
@@ -142,7 +150,7 @@ internal func system_backtrace_symbols(
 // fopen
 internal func system_fopen(
   _ path: UnsafePointer<CChar>, _ mode: UnsafePointer<CChar>
-) -> UnsafeMutablePointer<FILE>? {
+) -> _CFilePointer? {
 #if ENABLE_MOCKING
   if mockingEnabled { return _mockStreamResult(_mock(path: path, String(cString: mode))) }
 #endif
@@ -152,7 +160,7 @@ internal func system_fopen(
 // fdopen
 internal func system_fdopen(
   _ fd: CInt, _ mode: UnsafePointer<CChar>
-) -> UnsafeMutablePointer<FILE>? {
+) -> _CFilePointer? {
 #if ENABLE_MOCKING
   if mockingEnabled { return _mockStreamResult(_mock(fd, String(cString: mode))) }
 #endif
@@ -160,7 +168,7 @@ internal func system_fdopen(
 }
 
 // fclose
-internal func system_fclose(_ stream: UnsafeMutablePointer<FILE>) -> CInt {
+internal func system_fclose(_ stream: _CFilePointer) -> CInt {
 #if ENABLE_MOCKING
   if mockingEnabled { return _mock(Int(bitPattern: stream)) }
 #endif
@@ -168,7 +176,7 @@ internal func system_fclose(_ stream: UnsafeMutablePointer<FILE>) -> CInt {
 }
 
 // fflush
-internal func system_fflush(_ stream: UnsafeMutablePointer<FILE>?) -> CInt {
+internal func system_fflush(_ stream: _CFilePointer?) -> CInt {
 #if ENABLE_MOCKING
   if mockingEnabled { return _mock(stream.map { Int(bitPattern: $0) } ?? 0) }
 #endif
@@ -177,7 +185,7 @@ internal func system_fflush(_ stream: UnsafeMutablePointer<FILE>?) -> CInt {
 
 // fwrite: the count of bytes written, which is short only after an error.
 internal func system_fwrite(
-  _ bytes: UnsafeRawPointer?, _ count: Int, _ stream: UnsafeMutablePointer<FILE>
+  _ bytes: UnsafeRawPointer?, _ count: Int, _ stream: _CFilePointer
 ) -> Int {
 #if ENABLE_MOCKING
   if mockingEnabled { return _mockInt(Int(bitPattern: stream), count) == -1 ? 0 : count }
@@ -187,7 +195,7 @@ internal func system_fwrite(
 
 // fputs
 internal func system_fputs(
-  _ string: UnsafePointer<CChar>, _ stream: UnsafeMutablePointer<FILE>
+  _ string: UnsafePointer<CChar>, _ stream: _CFilePointer
 ) -> CInt {
 #if ENABLE_MOCKING
   if mockingEnabled { return _mock(Int(bitPattern: stream), String(cString: string)) == -1 ? EOF : 0 }
@@ -196,7 +204,7 @@ internal func system_fputs(
 }
 
 // fputc
-internal func system_fputc(_ byte: CInt, _ stream: UnsafeMutablePointer<FILE>) -> CInt {
+internal func system_fputc(_ byte: CInt, _ stream: _CFilePointer) -> CInt {
 #if ENABLE_MOCKING
   if mockingEnabled { return _mock(Int(bitPattern: stream), byte) == -1 ? EOF : byte }
 #endif
@@ -205,7 +213,7 @@ internal func system_fputc(_ byte: CInt, _ stream: UnsafeMutablePointer<FILE>) -
 
 // fread: the count of bytes read, which is short at the end or after an error.
 internal func system_fread(
-  _ bytes: UnsafeMutableRawPointer?, _ count: Int, _ stream: UnsafeMutablePointer<FILE>
+  _ bytes: UnsafeMutableRawPointer?, _ count: Int, _ stream: _CFilePointer
 ) -> Int {
 #if ENABLE_MOCKING
   if mockingEnabled { return _mockInt(Int(bitPattern: stream), count) == -1 ? 0 : count }
@@ -218,7 +226,7 @@ internal func system_fread(
 internal func system_getline(
   _ line: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>,
   _ capacity: UnsafeMutablePointer<Int>,
-  _ stream: UnsafeMutablePointer<FILE>
+  _ stream: _CFilePointer
 ) -> Int {
 #if ENABLE_MOCKING
   if mockingEnabled { return _mockInt(Int(bitPattern: stream)) }
@@ -227,7 +235,7 @@ internal func system_getline(
 }
 
 // fileno
-internal func system_fileno(_ stream: UnsafeMutablePointer<FILE>) -> CInt {
+internal func system_fileno(_ stream: _CFilePointer) -> CInt {
 #if ENABLE_MOCKING
   if mockingEnabled { return _mock(Int(bitPattern: stream)) }
 #endif
@@ -236,7 +244,7 @@ internal func system_fileno(_ stream: UnsafeMutablePointer<FILE>) -> CInt {
 
 // setvbuf
 internal func system_setvbuf(
-  _ stream: UnsafeMutablePointer<FILE>,
+  _ stream: _CFilePointer,
   _ buffer: UnsafeMutablePointer<CChar>?,
   _ mode: CInt,
   _ size: Int
@@ -253,33 +261,33 @@ internal func system_setvbuf(
 // is a placeholder that they'd touch; those tests don't call them.
 
 // ferror
-internal func system_ferror(_ stream: UnsafeMutablePointer<FILE>) -> CInt {
+internal func system_ferror(_ stream: _CFilePointer) -> CInt {
   ferror(stream)
 }
 
 // feof
-internal func system_feof(_ stream: UnsafeMutablePointer<FILE>) -> CInt {
+internal func system_feof(_ stream: _CFilePointer) -> CInt {
   feof(stream)
 }
 
 // clearerr
-internal func system_clearerr(_ stream: UnsafeMutablePointer<FILE>) {
+internal func system_clearerr(_ stream: _CFilePointer) {
   clearerr(stream)
 }
 
 #if !os(WASI)
 // flockfile
-internal func system_flockfile(_ stream: UnsafeMutablePointer<FILE>) {
+internal func system_flockfile(_ stream: _CFilePointer) {
   flockfile(stream)
 }
 
 // funlockfile
-internal func system_funlockfile(_ stream: UnsafeMutablePointer<FILE>) {
+internal func system_funlockfile(_ stream: _CFilePointer) {
   funlockfile(stream)
 }
 
 // ftrylockfile
-internal func system_ftrylockfile(_ stream: UnsafeMutablePointer<FILE>) -> CInt {
+internal func system_ftrylockfile(_ stream: _CFilePointer) -> CInt {
   ftrylockfile(stream)
 }
 #endif // !os(WASI)

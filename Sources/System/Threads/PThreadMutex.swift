@@ -439,6 +439,8 @@ extension PThread.Mutex {
     /// POSIX limits a ceiling to the priorities of
     /// ``PThread/SchedulingPolicy/fifo``, and glibc rejects any other
     /// with ``Errno/invalidArgument``.
+    /// Musl has no priority ceilings: a mutex with one fails to initialize
+    /// with ``Errno/notSupported``.
     ///
     /// The corresponding C function is `pthread_mutexattr_setprioceiling`.
     /// - Note: Not available on Android.
