@@ -11,17 +11,23 @@
 
 // Must import here to use C's struct tm in @usableFromInline API;
 // and CSystem on Linux, in case its headers declare tm's members.
+//
+// The C library first: this is SystemPackage's first file, and the first
+// module Swift loads owns the C types that it and CSystem's headers both
+// declare, such as timespec and timeval. If that's CSystem, their members
+// are hidden from clients, which don't import it (MemberImportVisibility;
+// Tests/MemberImportVisibility/TimespecProbe.swift).
 #if SYSTEM_PACKAGE_DARWIN
 import Darwin
 #elseif canImport(Glibc)
-import CSystem
 import Glibc
+import CSystem
 #elseif canImport(Musl)
-import CSystem
 import Musl
-#elseif canImport(Android)
 import CSystem
+#elseif canImport(Android)
 import Android
+import CSystem
 #else
 #error("Unsupported Platform")
 #endif
