@@ -351,6 +351,7 @@ target_sources(SystemPackage PRIVATE
   Win32/Win32FileHandle.swift
   Win32/Win32FileIO.swift
   Win32/Win32FileType.swift
+  Win32/Win32FinalPath.swift
   Win32/Win32HandleOperations.swift
   Win32/Win32Locking.swift
   Win32/Win32Open.swift

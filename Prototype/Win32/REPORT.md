@@ -10,8 +10,8 @@ kept inside `#if os(Windows)`; its tests are Windows-only and haven't run.
 Darwin, before any change (`6a9833f`): XCTest 565 tests (4 skipped), swift-testing 496 tests in 80 suites, all
 passing. After each commit: the same, since every new file compiles to nothing on Darwin.
 
-**Resume here:** SYS-0010 to SYS-0015 are done (sections 1 to 6). Next is SYS-0016, the final path name; then the
-adopter ranking.
+**Resume here:** all seven drafts are done (sections 1 to 7). Next is part 2, the adopter ranking, with
+`survey-windows-imports.py`; its results go in section 8.
 
 ## How it was checked
 
@@ -313,7 +313,7 @@ shows); `testNegativeBoundsAreRejected` (all five forms); `testRangesClosedAtThe
 
 Next: SYS-0015.
 
-## 6. SYS-0015: volume information: this commit
+## 6. SYS-0015: volume information: `b689377`
 
 What: `Win32VolumeInformation.swift`: `Win32.VolumeInformation` (`name`, `fileSystemName`, `serialNumber`,
 `maximumComponentLength`, `flags`), `Win32.FileSystemFlags` (30 flags, in bit order), and `volumeInformation()`
@@ -330,6 +330,23 @@ length) equal to its directory's, which is opened with no access rights; a pipe 
 throwing `invalidFunction`. The last two are the draft's observations.
 
 Next: SYS-0016.
+
+## 7. SYS-0016: the final path name: this commit
+
+What: `Win32FinalPath.swift`: `Win32.VolumeNameFormat` (`dos`, `guid`, `nt`, `volumeRelative`) and
+`finalPath(volumeName:normalized:)` on both handle types, over `GetFinalPathNameByHandleW`, starting with a stack
+buffer of `MAX_PATH + 1` characters and retrying at the size it reports.
+
+Follows the draft exactly: `normalized` is a `Bool` (`FILE_NAME_NORMALIZED` or `FILE_NAME_OPENED`), and the path
+comes back as Windows reports it, with its `\\?\` prefix.
+
+Darwin tests: unchanged. Windows tests: `Win32FinalPathTests`.
+
+A Windows run must check: each format's shape (`\\?\`, `\Device\`, `\\?\Volume{`, and a volume-relative path);
+`normalized` against the opened name's case; a file renamed while open; a directory; a path longer than MAX_PATH,
+which needs the retry; and a pipe (`badPathName`) and `NUL` (`invalidParameter`), the draft's observations.
+
+Next: the adopter ranking.
 
 ## 9. Findings
 

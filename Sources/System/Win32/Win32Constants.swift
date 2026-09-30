@@ -71,4 +71,12 @@ internal var _LOCKFILE_EXCLUSIVE_LOCK: DWORD { 0x0000_0002 }
 @_alwaysEmitIntoClient
 internal var _LOCKFILE_FAIL_IMMEDIATELY: DWORD { 0x0000_0001 }
 
+// MARK: - Final path name
+
+@_alwaysEmitIntoClient
+internal var _FILE_NAME_NORMALIZED: DWORD { 0x0 }
+
+@_alwaysEmitIntoClient
+internal var _FILE_NAME_OPENED: DWORD { 0x8 }
+
 #endif // os(Windows)

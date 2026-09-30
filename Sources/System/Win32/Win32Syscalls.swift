@@ -265,4 +265,15 @@ internal func system_GetVolumeInformationByHandleW(
     nFileSystemNameSize)
 }
 
+// MARK: - Final path name
+
+internal func system_GetFinalPathNameByHandleW(
+  _ hFile: HANDLE,
+  _ lpszFilePath: UnsafeMutablePointer<WCHAR>?,
+  _ cchFilePath: DWORD,
+  _ dwFlags: DWORD
+) -> DWORD {
+  GetFinalPathNameByHandleW(hFile, lpszFilePath, cchFilePath, dwFlags)
+}
+
 #endif // os(Windows)
