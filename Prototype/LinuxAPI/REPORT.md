@@ -10,16 +10,17 @@ interface at Swift's default API level (21), and said otherwise.
 
 ## Resume here
 
-- State: inventory (section 1) and batches 1 to 10 (sections 2.1 to 2.10)
+- State: inventory (section 1) and batches 1 to 11 (sections 2.1 to 2.11)
   committed. Batch 9 made system-next's code build on Linux: SystemPackage,
   the MemberImportVisibility probes and SystemTests all build, and the tests
   run; the failures left are other lanes' tests (section 3). Every earlier
   batch's Linux check (below) passed at `eabcd46`, but batch 8's pipe
   expectation, fixed in `08c79ad`.
-- Next: inotify (TSC), then `clone3` (Subprocess). `SpawnCredentials` on
-  Linux (Subprocess) is designed but left (section 2.10's note):
-  its C file actions can't be replayed on glibc. `readPassphrase` is done
-  (2.10). `copy_file_range` turned out not to be needed on Linux (2.8).
+- Next: `clone3` with `CLONE_PIDFD` (Subprocess), then the section 4
+  needs, or a new pass over section 1.4 against the adopters' current
+  branches. `SpawnCredentials` on Linux (Subprocess) is designed but left
+  (section 2.10's note). `copy_file_range` turned out not to be needed on
+  Linux (2.8).
 - This lane owns `Sources/System/**`, `Sources/CSystem`, `Tests/SystemTests`
   and this report, not SystemSockets or its tests: socket API (vsock, UDP
   offload) goes to section 4, with a patch where one is written.
@@ -110,6 +111,8 @@ musl.
      run it on Btrfs or XFS with reflinks, if there's one to mount.
 9. Batch 10 (`readPassphrase`): `--filter ReadPassphrase`, 5 XCTest tests;
    passed at `7f99387`.
+10. Batch 11 (`FileWatcher`): `--filter FileWatcherTest`, 4 XCTest tests;
+    passed at `1c3e1c5`.
 
 ## Baseline (Darwin)
 
@@ -256,8 +259,8 @@ In the ranking's order, each small enough to review alone:
 6. swift-sdk-generator: the three default pthread initializers; `O_SYNC`
    and `O_DSYNC` (done, section 2.6).
 7. Larger, later: `readPassphrase` on Linux (SwiftPM; done, section 2.10),
-   `SpawnCredentials` on Linux (Subprocess; left, 2.10), inotify (TSC),
-   `FICLONE` (Foundation; done, 2.8), `clone3` (Subprocess).
+   `SpawnCredentials` on Linux (Subprocess; left, 2.10), inotify (TSC; done,
+   2.11), `FICLONE` (Foundation; done, 2.8), `clone3` (Subprocess).
 
 ## 2. Batches
 
@@ -700,6 +703,52 @@ Tests:
 
 Linux (`../linux-logs/linux-api-7f99387-noble-test.log`,
 `--filter ReadPassphrase`): 5 XCTest tests pass.
+
+Darwin, after: XCTest 565 tests, 4 skipped, 0 failures; swift-testing 498
+tests in 81 suites passed.
+
+### 2.11 Batch 11: `FileWatcher`, an owned inotify instance (swift-tools-support-core)
+
+- `FileWatcher` (`Events/FileWatcher.swift`, Linux and Android), on
+  `EventPoll`'s pattern: a noncopyable owner of an inotify descriptor, from
+  `inotify_init1` (`Options`: `nonBlocking`, `closeOnExec`) or
+  `init(taking:)`, with `fileDescriptor`, `close()` and `relinquish()`;
+  `add(_:events:)` (`inotify_add_watch`, `FilePath` and C string forms)
+  returning a `Watch`; `remove(_:)` (`inotify_rm_watch`); and
+  `read(into:retryOnInterrupt:)` and `read(retryOnInterrupt:)`, which parse
+  the records into `Event`s: the watch, the `Mask`, the cookie, and the name
+  as a `FilePath.Component`. `Mask` holds the events (`created`, `movedFrom`,
+  ...; `closed`, `moved` and `allEvents` as unions, since glibc's
+  `IN_ALL_EVENTS` is an OR Swift can't import), the flags events carry
+  (`ignored`, `isDirectory`, `queueOverflowed`, `unmounted`), and a watch's
+  options (`onlyDirectory`, `noFollow`, `excludeUnlinked`, `addToExisting`,
+  `oneShot`), as C's mask and `EventPoll.Mask` do.
+  `minimumReadByteCount` is a header and `NAME_MAX` plus one.
+- TSC's `FSWatch.swift` calls `inotify_init1`, `inotify_add_watch` and reads
+  `inotify_event`s on Linux, waiting with `select`; with this and
+  `FileDescriptor.poll(for:timeout:)` it needs neither.
+- Every Linux C library's module includes `<sys/inotify.h>`, so no shims.
+  The records are parsed by offset, with `inotify_event`'s 16-byte header
+  loaded unaligned; the name ends at its first zero byte.
+- Design calls, open: the name (`FileWatcher`; rejected `InotifyDescriptor`,
+  a C name, and `FileSystemWatcher`, which SwiftPM and sourcekit-lsp use for
+  the LSP type); one `Mask` for events, flags and options, as C and
+  `EventPoll` have it, rather than three types; `IN_MASK_CREATE` (Linux
+  4.18) left out, since older headers lack it; the allocating `read()`
+  uses a 4 KiB temporary buffer.
+
+Tests: `Tests/SystemTests/FileWatcherTests.swift` (Linux and Android,
+XCTest): the three calls' mocks, through the internal static forms so that
+no watcher owns a made-up descriptor; the mask's unions; a directory's
+events in order (create, a move's two halves with one cookie, a
+subdirectory with `isDirectory`, a delete, `ignored` after `remove`, and
+`EINVAL` for removing it again); a file's own events with no name,
+`ENOTDIR` for `onlyDirectory`, and `EINVAL` for a buffer too small for the
+next event. The kernel queues an event during the call that causes it, so
+each nonblocking read right after has it.
+
+Linux (`../linux-logs/linux-api-1c3e1c5-noble-test.log`,
+`--filter FileWatcherTest`): 4 XCTest tests pass, on the first build.
 
 Darwin, after: XCTest 565 tests, 4 skipped, 0 failures; swift-testing 498
 tests in 81 suites passed.
