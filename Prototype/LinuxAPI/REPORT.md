@@ -804,6 +804,11 @@ Linux (`../linux-logs/linux-api-c5fface-noble-test.log`,
 Darwin, after: XCTest 566 tests, 5 skipped (the root-only test), 0
 failures; swift-testing 498 tests in 81 suites passed.
 
+Full Linux run after batch 12 (`../linux-logs/linux-api-f15986b-noble-test.log`):
+XCTest 476 run, 6 skipped, 5 failures; swift-testing 459 tests in 77
+suites, 7 issues. The failures are section 3's, as after batch 9; this
+lane's tests all pass.
+
 ## 3. Findings
 
 - **`clone3` isn't wrapped.** Subprocess's Linux shim calls it with
