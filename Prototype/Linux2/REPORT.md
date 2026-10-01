@@ -6,28 +6,37 @@ with logs in `../linux-logs/linux-2-<commit>-<what>.log`.
 
 ## Resume here
 
-- State: steps 1 to 4 are done but swift-foundation (sections 1 to 4). swift-nio's `migrate-unix`
-  (`cc819b01`) is built and tested on Linux (section 4.1); what fails is under "For unix-adopt", with the
-  tested fixes in Appendix A. swift-foundation's `bde165fd` needs a toolchain newer than the 6.3 image
-  (section 4.2): a nightly image's pull was refused, and waits for Michael. The other unix-adopt worktrees
-  have no commits yet. Nothing is uncommitted; system-next hasn't moved from `4365f83`.
-- At `3ac2c29`: Darwin, XCTest 571 tests, 5 skipped, 0 failures; swift-testing 502 tests in 82 suites passed.
-  Linux as root (`linux-2-3ac2c29-root.log`), XCTest 481 tests, 6 skipped, 0 failures; swift-testing 463
-  tests in 78 suites passed; as 1000:1000 (`linux-2-3ac2c29-user.log`), 481 tests, 4 skipped, 0 failures,
-  and 463 tests in 78 suites passed.
-- Next: Foundation, if Michael allows a newer image: a scratch copy of the commit
-  (`git -C ../adopters-unix/swift-foundation archive bde165fd`, under `.build/foundation-scratch/adopters-unix/swift-foundation`,
-  with an empty `.build/foundation-scratch/swift-system`), then `Utilities/linux/build.sh --quiet --image
-  <image> --root .build/foundation-scratch --dir adopters-unix/swift-foundation --mount .:swift-system --log
-  <absolute log path> build-tests`, then section 2.2's tests there; then WasmKit and the rest as unix-adopt
-  commits them.
-- This lane's scratch paths (`.build`, the NIO and Foundation copies, the probe package) are deleted.
-- System's Linux run: `container system start >/dev/null 2>&1; Utilities/linux/build.sh --quiet --log
-  ../linux-logs/linux-2-$(git rev-parse --short HEAD)-<what>.log test`, with `--user 1000:1000` for the
-  unprivileged run and `-- --filter <Suite>` to narrow. Commit first: the log is named for HEAD.
-- An adopter's run (section 3): `--root .. --dir adopters-unix/<pkg>`, with `--scratch` and `--log` outside
-  the adopter's worktree, and `--mount .:swift-system` to build it against this worktree.
-- Merge system-next whenever it moves; delete this lane's scratch paths when done.
+- Done (converging, 2026-10-01):
+  - Step 1, the Linux run clean as root and as 1000:1000: `1173838` (section 1).
+  - Step 2, O1 on Linux: no change needed (section 2).
+  - Step 3, `build.sh --root/--dir/--mount`: `cf4ef08` (section 3).
+  - Step 4, unix-adopt on Linux: swift-nio's `migrate-unix` `cc819b01` built and tested in a scratch copy with
+    six fixes (section 4.1, "For unix-adopt", Appendix A); `CInterop.EPollEvent`'s doc `67a8a8d`; README's
+    Linux pitfalls and the report `3ac2c29`. The CSystem module-import experiment, `440eac5`, `5ea8bef` and
+    `54f5258`, is reverted by `c259458`, `9f95920` and `9f41cfd` (section 4.3).
+  - system-next `70e1766` (with this lane's `3ac2c29`, other-platforms and windows-2) merged: `1ce85c1`.
+- In progress: nothing; nothing is uncommitted.
+- Next step: swift-foundation's `bde165fd` on Linux (section 4.2), which needs a toolchain newer than the 6.3
+  image; pulling `swiftlang/swift:nightly-main-noble` was refused by the permission classifier, so it waits for
+  Michael (an allow rule such as `Bash(Utilities/linux/build.sh --quiet --image swiftlang/swift:nightly-main-noble:*)`).
+  Then: a scratch copy (`git -C ../adopters-unix/swift-foundation archive bde165fd` into
+  `.build/foundation-scratch/adopters-unix/swift-foundation`, and an empty `.build/foundation-scratch/swift-system`),
+  `Utilities/linux/build.sh --quiet --image <image> --root .build/foundation-scratch --dir
+  adopters-unix/swift-foundation --mount .:swift-system --log <absolute path> build-tests`, then unix-adopt's
+  section 2.2 tests; then WasmKit and the others as unix-adopt commits them (none had commits on 2026-10-01).
+- Notes for other lanes: "For unix-adopt" (swift-nio's six fixes, Appendix A's patch) and "Needs outside this
+  lane's files" (demos' `TerminalSize.swift` reading `winsize`'s fields; a MemberImportVisibility probe with a
+  C module of its own).
+- Latest tests, at `1ce85c1`: Darwin, XCTest 572 tests, 5 skipped, 0 failures; swift-testing 502 tests in 82
+  suites passed. Linux as root (`linux-2-1ce85c1-root.log`), XCTest 482 tests, 6 skipped, 0 failures;
+  swift-testing 463 tests in 78 suites passed; as 1000:1000 (`linux-2-1ce85c1-user.log`), 482 tests, 4 skipped,
+  0 failures, and 463 tests in 78 suites passed.
+- Scratch: this lane's `.build` (and with it the NIO and Foundation copies and the probe package) is deleted;
+  the logs stay in `../linux-logs/linux-2-*`.
+- How to run: System's Linux run is `container system start >/dev/null 2>&1; Utilities/linux/build.sh --quiet
+  --log ../linux-logs/linux-2-$(git rev-parse --short HEAD)-<what>.log test`, with `--user 1000:1000` and `--
+  --filter <Suite>`; commit first, since the log is named for HEAD. An adopter's run is `--root .. --dir
+  adopters-unix/<pkg>`, with `--scratch` and `--log` outside its worktree and `--mount .:swift-system`.
 
 ## For unix-adopt
 
