@@ -11,10 +11,11 @@ other lanes'.
 - State: step 1 (builds) done: `Utilities/linux/cross.sh` builds for Musl and
   WASI (section 1). Step 2: SystemPackage builds for Musl (aarch64 and x86_64)
   and WASI, and SystemTests for WASI (section 2); the rest of the package
-  needs other lanes' files (section 5).
-- Blocked: Android needs an NDK, which this lane can't fetch (section 1.3).
-- Next: step 2 for FreeBSD and OpenBSD from their headers, then step 3, the
-  adopters' Musl, Bionic and WASILibc names (section 3).
+  needs other lanes' files (section 5). The terminal API's storage and flags
+  are written for Android, FreeBSD and OpenBSD from their headers (2.3).
+- Blocked: Android needs an NDK, which this lane can't fetch (section 1.3):
+  waiting for Michael to put one in `../linux-logs/cross/ndk/`.
+- Next: step 3, the adopters' Musl, Bionic and WASILibc names (section 3).
 - Checks: `swift build && swift test` on Darwin; `Utilities/linux/cross.sh musl`,
   `cross.sh musl build -- --target SystemPackage`, and
   `cross.sh wasi build -- --target SystemTests`.
@@ -74,9 +75,13 @@ blocks on the host. Fetching it in the container instead was denied by the
 auto mode classifier, so `cross.sh` doesn't download an NDK: it takes
 `android-ndk-r27d-linux.zip`, or the directory it unzips to, from
 `../linux-logs/cross/ndk/`, unzips the sysroot, the clang resources and
-`source.properties` from it, and runs the setup script. Until an NDK is
-there, Android is handled as the BSDs are: fixes only where headers make
-them certain.
+`source.properties` from it, and runs the setup script. Asked to retry, the
+classifier also denied adding an opt-in `--fetch-ndk` to the script, so the
+NDK has to come from outside the lane: `android-ndk-r27d-linux.zip` from
+developer.android.com in `../linux-logs/cross/ndk/`, then
+`Utilities/linux/cross.sh android install` and `cross.sh android`. Until
+then, Android is handled as the BSDs are: fixes only where headers make them
+certain.
 
 ### 1.4 FreeBSD and OpenBSD
 
@@ -121,6 +126,33 @@ builds for Musl and `system-samples` links statically.
   with `CLOCK_REALTIME` (a pointer macro Swift can't import on WASI) are
   gated off WASI.
 
+### 2.3 Android, FreeBSD and OpenBSD: the terminal API
+
+The terminal API compiled only on Darwin and Linux: `ControlCharacters`'
+storage, a tuple that `TerminalAttributes` rebinds `termios`'s `c_cc` to, was
+written out for those two. From the headers (FreeBSD's `sys/_termios.h`,
+OpenBSD's `sys/termios.h`, both read through the GitHub API; the kernel's
+`asm-generic/termbits.h`, which Bionic's `<termios.h>` includes):
+
+- **Storage**: NCCS is 20 on FreeBSD and OpenBSD, as on Darwin, and 19 in the
+  kernel's `termios`, which Bionic's is (glibc's and Musl's have 32).
+  `testControlCharactersMatchTheCArray` checks the tuple against `c_cc` on
+  every platform, so a wrong count fails a test rather than corrupting memory.
+- **Flags**: the `os(Linux)` ones are on Android too, since the kernel defines
+  them all; the `canImport(Darwin)` ones (now `SYSTEM_PACKAGE_DARWIN`) are on
+  FreeBSD and OpenBSD, which define the same BSD names, but for OpenBSD's
+  missing `CDTR_IFLOW`, `CDSR_OFLOW` and `CCAR_OFLOW`. The BSDs have no fill
+  characters or delays but the tab's, so `OFILL`, `OFDEL`, the NL, CR, BS, VT
+  and FF delays, `TAB1` and `TAB2` are off there, and OpenBSD has no `IUTF8`.
+- **Window size**: FreeBSD and OpenBSD get the `TIOCGWINSZ` and `TIOCSWINSZ`
+  shims, declared in `CSystemShared.h` with untyped pointers.
+- `_POSIX_VDISABLE` was already right everywhere (`Constants.swift`).
+
+Left for the BSDs, unverified without a compiler: the rest of System. Each
+header-checked name above compiles only if everything around it does.
+Possible widenings: FreeBSD defines most of the Linux-only high baud rates
+(`B460800` and up, but `B576000` and `B1152000`), and OpenBSD has `OLCUC`.
+
 ## 3. The adopters' needs
 
 Not started. From `../adopters-unix/INVENTORY.md`, the names whose class is
@@ -137,6 +169,10 @@ the allocator (done, 2.2), clocks, directory streams, `getenv`, `getuid`,
   `statAccessors()` fails with `ENOENT` and `permissions()` with `ENOSYS`
   (wasi-libc's `fchmod`), and then WasmKit itself exits with "Error: Bad file
   descriptor" during the `Stat` suite, ending the run.
+- **A stale build description**: after `swift build --target A` on a scratch
+  path, `--target B` can fail with "No target named
+  'B-<triple>-debug.module' in build description"; deleting
+  `<triple>/debug/description.json` there makes SwiftPM plan again.
 - **Declared but not defined**: musl and wasi-libc both declare functions
   their libraries lack, so a wrapper compiles and fails only at an
   executable's link. `nm` on the SDKs' `libc.a` in the cache checks a name.
