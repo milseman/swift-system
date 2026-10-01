@@ -7,7 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-#if !os(Windows) && !os(WASI)
+#if !os(Windows)
 
 // Must import here to use C's struct tm in @usableFromInline API;
 // and CSystem on Linux, in case its headers declare tm's members.
@@ -19,6 +19,8 @@ import Glibc
 #elseif canImport(Musl)
 import CSystem
 import Musl
+#elseif canImport(WASILibc)
+import WASILibc
 #elseif canImport(Android)
 import CSystem
 import Android
@@ -327,6 +329,7 @@ extension BrokenDownTime {
   /// so that it uses the `TZ` environment variable's current value
   /// on every platform, as `mktime` does;
   /// glibc's `localtime_r` otherwise reads it only once.
+  /// WASI has no time zones: its local time is UTC.
   ///
   /// The corresponding C functions are `gmtime_r` and `localtime_r`.
   @_alwaysEmitIntoClient
@@ -635,4 +638,4 @@ private func _setTimeZoneAbbreviation(
   #endif
 }
 
-#endif // !os(Windows) && !os(WASI)
+#endif // !os(Windows)

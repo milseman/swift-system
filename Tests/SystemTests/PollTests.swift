@@ -7,7 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-#if !os(Windows) && !os(WASI)
+#if !os(Windows)
 
 import XCTest
 
@@ -17,6 +17,8 @@ import Darwin
 import Glibc
 #elseif canImport(Musl)
 import Musl
+#elseif canImport(WASILibc)
+import WASILibc
 #elseif canImport(Android)
 import Android
 #else
@@ -32,6 +34,7 @@ import Android
 @available(System 199, *)
 @available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *)
 final class PollTests: XCTestCase {
+  #if !os(WASI) // WASI has no pipe
   func testReadableAfterWrite() throws {
     let pipe = try OwnedFD.pipe()
     let readEnd = pipe.readEnd.fileDescriptor
@@ -55,12 +58,15 @@ final class PollTests: XCTestCase {
     XCTAssertTrue(events.contains(.readable), "data remains to read")
   }
 
+  #endif // !os(WASI)
+
   func testInvalidDescriptor() throws {
     // No descriptor can be this high, so it's never open.
     let notOpen = FileDescriptor(rawValue: .max)
     XCTAssertEqual(try notOpen.poll(for: .readable, timeout: .zero), .invalidDescriptor)
   }
 
+  #if !os(WASI) // WASI has no pipe
   func testEntries() throws {
     let first = try OwnedFD.pipe()
     let second = try OwnedFD.pipe()
@@ -87,8 +93,14 @@ final class PollTests: XCTestCase {
     XCTAssertGreaterThanOrEqual(ContinuousClock.now - start, .milliseconds(15))
   }
 
+  #endif // !os(WASI)
+
   func testEntryEquality() {
+    #if os(WASI) // WASI has no priority data
+    let entry = FileDescriptor.PollEntry(.standardInput, events: [.readable, .writable])
+    #else
     let entry = FileDescriptor.PollEntry(.standardInput, events: [.readable, .priority])
+    #endif
     XCTAssertEqual(entry, FileDescriptor.PollEntry(rawValue: entry.rawValue))
     var other = entry
     other.returnedEvents = .hangUp
@@ -106,6 +118,7 @@ final class PollTests: XCTestCase {
   }
 
   #if ENABLE_MOCKING
+  #if !os(WASI) // WASI has no priority data
   // The mock records each entry's descriptor and events, and the timeout
   // in milliseconds.
   func testSyscalls() {
@@ -127,6 +140,7 @@ final class PollTests: XCTestCase {
     ]
     syscallTestCases.forEach { $0.runAllTests() }
   }
+  #endif // !os(WASI)
 
   func testTimeouts() throws {
     let cases: [(Duration?, milliseconds: CInt)] = [
@@ -167,4 +181,4 @@ private func poll(
       &span, timeout: timeout, retryOnInterrupt: retryOnInterrupt)
   }
 }
-#endif // !os(Windows) && !os(WASI)
+#endif // !os(Windows)

@@ -7,7 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-#if !os(Windows) && !os(WASI)
+#if !os(Windows)
 
 /// A namespace for the system's configurable limits and options.
 ///
@@ -19,7 +19,7 @@
 /// A variable's value is `nil` if the system has no limit for it,
 /// or, for an option, if the system doesn't support the option.
 ///
-/// - Note: Only available on Unix-like platforms other than WASI.
+/// - Note: Not available on Windows.
 @available(System 199, *)
 public enum SystemConfig {}
 
@@ -710,4 +710,4 @@ internal func _valueOrNil(_ body: () -> Int) -> Result<Int?, Errno> {
   return system_errno == 0 ? .success(nil) : .failure(.current)
 }
 
-#endif // !os(Windows) && !os(WASI)
+#endif // !os(Windows)

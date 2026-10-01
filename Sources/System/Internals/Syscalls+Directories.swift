@@ -16,7 +16,7 @@
 // pointers, or can't fail, so the mocking driver can't stand in for them,
 // as with readdir. The directory API has real-call tests instead.
 
-#if !os(Windows) && !os(WASI)
+#if !os(Windows)
 
 #if SYSTEM_PACKAGE_DARWIN
 import Darwin
@@ -24,6 +24,9 @@ import Darwin
 import Glibc
 #elseif canImport(Musl)
 import Musl
+#elseif canImport(WASILibc)
+import CSystem
+import WASILibc
 #elseif canImport(Android)
 import Android
 #else
@@ -42,6 +45,17 @@ internal func system_dirfd(_ dir: system_DIRPtr) -> CInt {
 
 // The d_type values. They're here rather than in Constants.swift, which
 // another lane owns.
+#if os(WASI)
+// wasi-libc's are casts of WASI's file types, which Swift can't import.
+internal var _DT_UNKNOWN: CInt { CInt(_getConst_DT_UNKNOWN()) }
+internal var _DT_FIFO: CInt { CInt(_getConst_DT_FIFO()) }
+internal var _DT_CHR: CInt { CInt(_getConst_DT_CHR()) }
+internal var _DT_DIR: CInt { CInt(_getConst_DT_DIR()) }
+internal var _DT_BLK: CInt { CInt(_getConst_DT_BLK()) }
+internal var _DT_REG: CInt { CInt(_getConst_DT_REG()) }
+internal var _DT_LNK: CInt { CInt(_getConst_DT_LNK()) }
+internal var _DT_SOCK: CInt { CInt(_getConst_DT_SOCK()) }
+#else
 internal var _DT_UNKNOWN: CInt { CInt(DT_UNKNOWN) }
 internal var _DT_FIFO: CInt { CInt(DT_FIFO) }
 internal var _DT_CHR: CInt { CInt(DT_CHR) }
@@ -50,6 +64,7 @@ internal var _DT_BLK: CInt { CInt(DT_BLK) }
 internal var _DT_REG: CInt { CInt(DT_REG) }
 internal var _DT_LNK: CInt { CInt(DT_LNK) }
 internal var _DT_SOCK: CInt { CInt(DT_SOCK) }
+#endif
 #if SYSTEM_PACKAGE_DARWIN || os(FreeBSD)
 internal var _DT_WHT: CInt { CInt(DT_WHT) }
 #endif
@@ -239,4 +254,4 @@ extension FileType {
   }
 }
 
-#endif // !os(Windows) && !os(WASI)
+#endif // !os(Windows)

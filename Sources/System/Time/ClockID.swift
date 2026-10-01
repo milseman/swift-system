@@ -7,7 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-#if !os(Windows) && !os(WASI)
+#if !os(Windows)
 
 // Must import here to use the C clockid_t type in @_alwaysEmitIntoClient
 // APIs, and Darwin's _CLOCK_ constants; and CSystem on Linux, where
@@ -20,6 +20,8 @@ import Glibc
 #elseif canImport(Musl)
 import CSystem
 import Musl
+#elseif canImport(WASILibc)
+import WASILibc
 #elseif canImport(Android)
 import CSystem
 import Android
@@ -49,7 +51,7 @@ extension CInterop {
 /// The corresponding C type is `clockid_t`.
 @frozen
 @available(System 199, *)
-public struct ClockID: RawRepresentable, Hashable, Sendable {
+public struct ClockID: RawRepresentable, Hashable {
   /// The raw C clock ID.
   @_alwaysEmitIntoClient
   public var rawValue: CInterop.ClockID
@@ -58,6 +60,15 @@ public struct ClockID: RawRepresentable, Hashable, Sendable {
   @_alwaysEmitIntoClient
   public init(rawValue: CInterop.ClockID) { self.rawValue = rawValue }
 }
+
+// WASI's clockid_t is a pointer, which isn't Sendable, to a constant.
+#if os(WASI)
+@available(System 199, *)
+extension ClockID: @unchecked Sendable {}
+#else
+@available(System 199, *)
+extension ClockID: Sendable {}
+#endif
 
 @available(System 199, *)
 extension ClockID {
@@ -84,10 +95,12 @@ extension ClockID {
   @_alwaysEmitIntoClient
   public static var monotonic: ClockID { ClockID(rawValue: _CLOCK_MONOTONIC) }
 
+  #if !os(WASI)
   /// The processor time that the calling process has used,
   /// in all its threads.
   ///
   /// The corresponding C constant is `CLOCK_PROCESS_CPUTIME_ID`.
+  /// - Note: Not available on WASI.
   @_alwaysEmitIntoClient
   public static var processCPUTime: ClockID {
     ClockID(rawValue: _CLOCK_PROCESS_CPUTIME_ID)
@@ -96,10 +109,12 @@ extension ClockID {
   /// The processor time that the calling thread has used.
   ///
   /// The corresponding C constant is `CLOCK_THREAD_CPUTIME_ID`.
+  /// - Note: Not available on WASI.
   @_alwaysEmitIntoClient
   public static var threadCPUTime: ClockID {
     ClockID(rawValue: _CLOCK_THREAD_CPUTIME_ID)
   }
+  #endif
 
   #if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
   /// A clock like ``monotonic``, without the adjustments
@@ -226,4 +241,4 @@ extension ClockID {
   }
 }
 
-#endif // !os(Windows) && !os(WASI)
+#endif // !os(Windows)

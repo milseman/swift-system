@@ -320,14 +320,18 @@ internal var _CLOCK_REALTIME_ALARM: CInt { 8 }
 internal var _CLOCK_BOOTTIME_ALARM: CInt { 9 }
 #endif // os(Linux) || os(Android)
 
-#if !os(Windows) && !os(WASI)
+#if !os(Windows)
 // MARK: poll
+
+// WASI has no priority data, so no POLLPRI, POLLRDBAND or POLLWRBAND.
 
 @_alwaysEmitIntoClient
 internal var _POLLIN: CShort { CShort(POLLIN) }
 
+#if !os(WASI)
 @_alwaysEmitIntoClient
 internal var _POLLPRI: CShort { CShort(POLLPRI) }
+#endif
 
 @_alwaysEmitIntoClient
 internal var _POLLOUT: CShort { CShort(POLLOUT) }
@@ -335,14 +339,18 @@ internal var _POLLOUT: CShort { CShort(POLLOUT) }
 @_alwaysEmitIntoClient
 internal var _POLLRDNORM: CShort { CShort(POLLRDNORM) }
 
+#if !os(WASI)
 @_alwaysEmitIntoClient
 internal var _POLLRDBAND: CShort { CShort(POLLRDBAND) }
+#endif
 
 @_alwaysEmitIntoClient
 internal var _POLLWRNORM: CShort { CShort(POLLWRNORM) }
 
+#if !os(WASI)
 @_alwaysEmitIntoClient
 internal var _POLLWRBAND: CShort { CShort(POLLWRBAND) }
+#endif
 
 @_alwaysEmitIntoClient
 internal var _POLLERR: CShort { CShort(POLLERR) }
@@ -359,4 +367,4 @@ internal var _POLLNVAL: CShort { CShort(POLLNVAL) }
 @_alwaysEmitIntoClient
 internal var _POLLRDHUP: CShort { 0x2000 }
 #endif
-#endif // !os(Windows) && !os(WASI)
+#endif // !os(Windows)

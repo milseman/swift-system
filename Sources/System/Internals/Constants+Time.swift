@@ -7,7 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-// Clock IDs. On platforms other than Darwin, _CLOCK_REALTIME and
+// Clock IDs. On platforms other than Darwin and WASI, _CLOCK_REALTIME and
 // _CLOCK_MONOTONIC are in Constants+Threads.swift, and Linux's
 // _CLOCK_BOOTTIME is in Constants+Events.swift; the rest are here.
 //
@@ -15,7 +15,7 @@
 // _CLOCK_REALTIME and so on, but Swift renames those to the names of the
 // CLOCK_ macros, so System defines its own _CLOCK_ names there.
 
-#if !os(Windows) && !os(WASI)
+#if !os(Windows)
 
 #if SYSTEM_PACKAGE_DARWIN
 import Darwin
@@ -23,6 +23,9 @@ import Darwin
 import Glibc
 #elseif canImport(Musl)
 import Musl
+#elseif canImport(WASILibc)
+import CSystem
+import WASILibc
 #elseif canImport(Android)
 import Android
 #else
@@ -53,6 +56,14 @@ internal var _CLOCK_UPTIME_RAW: clockid_t { CLOCK_UPTIME_RAW }
 
 @_alwaysEmitIntoClient
 internal var _CLOCK_UPTIME_RAW_APPROX: clockid_t { CLOCK_UPTIME_RAW_APPROX }
+#elseif os(WASI)
+// wasi-libc's clocks are pointers to constants, whose CLOCK_ macros take an
+// address, which Swift can't import. It has no processor-time clocks.
+@_alwaysEmitIntoClient
+internal var _CLOCK_REALTIME: clockid_t { _getConst_CLOCK_REALTIME() }
+
+@_alwaysEmitIntoClient
+internal var _CLOCK_MONOTONIC: clockid_t { _getConst_CLOCK_MONOTONIC() }
 #else
 @_alwaysEmitIntoClient
 internal var _CLOCK_PROCESS_CPUTIME_ID: clockid_t { clockid_t(CLOCK_PROCESS_CPUTIME_ID) }
@@ -76,4 +87,4 @@ internal var _CLOCK_MONOTONIC_COARSE: clockid_t { 6 }
 internal var _CLOCK_TAI: clockid_t { 11 }
 #endif // os(Linux) || os(Android)
 
-#endif // !os(Windows) && !os(WASI)
+#endif // !os(Windows)

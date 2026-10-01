@@ -7,7 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-#if !os(Windows) && !os(WASI)
+#if !os(Windows)
 
 import XCTest
 
@@ -17,6 +17,8 @@ import Darwin
 import Glibc
 #elseif canImport(Musl)
 import Musl
+#elseif canImport(WASILibc)
+import WASILibc
 #elseif canImport(Android)
 import Android
 #endif
@@ -135,6 +137,7 @@ final class SystemConfigTest: XCTestCase {
       }
     }
 
+    #if !os(WASI) // WASI has no pipe
     // POSIX requires at least 512 bytes for an atomic write to a pipe.
     let pipe = try FileDescriptor.pipe()
     defer {
@@ -144,6 +147,7 @@ final class SystemConfigTest: XCTestCase {
     let atomicWrite = try XCTUnwrap(
       SystemConfig.value(.maxAtomicPipeWriteBytes, for: pipe.writeEnd))
     XCTAssertGreaterThanOrEqual(atomicWrite, 512)
+    #endif
 
     XCTAssertThrowsError(
       try SystemConfig.value(.maxFileNameBytes, for: FileDescriptor(rawValue: -1))
@@ -153,4 +157,4 @@ final class SystemConfigTest: XCTestCase {
   }
 }
 
-#endif // !os(Windows) && !os(WASI)
+#endif // !os(Windows)

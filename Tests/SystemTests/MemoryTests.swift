@@ -7,7 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-#if !os(Windows) && !os(WASI)
+#if !os(Windows)
 
 import Testing
 
@@ -37,7 +37,7 @@ private struct MemoryTests {
   @available(System 199, *)
   @Test func zeroBytesAllocateABlockToFree() throws {
     let block = try Memory.allocate(byteCount: 0)
-    #if !os(OpenBSD)
+    #if !os(OpenBSD) && !os(WASI)
     #expect(Memory.usableSize(of: block) >= 1)
     #endif
     Memory.free(block)
@@ -137,7 +137,7 @@ private struct MemoryTests {
   }
   #endif
 
-  #if !os(OpenBSD)
+  #if !os(OpenBSD) && !os(WASI)
   @available(System 199, *)
   @Test func usableSizeIsAtLeastTheRequest() throws {
     for byteCount in [1, 17, 100, 1000, 100_000] {
@@ -265,4 +265,4 @@ private struct MemoryFunctionTests {
   }
 }
 
-#endif // !os(Windows) && !os(WASI)
+#endif // !os(Windows)

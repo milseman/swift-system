@@ -7,7 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-#if !os(Windows) && !os(WASI)
+#if !os(Windows)
 
 // Must import here to use the C pollfd type in @_alwaysEmitIntoClient APIs.
 #if SYSTEM_PACKAGE_DARWIN
@@ -16,6 +16,8 @@ import Darwin
 import Glibc
 #elseif canImport(Musl)
 import Musl
+#elseif canImport(WASILibc)
+import WASILibc
 #elseif canImport(Android)
 import Android
 #else
@@ -51,12 +53,16 @@ extension FileDescriptor {
     @_alwaysEmitIntoClient
     public static var readable: PollEvents { PollEvents(rawValue: _POLLIN) }
 
+    #if !os(WASI)
     /// There's urgent data to read,
     /// such as a socket's out-of-band data.
     ///
     /// The corresponding C constant is `POLLPRI`.
+    ///
+    /// - Note: Not available on WASI.
     @_alwaysEmitIntoClient
     public static var priority: PollEvents { PollEvents(rawValue: _POLLPRI) }
+    #endif
 
     /// Writing won't block.
     ///
@@ -70,11 +76,15 @@ extension FileDescriptor {
     @_alwaysEmitIntoClient
     public static var readableNormalData: PollEvents { PollEvents(rawValue: _POLLRDNORM) }
 
+    #if !os(WASI)
     /// There's priority data to read.
     ///
     /// The corresponding C constant is `POLLRDBAND`.
+    ///
+    /// - Note: Not available on WASI.
     @_alwaysEmitIntoClient
     public static var readablePriorityData: PollEvents { PollEvents(rawValue: _POLLRDBAND) }
+    #endif
 
     /// Writing data other than priority data won't block.
     ///
@@ -82,11 +92,15 @@ extension FileDescriptor {
     @_alwaysEmitIntoClient
     public static var writableNormalData: PollEvents { PollEvents(rawValue: _POLLWRNORM) }
 
+    #if !os(WASI)
     /// Writing priority data won't block.
     ///
     /// The corresponding C constant is `POLLWRBAND`.
+    ///
+    /// - Note: Not available on WASI.
     @_alwaysEmitIntoClient
     public static var writablePriorityData: PollEvents { PollEvents(rawValue: _POLLWRBAND) }
+    #endif
 
     #if os(Linux) || os(Android)
     /// The other end of a stream socket closed, or shut down writing.
@@ -224,6 +238,16 @@ extension FileDescriptor.PollEvents: CustomStringConvertible, CustomDebugStringC
       (.hangUp, ".hangUp"),
       (.invalidDescriptor, ".invalidDescriptor"),
     ]
+    #elseif os(WASI)
+    let descriptions: [(Element, StaticString)] = [
+      (.readable, ".readable"),
+      (.writable, ".writable"),
+      (.readableNormalData, ".readableNormalData"),
+      (.writableNormalData, ".writableNormalData"),
+      (.error, ".error"),
+      (.hangUp, ".hangUp"),
+      (.invalidDescriptor, ".invalidDescriptor"),
+    ]
     #else
     let descriptions: [(Element, StaticString)] = [
       (.readable, ".readable"),
@@ -353,4 +377,4 @@ extension FileDescriptor {
     }
   }
 }
-#endif // !os(Windows) && !os(WASI)
+#endif // !os(Windows)

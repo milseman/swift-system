@@ -951,7 +951,7 @@ internal func system_getgrnam_r(
 #endif // !os(Windows) && !os(WASI)
 
 // These return -1 without setting errno for a variable with no limit.
-#if !os(Windows) && !os(WASI)
+#if !os(Windows)
 internal func system_sysconf(_ name: CInt) -> Int {
 #if ENABLE_MOCKING
   if mockingEnabled { return _mockInt(name) }
@@ -975,7 +975,7 @@ internal func system_fpathconf(_ fd: CInt, _ name: CInt) -> Int {
 #endif
   return fpathconf(fd, name)
 }
-#endif // !os(Windows) && !os(WASI)
+#endif // !os(Windows)
 
 #if !os(Windows) && !os(WASI)
 internal func system_getpid() -> pid_t {

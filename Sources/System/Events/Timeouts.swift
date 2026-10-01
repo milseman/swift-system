@@ -11,7 +11,7 @@
 // calls take. Each rounds up, so that a positive timeout doesn't become zero,
 // which means "don't wait".
 
-#if !os(Windows) && !os(WASI)
+#if !os(Windows)
 
 // Must import here to use the C timespec type in @_alwaysEmitIntoClient code,
 // and CSystem on Linux, whose copy of timespec can own its members.
@@ -23,6 +23,8 @@ import Glibc
 #elseif canImport(Musl)
 import CSystem
 import Musl
+#elseif canImport(WASILibc)
+import WASILibc
 #elseif canImport(Android)
 import CSystem
 import Android
@@ -94,4 +96,4 @@ internal func _milliseconds(timeout: Duration?) -> CInt {
   let milliseconds = (attoseconds + 999_999_999_999_999) / 1_000_000_000_000_000
   return CInt((seconds * 1000) + milliseconds)
 }
-#endif // !os(Windows) && !os(WASI)
+#endif // !os(Windows)

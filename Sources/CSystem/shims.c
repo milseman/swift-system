@@ -374,20 +374,26 @@ extern int csystem_shm_open(const char *name, int oflag, unsigned int mode) {
 }
 #endif
 
-#if !defined(_WIN32) && !defined(__wasi__)
+#if !defined(_WIN32)
 #if defined(__APPLE__)
 #include <crt_externs.h>
+#elif defined(__wasi__)
+#include <wasi/libc-environ.h>
 #endif
 
 extern char **csystem_environ(void) {
   #if defined(__APPLE__)
   return *_NSGetEnviron();
+  #elif defined(__wasi__)
+  // wasi-libc reads the environment into environ on first use, which this
+  // does, where reading environ itself wouldn't.
+  return __wasilibc_get_environ();
   #else
   extern char **environ;
   return environ;
   #endif
 }
-#endif // !defined(_WIN32) && !defined(__wasi__)
+#endif // !defined(_WIN32)
 
 #ifdef __linux__
 #include <stdlib.h>

@@ -11,7 +11,7 @@
 // readdir rather than fts. Prototype/Directories/README.md compares the two
 // and records why.
 
-#if !os(Windows) && !os(WASI)
+#if !os(Windows)
 
 // Must import here to read dirent's members.
 #if SYSTEM_PACKAGE_DARWIN
@@ -20,6 +20,10 @@ import Darwin
 import Glibc
 #elseif canImport(Musl)
 import Musl
+#elseif canImport(WASILibc)
+// WASI's directory entries are CSystem's copies (see CSystemWASI.h).
+import CSystem
+import WASILibc
 #elseif canImport(Android)
 import Android
 #else
@@ -1057,4 +1061,4 @@ extension DirectoryWalk {
   }
 }
 
-#endif // !os(Windows) && !os(WASI)
+#endif // !os(Windows)

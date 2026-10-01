@@ -26,10 +26,10 @@ extern int _system_ioctl_TIOCSWINSZ(int fd, const void *ws);
 extern int csystem_shm_open(const char *name, int oflag, unsigned int mode);
 #endif
 
-#if !defined(_WIN32) && !defined(__wasi__)
+#if !defined(_WIN32)
 // The process's environ array. Darwin's is _NSGetEnviron's, since a library
-// can't link to environ there, and not every other C library declares
-// environ without feature macros.
+// can't link to environ there, WASI's is filled in on first use, and not
+// every other C library declares environ without feature macros.
 extern char **csystem_environ(void);
 #endif
 
