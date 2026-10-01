@@ -24,8 +24,9 @@ Lane `api-graph-speed`, base `3f9f9e1` (system-next), merged with system-next `6
 
 **Next:**
 1. Step 3, the tool at `d1f856c` or later:
-   - d4 again (in progress at 20:05): `measure.sh d4 API_GRAPH_ADOPTER_JOBS=4 API_GRAPH_CACHE=<speed>/cache-d4 API_GRAPH_BUILDS=<speed>/builds-d4`, after deleting both directories. Then delete `builds-d4`.
-   - The same with `=18`, into `cache-d18` and `builds-d18`.
+   - Done: d4 again, run from 20:57 to 21:15 (step 3, below). The machine was in clamshell sleep from 20:02 to 20:55. `builds-d4` is deleted, and `cache-d4` is kept for the run with history.
+   - In progress at 21:17: d18, `measure.sh d18 API_GRAPH_ADOPTER_JOBS=18 API_GRAPH_CACHE=<speed>/cache-d18 API_GRAPH_BUILDS=<speed>/builds-d18`.
+   - d4 with history: a fresh builds directory and `cache-d4`, forced with `API_GRAPH_ADOPTER_VALIDATE=tree HEAD_REF=279c229`, so the builds go longest first.
    - Then (b), nothing changed, (c), `HEAD_REF=279c229`, and a forced rebuild with 4 jobs, `API_GRAPH_ADOPTER_VALIDATE=tree HEAD_REF=279c229`, all three against `d18`'s cache and builds.
    - Update the README's "Run time".
 2. At the stop, delete `.build/speed` and `${TMPDIR}api-graph-speed`, except a persistent builds directory, whose place and size go here.
@@ -186,6 +187,12 @@ These two packages are small, so an incremental build after a real System change
   - The load samples have gaps of up to 50 minutes, and their "load" of 191 (max 377) is the backlog at each wake.
   - With no cache entries, the order was alphabetical, as designed: unknown builds first.
 - The runs before it, a-old to s2-incr, had no sleep in the power log, all on AC power.
+- d4, rerun with the tool at `d1f856c`: cold, 4 jobs, fresh cache and builds directory.
+  - 1059.2 s wall (17 min 39 s); user 3761 s, sys 855 s. The adopters step took 907 s.
+  - No sleep, on battery throughout. Links identical to the baseline's.
+  - Load: 45.4 at the start; the per-minute mean was 129.4 (median 108, max 268), about s2-cold's 117. At that load, 4 jobs cut the cold adopters step from s2-cold's 1804 s to 907 s, by about half, and the run from 1966 s to 1059 s.
+  - Each build took 1.3 to 3.7 times as long as alone in the baseline (swift-foundation 485 s against 182 s), sharing the CPUs.
+  - With no history the builds went alphabetically. wasmkit started last, at about 795 s, and ended the builds at 951 s; swift-foundation (485 s) and swift-package-manager (428 s) started in the middle. Longest-first needs a recorded build: the run with history checks what it buys.
 
 ## Tests
 
