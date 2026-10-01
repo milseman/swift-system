@@ -112,6 +112,32 @@ let testsToExclude:[String] = []
 let testsToExclude = ["IORequestTests.swift", "IORingTests.swift"]
 #endif
 
+// A second SystemPackage for SourceKit-LSP's plugins: the same sources as a
+// module of another name, as swift-tools-protocols' _SKLoggingForPlugin is
+// SKLogging's, so that a plugin's copy and its host's don't define the same
+// Swift classes. A plugin target imports it as SystemPackage with
+// `-module-alias SystemPackage=_SystemPackageForPlugin`. Its directory,
+// Sources/_SystemPackageForPlugin, is a symbolic link to Sources/System. Not
+// on Windows, where git checks a link out as a file unless it's set to make
+// links, and the package would then fail to load.
+#if os(Windows)
+let pluginProducts: [Product] = []
+let pluginTargets: [Target] = []
+#else
+let pluginProducts: [Product] = [
+  .library(name: "_SystemPackageForPlugin", targets: ["_SystemPackageForPlugin"]),
+]
+let pluginTargets: [Target] = [
+  .target(
+    name: "_SystemPackageForPlugin",
+    dependencies: ["CSystem"],
+    path: "Sources/_SystemPackageForPlugin",
+    exclude: filesToExclude,
+    cSettings: cSettings,
+    swiftSettings: swiftSettings),
+]
+#endif
+
 let package = Package(
   name: "swift-system",
   platforms: platforms,
@@ -119,7 +145,7 @@ let package = Package(
     .library(name: "SystemPackage", targets: ["SystemPackage"]),
     .library(name: "SystemSockets", targets: ["SystemSockets"]),
     .executable(name: "system-samples", targets: ["Samples"]),
-  ],
+  ] + pluginProducts,
   dependencies: [
     .package(url: "https://github.com/apple/swift-argument-parser", from: "1.3.0"),
   ],
@@ -177,6 +203,6 @@ let package = Package(
       ],
       path: "Sources/Samples",
       swiftSettings: swiftSettings),
-  ],
+  ] + pluginTargets,
   swiftLanguageModes: [.v6]
 )
