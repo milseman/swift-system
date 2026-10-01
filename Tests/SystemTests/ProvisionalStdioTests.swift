@@ -79,6 +79,14 @@ final class ProvisionalStdioTest: XCTestCase {
       MockTestCase(name: "fileno", .noInterrupt, address) { _ in
         _ = try stream.fileDescriptor()
       },
+      MockTestCase(
+        name: "fseeko", .noInterrupt, address, Int64(-3), FileDescriptor.SeekOrigin.end.rawValue
+      ) { _ in
+        try stream.seek(offset: -3, from: .end)
+      },
+      MockTestCase(name: "ftello", .noInterrupt, address) { _ in
+        _ = try stream.offset()
+      },
       MockTestCase(name: "setvbuf", .noInterrupt, address, 0, _IONBF, 0) { _ in
         try stream.setBuffering(.unbuffered)
       },
@@ -114,6 +122,43 @@ final class ProvisionalStdioTest: XCTestCase {
       XCTAssertEqual(try input.read(into: buffer), 0)
       input.clearError()
       XCTAssertFalse(input.isAtEnd)
+    }
+  }
+
+  func testSeekingAndTheOffset() throws {
+    try withTemporaryFilePath(basename: "testSeekingAndTheOffset") { dir in
+      let stream = try FileStream.open(dir.appending("file"), mode: "w+")
+      defer { try? stream.close() }
+      try stream.write("hello world")
+      // The offset counts what the buffer holds.
+      XCTAssertEqual(try stream.offset(), 11)
+
+      let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 16, alignment: 1)
+      defer { buffer.deallocate() }
+      try stream.seek(offset: 6, from: .start)
+      XCTAssertEqual(try stream.offset(), 6)
+      var count = try stream.read(into: buffer)
+      XCTAssertEqual(String(decoding: buffer[..<count], as: UTF8.self), "world")
+      XCTAssertTrue(stream.isAtEnd)
+
+      try stream.seek(offset: -5, from: .end)
+      XCTAssertFalse(stream.isAtEnd)
+      try stream.seek(offset: -1, from: .current)
+      XCTAssertEqual(try stream.offset(), 5)
+      count = try stream.read(into: UnsafeMutableRawBufferPointer(rebasing: buffer[..<3]))
+      XCTAssertEqual(String(decoding: buffer[..<count], as: UTF8.self), " wo")
+      XCTAssertEqual(try stream.offset(), 8)
+
+      // A write after a seek starts at the new position.
+      try stream.seek(offset: 0, from: .start)
+      try stream.write("J")
+      try stream.seek(offset: 0, from: .start)
+      count = try stream.read(into: buffer)
+      XCTAssertEqual(String(decoding: buffer[..<count], as: UTF8.self), "Jello world")
+
+      XCTAssertThrowsError(try stream.seek(offset: -1, from: .start)) {
+        XCTAssertEqual($0 as? Errno, .invalidArgument)
+      }
     }
   }
 
@@ -174,6 +219,19 @@ final class ProvisionalStdioTest: XCTestCase {
     // Closing the stream closes the descriptor.
     try stream.close()
     XCTAssertEqual(try reader.read(into: buffer), 0)
+  }
+
+  func testAPipeHasNoPosition() throws {
+    let (reader, writer) = try FileDescriptor.pipe()
+    defer { try? writer.close() }
+    let stream = try FileStream.open(reader, mode: "r")
+    defer { try? stream.close() }
+    XCTAssertThrowsError(try stream.seek(offset: 0, from: .start)) {
+      XCTAssertEqual($0 as? Errno, .illegalSeek)
+    }
+    XCTAssertThrowsError(try stream.offset()) {
+      XCTAssertEqual($0 as? Errno, .illegalSeek)
+    }
   }
 
   func testBuffering() throws {
@@ -246,7 +304,10 @@ final class ProvisionalStdioTest: XCTestCase {
     try withTemporaryFilePath(basename: "testLocking") { dir in
       let stream = try FileStream.open(dir.appending("file"), mode: "w")
       defer { try? stream.close() }
-      XCTAssertEqual(try stream.withLock { () throws(Errno) -> Int in
+      // An untyped closure: the main-branch compiler (6.5-dev) fails SIL
+      // verification for a throws(Errno) one passed to withLock's untyped
+      // rethrows.
+      XCTAssertEqual(try stream.withLock { () -> Int in
         try stream.write("locked")
         return 42
       }, 42)

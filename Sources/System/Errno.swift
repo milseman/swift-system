@@ -1460,7 +1460,7 @@ extension Errno {
 #endif
 
 // Darwin's SDKs define ENOTCAPABLE from the macOS 26 generation on.
-#if canImport(Darwin, _version: 346) || os(FreeBSD)
+#if SYSTEM_PACKAGE_DARWIN && canImport(Darwin, _version: 346) || os(FreeBSD)
   /// Capabilities insufficient.
   ///
   /// The corresponding C error is `ENOTCAPABLE`.

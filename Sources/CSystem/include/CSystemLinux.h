@@ -67,11 +67,12 @@ extern int csystem_renameat2(int olddirfd, const char *oldpath,
 #define CSYSTEM_F_SETPIPE_SZ 1031
 #define CSYSTEM_F_GETPIPE_SZ 1032
 
-// open's O_TMPFILE and the *at functions' AT_EMPTY_PATH, which glibc and
-// Musl declare only with _GNU_SOURCE, which can't be defined here; see
-// shims.c. O_TMPFILE includes O_DIRECTORY, whose value differs by
-// architecture, so these are the headers' own values.
+// open's O_PATH and O_TMPFILE and the *at functions' AT_EMPTY_PATH, which
+// glibc declares only with _GNU_SOURCE, as Musl does the last two, which
+// can't be defined here; see shims.c. O_PATH's value and O_TMPFILE's
+// O_DIRECTORY differ by architecture, so these are the headers' own values.
 int _system_get_AT_EMPTY_PATH(void);
+int _system_get_O_PATH(void);
 int _system_get_O_TMPFILE(void);
 
 // MAXSYMLINKS, from <sys/param.h>, which glibc's and Bionic's Swift modules
@@ -245,11 +246,6 @@ extern int csystem_recvmmsg(int fd, void *msgvec, unsigned int vlen, int flags, 
 #endif // __linux__
 
 #if defined(__linux__) && !defined(__ANDROID__)
-// strtod_l and strtof_l, which glibc and Musl declare only with _GNU_SOURCE,
-// and LC_ALL_MASK, which glibc defines as an OR of its twelve categories'
-// masks, which Swift can't import; see shims.c. `locale` is a locale_t,
-// untyped so that this header needn't include <locale.h> (see the top of
-// this file).
 // Starts a child that runs a program with other credentials, which
 // posix_spawn can't set, as Darwin's version in CSystemDarwin.h does, with
 // its arguments: from a thread whose own credentials it sets first (the
@@ -265,9 +261,11 @@ int csystem_spawn_with_credentials(
     int group_count, const unsigned int *groups,
     int descriptor_count, const int *descriptors);
 
+// strtod_l and strtof_l, which glibc and Musl declare only with
+// _GNU_SOURCE; see shims.c. `locale` is a locale_t, untyped so that this
+// header needn't include <locale.h> (see the top of this file).
 extern double csystem_strtod_l(const char *string, char **end, void *locale);
 extern float csystem_strtof_l(const char *string, char **end, void *locale);
-int _system_get_LC_ALL_MASK(void);
 
 // <tzfile.h>'s TZDIR and TZDEFAULT, which glibc doesn't install and Musl
 // doesn't have: the system's, where it has the header, and otherwise the
@@ -275,6 +273,12 @@ int _system_get_LC_ALL_MASK(void);
 const char *_system_get_TZDEFAULT(void);
 const char *_system_get_TZDIR(void);
 #endif // defined(__linux__) && !defined(__ANDROID__)
+
+#ifdef __linux__
+// LC_ALL_MASK, which glibc and Bionic define as an OR of their twelve
+// categories' masks, which Swift can't import; see shims.c.
+int _system_get_LC_ALL_MASK(void);
+#endif // __linux__
 
 #if defined(__linux__) && defined(__GLIBC__)
 // glibc's allocator extensions, which it declares in <malloc.h>, which its

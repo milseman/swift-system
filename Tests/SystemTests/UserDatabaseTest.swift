@@ -122,9 +122,14 @@ final class UserDatabaseTest: XCTestCase {
       XCTAssertEqual(found.groupID.rawValue, c.pw_gid)
       XCTAssertEqual(found.homeDirectory, c.pw_dir.map { FilePath(platformString: $0) })
       XCTAssertEqual(found.shell, c.pw_shell.map { FilePath(platformString: $0) })
-      #if !os(Android) || _pointerBitWidth(_64)
-      XCTAssertEqual(found.realName, c.pw_gecos.map { String(cString: $0) })
+      // A null real name is empty. 32-bit Bionic's header defines pw_gecos
+      // as pw_passwd.
+      #if os(Android) && _pointerBitWidth(_32)
+      let realName = c.pw_passwd
+      #else
+      let realName = c.pw_gecos
       #endif
+      XCTAssertEqual(found.realName, realName.map { String(cString: $0) } ?? "")
     }
 
     XCTAssertNil(try UserEntry(name: "no such user \(Int.random(in: 0..<1_000_000))"))

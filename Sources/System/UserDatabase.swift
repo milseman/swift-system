@@ -58,14 +58,11 @@ public struct UserEntry: Sendable, Hashable {
   /// The corresponding C property is `pw_gid`.
   public var groupID: GroupID
 
-  #if !os(Android) || _pointerBitWidth(_64)
   /// The user's real name,
   /// which some systems follow with other information, separated by commas.
   ///
   /// The corresponding C property is `pw_gecos`.
-  /// - Note: Not available on 32-bit Android.
   public var realName: String
-  #endif
 
   /// The user's home directory.
   ///
@@ -149,22 +146,20 @@ extension UserEntry {
   // Copies the values out of a C entry, whose strings point into
   // the buffer passed to the lookup function.
   internal init(_ entry: passwd) {
-    #if !os(Android) || _pointerBitWidth(_64)
-    self.init(
-      name: _string(entry.pw_name),
-      userID: UserID(rawValue: entry.pw_uid),
-      groupID: GroupID(rawValue: entry.pw_gid),
-      realName: _string(entry.pw_gecos),
-      homeDirectory: _path(entry.pw_dir),
-      shell: _path(entry.pw_shell))
+    #if os(Android) && _pointerBitWidth(_32)
+    // 32-bit Bionic's passwd has no pw_gecos: its header defines pw_gecos
+    // as pw_passwd, which Swift can't import, since both are null.
+    let realName = entry.pw_passwd
     #else
+    let realName = entry.pw_gecos
+    #endif
     self.init(
       name: _string(entry.pw_name),
       userID: UserID(rawValue: entry.pw_uid),
       groupID: GroupID(rawValue: entry.pw_gid),
+      realName: _string(realName),
       homeDirectory: _path(entry.pw_dir),
       shell: _path(entry.pw_shell))
-    #endif
   }
 }
 

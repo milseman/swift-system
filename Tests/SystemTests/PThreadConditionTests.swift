@@ -121,7 +121,6 @@ private struct PThreadConditionTests {
     try queue.mutex.unlock()
   }
 
-  #if SYSTEM_PACKAGE_DARWIN
   @available(System 199, *)
   @available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *)
   @Test func timeout() throws {
@@ -137,7 +136,7 @@ private struct PThreadConditionTests {
   @available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *)
   @Test func timeoutThatIsNotPositive() throws {
     // Darwin waits forever for a negative relative timeout (T11), so the
-    // wrapper times out at once instead.
+    // wrapper times out at once instead; elsewhere the deadline is now.
     let queue = Queue()
     try queue.mutex.lock()
     #expect(try queue.workAvailable.wait(on: queue.mutex, timeout: .zero) == false)
@@ -145,7 +144,51 @@ private struct PThreadConditionTests {
     #expect(try queue.workAvailable.wait(on: queue.mutex, timeout: .nanoseconds(-5)) == false)
     try queue.mutex.unlock()
   }
-  #else
+
+  // A timeout too long for any test to reach: the wait ends when the
+  // condition is signaled.
+  @available(System 199, *)
+  final class TimedWait: @unchecked Sendable {
+    let mutex = try! PThread.Mutex()
+    let waiterIsWaiting = try! PThread.Condition()
+    let jobAdded = try! PThread.Condition()
+    var isWaiting = false
+    var jobs = 0
+    var timedOut = false
+  }
+
+  @available(System 199, *)
+  @available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *)
+  @Test func signalEndsATimedWait() throws {
+    let state = TimedWait()
+    let waiter = try PThread {
+      try! state.mutex.withLock {
+        state.isWaiting = true
+        try state.waiterIsWaiting.signal()
+        while state.jobs == 0 {
+          if try !state.jobAdded.wait(on: state.mutex, timeout: .seconds(hangGuardSeconds)) {
+            state.timedOut = true
+            return
+          }
+        }
+      }
+    }
+    // The waiter holds the mutex from setting isWaiting until its wait
+    // releases it, so once this thread has the mutex and sees isWaiting,
+    // the waiter is waiting.
+    try state.mutex.withLock {
+      while !state.isWaiting {
+        _ = try state.waiterIsWaiting.wait(on: state.mutex, timeout: .seconds(hangGuardSeconds))
+      }
+      state.jobs = 1
+    }
+    try state.jobAdded.signal()
+    try waiter.join()
+    #expect(state.jobs == 1)
+    #expect(!state.timedOut)
+  }
+
+  #if !SYSTEM_PACKAGE_DARWIN
   @available(System 199, *)
   @Test func monotonicClock() throws {
     var attributes = PThread.Condition.Attributes()
@@ -162,6 +205,60 @@ private struct PThreadConditionTests {
       signaled = try condition.wait(on: mutex, until: now)
     }
     try mutex.unlock()
+  }
+
+  // A timeout on the monotonic clock, from a deadline on that clock: one on
+  // the time of day would be decades past the monotonic clock's time, and
+  // the wait wouldn't end.
+  @available(System 199, *)
+  @Test func timeoutOnTheMonotonicClock() throws {
+    var attributes = PThread.Condition.Attributes()
+    attributes.clock = .monotonic
+    let condition = try PThread.Condition(attributes: attributes)
+    let mutex = try PThread.Mutex()
+    let start = monotonicNanoseconds()
+    try mutex.lock()
+    #expect(try condition.wait(on: mutex, timeout: .milliseconds(20)) == false)
+    try mutex.unlock()
+    #expect(monotonicNanoseconds() - start >= 15_000_000)
+  }
+
+  @available(System 199, *)
+  @Test func timeoutOnABorrowedConditionsClock() throws {
+    let address = UnsafeMutablePointer<CInterop.PThreadCondition>.allocate(capacity: 1)
+    defer { address.deallocate() }
+    var attributes = pthread_condattr_t()
+    #expect(pthread_condattr_init(&attributes) == 0)
+    #expect(pthread_condattr_setclock(&attributes, CLOCK_MONOTONIC) == 0)
+    #expect(pthread_cond_init(address, &attributes) == 0)
+    #expect(pthread_condattr_destroy(&attributes) == 0)
+    let mutex = try PThread.Mutex()
+    let start = monotonicNanoseconds()
+    let signaled = try PThread.Condition.withUnsafeCondition(
+      at: address, clock: .monotonic
+    ) { condition in
+      try mutex.withLock {
+        try condition.wait(on: mutex, timeout: .milliseconds(20))
+      }
+    }
+    #expect(!signaled)
+    #expect(monotonicNanoseconds() - start >= 15_000_000)
+    #expect(pthread_cond_destroy(address) == 0)
+  }
+
+  @available(System 199, *)
+  @Test func deadlineAfterATimeout() {
+    let now = timespec(tv_sec: 100, tv_nsec: 999_999_999)
+    let deadline = PThread.Condition._deadline(after: now, timeout: .milliseconds(2))
+    #expect(deadline.tv_sec == 101 && deadline.tv_nsec == 1_999_999)
+    // A part of a nanosecond rounds up.
+    let rounded = PThread.Condition._deadline(after: now, timeout: .nanoseconds(1) / 2)
+    #expect(rounded.tv_sec == 101 && rounded.tv_nsec == 0)
+    let negative = PThread.Condition._deadline(after: now, timeout: .seconds(-5))
+    #expect(negative.tv_sec == 100 && negative.tv_nsec == 999_999_999)
+    // A deadline past time_t's last time is that time.
+    let late = PThread.Condition._deadline(after: now, timeout: .seconds(Int64.max))
+    #expect(late.tv_sec == .max && late.tv_nsec == 999_999_999)
   }
   #endif
 
