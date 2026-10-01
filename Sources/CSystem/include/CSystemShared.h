@@ -19,6 +19,9 @@ extern int csystem_posix_dup3(int fildes, int fildes2, int flag);
 // include <sys/ioctl.h>, as CSystemLinux.h explains.
 extern int _system_ioctl_TIOCGWINSZ(int fd, void *ws);
 extern int _system_ioctl_TIOCSWINSZ(int fd, const void *ws);
+
+// MAXSYMLINKS, from <sys/param.h>, as CSystemLinux.h declares it.
+extern int _system_get_MAXSYMLINKS(void);
 #endif
 
 #if !defined(_WIN32) && !defined(__wasi__) && !defined(__ANDROID__)

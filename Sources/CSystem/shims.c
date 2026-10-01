@@ -119,6 +119,7 @@ char *csystem_mktemp(char *path) {
 
 #include <CSystemShared.h>
 #include <sys/ioctl.h>
+#include <sys/param.h>
 
 // Terminal ioctl shims for FreeBSD and OpenBSD
 int _system_ioctl_TIOCGWINSZ(int fd, void *ws) {
@@ -128,6 +129,9 @@ int _system_ioctl_TIOCGWINSZ(int fd, void *ws) {
 int _system_ioctl_TIOCSWINSZ(int fd, const void *ws) {
   return ioctl(fd, TIOCSWINSZ, ws);
 }
+
+// 32 on both: FreeBSD's is a literal, OpenBSD's its SYMLOOP_MAX.
+int _system_get_MAXSYMLINKS(void) { return MAXSYMLINKS; }
 
 #endif
 

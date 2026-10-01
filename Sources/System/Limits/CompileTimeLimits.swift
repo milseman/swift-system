@@ -78,7 +78,9 @@ extension SystemConfig {
   /// - Note: Only available on Darwin, Linux, and Android.
   @_alwaysEmitIntoClient
   public static var maxExtendedAttributeNameBytes: Int { Int(_XATTR_MAXNAMELEN) }
+  #endif
 
+  #if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD)
   /// The maximum number of symbolic links that resolving one path follows,
   /// as the C library's headers define it.
   ///
@@ -87,10 +89,11 @@ extension SystemConfig {
   /// fails with ``Errno/tooManySymbolicLinkLevels``.
   /// On Linux the headers' limit, 20 in glibc and Musl,
   /// is lower than the kernel's: the kernel follows up to 40 links.
+  /// FreeBSD's and OpenBSD's is 32.
   ///
   /// The corresponding C constant is `MAXSYMLINKS`.
   ///
-  /// - Note: Only available on Darwin, Linux, and Android.
+  /// - Note: Only available on Darwin, Linux, Android, FreeBSD, and OpenBSD.
   @_alwaysEmitIntoClient
   public static var maxSymbolicLinks: Int { Int(_MAXSYMLINKS) }
   #endif
