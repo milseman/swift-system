@@ -25,8 +25,8 @@ Lane `api-graph-speed`, base `3f9f9e1` (system-next), merged with system-next `6
 **Next:**
 1. Step 3, the tool at `d1f856c` or later:
    - Done: d4 again, run from 20:57 to 21:15 (step 3, below). The machine was in clamshell sleep from 20:02 to 20:55. `builds-d4` is deleted, and `cache-d4` is kept for the run with history.
-   - In progress at 21:17: d18, `measure.sh d18 API_GRAPH_ADOPTER_JOBS=18 API_GRAPH_CACHE=<speed>/cache-d18 API_GRAPH_BUILDS=<speed>/builds-d18`.
-   - d4 with history: a fresh builds directory and `cache-d4`, forced with `API_GRAPH_ADOPTER_VALIDATE=tree HEAD_REF=279c229`, so the builds go longest first.
+   - Done: d18, from 21:17 to 21:34 (step 3, below). `cache-d18` and `builds-d18` are kept for (b), (c) and the forced rebuild.
+   - Next: d4h, d4 with history: `measure.sh d4h API_GRAPH_ADOPTER_JOBS=4 API_GRAPH_CACHE=<speed>/cache-d4 API_GRAPH_BUILDS=<speed>/builds-d4h API_GRAPH_ADOPTER_VALIDATE=tree HEAD_REF=279c229`. That's cold builds in a fresh builds directory, ordered longest first by d4's recorded times.
    - Then (b), nothing changed, (c), `HEAD_REF=279c229`, and a forced rebuild with 4 jobs, `API_GRAPH_ADOPTER_VALIDATE=tree HEAD_REF=279c229`, all three against `d18`'s cache and builds.
    - Update the README's "Run time".
 2. At the stop, delete `.build/speed` and `${TMPDIR}api-graph-speed`, except a persistent builds directory, whose place and size go here.
@@ -193,6 +193,13 @@ These two packages are small, so an incremental build after a real System change
   - Load: 45.4 at the start; the per-minute mean was 129.4 (median 108, max 268), about s2-cold's 117. At that load, 4 jobs cut the cold adopters step from s2-cold's 1804 s to 907 s, by about half, and the run from 1966 s to 1059 s.
   - Each build took 1.3 to 3.7 times as long as alone in the baseline (swift-foundation 485 s against 182 s), sharing the CPUs.
   - With no history the builds went alphabetically. wasmkit started last, at about 795 s, and ended the builds at 951 s; swift-foundation (485 s) and swift-package-manager (428 s) started in the middle. Longest-first needs a recorded build: the run with history checks what it buys.
+- d18: cold, all 18 builds at once, fresh cache and builds directory.
+  - 973.9 s wall (16 min 14 s); user 3878 s, sys 918 s. The adopters step took 791 s.
+  - No sleep, on battery throughout. Links identical to the baseline's.
+  - The builds finished between 344 s and 886 s into the run, with swift-foundation last (713 s).
+  - Load: 33.2 at the start; the per-minute mean was 194.0 (median 209, max 395), the highest of any run. Swap reached 8.2 GB.
+  - The build directories took 12.1 GB.
+  - Against d4: 85 s less wall time at half again d4's load. Most of the gain is that no build waits to start.
 
 ## Tests
 
