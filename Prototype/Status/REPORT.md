@@ -20,9 +20,9 @@ brief, rows C1 to C4:
 | # | Item | State |
 |---|---|---|
 | C1 | STATUS.md section 4 per platform, each adopter at its newest migration branch | done (section 49, `30007dd`) |
-| C2 | Section 1: the symbols the built SystemPackage exports, and the added declarations that export one only to forward a C value | done (section 50); a need for the Threads owner (its finding 2) |
+| C2 | Section 1: the symbols the built SystemPackage exports, and the added declarations that export one only to forward a C value | done (section 50, `c7b71cc`); a need for the Threads owner (its finding 2) |
 | C3 | windows-2's patch P3, the Win32 sources in `Sources/System/CMakeLists.txt` | done (section 48, `8caa741`) |
-| C4 | A `_SystemPackageForPlugin` product (O2 below) | open |
+| C4 | A `_SystemPackageForPlugin` product (O2 below) | done (section 51), with a link under Sources/ |
 
 coverage-3 stopped 2026-09-30, done: section 40's rows are all closed (sections 41 to 43), both queues are empty and
 popular.tsv needs no fourth batch (section 44), the `_version: 346` gates stay (section 45),
@@ -32,7 +32,7 @@ popular.tsv needs no fourth batch (section 44), the `_version: 346` gates stay (
 | # | Item | State |
 |---|---|---|
 | O1 | Linux, Windows and WASI builds of sections 42 and 43's API: `CInterop.Offset` everywhere, PIPE_BUF and cancellation off Darwin | unbuilt; `Utilities/linux/build.sh --quiet test` when the container service runs |
-| O2 | A `_SystemPackageForPlugin` product for sourcekit-lsp's plugins (the packages-5 lane's ask) | coverage-4's C4 |
+| O2 | A `_SystemPackageForPlugin` product for sourcekit-lsp's plugins (the packages-5 lane's ask) | done: coverage-4's C4 (section 51) |
 | O3 | A join that tells a cancelled thread from one that returned (section 43) | open |
 | O4 | Why Foundation's build ignores `_version` (section 45) | open, Foundation's |
 | O5 | A fourth popular batch | not needed now (section 44); the alternative is there |
@@ -1302,7 +1302,7 @@ platform code with `#if !$Embedded`, so those files were dead on every platform,
 ecosystem.sh's extractions of WasmKit change the same way at their next runs, which are full runs anyway: these edits
 change adopter-coverage's tool id.
 
-## 50. Section 1's ABI symbols: this commit
+## 50. Section 1's ABI symbols: `c7b71cc`
 
 Michael's ask: beside the API points, the number of symbols the built SystemPackage exports, and the added public
 declarations that export a symbol although they only forward a C header value, the candidates for
@@ -1322,9 +1322,10 @@ declarations that export a symbol although they only forward a C header value, t
   `-enable-testing` exports internal declarations too.
 - **Not library evolution.** The SDK's System is built with it, but SystemPackage doesn't build with
   `-enable-library-evolution` (finding 2). With that file patched in a scratch copy, it exported nearly the same set
-  as the plain release build: a few variable initializers and synthesized equality functions one way, their
-  operator forms the other. Alternative, once the file is fixed: count the library-evolution build, which would
-  match the SDK's own.
+  as the plain release build: only the plain build exports stored properties' initial values, OwnedFD's three
+  addressors, a few protocol witnesses and the synthesized `__derived_*_equals` functions, and only the evolution
+  build those types' `==` operators. Alternative, once the file is fixed: count the library-evolution build, which
+  would match the SDK's own.
 - **Candidates.** An added declaration that exports code and whose body, on the lines the macOS release build
   compiles, is one expression (a getter and a setter for a property; stores into `rawValue` or a delegation to
   `init(rawValue:)` for an initializer) that calls nothing but conversions (a type's initializer, `numericCast`,
@@ -1353,3 +1354,39 @@ Findings:
 Checks: no Swift changed. A run of status.py into a scratch file printed both parts, and the candidate rules were
 read against every added declaration that exports code: those they turn down are buffer readers, string
 conversions, `description`s, memberwise and failable initializers, and stored properties.
+
+## 51. `_SystemPackageForPlugin`: this commit
+
+The packages-5 lane's ask (O2): each of sourcekit-lsp's plugin dylibs links a SystemPackage, and a process that loads
+a plugin beside its host holds two copies, whose Swift classes the Objective-C runtime reports as implemented in
+both (PACKAGES-5-REPORT.md, "Two copies of SystemPackage"). swift-tools-protocols answers the same problem for
+SKLogging with `_SKLoggingForPlugin`: the same sources as a module of another name.
+
+- **Shape.** A `_SystemPackageForPlugin` library product and target, with SystemPackage's dependency, excludes and
+  settings, whose path, `Sources/_SystemPackageForPlugin`, is a symbolic link to `System`, as swift-tools-protocols'
+  `Sources/_SKLoggingForPlugin` links to `SKLogging/`. SwiftPM refuses two targets with one path ("has overlapping
+  sources", checked in a scratch package), so the link is what lets the sources build twice. A plugin target depends
+  on the product and imports it as SystemPackage with `-module-alias SystemPackage=_SystemPackageForPlugin`, as
+  `_SKLoggingForPlugin` aliases its own dependency; swift-tools-protocols' `systemPackageForPlugin`
+  (Package.swift:31) would name the product, and sourcekit-lsp's `…ForPlugin` targets would add the alias. The
+  manifest's comment gives the recipe.
+- **Not on Windows.** Git for Windows checks a symbolic link out as a plain file unless it's set to make links, and
+  SwiftPM then rejects the target's path, so the whole package would fail to load for those Windows clients. The
+  manifest declares the product only when the host evaluating it isn't Windows. sourcekit-lsp's dependency on
+  System is Darwin's only. Alternatives: declare it everywhere, as swift-tools-protocols does (its Windows CI makes
+  links); or declare it wherever the link is a directory, read with FileManager in the manifest.
+- **Cost.** swift-system's own builds compile its sources twice, since a root package builds all its targets: on
+  this machine, about 10 s more of a debug build's wall time (33 s of CPU) whenever Sources/System changes. No
+  SwiftPM setting keeps a root package from building a target, and declaring it only on request (an environment
+  variable) would hide it from clients too.
+- **Files.** The link is the one new file outside this lane's files, and the product needs it; it can't collide
+  with the lanes editing Sources/. CMake is unchanged (it adds only `CSystem` and `System`), and CI's CMake
+  comparison reads the SystemPackage target by name.
+
+Checks:
+- `swift build` builds `_SystemPackageForPlugin`, its symbols mangled under the new name
+  (`$s23_SystemPackageForPlugin5ErrnoV…`), and `swift package describe` gives it SystemPackage's sources.
+- A scratch client (in `.build`, deleted after) with a host target on SystemPackage and a plugin target on
+  `_SystemPackageForPlugin` with the alias, linked into one executable: it builds and runs, printing `FilePath` from
+  the host and `_SystemPackageForPlugin.FilePath` from the plugin, two types, as the plugin's copy needs.
+- api-delta's `patch_manifest.py` still applies to the manifest (it drops Samples).
