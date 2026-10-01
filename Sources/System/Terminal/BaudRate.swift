@@ -153,10 +153,10 @@ public struct BaudRate: RawRepresentable, Hashable, Sendable {
   @_alwaysEmitIntoClient
   public static var b230400: BaudRate { BaudRate(rawValue: _B230400) }
 
-  #if canImport(Darwin)
+  #if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
   /// 7200 baud.
   ///
-  /// This is a Darwin-specific extension.
+  /// This is a BSD extension, which Linux lacks.
   ///
   /// The corresponding C constant is `B7200`.
   @_alwaysEmitIntoClient
@@ -164,7 +164,7 @@ public struct BaudRate: RawRepresentable, Hashable, Sendable {
 
   /// 14400 baud.
   ///
-  /// This is a Darwin-specific extension.
+  /// This is a BSD extension, which Linux lacks.
   ///
   /// The corresponding C constant is `B14400`.
   @_alwaysEmitIntoClient
@@ -172,7 +172,7 @@ public struct BaudRate: RawRepresentable, Hashable, Sendable {
 
   /// 28800 baud.
   ///
-  /// This is a Darwin-specific extension.
+  /// This is a BSD extension, which Linux lacks.
   ///
   /// The corresponding C constant is `B28800`.
   @_alwaysEmitIntoClient
@@ -180,14 +180,14 @@ public struct BaudRate: RawRepresentable, Hashable, Sendable {
 
   /// 76800 baud.
   ///
-  /// This is a Darwin-specific extension.
+  /// This is a BSD extension, which Linux lacks.
   ///
   /// The corresponding C constant is `B76800`.
   @_alwaysEmitIntoClient
   public static var b76800: BaudRate { BaudRate(rawValue: _B76800) }
   #endif
 
-  #if os(Linux)
+  #if os(Linux) || os(Android)
   /// 460800 baud.
   ///
   /// The corresponding C constant is `B460800`.

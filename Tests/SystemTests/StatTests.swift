@@ -226,6 +226,7 @@ private struct StatTests {
     }
   }
 
+  #if !os(WASI) // WASI's CLOCK_REALTIME is a macro Swift can't import
   @available(System 1.7.0, *)
   @Test func times() async throws {
     // This test pauses with `usleep` between some measurements to ensure that
@@ -360,6 +361,7 @@ private struct StatTests {
       #endif
     }
   }
+  #endif // !os(WASI)
 
   #if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
   @available(System 1.7.0, *)

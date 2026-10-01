@@ -47,7 +47,7 @@ internal var __IONBF: CInt { _IONBF }
 
 // The standard streams, which only Darwin declares as non-optional.
 @_alwaysEmitIntoClient
-internal var _stdin: UnsafeMutablePointer<FILE> {
+internal var _stdin: _CFilePointer {
 #if SYSTEM_PACKAGE_DARWIN
   stdin
 #else
@@ -56,7 +56,7 @@ internal var _stdin: UnsafeMutablePointer<FILE> {
 }
 
 @_alwaysEmitIntoClient
-internal var _stdout: UnsafeMutablePointer<FILE> {
+internal var _stdout: _CFilePointer {
 #if SYSTEM_PACKAGE_DARWIN
   stdout
 #else
@@ -65,7 +65,7 @@ internal var _stdout: UnsafeMutablePointer<FILE> {
 }
 
 @_alwaysEmitIntoClient
-internal var _stderr: UnsafeMutablePointer<FILE> {
+internal var _stderr: _CFilePointer {
 #if SYSTEM_PACKAGE_DARWIN
   stderr
 #else
