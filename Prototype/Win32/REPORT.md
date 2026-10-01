@@ -14,10 +14,10 @@ The windows-2 lane (sections 11 on, base system-next at `4365f83`) applies patch
 adds API for the adopters' top Windows gaps of section 8, in its order, checked the same way.
 
 **Resume here:** windows-api's parts are done (sections 1 to 10). windows-2: P1 and P2 are applied (section 11);
-processes (sections 12 and 13), clocks and sleeping (section 14), and SRW locks and condition variables (section 15)
-are done. Next: consoles and standard handles, the fourth gap, then the rest of section 8's gaps in order. Findings
-and patches for other lanes' files are the last two sections; patch P3 (the CMake source list) grows with each new
-file.
+processes (sections 12 and 13), clocks and sleeping (14), SRW locks and condition variables (15), and consoles and
+standard handles (16) are done. Next: well-known directories, the fifth gap, then the rest of section 8's gaps in
+order. Findings and patches for other lanes' files are the last two sections; patch P3 (the CMake source list)
+grows with each new file.
 
 ## How it was checked
 
@@ -864,7 +864,7 @@ A Windows run must check:
   link through the WinSDK module, as swift-foundation's call to the unbiased one does.
 - `testSleepYieldsForNonpositiveDurations`.
 
-## 15. SRW locks and condition variables: this commit
+## 15. SRW locks and condition variables: `a3eb00c`
 
 The third gap of section 8. Every file in it takes an exclusive SRW lock (`InitializeSRWLock`,
 `AcquireSRWLockExclusive`, `ReleaseSRWLockExclusive`), as each package's own lock type; a third of them wait on a
@@ -912,7 +912,67 @@ either way while it's held); `testSharedLock` (two shared holders; no exclusive 
 `testWithLockRethrowsAndReleases`; `testConditionVariableWakesAWaiter`; `testWaitTimesOut` and `testSharedWait`
 (the lock is held again, the same way, after a time-out); `testWakeAll` (three waiters).
 
-## 16. windows-2: findings
+## 16. Consoles and standard handles: this commit
+
+The fourth gap of section 8. Its files read a standard handle (`GetStdHandle`), ask whether a stream is a
+terminal (`isatty`), measure the console window (`GetConsoleScreenBufferInfo`), change console modes
+(`GetConsoleMode`, `SetConsoleMode`: virtual terminal output, and line input without echo for a password), and
+handle or ignore Ctrl+C (`SetConsoleCtrlHandler`). One file each attaches to another process's console, frees its
+own, or reads the console directly.
+
+What: `Win32Console.swift`.
+- `Win32.StandardHandle` (`input`, `output`, `error`) and `Win32.FileHandle.withStandardHandle(_:_:)`, which lends
+  the process's current standard handle (`GetStdHandle`).
+- `Win32.ConsoleMode`, the input and output flags, and on `Win32.FileHandle`: `isConsole`, `consoleMode()`,
+  `setConsoleMode(_:)`, and `withConsoleMode(_:_:)`, with a typed and an untyped overload as SYS-0014's `withLock`
+  has (`GetConsoleMode`, `SetConsoleMode`).
+- `Win32.ConsoleScreenBufferInfo`, over `CONSOLE_SCREEN_BUFFER_INFO`: the buffer's size, the cursor, the window's
+  position and size, the maximum window size and the attributes; and
+  `Win32.FileHandle.consoleScreenBufferInfo()` (`GetConsoleScreenBufferInfo`).
+- `Win32.ConsoleControlEvent`, and `Win32.addConsoleControlHandler(_:)`, `removeConsoleControlHandler(_:)` and
+  `setIgnoresConsoleInterrupt(_:)` (`SetConsoleCtrlHandler`).
+- `FileDescriptor.isTerminal` on Windows: whether the descriptor's handle is a console's.
+
+Which API: **Win32, and `isTerminal` shared.**
+- A console is a Windows concept, with modes and a screen buffer rather than POSIX's termios and window size, so
+  its API is Win32, on `FileHandle`, where SYS-0011 and SYS-0012's future directions put it.
+- Whether a stream is a terminal is the same question on every platform, and swift-docc already spells it
+  `FileDescriptor.standardError.isTerminal` on Darwin, so Windows gets the same property. Rejected: the UCRT's
+  `_isatty`, the POSIX-shaped call, which reports every character device, `NUL` and serial ports included; the
+  test shows it calling `NUL` a terminal. `GetConsoleMode` is what Rust's `IsTerminal` checks first.
+  `FileDescriptor.asTerminal` and `TerminalDescriptor` stay POSIX-only, since they're termios.
+
+Design calls, with the alternatives rejected:
+- **Standard handles are lent, not owned**, like `withWin32HandleIfAvailable`'s: the process keeps them, so an
+  owner would close a handle the process still uses. Each call reads `GetStdHandle`, so it sees `SetStdHandle`'s
+  changes; it skips a missing handle and an overlapped one, as the bridge does. Rejected: immortal static owners,
+  as the PlatformEnum stand-in has (`static let standardInput: Win32.FileHandle?`), which read the handle once.
+  Not wrapped: `SetStdHandle`, whose ownership is unclear (the C runtime's descriptor 1 can hold the same handle).
+- **One `ConsoleMode` for both kinds of handle**, with each input flag documented as the same bit as an output
+  flag, as `AccessMask` documents its file and directory pairs. Rejected: two option sets and two pairs of
+  methods, when the handle, not the type, decides what a bit means.
+- **`withConsoleMode` restores the previous mode**, as `TerminalDescriptor.withRawMode` does on POSIX; the mode
+  belongs to the console, so it would otherwise outlive the process.
+- **The control handler is a `PHANDLER_ROUTINE`**, the C type, as `ProcessID.addExitHandler` takes a C function:
+  Windows calls it on a thread of its own, and it can't capture context. Its event arrives as a `DWORD`, since a
+  C function can't take a Swift struct.
+- **Not wrapped**: `AttachConsole`, `FreeConsole`, `AllocConsole`, `GetConsoleWindow`, `GenerateConsoleCtrlEvent`,
+  and `ReadConsoleW` and `WriteConsoleW`, one file each.
+
+Tests: `Win32ConsoleTests`. The console tests open `CONOUT$` and `CONIN$`, and skip without a console.
+
+A Windows run must check:
+- `testConstantsMatchTheSDK`.
+- `testLendingAStandardHandle`: `SetStdHandle` to a pipe, a write through the lent handle arrives, and a missing
+  handle skips the body. This also checks that `_isSynchronous` accepts an anonymous pipe as a standard handle.
+- `testOtherCharacterDevicesAreNotConsoles`: `NUL`, a pipe and a file aren't consoles; a file's `consoleMode()`
+  throws `invalidHandle`; `isTerminal` is false for `NUL`, where `_isatty` is nonzero.
+- `testConsoleOutput` and `testConsoleInput`, where there's a console: the modes are set and restored, after a
+  throw too, and the screen buffer's sizes are consistent. Whether a console handle passes `_isSynchronous`, which
+  `withStandardHandle` needs, is untested: lend a console's standard output to check it.
+- `testControlHandlers`.
+
+## 17. windows-2: findings
 
 - **The PlatformEnum samples' Windows arms now reach System's `Win32.ProcessHandle`** (the stand-ins compile only
   with `SIMULATE_PLATFORMS`), and differ from it: `Platform.Process` reads `processID` as a property, where
@@ -929,7 +989,7 @@ either way while it's held); `testSharedLock` (two shared holders; no exclusive 
   available for a noncopyable wrapped type in Swift 6.2, and a closure that captures a partially consumed struct
   is "used after consume" even when it touches only a field that wasn't consumed.
 
-## 17. windows-2: patches for files outside the lane
+## 18. windows-2: patches for files outside the lane
 
 **P3, `Sources/System/CMakeLists.txt`: list the lane's new sources.** CI's CMake job fails when a SwiftPM source is
 missing from the list. Kept current with each commit; it applies to this branch with `git apply`.
@@ -937,13 +997,15 @@ missing from the list. Kept current with each commit; it applies to this branch 
 ```diff
 --- a/Sources/System/CMakeLists.txt
 +++ b/Sources/System/CMakeLists.txt
-@@ -355,4 +355,5 @@
+@@ -355,5 +355,7 @@
    VectoredIO/VectoredIO.swift)
  target_sources(SystemPackage PRIVATE
 +  Win32/ProcessIDWindows.swift
    Win32/Win32.swift
++  Win32/Win32Console.swift
    Win32/Win32Constants.swift
-@@ -366,7 +367,13 @@
+   Win32/Win32Error.swift
+@@ -366,7 +368,13 @@
    Win32/Win32Locking.swift
    Win32/Win32Open.swift
 +  Win32/Win32Process.swift

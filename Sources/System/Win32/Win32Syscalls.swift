@@ -504,4 +504,27 @@ internal func system_WakeAllConditionVariable(
   WakeAllConditionVariable(ConditionVariable)
 }
 
+// MARK: - Consoles
+
+internal func system_GetConsoleMode(
+  _ hConsoleHandle: HANDLE, _ lpMode: UnsafeMutablePointer<DWORD>
+) -> Bool {
+  GetConsoleMode(hConsoleHandle, lpMode)
+}
+
+internal func system_SetConsoleMode(_ hConsoleHandle: HANDLE, _ dwMode: DWORD) -> Bool {
+  SetConsoleMode(hConsoleHandle, dwMode)
+}
+
+internal func system_GetConsoleScreenBufferInfo(
+  _ hConsoleOutput: HANDLE,
+  _ lpConsoleScreenBufferInfo: UnsafeMutablePointer<CONSOLE_SCREEN_BUFFER_INFO>
+) -> Bool {
+  GetConsoleScreenBufferInfo(hConsoleOutput, lpConsoleScreenBufferInfo)
+}
+
+internal func system_SetConsoleCtrlHandler(_ HandlerRoutine: PHANDLER_ROUTINE?, _ Add: Bool) -> Bool {
+  SetConsoleCtrlHandler(HandlerRoutine, Add)
+}
+
 #endif // os(Windows)

@@ -35,3 +35,6 @@ int _write(int _FileHandle, const void *_Buf, unsigned int _MaxCharCount);
 // time.h
 typedef long long __time64_t;
 __time64_t _time64(__time64_t *_Time);
+
+// io.h
+int _isatty(int _FileHandle);

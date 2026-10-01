@@ -602,3 +602,57 @@ BOOL SleepConditionVariableSRW(PCONDITION_VARIABLE ConditionVariable, PSRWLOCK S
                                DWORD dwMilliseconds, ULONG Flags);
 void WakeConditionVariable(PCONDITION_VARIABLE ConditionVariable);
 void WakeAllConditionVariable(PCONDITION_VARIABLE ConditionVariable);
+
+// consoleapi.h, consoleapi2.h, wincon.h: consoles
+
+typedef short SHORT;
+
+typedef struct _COORD {
+  SHORT X;
+  SHORT Y;
+} COORD, *PCOORD;
+
+typedef struct _SMALL_RECT {
+  SHORT Left;
+  SHORT Top;
+  SHORT Right;
+  SHORT Bottom;
+} SMALL_RECT, *PSMALL_RECT;
+
+typedef struct _CONSOLE_SCREEN_BUFFER_INFO {
+  COORD dwSize;
+  COORD dwCursorPosition;
+  WORD wAttributes;
+  SMALL_RECT srWindow;
+  COORD dwMaximumWindowSize;
+} CONSOLE_SCREEN_BUFFER_INFO, *PCONSOLE_SCREEN_BUFFER_INFO;
+
+typedef BOOL (*PHANDLER_ROUTINE)(DWORD CtrlType);
+
+#define ENABLE_PROCESSED_INPUT 0x0001
+#define ENABLE_LINE_INPUT 0x0002
+#define ENABLE_ECHO_INPUT 0x0004
+#define ENABLE_WINDOW_INPUT 0x0008
+#define ENABLE_MOUSE_INPUT 0x0010
+#define ENABLE_INSERT_MODE 0x0020
+#define ENABLE_QUICK_EDIT_MODE 0x0040
+#define ENABLE_EXTENDED_FLAGS 0x0080
+#define ENABLE_AUTO_POSITION 0x0100
+#define ENABLE_VIRTUAL_TERMINAL_INPUT 0x0200
+#define ENABLE_PROCESSED_OUTPUT 0x0001
+#define ENABLE_WRAP_AT_EOL_OUTPUT 0x0002
+#define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
+#define DISABLE_NEWLINE_AUTO_RETURN 0x0008
+#define ENABLE_LVB_GRID_WORLDWIDE 0x0010
+
+#define CTRL_C_EVENT 0
+#define CTRL_BREAK_EVENT 1
+#define CTRL_CLOSE_EVENT 2
+#define CTRL_LOGOFF_EVENT 5
+#define CTRL_SHUTDOWN_EVENT 6
+
+BOOL GetConsoleMode(HANDLE hConsoleHandle, LPDWORD lpMode);
+BOOL SetConsoleMode(HANDLE hConsoleHandle, DWORD dwMode);
+BOOL GetConsoleScreenBufferInfo(HANDLE hConsoleOutput,
+                                PCONSOLE_SCREEN_BUFFER_INFO lpConsoleScreenBufferInfo);
+BOOL SetConsoleCtrlHandler(PHANDLER_ROUTINE HandlerRoutine, BOOL Add);
