@@ -230,12 +230,13 @@ final class PThreadMockTests: XCTestCase {
   // waits until the deadline that the timeout gives on it. The mocked
   // clock_gettime leaves the time it reads at zero, so the deadline is the
   // timeout.
-  func testRelativeWaitReadsTheConditionsClock() {
+  func testRelativeWaitReadsTheConditionsClock() throws {
     let objects = Objects()
     let monotonic = MonotonicCondition()
     let borrowed = UnsafeMutablePointer<CInterop.PThreadCondition>.allocate(capacity: 1)
     defer { borrowed.deallocate() }
-    MockingDriver.withMockingEnabled { mocking in
+    // The try in XCTAssertThrowsError's argument makes the closure throwing.
+    try MockingDriver.withMockingEnabled { mocking in
       func expectWait(
         clock: clockid_t, _ condition: UnsafeMutablePointer<CInterop.PThreadCondition>,
         until seconds: Int, _ nanoseconds: Int, line: UInt = #line
