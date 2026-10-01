@@ -513,6 +513,14 @@ standing in for the `_l` forms, which Bionic has only from API levels 26 and
 - **Sites unblocked**: TSC's `Process.swift` (`posix_spawn_file_actions_t`),
   whose Android branch is C's.
 
+### 7.3 linux-3's other Android widenings
+
+Also in linux-3, not yet in system-next: `FilePath.timeZoneDirectory` and
+`defaultTimeZoneFile` (`42616ac`; UNIX gap rank 8, Foundation's
+`TimeZone_Cache`) and `UserEntry.realName` on 32-bit Android (`9d00c35`;
+rank 9, Foundation's `Platform.fullName`). So each row of the UNIX gap list
+that names Android (2, 8 and 9) has its API in linux-3.
+
 ## 8. platforms-2: FreeBSD and OpenBSD
 
 ### 8.1 What the widened branches leave on C there
