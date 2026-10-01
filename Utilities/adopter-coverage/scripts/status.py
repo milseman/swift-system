@@ -43,6 +43,7 @@ sys.path.insert(0, os.path.join(HERE, "..", "..", "api-delta", "scripts"))
 from scan_sources import strip_comments_and_strings  # noqa: E402
 
 import check  # noqa: E402
+import abi  # noqa: E402
 import ecosystem  # noqa: E402
 import platforms  # noqa: E402
 
@@ -907,6 +908,18 @@ class Snapshot:
 PLATFORM_MODULES = ("Darwin", "Glibc", "Musl", "Bionic", "Android", "WASILibc", "ucrt", "WinSDK", "CRT", "visualc")
 IMPORT_PLATFORM = ecosystem.import_of(PLATFORM_MODULES)
 IMPORT_KINDS = ("library", "tests", "other", "nested package")
+# The platform families whose builds are evaluated (platforms.py's names),
+# in the tables' order, with their names there and their own C modules, which
+# the lexical count of a platform's imports looks for. FreeBSD and OpenBSD
+# import the libc overlay named Glibc.
+IMPORT_PLATFORMS = (("Darwin", "Darwin", ("Darwin",)), ("Linux", "Linux (glibc)", ("Glibc",)),
+                    ("Musl", "Musl", ("Musl",)), ("Android", "Android", ("Android", "Bionic")),
+                    ("WASI", "WASI", ("WASILibc",)), ("FreeBSD", "FreeBSD", ("Glibc",)),
+                    ("OpenBSD", "OpenBSD", ("Glibc",)), ("Windows", "Windows", ("ucrt", "WinSDK", "CRT", "visualc")))
+# Each adopter's branches for the platform imports, newest first: the first
+# one its checkout has is read. --platform-branches-for gives a package its
+# own list.
+PLATFORM_BRANCHES = ("migrate-all", "migrate-unix", "migrate-darwin")
 # The scheme's repositories the tracker leaves out.
 NOT_TRACKED = {"swift-system": "System itself, whose imports are what it wraps",
                "swift": "the compiler, the runtime, and the platform modules' own overlays"}
@@ -934,8 +947,12 @@ def import_kind(path, nested):
 
 
 def platform_imports(repo, commit):
-    """{path: (kind, {modules})} for the Swift files at `commit` that import
-    a platform C module, read lexically with comments and strings blanked."""
+    """{path: (kind, {modules}, {platform: T or M})} for the Swift files at
+    `commit` that import a platform C module, read with comments and strings
+    blanked: the modules its imports name in any `#if` branch, and the
+    platforms whose build compiles one of those imports, by platforms.py's
+    evaluation with FOUNDATION_FRAMEWORK false. M is "maybe": a flag the scan
+    can't read decides, or a condition it can't parse."""
     files = tree_files(repo, commit)
     nested = {os.path.dirname(f) for f in files if MANIFEST.match(os.path.basename(f)) and "/" in f}
     candidates = grep_files(repo, commit, "|".join(PLATFORM_MODULES), ["*.swift"], fixed=False)
@@ -943,10 +960,40 @@ def platform_imports(repo, commit):
     out = {}
     for f in candidates:
         code, _ = strip_comments_and_strings(blobs.get(f"{commit}:{f}", ""))
-        modules = {m.group(1) for m in IMPORT_PLATFORM.finditer(code)}
-        if modules:
-            out[f] = (import_kind(f, nested), modules)
+        lines = code.split("\n")
+        found = [(i, im.group(1)) for i, line in enumerate(lines) for im in [IMPORT_PLATFORM.match(line)] if im]
+        if not found:
+            continue
+        try:
+            states, _, _ = platforms.swift_line_states(lines, PACKAGE_MODEL)
+        except (ValueError, IndexError):
+            states = [{p: (platforms.M, []) for p in platforms.PLATFORMS}] * len(lines)
+        compiled = {}
+        for i, _ in found:
+            for p, (v, _) in states[i].items():
+                if compiled.get(p) != platforms.T:
+                    compiled[p] = v
+        out[f] = (import_kind(f, nested), {m for _, m in found}, compiled)
     return out
+
+
+def is_checkout(path):
+    """Whether `path` is the top of a git checkout."""
+    if not os.path.isdir(path):
+        return False
+    top = subprocess.run(["git", "-C", path, "rev-parse", "--show-toplevel"], capture_output=True, text=True)
+    return top.returncode == 0 and os.path.realpath(top.stdout.strip()) == os.path.realpath(path)
+
+
+def newest_branch(path, branches):
+    """(branch, commit) for the first of `branches` that the checkout at
+    `path` has, else (None, None)."""
+    if is_checkout(path):
+        for b in branches:
+            tip = commit_of(path, b)
+            if tip:
+                return b, tip
+    return None, None
 
 
 def scheme_repos(eco):
@@ -958,13 +1005,18 @@ def scheme_repos(eco):
         return [line.split("\t")[0] for line in f if line.strip() and not line.startswith("#")]
 
 
-def import_cell(files, kind):
-    """`n (Darwin a, Glibc b)` for one kind of a repository's files."""
-    of_kind = [mods for k, mods in files.values() if k == kind]
-    if not of_kind:
+def count_cell(n, maybe=0):
+    """`n`, `n (m maybe)`, or — for none."""
+    if not n:
         return "—"
-    counts = collections.Counter(m for mods in of_kind for m in mods)
-    return f"{len(of_kind)} (" + ", ".join(f"{m} {counts[m]}" for m in PLATFORM_MODULES if counts[m]) + ")"
+    return f"{n} ({maybe} maybe)" if maybe else str(n)
+
+
+def compiled_counts(files, platform):
+    """(library files whose build for `platform` compiles a platform import,
+    how many of them only maybe)."""
+    lib = [c for kind, _, c in files.values() if kind == "library"]
+    return sum(1 for c in lib if platform in c), sum(1 for c in lib if c.get(platform) == platforms.M)
 
 
 # ---------------------------------------------------------------- copies from the packages' reports
@@ -1128,9 +1180,106 @@ def api_section(api_dir):
     return meta, "\n".join(report[start:end]).rstrip()
 
 
-def platform_section(w, a, packages):
-    """Section 4, the platform imports of the main scheme's repositories;
-    returns how many were read."""
+def abi_section(w, a, head, api_dir, meta):
+    """Section 1's ABI part: what each module's release build exports at the
+    api-delta's base and at HEAD, by kind, and the added declarations whose
+    code only forwards a C header value."""
+    w("## ABI: exported symbols")
+    w("")
+    os.makedirs(a.abi_work, exist_ok=True)
+    base = meta["baseCommit"]
+    now, then = abi.exports(a.repo, head, a.abi_work, "head"), abi.exports(a.repo, base, a.abi_work, "base")
+    abi.prune(a.abi_work, {now["key"], then["key"]})
+    for side, r in (("HEAD", now), (f"`{meta['baseRef']}`", then)):
+        if r["error"]:
+            w(f"The ABI count reads {side}'s release build, and {r['error']}.")
+            w("")
+    if now["error"] or then["error"]:
+        return
+    # Each side's public declarations, by module, from api-delta's graphs.
+    usrs = {}
+    for side in ("base", "head"):
+        usrs[side] = collections.defaultdict(set)
+        graphs = os.path.join(api_dir, "symbolgraphs", side)
+        for path in sorted(os.listdir(graphs)) if os.path.isdir(graphs) else []:
+            if path.endswith(".symbols.json"):
+                with open(os.path.join(graphs, path)) as f:
+                    usrs[side][path.split("@")[0].split(".")[0]] |= {
+                        s["identifier"]["precise"] for s in json.load(f)["symbols"]}
+    columns = ("property descriptors", "conformances", "types", "public", "other")
+
+    def counts(symbols, module, side):
+        c = collections.Counter()
+        for sym, dem in zip(symbols, abi.demangle(symbols)):
+            kind = abi.symbol_kind(dem)
+            if kind in ("code", "initial values"):
+                sym = sym[1:] if sym.startswith("_") else sym
+                kind = "public" if abi.usr_of(sym, usrs[side][module]) else "other"
+            c[kind] += 1
+        return c
+
+    w(f"What each module's release build exports, at `{meta['baseRef']}` (`{short(base)}`) → HEAD "
+      f"(`{short(head)}`), beside the API points above: `nm`'s external symbols in the objects of "
+      "`swift build -c release`, built from an export of the commit. Every public property exports a property "
+      "descriptor, `@_alwaysEmitIntoClient` or not (the SDK's System does too), so the descriptors grow with the "
+      "API. *Code* is functions and accessors, what `@_alwaysEmitIntoClient` leaves to the client: of *public* "
+      "declarations, in the symbol graphs, and *other*, which the graphs don't show (`@usableFromInline` "
+      "internals, synthesized Equatable and Hashable members, deinitializers, stored properties' initial values).")
+    w("")
+    w("| Module | Exported | Property descriptors | Conformances | Types | Code, public | Code, other |")
+    w("|---|---:|---:|---:|---:|---:|---:|")
+    for m in abi.MODULES:
+        if m not in now["modules"]:
+            continue
+        before = then["modules"].get(m)
+        b = counts(before, m, "base") if before is not None else None
+        c = counts(now["modules"][m], m, "head")
+        cells = [arrow(len(before) if before is not None else "—", len(now["modules"][m]))]
+        cells += [arrow(b[k] if b is not None else "—", c[k]) for k in columns]
+        w(f"| {m} | " + " | ".join(str(x) for x in cells) + " |")
+    w("")
+
+    # The candidates: added declarations whose exported code only forwards.
+    with open(os.path.join(api_dir, "api-delta.json")) as f:
+        entries = [e for e in json.load(f)["entries"] if e["status"] == "added" and e.get("usr") and e.get("file")]
+    exported = {m: set(s[1:] if s.startswith("_") else s for s in syms) for m, syms in now["modules"].items()}
+    found = []
+    for e in entries:
+        code = abi.code_symbols(e["usr"], exported.get(e["module"], set()))
+        if code:
+            found.append((e, code))
+    texts = read_blobs(a.repo, [f"{head}:{e['file']}" for e, _ in found])
+    rows = []
+    for e, code in found:
+        fw = abi.forwarding(texts.get(f"{head}:{e['file']}", ""), e["line"], e["kind"])
+        if fw:
+            rows.append((e, code, fw))
+    w("### Candidates for `@_alwaysEmitIntoClient`")
+    w("")
+    by_module = collections.Counter(e["module"] for e, _, _ in rows)
+    w(f"Of the {len(found)} declarations added since `{meta['baseRef']}` that export code, {len(rows)} only "
+      "forward a C header value" +
+      (" (" + ", ".join(f"{m} {by_module[m]}" for m in abi.MODULES if by_module[m]) + ")" if rows else "") +
+      ": a *constant* is a static member that reads a C macro or enumerator, a *raw value* an initializer that "
+      "stores one (or its getter), and an *accessor* an instance member that reads a C struct's field or tests a "
+      "C constant, through conversions at most. With `@_alwaysEmitIntoClient`, the client would compile that "
+      "code; a property keeps its descriptor. The other declarations' code is stored properties' accessors and "
+      "code that does more than forward.")
+    w("")
+    if rows:
+        w("| Module | Declaration | Forwards | Exports | Where |")
+        w("|---|---|---|---|---|")
+        for e, code, (what, names) in rows:
+            forwards = what + (" " + ", ".join(f"`{n}`" for n in names) if names else "")
+            exports = ", ".join(dict.fromkeys(x for _, x in code))
+            w(f"| {e['module']} | `{cell(e['path'])}` | {forwards} | {exports} | `{e['file']}:{e['line']}` |")
+        w("")
+
+
+def platform_section(w, a, branches, branches_for):
+    """Section 4, the platform imports of the main scheme's repositories,
+    each adopter read at the first of `branches` (or of its own list in
+    `branches_for`) that its checkout has; returns how many were read."""
     w("# 4. Platform imports")
     w("")
     repos = scheme_repos(a.ecosystem) if a.ecosystem else None
@@ -1138,53 +1287,91 @@ def platform_section(w, a, packages):
         w("No ecosystem checkout with a `scheme-main.tsv` was given (`STATUS_ECOSYSTEM`), so nothing was counted.")
         w("")
         return 0
-    adopters = {p["name"]: p for p in packages}
     eco = os.path.relpath(a.ecosystem, a.repo)
     left_out = [r for r in repos if r in NOT_TRACKED]
-    w("The goal: no library of the repositories that swift's update-checkout clones for the main scheme imports a "
-      "platform C module (" + ", ".join(PLATFORM_MODULES) + ") in any form, on any platform. Each repository is "
-      f"read at its migrated clone in `{os.path.relpath(a.adopters, a.repo)}`, on its migration branch (as in "
-      f"*Adopters* above), else at its clone in `{eco}` as it is, else it's *not cloned*. Left out: " +
-      "; ".join(f"{r} ({NOT_TRACKED[r]})" for r in left_out) + ". Each cell is the number of Swift files of that "
-      "kind that import any of the modules, then how many import each; a file under `#if` branches for several "
-      "platforms counts once per module. Kinds are by path (see [How this is computed](#how-this-is-computed)): "
-      "*library* is under `Sources` (or `src`, `lib`, `products`), *tests* under a test directory, *other* the "
-      "rest (benchmarks, examples, tools, plugins, docs, utilities), and a *nested package* is under a "
-      "directory with its own `Package.swift`.")
-    w("")
-    w("| Repository | Read at | Library | Tests | Other | Nested packages | Files |")
-    w("|---|---|---|---|---|---|---:|")
-    totals = {k: collections.Counter() for k in IMPORT_KINDS}
-    any_files = collections.Counter()
-    read, with_library = 0, []
+    rows, read = [], {}
     for r in repos:
         if r in NOT_TRACKED:
             continue
-        p = adopters.get(ADOPTER_DIRS.get(r, r))
+        d = ADOPTER_DIRS.get(r, r)
+        path = os.path.join(a.adopters, d)
+        branch, tip = newest_branch(path, branches_for.get(d, branches))
         clone = os.path.join(a.ecosystem, r)
-        if p:
-            where = f"`{os.path.relpath(p['path'], a.repo)}` `{p['branch']}` @ `{short(p['tip'])}`"
-            files = platform_imports(p["path"], p["tip"])
+        if tip:
+            where = f"`{os.path.relpath(path, a.repo)}` `{branch}` @ `{short(tip)}`"
+            read[r] = platform_imports(path, tip)
         elif os.path.exists(os.path.join(clone, ".git")) and commit_of(clone, "HEAD"):
             commit = commit_of(clone, "HEAD")
             where = f"`{os.path.relpath(clone, a.repo)}` @ `{short(commit)}`"
-            files = platform_imports(clone, commit)
+            read[r] = platform_imports(clone, commit)
         else:
-            w(f"| {r} | not cloned | | | | | |")
+            where = None
+        rows.append((r, where))
+
+    def own_list(names):
+        return ", ".join(names[:-1]) + " or " + names[-1] if len(names) > 1 else names[0]
+
+    others = "; ".join(f"{n}: {own_list(bs)}" for n, bs in sorted(branches_for.items()))
+    w("The goal: no library of the repositories that swift's update-checkout clones for the main scheme imports a "
+      "platform C module (" + ", ".join(PLATFORM_MODULES) + ") in any form, on any platform. Each repository is "
+      f"read at its migrated clone in `{os.path.relpath(a.adopters, a.repo)}`, on its newest migration branch "
+      f"(the first of {', '.join(branches)} that it has" + (f"; {others}" if others else "") + "), else at its "
+      f"clone in `{eco}` as it is, else it's *not cloned*. Left out: " +
+      "; ".join(f"{r} ({NOT_TRACKED[r]})" for r in left_out) + ". A platform's count is the library files whose "
+      "build for that platform compiles an import of one of the modules, with each `#if` evaluated for it by "
+      "adopter-coverage's `platforms.py`: an `import Glibc` under `#elseif canImport(Glibc)`, after a branch that "
+      "Linux takes, counts for FreeBSD and OpenBSD but not for Linux. *Maybe*: files counted because a flag the scan "
+      "can't read (a trait, a build setting) decides whether the import compiles. *Lexical* counts each import in "
+      "any branch, compiled or not, as the tracker did before: for a platform, the files that import its own "
+      "modules (" + "; ".join(f"{name}: {', '.join(mods)}" for _, name, mods in IMPORT_PLATFORMS) + "). Kinds are "
+      "by path (see [How this is computed](#how-this-is-computed)): *library* is under `Sources` (or `src`, `lib`, "
+      "`products`), *tests* under a test directory, *other* the rest (benchmarks, examples, tools, plugins, docs, "
+      "utilities), and a *nested package* is under a directory with its own `Package.swift`; the last three are "
+      "counted lexically only.")
+    w("")
+
+    # The summary by platform, over every repository read.
+    w("| Platform | Library files that import one | Repositories | Library files, lexical |")
+    w("|---|---:|---:|---:|")
+    library = {r: {f: v for f, v in files.items() if v[0] == "library"} for r, files in read.items()}
+    for p, name, mods in IMPORT_PLATFORMS:
+        n = maybe = repos_with = lexical = 0
+        for r, files in library.items():
+            k, km = compiled_counts(files, p)
+            n, maybe, repos_with = n + k, maybe + km, repos_with + (1 if k else 0)
+            lexical += sum(1 for _, ms, _ in files.values() if ms & set(mods))
+        w(f"| {name} | {count_cell(n, maybe)} | {repos_with} | {lexical} |")
+    compiled_any = {r: [f for f, (_, _, c) in files.items() if c] for r, files in library.items()}
+    w(f"| **Any** | {sum(len(fs) for fs in compiled_any.values())} | "
+      f"{sum(1 for fs in compiled_any.values() if fs)} | {sum(len(fs) for fs in library.values())} |")
+    w("")
+
+    w("| Repository | Read at | Library, lexical | " + " | ".join(name.split(" ")[0] for _, name, _ in IMPORT_PLATFORMS)
+      + " | Tests | Other | Nested packages |")
+    w("|---|---|---:|" + "---:|" * len(IMPORT_PLATFORMS) + "---:|---:|---:|")
+    totals = {k: collections.Counter() for k in IMPORT_KINDS}
+    any_files = collections.Counter()
+    for r, where in rows:
+        if where is None:
+            w(f"| {r} | not cloned |" + " |" * (len(IMPORT_PLATFORMS) + 4))
             continue
-        read += 1
-        for kind, mods in files.values():
+        files = read[r]
+        for kind, mods, _ in files.values():
             any_files[kind] += 1
             totals[kind].update(mods)
-        if any(kind == "library" for kind, _ in files.values()):
-            with_library.append(r)
-        cells = " | ".join(import_cell(files, k) for k in IMPORT_KINDS)
-        w(f"| {r} | {where} | {cells} | {len(files)} |")
+        kinds = {k: sum(1 for kind, _, _ in files.values() if kind == k) for k in IMPORT_KINDS}
+        cells = [count_cell(*compiled_counts(files, p)) for p, _, _ in IMPORT_PLATFORMS]
+        w(f"| {r} | {where} | {count_cell(kinds['library'])} | " + " | ".join(cells) + " | "
+          + " | ".join(count_cell(kinds[k]) for k in IMPORT_KINDS[1:]) + " |")
     w("")
-    w(f"{read} repositories read; {len(with_library)} import a platform module in library code"
-      + (": " + ", ".join(with_library) if with_library else "") + ".")
+    compiling = [r for r, fs in compiled_any.items() if fs]
+    dead = [r for r, files in library.items() if files and not compiled_any[r]]
+    w(f"{len(read)} repositories read; {len(compiling)} compile an import of a platform module in library code on "
+      "some platform" + (": " + ", ".join(compiling) if compiling else "") + "." +
+      (f" {len(dead)} more import one in library code only in branches that no platform compiles: "
+       + ", ".join(dead) + "." if dead else ""))
     w("")
-    w("All repositories, files by module and kind:")
+    w("All repositories, files by module and kind, lexically:")
     w("")
     w("| Module | Library | Tests | Other | Nested packages | All |")
     w("|---|---:|---:|---:|---:|---:|")
@@ -1194,7 +1381,7 @@ def platform_section(w, a, packages):
     counts = [any_files[k] for k in IMPORT_KINDS]
     w("| **Any** | " + " | ".join(str(c) for c in counts) + f" | {sum(counts)} |")
     w("")
-    return read
+    return len(read)
 
 
 def main():
@@ -1207,16 +1394,25 @@ def main():
     ap.add_argument("--branch-for", action="append", default=[], metavar="PACKAGE=BRANCH",
                     help="a package's migration branch, where it isn't --branch")
     ap.add_argument("--ecosystem", help="the ecosystem's clones and scheme-main.tsv, for the platform imports")
+    ap.add_argument("--platform-branches", default=",".join(PLATFORM_BRANCHES), metavar="BRANCH,...",
+                    help="the adopters' branches for the platform imports, newest first; the first one a "
+                         "checkout has is read")
+    ap.add_argument("--platform-branches-for", action="append", default=[], metavar="PACKAGE=BRANCH,...",
+                    help="a package's own --platform-branches")
     ap.add_argument("--base", default="main")
     ap.add_argument("--system-next", default="system-next")
     ap.add_argument("--vocab")
     ap.add_argument("--cache", required=True)
+    ap.add_argument("--abi-work", required=True, help="the release builds' scratch and results, for the ABI count")
     ap.add_argument("--date", default=datetime.date.today().isoformat())
     ap.add_argument("--dump-markers", action="store_true", help="print each marker's interfaces and stop")
     a = ap.parse_args()
 
     vocab = load_vocab(a.vocab)
     branch_for = dict(x.split("=", 1) for x in a.branch_for)
+    platform_branches = [b for b in a.platform_branches.split(",") if b]
+    platform_branches_for = {n: [b for b in bs.split(",") if b]
+                             for n, bs in (x.split("=", 1) for x in a.platform_branches_for)}
     head = commit_of(a.repo, "HEAD")
     branch = git(a.repo, "rev-parse", "--abbrev-ref", "HEAD").strip()
     nxt = commit_of(a.repo, a.system_next)
@@ -1230,10 +1426,7 @@ def main():
     packages = []
     for d in sorted(os.listdir(a.adopters)):
         path = os.path.join(a.adopters, d)
-        if not os.path.isdir(path):
-            continue
-        top = subprocess.run(["git", "-C", path, "rev-parse", "--show-toplevel"], capture_output=True, text=True)
-        if top.returncode != 0 or os.path.realpath(top.stdout.strip()) != os.path.realpath(path):
+        if not is_checkout(path):
             continue
         pkg_branch = branch_for.get(d, a.branch)
         tip = commit_of(path, pkg_branch)
@@ -1299,6 +1492,7 @@ def main():
     w("")
     w(api_text)
     w("")
+    abi_section(w, a, head, a.api_delta, meta)
 
     # ---- 2. Adoption
     w("# 2. Adoption")
@@ -1527,7 +1721,7 @@ def main():
     w("")
 
     # ---- 4. Platform imports
-    tracked = platform_section(w, a, packages)
+    tracked = platform_section(w, a, platform_branches, platform_branches_for)
 
     w("# How this is computed")
     w("")
@@ -1544,11 +1738,27 @@ def main():
 
 METHOD = """
 `Utilities/adopter-coverage/status.sh` makes this file from commits, with git and the existing tools, and no
-reading of reports for meaning. It takes about as long as api-delta when System's sources have changed since
-api-delta's last run, and a few seconds when they haven't.
+reading of reports for meaning. It takes about as long as api-delta and a release build when System's sources
+have changed since their last runs, and a few seconds when they haven't.
 
 - **API** is api-delta's own report (`BASE_REF=main HEAD_REF=HEAD`), its Summary and *By area* table copied
   verbatim. api-delta reruns only when `Sources/`, `Package.swift` or the tool changed since its last run.
+- **ABI symbols** are the external symbols, less the private externs, that `nm` finds in each module's objects
+  from `swift build -c release`, built from a `git archive` export of HEAD and of api-delta's base commit, with
+  the manifest patched as api-delta patches it (no Samples, so no network). A result is cached by the commit's
+  `Sources` and `Package.swift` trees, so only a change to either rebuilds. Each symbol is sorted by its demangled
+  form into property descriptors, conformances (descriptors and witness tables), types (metadata and
+  descriptors) and code (functions, accessors, initial values). Code is *public* when it belongs to a
+  declaration in api-delta's symbol graphs, by USR: a function's symbol is its USR's mangling, and a property's
+  accessors replace the USR's `vp` with `vg`, `vs`, `vM` and the like. A *candidate* is an added declaration
+  that exports code and whose body, on the lines the macOS release build compiles, is one expression (a getter
+  and a setter for a property; for an initializer, stores into `rawValue` or a delegation to
+  `init(rawValue:)`) that calls nothing but conversions (a type's initializer, `numericCast`, Duration's unit
+  factories) and reads a C name: an all-caps macro or enumerator or System's `_`-prefixed accessor for one, or a
+  snake_case field, which System's own names never are. Rejected: swift-api-digester's ABI mode (`-dump-sdk
+  -abi`), which lists declarations, not what a build exports (no property descriptors, conformances or
+  metadata, and an `@_alwaysEmitIntoClient` function that exports nothing); and a library-evolution build, as
+  the SDK's is, which a check exported nearly the same set from (REPORT.md section 50).
 - **Package targets** come from `swift package dump-package` on the package's manifests at each commit, cached
   by the manifests' blob ids, with SwiftPM's default paths (`Sources/<target>`, `Tests/<target>`) where a
   target gives none, and its `sources` and `exclude`. A manifest that doesn't evaluate falls back to
@@ -1617,20 +1827,30 @@ api-delta's last run, and a few seconds when they haven't.
   only groups them in the work list.
 - **Families** group the ranked interfaces for the work list: the provisional families, then a fixed map of
   name patterns to System's clusters, else the marker's phrase, else the name itself.
-- **Platform imports** (section 4) are lexical, like ecosystem.py's survey: each Swift file, with comments and
-  string literals blanked, is matched against the survey's import pattern (`import_of` in `scripts/ecosystem.py`),
-  widened to Darwin, Glibc, Musl, Bionic, Android, WASILibc, ucrt, WinSDK, CRT and visualc, in every form: the whole
-  module, a submodule, one declaration, with `@_exported` or another attribute, and with an access modifier. It
-  doesn't evaluate `#if`: an import under `#if os(Linux)` counts as Glibc's, since the goal is none on any
-  platform. Each repository of `scheme-main.tsv` is read at a commit: its migrated clone's migration branch (the
-  adopters' branch, or its `--branch-for` override: swift-foundation's `no-darwin`), else the ecosystem clone's
-  HEAD. A file's kind is by its path: in a nested package if a directory above it, below the root, has a
-  `Package.swift`; else tests if a directory in its path is a test directory (`Tests`, `IntegrationTests`,
-  `Fixtures`, `unittests` and the like); else library under a top-level `Sources`, `Source`, `src`, `srcs`, `lib`
-  or `products`, outside a `.docc` catalog; else other. Rejected: the manifests' targets, as the Adoption section
-  uses them, which needs every clone's manifest evaluated (swift-foundation's needs a newer compiler than 6.2)
-  and says nothing of nested packages; and platforms.py's `#if` evaluation, which answers what one platform's
-  build compiles, not whether any does.
+- **Platform imports** (section 4) are found as ecosystem.py's survey finds them: each Swift file, with comments
+  and string literals blanked, is matched against the survey's import pattern (`import_of` in
+  `scripts/ecosystem.py`), widened to Darwin, Glibc, Musl, Bionic, Android, WASILibc, ucrt, WinSDK, CRT and visualc,
+  in every form: the whole module, a submodule, one declaration, with `@_exported` or another attribute, and with
+  an access modifier. Then each `#if` is evaluated for each platform family by adopter-coverage's `platforms.py`
+  (Darwin is macOS; Linux is glibc; Musl, Android, WASI, FreeBSD, OpenBSD and Windows as its environments
+  describe them), with FOUNDATION_FRAMEWORK false, as in the Adoption section, and a library file counts for a
+  platform when an import of any of the modules is on a line that platform's build compiles. `canImport` finds
+  the platform's own modules and the cross-platform ones `platforms.py` lists, not the package's own or its
+  dependencies' (no manifest is read); an unknown flag or trait is *maybe*, counted, and so is every import in a
+  file whose conditions don't parse. The lexical count, every import in any branch, stands beside it: per
+  repository, the library files that import any of the modules; per platform, those that import the platform's
+  own modules (Glibc for Linux, FreeBSD and OpenBSD). Each repository of `scheme-main.tsv` is read at a commit:
+  its migrated clone's newest migration branch (the first of `--platform-branches` it has, by default
+  migrate-all, migrate-unix, migrate-darwin; `--platform-branches-for` gives a package its own list:
+  swift-foundation's migrate-unix, else no-darwin), else the ecosystem clone's HEAD. A file's kind is by its path:
+  in a nested package if a directory above it, below the root, has a `Package.swift`; else tests if a directory
+  in its path is a test directory (`Tests`, `IntegrationTests`, `Fixtures`, `unittests` and the like); else
+  library under a top-level `Sources`, `Source`, `src`, `srcs`, `lib` or `products`, outside a `.docc` catalog;
+  else other. Only library files are evaluated. Rejected: the manifests' targets, as the Adoption section uses
+  them, which needs every clone's manifest evaluated (swift-foundation's needs a newer compiler than 6.2) and says
+  nothing of nested packages, so a target that a manifest builds only for some platforms counts wherever its
+  `#if`s let it; and the lexical count alone, which counts an `import Glibc` under `#elseif canImport(Glibc)`,
+  after a branch that Linux takes, as Linux's.
 """
 
 

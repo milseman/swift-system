@@ -14,15 +14,28 @@ Darwin; grouped here into clusters and ranked by packages, then call sites. `eco
 toolchain's packages, and `ecosystem.sh --popular report` for popular.tsv's (section 37). Counts are in the runs'
 reports and in STATUS.md, not here.
 
-**Resume here** (coverage-3 stopped 2026-09-30, done; STATUS.md regenerated at the stop). Section 40's rows are all
-closed (sections 41 to 43), both queues are empty and popular.tsv needs no fourth batch (section 44), the
-`_version: 346` gates stay (section 45), `Utilities/linux/build.sh --quiet` exists (section 46), and STATUS.md's
-section 4 tracks the platform imports (section 47). Nothing is uncommitted. Open, for a next lane:
+**Resume here** (coverage-4, worktree `../coverage-4`, from system-next `bb950db`; stopped 2026-10-01, done; STATUS.md
+regenerated at the stop, section 52). Its brief, rows C1 to C4, and what they leave for others:
+
+| # | Item | State |
+|---|---|---|
+| C1 | STATUS.md section 4 per platform, each adopter at its newest migration branch | done (section 49, `30007dd`) |
+| C2 | Section 1: the symbols the built SystemPackage exports, and the added declarations that export one only to forward a C value | done (section 50, `c7b71cc`); a need for the Threads owner (its finding 2) |
+| C3 | windows-2's patch P3, the Win32 sources in `Sources/System/CMakeLists.txt` | done (section 48, `8caa741`) |
+| C4 | A `_SystemPackageForPlugin` product (O2 below) | done (section 51, `79ee4f7`), with a link under Sources/ |
+| N1 | `Threads/PThreadReadWriteLock.swift`'s platform import block, which a library-evolution build needs (section 50, finding 2) | the Threads owner's file |
+| N2 | SystemSockets' forwarding declarations without `@_alwaysEmitIntoClient` (STATUS.md section 1's list) | Michael's call; the sockets owner's files |
+| N3 | sourcekit-lsp's and swift-tools-protocols' plugin copies on `_SystemPackageForPlugin`, with `-module-alias SystemPackage=_SystemPackageForPlugin` (section 51) | the adopters' lanes |
+
+coverage-3 stopped 2026-09-30, done: section 40's rows are all closed (sections 41 to 43), both queues are empty and
+popular.tsv needs no fourth batch (section 44), the `_version: 346` gates stay (section 45),
+`Utilities/linux/build.sh --quiet` exists (section 46), and STATUS.md's section 4 tracks the platform imports
+(section 47). Open from it:
 
 | # | Item | State |
 |---|---|---|
 | O1 | Linux, Windows and WASI builds of sections 42 and 43's API: `CInterop.Offset` everywhere, PIPE_BUF and cancellation off Darwin | unbuilt; `Utilities/linux/build.sh --quiet test` when the container service runs |
-| O2 | A `_SystemPackageForPlugin` product for sourcekit-lsp's plugins (the packages-5 lane's ask) | Package.swift, outside this lane's files |
+| O2 | A `_SystemPackageForPlugin` product for sourcekit-lsp's plugins (the packages-5 lane's ask) | done: coverage-4's C4 (section 51) |
 | O3 | A join that tells a cancelled thread from one that returned (section 43) | open |
 | O4 | Why Foundation's build ignores `_version` (section 45) | open, Foundation's |
 | O5 | A fourth popular batch | not needed now (section 44); the alternative is there |
@@ -1236,3 +1249,161 @@ per kind, and a module-by-kind table the totals. The counts are there, not here.
   evaluation, which answers what one platform's build compiles, not whether any does.
 - `--branch-for` (`STATUS_BRANCHES`) sets a package's migration branch for the adoption and gaps sections too, whose
   header names it when it isn't the default; `STATUS_ECOSYSTEM` points at the clones.
+
+## 48. coverage-4: windows-2's P3, the Win32 sources in CMake: `8caa741`
+
+The coverage-4 lane (worktree `../coverage-4`, from system-next `bb950db`, after the 2026-10-01 convergence merge) took
+four rows: STATUS.md's section 4 per platform, ABI symbols in section 1, windows-2's CMake patch, and the plugin
+product (the Resume-here table's C1 to C4).
+
+`Sources/System/CMakeLists.txt` now lists the twelve Win32 sources that windows-2 added after `b63bce9`: its patch P3
+(Prototype/Win32/REPORT.md section 22), applied with `git apply` as it stands. They are DynamicLibraryWindows,
+PathsWindows, ProcessEnvironmentWindows, ProcessIDWindows, Win32Console, Win32FileInformation, Win32Process,
+Win32ProcessCreation, Win32Synchronization, Win32Thread, Win32Time and Win32Wait. The block stays in byte order, as
+the others are (Win32FileIO before Win32FileInformation).
+
+Check: CI's comparison (`.github/workflows/pull_request.yml`, CMake Validation), redone here with `swift package
+describe` and the file's `add_library` and `target_sources` lists. Before, the twelve were SwiftPM's only sources
+missing from CMake; after, none is, and CMake's only extras are the Linux-only IORing files in its conditional block.
+Nothing builds CMake here.
+
+## 49. STATUS.md's section 4, per platform: `30007dd`
+
+Section 4 now counts what each platform's build compiles, not each import in any branch.
+
+- **Branches.** Each adopter is read at its newest migration branch, the first of migrate-all, migrate-unix and
+  migrate-darwin that its checkout in `../adopters` has (swift-foundation: migrate-unix, else no-darwin), named in the
+  table's *Read at*. `../adopters-unix`'s checkouts are worktrees of `../adopters`' and share their branches, so
+  nothing reads them. `--platform-branches` and `--platform-branches-for` (`STATUS_PLATFORM_BRANCHES`,
+  `STATUS_PLATFORM_BRANCHES_FOR`) set the lists. Sections 2 and 3 stay on migrate-darwin (swift-foundation's
+  no-darwin) against main: they measure the Darwin migration and its markers. Rejected: moving them to the newest
+  branches too, which would mix other platforms' work into the Darwin migration's merge-base comparison.
+- **Evaluation.** Each library file's `#if`s are evaluated by platforms.py for its eight families (Darwin as macOS,
+  Linux as glibc, Musl, Android, WASI, FreeBSD, OpenBSD, Windows), with FOUNDATION_FRAMEWORK false as in section 2.
+  A file counts for a platform when that platform's build compiles one of its platform-module imports. An unknown
+  flag or trait makes an import *maybe*, which counts, and the cell says how many: the evaluator's own rule, and
+  the goal's, since an import that some configuration compiles is still there. Rejected: counting only what surely
+  compiles, which would drop WasmKit's trait-gated files that its default builds compile. A file whose conditions
+  don't parse counts as maybe everywhere, as section 2's fallback does.
+- **The lexical count stands beside it**: per repository, the library files with any import; per platform, in the
+  summary, the files that import the platform's own modules (Glibc for Linux, FreeBSD and OpenBSD), so the
+  difference is the dead branches. Tests, other code and nested packages stay lexical, as counts, and the
+  module-by-kind table stays as it was.
+- **A summary by platform** opens the section: the library files whose build imports one, the repositories with
+  any, and the lexical count. The per-repository module lists are gone; the platform columns say more.
+- `canImport` finds the platform's own modules and platforms.py's cross-platform ones, but not a package's own or
+  its dependencies' (no manifest is read). Checked at the adopters' commits of 2026-10-01: the only `canImport` of
+  any other module that guards a platform import is swift-foundation's EmscriptenLibc, false on all eight, rightly.
+- Spot checks: swift-nio's NIOLock.swift imports Glibc only under `#elseif canImport(Glibc)`, after a branch for
+  `canImport(Darwin) || os(Linux) || os(Android)`, so it counts for FreeBSD and OpenBSD, not Linux;
+  Subprocess+BSD.swift's Glibc is FreeBSD's and OpenBSD's; swift-foundation's three Darwin imports that Darwin doesn't
+  compile are under FOUNDATION_FRAMEWORK.
+
+**Finding: platforms.py read `$Embedded` as true.** It took every `$Feature` atom as true, and WasmKit guards its
+platform code with `#if !$Embedded`, so those files were dead on every platform, here and in section 2's macOS count.
+`$Feature` now answers as hasFeature does: false for FALSE_FEATURES (Embedded), true otherwise. check.sh's and
+ecosystem.sh's extractions of WasmKit change the same way at their next runs, which are full runs anyway: these edits
+change adopter-coverage's tool id.
+
+## 50. Section 1's ABI symbols: `c7b71cc`
+
+Michael's ask: beside the API points, the number of symbols the built SystemPackage exports, and the added public
+declarations that export a symbol although they only forward a C header value, the candidates for
+`@_alwaysEmitIntoClient`. Sources are unchanged; the list is STATUS.md's.
+
+- **What's counted.** `scripts/abi.py` builds HEAD and api-delta's base commit (`swift build -c release --target
+  SystemSockets`, from a `git archive` export patched as api-delta patches it, so no network), and `nm -gUm` lists
+  each module's external symbols, less the private externs. A result is cached by the commit's `Sources` and
+  `Package.swift` trees, so main builds again only when it moves. The table sorts them by their demangled form:
+  property descriptors, conformances, types, and code (functions and accessors), public when it belongs to a
+  declaration of api-delta's symbol graphs (by USR) and other when it doesn't (`@usableFromInline` internals,
+  synthesized Equatable and Hashable members, deinitializers, initial values). SystemSockets is counted too, since
+  it holds a fifth of the additions.
+- **nm, not swift-api-digester.** The digester's ABI mode (`-dump-sdk -abi`) runs with Swift 6.2, but it lists
+  declarations, not what the build exports: no property descriptors, conformance records or metadata, and the
+  `@_alwaysEmitIntoClient` declarations that export nothing are in it. A release build, since a debug build's
+  `-enable-testing` exports internal declarations too.
+- **Not library evolution.** The SDK's System is built with it, but SystemPackage doesn't build with
+  `-enable-library-evolution` (finding 2). With that file patched in a scratch copy, it exported nearly the same set
+  as the plain release build: only the plain build exports stored properties' initial values, OwnedFD's three
+  addressors, a few protocol witnesses and the synthesized `__derived_*_equals` functions, and only the evolution
+  build those types' `==` operators. Alternative, once the file is fixed: count the library-evolution build, which
+  would match the SDK's own.
+- **Candidates.** An added declaration that exports code and whose body, on the lines the macOS release build
+  compiles, is one expression (a getter and a setter for a property; stores into `rawValue` or a delegation to
+  `init(rawValue:)` for an initializer) that calls nothing but conversions (a type's initializer, `numericCast`,
+  Duration's unit factories) and reads a C name: an all-caps macro or enumerator, System's `_`-prefixed accessor
+  for one, or a snake_case field. Each row says which kind, the C names, what it exports and where. Rejected: a
+  list of every exporting declaration without AEIC, which would put stored properties (which can't be AEIC) and
+  `description`s beside the constants.
+
+Findings:
+
+1. **A property descriptor comes with every public property, `@_alwaysEmitIntoClient` or not**, and they're most of
+   what System exports. The SDK's own `libswiftSystem.tbd` (macOS 26) has them for `Errno`'s and
+   `FileDescriptor.AccessMode`'s constants, which are AEIC. AEIC removes a property's accessors, not its descriptor.
+2. **SystemPackage doesn't build with library evolution.** `Threads/PThreadReadWriteLock.swift` uses
+   `CInterop.PThreadReadWriteLock` (Darwin's `pthread_rwlock_t`, from `_DarwinFoundation2`) in `@usableFromInline`
+   and `@_alwaysEmitIntoClient` code without importing a platform module, and library evolution requires the file
+   to import the module its inlinable code names. Seven errors, that file only. Its siblings, such as
+   PThreadMutex.swift, have the `#if SYSTEM_PACKAGE_DARWIN import Darwin ... #endif` block it lacks. A need outside
+   this lane's files, for the Threads owner; nothing in CI builds with library evolution.
+3. **Every candidate is SystemSockets'.** SystemPackage's additions mark their forwarding code
+   `@_alwaysEmitIntoClient`; what they export is stored properties' accessors, `description`s, attribute-buffer
+   readers and the like. SystemSockets' candidates are `ResolutionFlags`' and `ReverseResolutionFlags`' constants
+   and raw-value initializers, `TCPConnectionInfo`'s fields, and the ancillary message header's level and type.
+   They stay as they are: the brief asked for the list, and SystemSockets is outside this lane's files.
+
+Checks: no Swift changed. A run of status.py into a scratch file printed both parts, and the candidate rules were
+read against every added declaration that exports code: those they turn down are buffer readers, string
+conversions, `description`s, memberwise and failable initializers, and stored properties.
+
+## 51. `_SystemPackageForPlugin`: `79ee4f7`
+
+The packages-5 lane's ask (O2): each of sourcekit-lsp's plugin dylibs links a SystemPackage, and a process that loads
+a plugin beside its host holds two copies, whose Swift classes the Objective-C runtime reports as implemented in
+both (PACKAGES-5-REPORT.md, "Two copies of SystemPackage"). swift-tools-protocols answers the same problem for
+SKLogging with `_SKLoggingForPlugin`: the same sources as a module of another name.
+
+- **Shape.** A `_SystemPackageForPlugin` library product and target, with SystemPackage's dependency, excludes and
+  settings, whose path, `Sources/_SystemPackageForPlugin`, is a symbolic link to `System`, as swift-tools-protocols'
+  `Sources/_SKLoggingForPlugin` links to `SKLogging/`. SwiftPM refuses two targets with one path ("has overlapping
+  sources", checked in a scratch package), so the link is what lets the sources build twice. A plugin target depends
+  on the product and imports it as SystemPackage with `-module-alias SystemPackage=_SystemPackageForPlugin`, as
+  `_SKLoggingForPlugin` aliases its own dependency; swift-tools-protocols' `systemPackageForPlugin`
+  (Package.swift:31) would name the product, and sourcekit-lsp's `…ForPlugin` targets would add the alias. The
+  manifest's comment gives the recipe.
+- **Not on Windows.** Git for Windows checks a symbolic link out as a plain file unless it's set to make links, and
+  SwiftPM then rejects the target's path, so the whole package would fail to load for those Windows clients. The
+  manifest declares the product only when the host evaluating it isn't Windows. sourcekit-lsp's dependency on
+  System is Darwin's only. Alternatives: declare it everywhere, as swift-tools-protocols does (its Windows CI makes
+  links); or declare it wherever the link is a directory, read with FileManager in the manifest.
+- **Cost.** swift-system's own builds compile its sources twice, since a root package builds all its targets: on
+  this machine, about 10 s more of a debug build's wall time (33 s of CPU) whenever Sources/System changes. No
+  SwiftPM setting keeps a root package from building a target, and declaring it only on request (an environment
+  variable) would hide it from clients too.
+- **Files.** The link is the one new file outside this lane's files, and the product needs it; it can't collide
+  with the lanes editing Sources/. CMake is unchanged (it adds only `CSystem` and `System`), and CI's CMake
+  comparison reads the SystemPackage target by name.
+
+Checks:
+- `swift build` builds `_SystemPackageForPlugin`, its symbols mangled under the new name
+  (`$s23_SystemPackageForPlugin5ErrnoV…`), and `swift package describe` gives it SystemPackage's sources.
+- A scratch client (in `.build`, deleted after) with a host target on SystemPackage and a plugin target on
+  `_SystemPackageForPlugin` with the alias, linked into one executable: it builds and runs, printing `FilePath` from
+  the host and `_SystemPackageForPlugin.FilePath` from the plugin, two types, as the plugin's copy needs.
+- api-delta's `patch_manifest.py` still applies to the manifest (it drops Samples).
+
+## 52. coverage-4's stop: tests and STATUS.md: this commit
+
+STATUS.md is regenerated once, here, at `79ee4f7`: section 1 with the ABI table and the candidates, section 4 per
+platform at the adopters' newest branches. The run rebuilt api-delta (Sources and Package.swift changed) and HEAD's
+release build; main's came from the cache.
+
+Tests, `swift build && swift test`: before any change (`bb950db`) and after the last change to Package.swift and
+Sources (`79ee4f7`), the same both times: XCTest 572 tests, 5 skipped (dup3, pipe2 twice, the root-only credentials
+spawn, the controlling terminal), 0 failures; swift-testing 502 tests in 82 suites, passed. Only the plugin target
+is new to the build; no Swift source changed.
+
+Scratch: the probes, the scratch client and the logs under `.build/c4-scratch` are deleted, and so is this worktree's
+`.build` (status.sh's caches included; the next run rebuilds them).
