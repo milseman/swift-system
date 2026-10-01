@@ -14,15 +14,18 @@ Darwin; grouped here into clusters and ranked by packages, then call sites. `eco
 toolchain's packages, and `ecosystem.sh --popular report` for popular.tsv's (section 37). Counts are in the runs'
 reports and in STATUS.md, not here.
 
-**Resume here** (coverage-4, worktree `../coverage-4`, from system-next `bb950db` on 2026-10-01; in progress). Its
-brief, rows C1 to C4:
+**Resume here** (coverage-4, worktree `../coverage-4`, from system-next `bb950db`; stopped 2026-10-01, done; STATUS.md
+regenerated at the stop, section 52). Its brief, rows C1 to C4, and what they leave for others:
 
 | # | Item | State |
 |---|---|---|
 | C1 | STATUS.md section 4 per platform, each adopter at its newest migration branch | done (section 49, `30007dd`) |
 | C2 | Section 1: the symbols the built SystemPackage exports, and the added declarations that export one only to forward a C value | done (section 50, `c7b71cc`); a need for the Threads owner (its finding 2) |
 | C3 | windows-2's patch P3, the Win32 sources in `Sources/System/CMakeLists.txt` | done (section 48, `8caa741`) |
-| C4 | A `_SystemPackageForPlugin` product (O2 below) | done (section 51), with a link under Sources/ |
+| C4 | A `_SystemPackageForPlugin` product (O2 below) | done (section 51, `79ee4f7`), with a link under Sources/ |
+| N1 | `Threads/PThreadReadWriteLock.swift`'s platform import block, which a library-evolution build needs (section 50, finding 2) | the Threads owner's file |
+| N2 | SystemSockets' forwarding declarations without `@_alwaysEmitIntoClient` (STATUS.md section 1's list) | Michael's call; the sockets owner's files |
+| N3 | sourcekit-lsp's and swift-tools-protocols' plugin copies on `_SystemPackageForPlugin`, with `-module-alias SystemPackage=_SystemPackageForPlugin` (section 51) | the adopters' lanes |
 
 coverage-3 stopped 2026-09-30, done: section 40's rows are all closed (sections 41 to 43), both queues are empty and
 popular.tsv needs no fourth batch (section 44), the `_version: 346` gates stay (section 45),
@@ -1355,7 +1358,7 @@ Checks: no Swift changed. A run of status.py into a scratch file printed both pa
 read against every added declaration that exports code: those they turn down are buffer readers, string
 conversions, `description`s, memberwise and failable initializers, and stored properties.
 
-## 51. `_SystemPackageForPlugin`: this commit
+## 51. `_SystemPackageForPlugin`: `79ee4f7`
 
 The packages-5 lane's ask (O2): each of sourcekit-lsp's plugin dylibs links a SystemPackage, and a process that loads
 a plugin beside its host holds two copies, whose Swift classes the Objective-C runtime reports as implemented in
@@ -1390,3 +1393,17 @@ Checks:
   `_SystemPackageForPlugin` with the alias, linked into one executable: it builds and runs, printing `FilePath` from
   the host and `_SystemPackageForPlugin.FilePath` from the plugin, two types, as the plugin's copy needs.
 - api-delta's `patch_manifest.py` still applies to the manifest (it drops Samples).
+
+## 52. coverage-4's stop: tests and STATUS.md: this commit
+
+STATUS.md is regenerated once, here, at `79ee4f7`: section 1 with the ABI table and the candidates, section 4 per
+platform at the adopters' newest branches. The run rebuilt api-delta (Sources and Package.swift changed) and HEAD's
+release build; main's came from the cache.
+
+Tests, `swift build && swift test`: before any change (`bb950db`) and after the last change to Package.swift and
+Sources (`79ee4f7`), the same both times: XCTest 572 tests, 5 skipped (dup3, pipe2 twice, the root-only credentials
+spawn, the controlling terminal), 0 failures; swift-testing 502 tests in 82 suites, passed. Only the plugin target
+is new to the build; no Swift source changed.
+
+Scratch: the probes, the scratch client and the logs under `.build/c4-scratch` are deleted, and so is this worktree's
+`.build` (status.sh's caches included; the next run rebuilds them).
