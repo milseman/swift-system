@@ -13,23 +13,12 @@
 // copy it loads first, and SystemPackage loads CSystem's copy when it calls
 // a CSystem function that takes the type, as timerfd_settime took
 // itimerspec, and so timespec. MemberImportVisibility then hides the type's
-// members from clients, which don't import CSystem (#320), and a client
-// can't find the extensions, such as System's accessors, that a module
-// compiled against the other copy declares. So under Swift on glibc, glibc's
-// module comes first: the includes below then find its headers already
-// included, and declare none of its types again. (<features.h>, which
-// declares no types, says whether this is glibc.) For Musl and Bionic, whose
-// modules this doesn't import, beyond these this header includes none of
-// the headers that the C library's Swift module includes, and the shims
-// below take their types as `void *`, while shims.c includes the real
-// headers. The thread shims need only <sys/types.h>'s pthread_t and pid_t;
-// <pthread.h> and <sched.h> would declare timespec and sched_param here.
-#if __has_include(<features.h>)
-#include <features.h>
-#endif
-#if defined(__swift__) && defined(__GLIBC__)
-#pragma clang module import SwiftGlibc
-#endif
+// members from clients, which don't import CSystem (#320). So beyond these,
+// this header includes none of the headers that glibc's Swift module
+// includes, and the shims below take their types as `void *`, while shims.c
+// includes the real headers. The thread shims need only <sys/types.h>'s
+// pthread_t and pid_t; <pthread.h> and <sched.h> would declare timespec and
+// sched_param here.
 #include <sys/epoll.h>
 #include <sys/eventfd.h>
 #include <sys/sysinfo.h>
