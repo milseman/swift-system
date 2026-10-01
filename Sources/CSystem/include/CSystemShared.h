@@ -71,4 +71,32 @@ extern void csystem_sigaction_set_handler(void *action, void *handler);
 extern int csystem_posix_spawn_file_actions_addchdir(void *actions, const char *path);
 extern int csystem_posix_spawn_file_actions_addfchdir(void *actions, int fd);
 extern int csystem_posix_spawn_file_actions_addclosefrom(void *actions, int from);
+
+#if defined(__ANDROID__)
+// posix_spawn, posix_spawnp, and the attribute and file action calls that
+// Sources/System/Processes makes, which Bionic has from API level 28 (and
+// declares only from it, with nullability that has changed between NDK
+// releases); below it, these return ENOSYS. `attributes` points to a
+// posix_spawnattr_t, `actions` to a posix_spawn_file_actions_t, and `mask`
+// to a sigset_t.
+extern int csystem_posix_spawn(int *pid, const char *path, const void *actions,
+                               const void *attributes, char *const arguments[],
+                               char *const environment[]);
+extern int csystem_posix_spawnp(int *pid, const char *file, const void *actions,
+                                const void *attributes, char *const arguments[],
+                                char *const environment[]);
+extern int csystem_posix_spawnattr_init(void *attributes);
+extern int csystem_posix_spawnattr_destroy(void *attributes);
+extern int csystem_posix_spawnattr_getflags(const void *attributes, short *flags);
+extern int csystem_posix_spawnattr_setflags(void *attributes, short flags);
+extern int csystem_posix_spawnattr_setpgroup(void *attributes, int group);
+extern int csystem_posix_spawnattr_setsigmask(void *attributes, const void *mask);
+extern int csystem_posix_spawnattr_setsigdefault(void *attributes, const void *mask);
+extern int csystem_posix_spawn_file_actions_init(void *actions);
+extern int csystem_posix_spawn_file_actions_destroy(void *actions);
+extern int csystem_posix_spawn_file_actions_addopen(void *actions, int fd, const char *path,
+                                                    int flags, unsigned int mode);
+extern int csystem_posix_spawn_file_actions_adddup2(void *actions, int fd, int target);
+extern int csystem_posix_spawn_file_actions_addclose(void *actions, int fd);
+#endif // defined(__ANDROID__)
 #endif // !defined(_WIN32) && !defined(__wasi__)

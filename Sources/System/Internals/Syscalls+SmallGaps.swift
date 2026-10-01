@@ -88,13 +88,18 @@ internal func system_readpassphrase(
 }
 #endif
 
-#if !os(watchOS) && !os(tvOS) && !os(Android)
+#if !os(watchOS) && !os(tvOS)
 // posix_spawnattr_getflags, which returns an error number. Like the
-// posix_spawnattr setters in Syscalls+Processes.swift, it has no mock hook.
+// posix_spawnattr setters in Syscalls+Processes.swift, it has no mock hook,
+// and on Android it's a CSystem shim.
 internal func system_posix_spawnattr_getflags(
   _ attributes: UnsafePointer<_SpawnAttributesStorage>, _ flags: UnsafeMutablePointer<CShort>
 ) -> CInt {
+#if os(Android)
+  csystem_posix_spawnattr_getflags(attributes, flags)
+#else
   posix_spawnattr_getflags(attributes, flags)
+#endif
 }
 #endif
 

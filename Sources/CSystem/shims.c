@@ -579,6 +579,78 @@ extern int csystem_posix_spawn_file_actions_addclosefrom(void *actions, int from
   return ENOSYS;
   #endif
 }
+
+#if defined(__ANDROID__)
+// Bionic has these from API level 28, and below it doesn't declare them.
+#if __ANDROID_API__ >= 28
+#define CSYSTEM_SPAWN_API_28(call) return call
+#else
+#define CSYSTEM_SPAWN_API_28(call) return ENOSYS
+#endif
+
+extern int csystem_posix_spawn(int *pid, const char *path, const void *actions,
+                               const void *attributes, char *const arguments[],
+                               char *const environment[]) {
+  CSYSTEM_SPAWN_API_28(posix_spawn(pid, path, actions, attributes, arguments, environment));
+}
+
+extern int csystem_posix_spawnp(int *pid, const char *file, const void *actions,
+                                const void *attributes, char *const arguments[],
+                                char *const environment[]) {
+  CSYSTEM_SPAWN_API_28(posix_spawnp(pid, file, actions, attributes, arguments, environment));
+}
+
+extern int csystem_posix_spawnattr_init(void *attributes) {
+  CSYSTEM_SPAWN_API_28(posix_spawnattr_init(attributes));
+}
+
+extern int csystem_posix_spawnattr_destroy(void *attributes) {
+  CSYSTEM_SPAWN_API_28(posix_spawnattr_destroy(attributes));
+}
+
+extern int csystem_posix_spawnattr_getflags(const void *attributes, short *flags) {
+  CSYSTEM_SPAWN_API_28(posix_spawnattr_getflags(attributes, flags));
+}
+
+extern int csystem_posix_spawnattr_setflags(void *attributes, short flags) {
+  CSYSTEM_SPAWN_API_28(posix_spawnattr_setflags(attributes, flags));
+}
+
+extern int csystem_posix_spawnattr_setpgroup(void *attributes, int group) {
+  CSYSTEM_SPAWN_API_28(posix_spawnattr_setpgroup(attributes, group));
+}
+
+extern int csystem_posix_spawnattr_setsigmask(void *attributes, const void *mask) {
+  CSYSTEM_SPAWN_API_28(posix_spawnattr_setsigmask(attributes, mask));
+}
+
+extern int csystem_posix_spawnattr_setsigdefault(void *attributes, const void *mask) {
+  CSYSTEM_SPAWN_API_28(posix_spawnattr_setsigdefault(attributes, mask));
+}
+
+extern int csystem_posix_spawn_file_actions_init(void *actions) {
+  CSYSTEM_SPAWN_API_28(posix_spawn_file_actions_init(actions));
+}
+
+extern int csystem_posix_spawn_file_actions_destroy(void *actions) {
+  CSYSTEM_SPAWN_API_28(posix_spawn_file_actions_destroy(actions));
+}
+
+extern int csystem_posix_spawn_file_actions_addopen(void *actions, int fd, const char *path,
+                                                    int flags, unsigned int mode) {
+  CSYSTEM_SPAWN_API_28(posix_spawn_file_actions_addopen(actions, fd, path, flags, (mode_t)mode));
+}
+
+extern int csystem_posix_spawn_file_actions_adddup2(void *actions, int fd, int target) {
+  CSYSTEM_SPAWN_API_28(posix_spawn_file_actions_adddup2(actions, fd, target));
+}
+
+extern int csystem_posix_spawn_file_actions_addclose(void *actions, int fd) {
+  CSYSTEM_SPAWN_API_28(posix_spawn_file_actions_addclose(actions, fd));
+}
+
+#undef CSYSTEM_SPAWN_API_28
+#endif // defined(__ANDROID__)
 #endif // !defined(_WIN32) && !defined(__wasi__)
 
 #ifdef __linux__

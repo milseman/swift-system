@@ -10,9 +10,9 @@
 // PROTOTYPE: exploring process and signal API. Not API. See Prototype/Processes
 // for the design and Sources/Samples/Process*.swift for uses.
 
-// posix_spawn is unavailable on watchOS and tvOS, and this package doesn't
-// wrap it on Android; see Internals/Syscalls+Processes.swift.
-#if !os(Windows) && !os(WASI) && !os(watchOS) && !os(tvOS) && !os(Android)
+// posix_spawn is unavailable on watchOS and tvOS, and on Android it needs
+// API level 28; see Internals/Syscalls+Processes.swift.
+#if !os(Windows) && !os(WASI) && !os(watchOS) && !os(tvOS)
 
 import CSystem
 #if SYSTEM_PACKAGE_DARWIN
@@ -21,6 +21,8 @@ import Darwin
 import Glibc
 #elseif canImport(Musl)
 import Musl
+#elseif canImport(Android)
+import Android
 #else
 #error("Unsupported Platform")
 #endif
@@ -173,7 +175,7 @@ extension SpawnAttributes {
     @available(*, unavailable, renamed: "resetIDs")
     public static var POSIX_SPAWN_RESETIDS: Flags { resetIDs }
 
-    #if SYSTEM_PACKAGE_DARWIN || os(Linux)
+    #if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
     /// Makes the child the leader of a new session,
     /// and of a new process group in it,
     /// with no controlling terminal.
@@ -184,7 +186,7 @@ extension SpawnAttributes {
     /// The corresponding C constant is `POSIX_SPAWN_SETSID`.
     ///
     /// - Note: Only available on Darwin, from macOS 10.15,
-    ///   and on Linux, from glibc 2.26.
+    ///   on Linux, from glibc 2.26, and on Android.
     @_alwaysEmitIntoClient
     public static var createSession: Flags { Flags(rawValue: _POSIX_SPAWN_SETSID) }
 
@@ -426,6 +428,9 @@ extension ProcessID {
   /// this method throws the error that the child's `exec` failed with,
   /// such as ``Errno/noSuchFileOrDirectory``,
   /// and no child is left to reap.
+  ///
+  /// On Android, whose C library has `posix_spawn` from API level 28,
+  /// a program built for an earlier level throws ``Errno/noFunction``.
   ///
   /// The corresponding C function is `posix_spawn`.
   @_alwaysEmitIntoClient
@@ -827,4 +832,4 @@ extension ProcessID {
   #endif
 }
 
-#endif // !os(Windows) && !os(WASI) && !os(watchOS) && !os(tvOS) && !os(Android)
+#endif // !os(Windows) && !os(WASI) && !os(watchOS) && !os(tvOS)

@@ -188,7 +188,7 @@ extension ChildProcess {
   }
 }
 
-#if !os(watchOS) && !os(tvOS) && !os(Android)
+#if !os(watchOS) && !os(tvOS)
 @available(System 199, *)
 extension ChildProcess {
   /// Starts a child process running a program,
@@ -230,6 +230,6 @@ extension ChildProcess {
       fileActions: fileActions, attributes: attributes))
   }
 }
-#endif // !os(watchOS) && !os(tvOS) && !os(Android)
+#endif // !os(watchOS) && !os(tvOS)
 
 #endif // !os(Windows) && !os(WASI)
