@@ -77,7 +77,7 @@ extension FilePath {
     }
     #endif
 
-    #if canImport(Darwin, _version: 346) || os(FreeBSD)
+    #if SYSTEM_PACKAGE_DARWIN && canImport(Darwin, _version: 346) || os(FreeBSD)
     /// If the path does not reside in the hierarchy beneath the starting directory, return an error.
     ///
     /// The corresponding C constant is `AT_RESOLVE_BENEATH`.

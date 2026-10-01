@@ -597,7 +597,7 @@ final class FilePathOperationsTest: XCTestCase {
     XCTAssertEqual(
       FilePath.ResolutionFlags.symlinkNoFollowAny.rawValue, AT_SYMLINK_NOFOLLOW_ANY)
     #endif
-    #if canImport(Darwin, _version: 346) || os(FreeBSD)
+    #if SYSTEM_PACKAGE_DARWIN && canImport(Darwin, _version: 346) || os(FreeBSD)
     XCTAssertEqual(FilePath.ResolutionFlags.resolveBeneath.rawValue, AT_RESOLVE_BENEATH)
     #endif
   }
@@ -711,7 +711,7 @@ final class FilePathOperationsTest: XCTestCase {
           XCTAssertEqual($0 as? Errno, .notDirectory)
         }
 
-        #if canImport(Darwin, _version: 346) || os(FreeBSD)
+        #if SYSTEM_PACKAGE_DARWIN && canImport(Darwin, _version: 346) || os(FreeBSD)
         XCTAssertThrowsError(
           try FilePath("../elsewhere").unlink(relativeTo: dir, flags: .resolveBeneath)
         ) {
