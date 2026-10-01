@@ -534,7 +534,8 @@ extension Win32.FileHandle {
   ///
   /// Unless `path` begins with `\\?\` or `\\.\`, it's resolved against the
   /// current directory and canonicalized first, and gets the `\\?\` prefix
-  /// if it's longer than `MAX_PATH`.
+  /// if it's long enough to need one, as
+  /// ``Win32/fullPath(of:extendedLengthPrefix:)`` does.
   ///
   /// The corresponding C function is `CreateFileW`.
   @_alwaysEmitIntoClient
@@ -679,6 +680,9 @@ extension Win32.DirectoryHandle {
 
 @available(System 199, *)
 extension Win32 {
+  /// Opens a file with `CreateFileW`. For a handle with synchronous I/O,
+  /// the default, it rejects `FILE_FLAG_OVERLAPPED`; for an overlapped one,
+  /// it adds the flag.
   @usableFromInline
   internal static func _createFile(
     _ path: FilePath,
@@ -688,12 +692,18 @@ extension Win32 {
     flagsAndAttributes: DWORD,
     inheritable: Bool,
     securityDescriptor: PSECURITY_DESCRIPTOR?,
-    templateFile: HANDLE?
+    templateFile: HANDLE?,
+    overlapped: Bool = false
   ) -> Result<(handle: HANDLE, lastError: DWORD), Win32.Error> {
-    // Checked on the combined value, so the bit can't arrive through
-    // FileAttributes(rawValue:) either.
-    guard flagsAndAttributes & _FILE_FLAG_OVERLAPPED == 0 else {
-      return .failure(.invalidParameter)
+    var flagsAndAttributes = flagsAndAttributes
+    if overlapped {
+      flagsAndAttributes |= _FILE_FLAG_OVERLAPPED
+    } else {
+      // Checked on the combined value, so the bit can't arrive through
+      // FileAttributes(rawValue:) either.
+      guard flagsAndAttributes & _FILE_FLAG_OVERLAPPED == 0 else {
+        return .failure(.invalidParameter)
+      }
     }
     return _withCanonicalPath(path) { path in
       var securityAttributes = SECURITY_ATTRIBUTES(
@@ -766,13 +776,17 @@ internal enum _Win32SizedResult<Success> {
 ///
 /// Like the `FileDescriptor` adapters, this resolves the path against the
 /// current directory and collapses dot segments with `GetFullPathNameW`, then
-/// canonicalizes it with `PathAllocCanonicalize`, which adds the `\\?\`
-/// prefix to a path longer than `MAX_PATH`, except that a resolved path
+/// canonicalizes it with `PathAllocCanonicalize`, except that a resolved path
 /// beginning with `\\.\` isn't canonicalized. Unlike the adapters, it passes
 /// a path that begins with `\\?\` or `\\.\` through untouched: `\\?\` means
-/// "pass this path through verbatim".
+/// "pass this path through verbatim". `prefix` says when the result gets the
+/// `\\?\` prefix: by default, at `CreateDirectoryW`'s limit, the lowest of
+/// the path functions', whether or not the process is long-path aware, where
+/// the adapters' `PATHCCH_ALLOW_LONG_PATHS` adds it only past `MAX_PATH`, and
+/// only in a process that isn't.
 internal func _withCanonicalPath<Success>(
   _ path: FilePath,
+  prefix: Win32.ExtendedLengthPrefix = .whenNeeded,
   _ body: (UnsafePointer<WCHAR>) -> Result<Success, Win32.Error>
 ) -> Result<Success, Win32.Error> {
   path.withPlatformString { path -> Result<Success, Win32.Error> in
@@ -793,7 +807,18 @@ internal func _withCanonicalPath<Success>(
         // A DOS device name, such as NUL, resolves to a \\.\ path, which
         // PathAllocCanonicalize would mangle.
         if _isVerbatimOrDevicePath(fullPath) { return .success(body(fullPath)) }
-        return .success(_withCanonicalizedPath(fullPath, body))
+        let flags: ULONG
+        switch prefix {
+        case .never:
+          return .success(body(fullPath))
+        case .whenNeeded:
+          // The length doesn't count the terminator, and the limit does.
+          flags = Int(length) + 1 >= _win32DirectoryMaxPath
+            ? _PATHCCH_ENSURE_IS_EXTENDED_LENGTH_PATH : _PATHCCH_ALLOW_LONG_PATHS
+        case .always:
+          flags = _PATHCCH_ENSURE_IS_EXTENDED_LENGTH_PATH
+        }
+        return .success(_withCanonicalizedPath(fullPath, flags: flags, body))
       }
       switch outcome {
       case .success(let result): return result
@@ -816,11 +841,11 @@ internal func _isVerbatimOrDevicePath(_ path: UnsafePointer<WCHAR>) -> Bool {
 
 internal func _withCanonicalizedPath<Success>(
   _ fullPath: UnsafePointer<WCHAR>,
+  flags: ULONG,
   _ body: (UnsafePointer<WCHAR>) -> Result<Success, Win32.Error>
 ) -> Result<Success, Win32.Error> {
   var canonical: PWSTR? = nil
-  let result = system_PathAllocCanonicalize(
-    fullPath, ULONG(truncatingIfNeeded: PATHCCH_ALLOW_LONG_PATHS.rawValue), &canonical)
+  let result = system_PathAllocCanonicalize(fullPath, flags, &canonical)
   defer {
     if let canonical { _ = system_LocalFree(canonical) }
   }
@@ -837,12 +862,7 @@ internal func _withCanonicalizedPath<Success>(
 /// and Windows treats such a code as an `HRESULT` wherever it expects a
 /// system error code.
 internal func _win32Error(fromHRESULT result: HRESULT) -> DWORD {
-  let bits = DWORD(bitPattern: result)
-  // HRESULT_FACILITY: bits 16 through 28.
-  if (bits >> 16) & 0x1FFF == _FACILITY_WIN32 {
-    return bits & 0xFFFF
-  }
-  return bits
+  Win32.HResult(rawValue: result).win32Error?.rawValue ?? DWORD(bitPattern: result)
 }
 
 #endif // os(Windows)

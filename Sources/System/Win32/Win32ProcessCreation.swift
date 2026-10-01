@@ -158,7 +158,10 @@ extension Win32.ProcessHandle {
   ///     strings by name, ignoring case, as Windows requires of an
   ///     environment block, and keeps strings with the same name in order.
   ///   - currentDirectory: The program's current directory, or `nil` for the
-  ///     calling process's.
+  ///     calling process's. A relative path is resolved against the calling
+  ///     process's. Unlike other paths, it doesn't get the `\\?\` prefix,
+  ///     which Windows doesn't support for a current directory, so one
+  ///     longer than `MAX_PATH` works only for a long-path-aware program.
   ///   - standardInput: The program's standard input, or `nil` for the
   ///     calling process's. The program receives a duplicate, so the handle
   ///     stays the caller's to close. The handle is borrowed, not consumed.
@@ -261,8 +264,10 @@ extension Win32 {
     defer {
       for case let handle? in inherited { _ = system_CloseHandle(handle) }
     }
+    // Windows doesn't support the \\?\ prefix for a current directory, so
+    // Rust's Command::current_dir removes it.
     return _withOptionalCanonicalPath(application) { application in
-      _withOptionalCanonicalPath(currentDirectory) { currentDirectory in
+      _withOptionalCanonicalPath(currentDirectory, prefix: .never) { currentDirectory in
         _withStandardHandleList(inherited) { attributes in
           var startupInfo = STARTUPINFOEXW()
           var creationFlags = flags | _CREATE_UNICODE_ENVIRONMENT
@@ -431,10 +436,11 @@ extension Win32 {
 /// `nil`.
 internal func _withOptionalCanonicalPath<Success>(
   _ path: FilePath?,
+  prefix: Win32.ExtendedLengthPrefix = .whenNeeded,
   _ body: (UnsafePointer<WCHAR>?) -> Result<Success, Win32.Error>
 ) -> Result<Success, Win32.Error> {
   guard let path else { return body(nil) }
-  return _withCanonicalPath(path) { body($0) }
+  return _withCanonicalPath(path, prefix: prefix) { body($0) }
 }
 
 /// Calls `body` with the storage of `buffer`, or with `nil`.

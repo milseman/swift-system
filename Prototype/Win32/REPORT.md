@@ -1,4 +1,4 @@
-# The windows-api and windows-2 lanes
+# The windows-api, windows-2 and windows-3 lanes
 
 System's Win32 namespace, from the drafts in `../win32-drafts/` (SYS-0010 to SYS-0016), in their order: the
 `Win32` namespace and `Win32.Error`, file handles, file types, file I/O, byte-range locking, volume information,
@@ -11,29 +11,28 @@ Darwin, before any change (`6a9833f`): XCTest 565 tests (4 skipped), swift-testi
 passing. After each commit: the same, since every new file compiles to nothing on Darwin.
 
 The windows-2 lane (sections 11 on, base system-next at `4365f83`) applies patches P1 and P2 of section 10, then
-adds API for the adopters' top Windows gaps of section 8, in its order, checked the same way.
+adds API for the adopters' top Windows gaps of section 8, in its order, checked the same way. The windows-3 lane
+(sections 23 on, base system-next at `bb950db`) continues that list, then the gaps the earlier sections left.
 
-**Resume here:** windows-api's parts are done (sections 1 to 10). windows-2 stopped at convergence, 2026-10-01,
-with nothing in progress. Done, one section and commit each: P1 and P2 (section 11, `037de61`, `5d843d5`),
-processes (12, `92a1dbd`), process creation and thread handles (13, `e84b953`), clocks and sleeping (14,
-`91b6894`), SRW locks and condition variables (15, `a3eb00c`), consoles and standard handles (16, `649fcd9`),
-well-known directories (17, `b63bce9`), dynamic loading (18, `257fb78`), environment variables (19, `0ed04ff`),
-and file information (20, the last commit); system-next was merged at `ed762e3`.
-- **Next**: the rest of section 8's list, in order: long paths (a public form of `_withCanonicalPath`, or
-  wrapping the calls that need it); threads (creating them, and fiber-local storage, on `Win32.ThreadHandle`);
-  `Win32.HResult`; path operations (create, remove, rename, copy, link, and the POSIX-semantics delete and rename
-  dispositions); overlapped I/O; system information; Winsock.
-- **Left within done gaps**: a Windows `BrokenDownTime` over the UCRT's time functions (14); a Windows
+**Resume here:** windows-api's parts are done (sections 1 to 10), and so are windows-2's (11 to 22: P1 and P2,
+then section 8's gaps from processes to file information). windows-3, in progress: long paths (section 23,
+`315f25b`), threads (24, `054e9e2`), `HRESULT` (25, `b89b78c`), path operations (26, `8326373`), overlapped I/O (27,
+`d479525`), system information (28, `c04d6b1`), and Winsock, as a design (29, the last commit). Section 8's
+list is done.
+- **Next, left within done gaps**: a Windows `BrokenDownTime` over the UCRT's time functions (14); a Windows
   `ProcessID.exit(_:)` and `exitImmediately(_:)` (12); `CRITICAL_SECTION` (15); attaching, freeing and
   generating console events, and `SetStdHandle` (16); `AddDllDirectory` (18); a quoting helper for command lines
-  (13).
-- **For other lanes**: P3 (section 22) must land with the next merge of this branch, or CI's CMake job fails on
-  system-next, which merged `b63bce9` without it. The PlatformEnum samples' Windows arms differ from
-  `Win32.ProcessHandle` (section 21).
-- **Tests**: no Windows test has run; each section lists what a Windows run must check. At the last commit:
-  Darwin `swift build` and `swift test`, XCTest 572 tests (5 skipped) and swift-testing 502 tests in 82 suites,
-  all passing; `check-windows.sh` compiles the Win32 files and the 19 Windows test files. No Linux build was run in
-  this lane.
+  (13); and packages-5's Windows gaps (`../adopters/PACKAGES-5-REPORT.md`, "Gaps, across platforms"):
+  `ProcessID.ExitCode`'s `success` and `failure`, and `FileStream.setBuffering`.
+- **For other lanes**: P3 (section 22) landed on system-next with coverage-4 (`8caa741`, merged here at
+  `bb225ab`). The CMake list still lacks this lane's files, so the Win32 block in the windows-3 patches section must
+  land with this branch's next merge, or CI's CMake job fails. P4 there brings `FileDescriptor`'s Windows
+  canonicalization to section 23's rule. The PlatformEnum samples' Windows arms differ from `Win32.ProcessHandle`
+  (section 21).
+- **Tests**: no Windows test has run; each section lists what a Windows run must check. At each commit, Darwin
+  `swift build` and `swift test` pass, with the same tests skipped as before the lane (for counts, see
+  `Prototype/Status/STATUS.md`), and `check-windows.sh` compiles the Win32 files and the Windows test files. No
+  Linux build was run in these lanes.
 
 ## How it was checked
 
@@ -1245,3 +1244,549 @@ P3 with the next merge of this branch, which brings the rest.
  target_link_libraries(SystemPackage PUBLIC
    CSystem)
 ```
+
+## 23. windows-3: long paths: `315f25b`
+
+The ninth gap of section 8. swift-foundation, swift-subprocess and swift-build each carry a copy of the
+canonicalization that `FileDescriptor`'s Windows adapters use (`withCanonicalPathRepresentation`:
+`GetFullPathNameW`, device paths left alone, then `PathAllocCanonicalize`), swift-build's with the traps that P2
+fixed in System's. Foundation's always adds the `\\?\` prefix (`PATHCCH_ENSURE_IS_EXTENDED_LENGTH_PATH`), "since we
+don't know if this is a directory"; the other two add it past `MAX_PATH` (`PATHCCH_ALLOW_LONG_PATHS`). SwiftPM
+calls `GetFullPathNameW` alone, and its comment expects the prefix from it. swift-tools-support-core's
+`resolveSymlinks`, its `realpath`, and Foundation's `removingNTPathPrefix` remove the prefix with
+`PathCchStripPrefix`.
+
+What:
+- `Win32LongPaths.swift`: `Win32.ExtendedLengthPrefix` (`never`, `whenNeeded`, `always`);
+  `Win32.fullPath(of:extendedLengthPrefix:)` (`GetFullPathNameW`, then `PathAllocCanonicalize`); and
+  `Win32.removingExtendedLengthPrefix(from:)` (`PathCchStripPrefix`).
+- `FilePathResolutionWindows.swift`: `FilePath.canonicalized()`, and `canonicalized(_:)` for a C string of
+  `CInterop.PlatformChar`, on Windows, over `GetFinalPathNameByHandleW`.
+- The namespace's own canonicalization (`_withCanonicalPath`, in `Win32Open.swift`) adds the prefix by
+  `whenNeeded`'s rule, and `ProcessHandle.create`'s current directory gets none.
+
+Which API: **Win32, and `canonicalized()` shared.** A full path, with Windows' rules for the prefix, is a Win32
+concept. `realpath`'s, the absolute path of an existing file with its links resolved, is the same on Windows, so it
+shares `FilePath.canonicalized()`, which the packages-5 lane wants on Windows for indexstore-db's `URLUtils.swift`,
+and which swift-tools-support-core implements by hand.
+
+Design calls, with the alternatives rejected:
+- **The public form returns a path.** A path can be resolved once and passed to many calls, as
+  `FilePathWindows.swift`'s FIXME wishes the adapters did, and the call needs no closure. Rejected: a closure form,
+  as System's internal one and the adopters' copies are, which saves an allocation but needs a typed and an
+  untyped overload, since Swift 6.2 doesn't infer a closure's typed throws.
+- **The prefix starts at 248 characters with the terminator, `CreateDirectoryW`'s limit, in every process**, which
+  is Rust's rule (`get_long_path`'s `LEGACY_MAX_PATH`). Rejected: `PATHCCH_ALLOW_LONG_PATHS`'s rule, the adapters',
+  which adds the prefix only past `MAX_PATH` and only where the process isn't long-path aware, so a directory of
+  248 to 259 characters can't be created there; and Foundation's, always, which `.always` offers.
+- **The namespace follows the same rule**, so a path from `fullPath(of:)` resolves to itself: paths of 247 to 259
+  characters, and long paths in a long-path-aware process, now get the prefix where they didn't. File functions
+  take either form. The exception is a current directory, for which Windows doesn't support the prefix (Rust's
+  `Command::current_dir` removes it), so `ProcessHandle.create(currentDirectory:)` now passes the full path
+  without one, `.never`; before, a current directory past `MAX_PATH` got the prefix where the process wasn't
+  long-path aware.
+- **Three cases, not a `Bool`**: `never` is the form for a current directory, and for display, and it's what
+  SwiftPM's `_normalized` computes. A path that begins with `\\?\` or `\\.\` passes through in each, as it did.
+- **`removingExtendedLengthPrefix(from:)` doesn't throw.** `PathCchStripPrefix` fails only for a buffer over
+  32,768 characters, and the path comes back unchanged then, as from Foundation's `removingNTPathPrefix` on any
+  failure.
+- **`canonicalized()` opens the file with no access rights and backup semantics**, so an unreadable file and a
+  directory resolve, and asks for its normalized DOS path. Its doc says how the result differs from `realpath`'s:
+  `..` is removed before the lookup, so `link\..` is the link's own directory; a mapped drive's file gets a UNC
+  path; the case is the file system's. Errors are `Errno`, the signature's, through `Errno(approximating:)`.
+- **`canonicalized()` keeps the prefix only where `whenNeeded` would add it.** Rejected: removing it always, as
+  swift-tools-support-core does, which gives long results that only a long-path-aware process can use; and keeping
+  it, `finalPath`'s form, which no other platform's result resembles.
+
+Tests: `Win32LongPathsTests`. They change the process's current directory, which XCTest allows.
+
+A Windows run must check:
+- `testInternalConstantsMatchTheSDK`.
+- `testRelativePathsResolveAgainstTheCurrentDirectory`: dot segments, a forward slash, trailing dots and spaces; a
+  full path resolves to itself; `.never` and `.always`.
+- `testThePrefixStartsAtCreateDirectorysLimit` (246 characters get no prefix, 247 do) and
+  `testDirectoriesAtTheLimitCanBeCreated` (`CreateDirectoryW` of a 250-character path from `fullPath(of:)`).
+- `testUNCPaths`: `\\?\UNC\` for `.always`, lexically, with no server.
+- `testVerbatimAndDevicePathsAreUnchanged`, in all three cases; `NUL` resolves to `\\.\NUL`, which relies on
+  Windows still doing that for a bare device name.
+- `testRemovingThePrefix`: a drive path and a UNC path lose it, and a volume GUID path keeps it, which assumes
+  `PathCchStripPrefix` returns `S_FALSE` for one.
+- `testCurrentDirectoriesOfNewProcessesHaveNoPrefix`: a 250-character current directory works for cmd.exe.
+- `testCanonicalizedFiles` (relative, in the wrong case, through a missing directory's `..`, the C-string overload,
+  and ENOENT), `testCanonicalizedResolvesJunctions` (a junction made with `mklink /J`), and
+  `testCanonicalizedKeepsThePrefixWhereNeeded`.
+- `Win32FileHandleTests.testLongAndVerbatimPaths`, and the other tests' paths, which now get the prefix from 247
+  characters.
+- Not covered: a long-path-aware process, network shares and mapped drives, drive-relative paths (`D:file`), and
+  `fullPath(of:)` of an empty path.
+
+## 24. windows-3: threads: `054e9e2`
+
+The tenth gap of section 8, the first of its last group. NIO starts its threads with `_beginthreadex`, names them
+(`SetThreadDescription`, `GetThreadDescription`), and keeps its thread-specific values in fiber-local storage
+(`FlsAlloc` with a destructor, `FlsGetValue`, `FlsSetValue`, `FlsFree`), as Foundation's `_ThreadLocal` does
+without a destructor; swift-subprocess starts its threads with `_beginthreadex`, and swift-tools-support-core
+yields with `SwitchToThread`. The thread handles and IDs they also use are section 13's.
+
+What:
+- `Win32ThreadCreation.swift`: `Win32.ThreadHandle.create(stackSize:suspended:inheritable:_:)` (`_beginthreadex`),
+  `name()` and `setName(_:)` (`GetThreadDescription`, `SetThreadDescription`), and `Win32.yield()`
+  (`SwitchToThread`).
+- `Win32FiberLocal.swift`: `Win32.FiberLocalKey<Value>`, with `init()` (`FlsAlloc`), `value()` (`FlsGetValue`),
+  `setValue(_:)` (`FlsSetValue`), and a deinit that frees the index (`FlsFree`).
+- `Win32.Error.notEnoughMemory` (8), which creating a thread can throw, and one of section 1's candidates.
+
+Which API: **Win32.** `PThread` wraps pthreads, which Windows doesn't have, so Windows' threads are
+`Win32.ThreadHandle`s, and its thread-specific storage is a Win32 type, both shaped like their `PThread`
+counterparts where the concepts agree.
+
+Design calls, with the alternatives rejected:
+- **`_beginthreadex`, not `CreateThread`.** Microsoft's documentation of `CreateThread` says that a thread that
+  calls the C runtime should come from `_beginthreadex`, or the C runtime can end the process when it can't
+  allocate the thread's data, and Swift's runtime calls the C runtime; NIO and swift-subprocess follow it.
+  Rejected: `CreateThread`, as Rust's standard library calls it. The errors are still Win32's: `_beginthreadex`
+  leaves `CreateThread`'s last error, and its own failure, an allocation, leaves none, for which System throws
+  `notEnoughMemory`.
+- **The closure returns nothing, and the exit code is 0**, as `PThread`'s closure returns nothing. Rejected: a
+  closure that returns the exit code, which swift-subprocess's helper takes, and whose callers all return 0.
+- **The handle doesn't wait for the thread.** It's section 13's owner, whose deinit closes the handle and lets the
+  thread run, where `PThread`'s deinit joins; waiting is `waitForExit()`. Rejected: a second thread owner that
+  waits in its deinit, which would reopen `PThread`'s deinit question (`Prototype/ThreadDeinit`) for a type that
+  section 13 settled.
+- **`stackSize` is the stack's reservation** (`STACK_SIZE_PARAM_IS_A_RESERVATION`), as Rust passes it, since what
+  a caller limits is how far the stack grows; without the flag, it's the initial commitment. `nil` is the
+  executable's default, and a size a `DWORD` can't hold is `invalidParameter`.
+- **No mock hook for `_beginthreadex`**, unlike the other C runtime calls: a mocked call would start no thread to
+  run the closure. `PThread`'s hook releases the closure and reports the calling thread as the new one.
+- **The names are `name()` and `setName(_:)`**, `PThread.ID`'s for the same concept, rather than Windows'
+  "description", which reads as `CustomStringConvertible`'s. They need a handle, so there's no `setCurrentName`;
+  `ThreadHandle.current()` gives one. They're linked directly, as NIO links them; Windows 10 1607 exports them
+  from KernelBase.dll alone, which is why Rust looks them up at run time.
+- **`FiberLocalKey` is fiber-local storage, not thread-local**: FLS calls a destructor, and TLS (`TlsAlloc`)
+  doesn't, and both adopters use FLS. Its shape is `PThread.Key`'s, a boxed value per thread that the C callback
+  releases, and what differs is documented: destroying a key destroys every thread's value, on the destroying
+  thread, as `FlsFree` does, where POSIX leaks the other threads'. Rejected: nesting it in `ThreadHandle`, as
+  `PThread.Key` is in `PThread`, since a key belongs to no handle; and a name for threads, which a thread that runs
+  fibers contradicts.
+- **`yield()` returns whether another thread ran**, as `SwitchToThread` reports, and is `@discardableResult`;
+  `PThread.yield()` is its POSIX counterpart.
+- **Not wrapped**: `ExitThread` and `_endthreadex`, `PThread.exit()`'s counterparts (a thread from `create` ends by
+  returning); priorities and affinity; `CompareObjectHandles`, with which NIO compares thread handles, and which
+  `threadID()` replaces; TLS; and fibers themselves.
+
+Tests: `Win32ThreadCreationTests`, with threads from `create` itself, and Dispatch's semaphores.
+
+A Windows run must check:
+- `testInternalConstantsMatchTheSDK`, and `notEnoughMemory` in `Win32ErrorTests.testCodesMatchTheSDK`.
+- `testCreatingAThread` (the closure runs on another thread, the exit code is 0, and `inheritable`),
+  `testClosingTheHandleLetsTheThreadRun`, and `testSuspendedThreads` (nothing runs until `resume()`, which returns
+  1).
+- `testStackReservation`: a 4 MiB reservation is what `GetCurrentThreadStackLimits` reports, which assumes its
+  limits span the whole reservation; `testInvalidStackSizesAreRejected`.
+- `testNames`: an unnamed thread's name is empty, a name with a non-ASCII character round-trips, a null character
+  is rejected, and a `.synchronize`-only handle gets `accessDenied`, through `E_ACCESSDENIED`'s Win32 code.
+- `testYield`, only that it returns.
+- `testFiberLocalValues`, `testReplacedValuesAreDestroyed`, `testValuesAreDestroyedWhenTheirThreadExits`, and
+  `testDestroyingAKeyDestroysEveryThreadsValue`, which relies on `FlsFree` calling the callback for a value of
+  another thread that's still running.
+- Not covered: running out of FLS indexes, fibers, and a thread that ends through `ExitThread`.
+
+## 25. windows-3: HRESULT: `b89b78c`
+
+The next gap of section 8, and SYS-0010's future direction. swift-foundation, swift-build and swift-subprocess
+each define `SUCCEEDED`, `HRESULT_CODE`, `HRESULT_FACILITY` and `WIN32_FROM_HRESULT` for themselves, Foundation's
+and swift-build's with the conversions P2 fixed in System (`DWORD(hr)` traps on a failure, and their
+`HRESULT_FACILITY` shifts left); they compare results with `S_OK`; SwiftPM and swift-build test `SHGetKnownFolderPath`'s
+result with their own `SUCCEEDED`; and swift-subprocess's `WindowsError` has a case for an `HRESULT`.
+
+What: `Win32HResult.swift`: `Win32.HResult`, a `@frozen` struct over `HRESULT` (`RawRepresentable`,
+`Swift.Error`, `Sendable`, `Hashable`, `Codable`), with:
+- `init(rawValue:)`, `init(_:)`, and `init(win32Error:)` (`HRESULT_FROM_WIN32`);
+- `isSuccess` and `isFailure` (`SUCCEEDED`, `FAILED`), `facility` and `code` (`HRESULT_FACILITY`,
+  `HRESULT_CODE`), and `win32Error`, the Win32 code of a failure in `FACILITY_WIN32`, as SYS-0010 sketches it;
+- `ok` and `false` (`S_OK`, `S_FALSE`), and the ten failures of Microsoft's "Common HRESULT values":
+  `aborted`, `accessDenied`, `unspecifiedFailure`, `invalidHandle`, `invalidArgument`, `noInterface`,
+  `notImplemented`, `outOfMemory`, `invalidPointer` and `unexpectedFailure`;
+- `description`, the system's message (`FormatMessageW`), and `debugDescription`, such as
+  `E_ACCESSDENIED (0x80070005)`, or `HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND) (0x80070002)` for a Win32 code
+  that `Win32.Error` names.
+
+System's internal conversion of a failed `HRESULT` to a `Win32.Error` (`_win32Error(fromHRESULT:)`, for
+`PathAllocCanonicalize` and the thread names) now goes through `win32Error`; its results are unchanged.
+
+Design calls, with the alternatives rejected:
+- **System's API keeps throwing `Win32.Error`**, as SYS-0010 has it, where a function it wraps returns an
+  `HRESULT`: one error type for the namespace. `HResult` is for the functions System doesn't wrap, the Shell's and
+  COM's, so it conforms to `Swift.Error` for code that throws what such a function returns, as swift-subprocess's
+  error type holds one. Rejected: throwing `HResult` from System's `HRESULT`-returning wrappers, which would give
+  callers two error types to catch from one namespace.
+- **No `~=` for untyped catches**, unlike `Win32.Error`'s: `HResult` names `accessDenied` and `invalidHandle` as
+  `Win32.Error` does, and a second disfavored operator would make `catch .accessDenied` depend on overload ranking
+  again (section 1). A typed catch matches through `Equatable`; an untyped one casts.
+- **The codes are literals**, as `Win32.Error`'s are, and here must be: Swift imports no failure code from
+  `winerror.h`, which spells them through `_HRESULT_TYPEDEF_`, a function-like macro, and a negative `HRESULT`'s
+  literal overflows even when cast directly (checked on macOS with the SDK's spelling). Only `S_OK` and `S_FALSE`
+  import, so the tests check the others against `winerror.h`'s values and the Win32 codes they carry.
+- **`facility` and `code` are `UInt16`**, the widths of the 13- and 16-bit fields, rather than a `Facility` type
+  with names; `win32Error` covers the one facility the adopters test.
+- **Names**: Swift names for the C ones (`unspecifiedFailure` for `E_FAIL`, `invalidPointer` for `E_POINTER`);
+  `false` is `S_FALSE`'s, a success that means "no", spelled with backticks where it's declared.
+- **`init(win32Error:)` is `HRESULT_FROM_WIN32`'s rule**: `success` becomes `ok`, and a code with bit 31 set, such
+  as System's `incompleteTransfer`, stays as it is, which is why SYS-0010 gives System's codes that bit.
+
+Tests: `Win32HResultTests`.
+
+A Windows run must check: `testConstantsMatchTheSDK` (`S_OK` and `S_FALSE` against the SDK, the rest against
+their values, and `E_OUTOFMEMORY`'s Win32 code against `ERROR_OUTOFMEMORY`); `testParts`; `testFromWin32Errors`;
+`testDescriptions`, where `E_ACCESSDENIED`'s system message is `ERROR_ACCESS_DENIED`'s, which relies on
+`FormatMessageW` resolving an `HRESULT` in `FACILITY_WIN32`, and a customer code (bit 29) has none;
+`testTypedThrows`; and `testWin32ErrorsFromHRESULTs`.
+
+## 26. windows-3: path operations: `8326373`
+
+The next gap of section 8. swift-foundation's `FileManager` creates and removes directories (`CreateDirectoryW`,
+`RemoveDirectoryW`), deletes, moves and copies files (`DeleteFileW`, `MoveFileExW`, `CopyFile2`, `CopyFileW`), makes
+symbolic links (`CreateSymbolicLinkW`, with `SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE`), and replaces a file
+atomically with `SetFileInformationByHandle(FileRenameInfoEx)` and POSIX semantics; NIO deletes a Unix domain
+socket's file with `FileDispositionInfoEx` and POSIX semantics, and other files with `DeleteFileW`; NIO's and
+WasmKit's tests make directories with `CreateDirectoryW` and the C runtime's `_mkdir`.
+
+What: `Win32PathOperations.swift`.
+- By path: `Win32.createDirectory(_:securityDescriptor:)` (`CreateDirectoryW`), `removeDirectory(_:)`
+  (`RemoveDirectoryW`), `deleteFile(_:)` (`DeleteFileW`), `moveFile(_:to:flags:)` (`MoveFileExW`, with
+  `Win32.MoveFileFlags`), `copyFile(_:to:flags:)` (`CopyFile2`, with `Win32.CopyFileFlags`),
+  `createSymbolicLink(_:to:flags:)` (`CreateSymbolicLinkW`, with `Win32.SymbolicLinkFlags`), and
+  `createHardLink(_:to:)` (`CreateHardLinkW`).
+- By handle, on `FileHandle` and `DirectoryHandle`: `setDisposition(_:)` (`FileDispositionInfoEx`, with
+  `Win32.DispositionFlags`) and `rename(to:flags:)` (`FileRenameInfoEx`, with `Win32.RenameFlags`).
+- `Win32.Error` gains three of section 1's candidates, which these functions document: `notSameDevice` (17),
+  `directoryNotEmpty` (145) and `privilegeNotHeld` (1314).
+
+Which API: **Win32.** `FilePathOperations.swift` is POSIX-only, and its signatures carry POSIX's parameters
+(`permissions:`, a `relativeTo:` descriptor, `ResolutionFlags`) and `Errno`; Windows' operations take security
+descriptors and flags of their own, and fail in ways `Errno` can't tell apart, such as sharing violations and
+files pending deletion. So they're Win32 functions, with Win32's verbs.
+
+Design calls, with the alternatives rejected:
+- **Win32 functions rather than `FilePath`'s POSIX names.** Open: the shared part, `removeDirectory()`,
+  `unlink()`, `rename(to:)` and `makeHardLink(to:)`, under POSIX's names on Windows too, as the working directory
+  shares them (section 17), with approximated errors.
+- **The defaults are the C functions'**, no flags: `moveFile` and `rename(to:)` don't replace a destination, and
+  `copyFile` does, as `MoveFileExW`, `FileRenameInfoEx` and `CopyFile2` behave without flags; each doc says so.
+  Rejected: safer defaults, such as `failIfExists` for a copy or `allowUnprivilegedCreate` for a link, which an
+  option set drops as soon as a caller passes another flag.
+- **`CopyFile2`**, rather than `CopyFileW` or `CopyFileExW`: it takes every `COPY_FILE_*` flag, and Foundation
+  calls it. Its `HRESULT` becomes a `Win32.Error` as section 25 describes. Not wrapped: its progress callback and
+  cancellation.
+- **A symbolic link's target isn't canonicalized**, as Foundation's `withNTPathRepresentation(relative: true)`
+  leaves it, since the link stores the target as it's given and a relative one must stay relative. `FilePath` turns
+  forward slashes into backslashes, which Windows' links need.
+- **Deleting and renaming by handle** take the `SetFileInformationByHandle` classes that section 20 left for this
+  gap. POSIX semantics are a flag, not a default, since FAT volumes and early Windows 10 releases don't support
+  them. Rejected: an `unlink()`-like method that falls back to `FileDispositionInfo` where the `Ex` class fails,
+  as Rust's `remove_dir_all` does, which hides which semantics applied.
+- **The rename's destination is a canonical full path**, with the prefix when it's long, as Rust's `rename`
+  passes one, and `RootDirectory` is NULL. Rejected: a `relativeTo:` directory handle, which `RootDirectory`
+  allows and no adopter uses.
+- **Not wrapped**: `CreateDirectoryExW` (template directories), `ReplaceFileW`, `MoveFileWithProgressW`, deleting
+  at the next start (`MoveFileExW` with no new name), `FileDispositionInfo` and `FileRenameInfo`, and the C
+  runtime's `_mkdir`, `_mktemp_s` and `_commit`.
+
+Tests: `Win32PathOperationsTests`. The symbolic link test skips without developer mode or elevation.
+
+A Windows run must check:
+- `testConstantsMatchTheSDK` (`COPY_FILE_*` aren't in Rust's bindings, so the SDK is the only check of their
+  values), and the three new codes in `Win32ErrorTests.testCodesMatchTheSDK`.
+- `testDirectories` (`alreadyExists`, `pathNotFound`, `directoryNotEmpty`, `fileNotFound`) and
+  `testCreatingADirectoryWithASecurityDescriptor`.
+- `testDeletingFiles`: a read-only file and a directory give `accessDenied`, and an open without delete sharing
+  `sharingViolation`.
+- `testMovingFiles` (`alreadyExists` without `replaceExisting`; a directory moves) and `testCopyingFiles` (a copy
+  replaces by default, `failIfExists` gives `fileExists` through `CopyFile2`'s `HRESULT`, the read-only attribute
+  comes along).
+- `testSymbolicLinks` (a relative file link and a directory link resolve; deleting a link leaves its target),
+  where links can be made; `testHardLinks` (a link count of 2; a directory gives `accessDenied`).
+- `testPOSIXDeletion` (the name goes when the deleting handle closes, a new file can take it, and another handle
+  still reads the old one), `testDeletionOnLastClose` (`isDeletePending`, and opening the pending name gives
+  `accessDenied`), `testClearingTheDisposition`.
+- `testRenamingByHandle` (the handle's final path follows; `alreadyExists`; POSIX semantics replace an open
+  destination, whose handle reads the old file), and `testDirectoryHandles`.
+- Not covered: moves and hard links across volumes (`notSameDevice`), FAT volumes, `delayUntilReboot`,
+  `ignoreReadOnlyAttribute`, and paths past `MAX_PATH`, beyond the canonicalization section 23 checks.
+
+## 27. windows-3: overlapped I/O: `d479525`
+
+The next gap of section 8, and SYS-0011 and SYS-0013's largest future direction. swift-subprocess reads and writes
+its pipes with overlapped I/O: it opens them with `FILE_FLAG_OVERLAPPED`, associates them with a completion port
+(`CreateIoCompletionPort`) that a thread of its own drains (`GetQueuedCompletionStatus`), wakes that thread with
+`PostQueuedCompletionStatus`, cancels with `CancelIoEx`, settles a canceled operation with `GetOverlappedResult`
+before freeing its `OVERLAPPED`, and keeps a completion off the port by setting the low bit of its event.
+swift-tools-support-core waits on a completion port for a job's processes, and watches directories with
+`ReadDirectoryChangesW` on an overlapped directory handle.
+
+What: `Win32OverlappedIO.swift`.
+- `Win32.OverlappedFileHandle`, an owner like `FileHandle`, whose `open` adds `FILE_FLAG_OVERLAPPED`, with
+  `read(into:fromAbsoluteOffset:overlapped:)` and `write(_:toAbsoluteOffset:overlapped:)` (`ReadFile`, `WriteFile`),
+  `result(of:wait:)` and `result(of:timeout:)` (`GetOverlappedResult`, `GetOverlappedResultEx`), `cancel(_:)` and
+  `cancelAll()` (`CancelIoEx`).
+- `Win32.CompletionPort`, an owner, with `create(concurrentThreads:)` and `associate(_:key:)`
+  (`CreateIoCompletionPort`), `post(bytesTransferred:key:overlapped:)` (`PostQueuedCompletionStatus`), and
+  `dequeue(timeout:)` (`GetQueuedCompletionStatus`), which returns a `Win32.Completion`: the bytes, the key, the
+  `OVERLAPPED`, and the operation's error.
+
+Which API: **Win32**, as SYS-0011 directs: "An overlapped handle should have its own type that applies
+`FILE_FLAG_OVERLAPPED` implicitly", and withholds the synchronous operations, which fail on one.
+
+Design calls, with the alternatives rejected:
+- **The operations that take an `OVERLAPPED` are `@unsafe`, with raw pointers for it and the buffer.** Windows
+  uses both until the operation finishes, which can be after the call returns, the handle closes, or the caller's
+  scope ends, and no Swift lifetime says so; the inherent hazard stays visible, as the Vision asks, rather than
+  being half-hidden. `IORing`'s unregistered buffers are raw buffer pointers for the same reason. The incidental
+  hazards are removed: the last error is read at once, `ERROR_IO_PENDING` is a `nil` result rather than a failure,
+  `ERROR_IO_INCOMPLETE` and `WAIT_TIMEOUT` mean "not yet", an offset can't be a sentinel, and a missing
+  operation to cancel is `false`, not an error. Rejected: an owned operation object that holds the `OVERLAPPED`
+  and the buffer and whose deinit cancels and waits, as swift-subprocess's `settlePendingOverlapped` does by hand,
+  which can't work with a completion port, whose packets arrive on another thread, without a registry of
+  operations; and a scoped `withOverlappedRead` that waits before returning, which is synchronous I/O again. Both
+  are candidates for a layer above.
+- **The `OVERLAPPED` isn't read after an operation starts**, not even for the count of one that finished in the
+  call: a completion port's waiter can take the packet and free the structure first. The count comes from the
+  call's own argument, which Windows writes during the call.
+- **Reads report the end of the data as failures** (`endOfFile`, `brokenPipe`), where `FileHandle`'s return 0:
+  `result(of:)` can't tell a read from a write, and a completion port reports them as failures too.
+  `ERROR_MORE_DATA`, a longer message from a message-mode pipe, is a short read, as in SYS-0013.
+- **The offset is a parameter**, which the method writes into the `OVERLAPPED` with its status cleared, since an
+  overlapped handle has no file pointer; the event stays the caller's.
+- **`Completion` carries the operation's error rather than throwing it**, since a packet for a failed operation is
+  still the operation's result; `dequeue` throws only when the wait fails, and returns `nil` at its time-out.
+  `Completion` isn't `Sendable`: it holds a raw pointer.
+- **Only `GetQueuedCompletionStatus`.** An entry from `GetQueuedCompletionStatusEx` has no documented status:
+  only a reserved field, or the `OVERLAPPED` itself, which System can't read for a posted packet whose pointer
+  isn't one. libuv reads the `OVERLAPPED`'s status, since every packet it queues has a real one.
+- **`associate` takes an `OverlappedFileHandle`.** Rejected for now: raw handles, for sockets and the like, which
+  Winsock's API would bring.
+- **Not wrapped**: `SetFileCompletionNotificationModes` (`FILE_SKIP_COMPLETION_PORT_ON_SUCCESS`),
+  `ReadFileEx`/`WriteFileEx` and alertable waits, scatter/gather (`ReadFileScatter`, `WriteFileGather`), overlapped
+  named pipes and directory handles (the pipes and directory-notification gaps), and the metadata queries of
+  `FileHandle`, which an overlapped handle could take: open the file again synchronously for those.
+
+Tests: `Win32OverlappedIOTests`, with an overlapped named pipe for pending operations.
+
+A Windows run must check:
+- `testInternalConstantsMatchTheSDK`; `testOpeningAddsTheFlag` (`_isSynchronous` is false for the overlapped
+  handle and true for a `FileHandle` of the same file).
+- `testFileReadsAndWrites` (a write at 0 and a read at 1, finishing at once or not, and `endOfFile` past the end)
+  and `testInvalidRequestsAreRejected`.
+- `testPendingReadsSignalTheirEvent`: a pending read, its event signaled by the client's write, and its result.
+- `testCancelingAPendingRead`: `result(of:timeout:)` returns `nil`, `cancel` returns true, the result is
+  `operationAborted`, and nothing is left to cancel.
+- `testCompletionPort` (the packet's key, `OVERLAPPED` and count; a posted packet; a second association is
+  `invalidParameter`) and `testCompletionPortReportsFailures` (cancellation's `operationAborted` and a closed
+  writer's `brokenPipe` arrive as packets).
+- Not covered: a port waiter woken by the port's closing, packets of operations that finish in the call,
+  disk files read past 4 GiB, and concurrency limits.
+
+## 28. windows-3: system information: `c04d6b1`
+
+The next gap of section 8. swift-foundation reads the page size, the processor count and mask (`GetSystemInfo`),
+the installed memory (`GetPhysicallyInstalledSystemMemory`), the host name (`GetComputerNameExW` with
+`ComputerNameDnsHostname`) and the Windows version (`RtlGetVersion`, looked up in ntdll, for `wProductType` and
+the build number); swift-subprocess reads the page size, swift-build the processor architecture, and NIO counts
+cores (`GetLogicalProcessorInformation`, `RelationProcessorCore`).
+
+What: `Win32SystemInformation.swift`.
+- `Win32.ProcessorArchitecture`, and `Win32.SystemInformation` (`SYSTEM_INFO`: architecture, page size,
+  allocation granularity, application addresses, processor mask and count, level and revision), from
+  `Win32.systemInformation()` and `nativeSystemInformation()` (`GetSystemInfo`, `GetNativeSystemInfo`);
+  `Win32.activeProcessorCount()` (`GetActiveProcessorCount` with `ALL_PROCESSOR_GROUPS`).
+- `Win32.ProcessorRelationship` and `Win32.LogicalProcessorInformation`, from
+  `Win32.logicalProcessorInformation()` (`GetLogicalProcessorInformation`).
+- `Win32.installedMemory()` (`GetPhysicallyInstalledSystemMemory`), in bytes.
+- `Win32.ComputerNameFormat` and `Win32.computerName(_:)` (`GetComputerNameExW`).
+- `Win32.ProductType` and `Win32.OSVersion` (`RTL_OSVERSIONINFOEXW`), from `Win32.osVersion()` (`RtlGetVersion`).
+
+Which API: **Win32.** `SystemConfig` is `sysconf`, and `SystemIdentity` is `uname`'s structure; neither has a
+Windows counterpart to share a name with, and faking `sysconf`'s names or `uname`'s fields over these calls is
+the emulation the Vision rules out. `SystemIdentity.hostName()` is the one shared concept, but it's a member of
+`uname`'s structure, which Windows would have to declare without its fields; `computerName(.dnsHostName)` is
+Windows' spelling.
+
+Design calls, with the alternatives rejected:
+- **C-struct wrappers**, as section 20's information types are: `rawValue` and named, read-only properties in
+  Swift types (`Int` for sizes and counts, `UInt` for masks and addresses). `SystemInformation` is
+  `@unchecked Sendable`: its two pointers are address bounds, never dereferenced.
+- **Functions, not properties**, as `Win32.tickCount()` is: each call asks Windows again.
+- **`installedMemory()` reports bytes**, where the C function reports kilobytes, so its unit matches every other
+  size here; the doc says so.
+- **`osVersion()` looks up `RtlGetVersion` at run time**, as Foundation does and System does for
+  `NtQueryInformationFile` (section 2): ntdll isn't linked. It throws only if the lookup fails, which it
+  doesn't on any Windows NT. Rejected: `GetVersionExW`, which reports no more than the version the program's
+  manifest names.
+- **`logicalProcessorInformation()` is the group-limited function**, as NIO calls it; a system with more than 64
+  logical processors needs `GetLogicalProcessorInformationEx`, whose entries vary in size. Not wrapped yet.
+- **Not wrapped**: `GlobalMemoryStatusEx`, `IsWow64Process2` and the PE machine types (`IMAGE_FILE_MACHINE_*`,
+  which swift-driver reads from a file's header), processor groups and NUMA queries, and the registry's
+  release names ("23H2").
+
+Tests: `Win32SystemInformationTests`.
+
+A Windows run must check: `testConstantsMatchTheSDK`; `testSystemInformation` (4 KiB pages, 64 KiB granularity, the
+mask's bits equal to the count, the architecture matching the build's, the native architecture x64 or ARM64);
+`testActiveProcessorCount`; `testLogicalProcessors` (cores and packages, and the cores' masks covering the group's);
+`testInstalledMemory`; `testComputerName` (the NetBIOS name is `COMPUTERNAME`'s, and the fully qualified name begins
+with the host name); and `testOSVersion` (10.0, from build 10240). Not covered: more than one processor group,
+emulated processes, and clusters' virtual servers.
+
+## 29. windows-3: Winsock, a design: this commit
+
+The last gap of section 8: two packages, but 23 files, nearly all NIO's. Not implemented: its natural shape needs
+files outside this lane, and its module structure waits on a decision (`../Claude outputs/decisions-triage.md`, item
+74, "No `SystemSockets` module: Unix sockets move into `SystemPackage`; Winsock gets its own Windows-only module",
+for after a meeting). This section is the design a later lane can start from.
+
+**What the adopters do.** NIO's `BSDSocketAPIWindows.swift` puts its BSD-shaped socket layer over Winsock. It
+aliases Winsock's structures to POSIX's names (`sockaddr = SOCKADDR`, `msghdr = WSAMSG`, `cmsghdr = WSACMSGHDR`,
+`sa_family_t = ADDRESS_FAMILY`), calls Winsock's BSD functions (`socket`, `bind`, `listen`, `accept`, `connect`,
+`shutdown`, `getpeername`, `getsockname`, and `getsockopt` and `recv` through C shims, since Winsock types their
+buffers `char *`), and replaces what Winsock lacks or renames: `close` with `closesocket`, `fcntl(O_NONBLOCK)` with
+`ioctlsocket(FIONBIO)`, `sendmsg` and `recvmsg` with `WSASendMsg` and `WSARecvMsg` (the latter found with
+`WSAIoctl(SIO_GET_EXTENSION_FUNCTION_POINTER)` on every call), `poll` with `WSAPoll`, `sendfile` with
+`TransmitFile`, and errno with `WSAGetLastError`. It deletes a Unix domain socket's file through its reparse point
+(section 26's disposition). swift-certificates parses IP addresses with `inet_pton` into `in_addr` and `in6_addr`.
+
+**The proposal.**
+1. **Share SystemSockets' names and shapes.** A socket, its address, its options and its messages are the same
+   concepts on Windows, and Winsock spells them as BSD does: the same functions, the same structure layouts and field
+   names (`sin_family`, `sin_addr`), and nearly the same constants. What differs is the handle type, the close and
+   control calls, and where errors come from. So Windows gets `SocketDescriptor`, `SocketAddress`,
+   `SocketDescriptor.Option` and the rest, with SystemSockets' signatures, and code written against them compiles on
+   both where the concept holds. A Windows-only API in a namespace, as `Win32` is for files, would make every NIO
+   call site a `#if`, which the shared spelling avoids.
+2. **Don't fake what Winsock lacks.** `socketpair`, `SCM_RIGHTS` over Unix domain sockets, abstract socket names,
+   `SO_PEERCRED`, `MSG_NOSIGNAL`, VM sockets and `sendfile` don't exist on Windows, so their API stays off it, as the
+   Vision draws the line; `TransmitFile`, `AcceptEx` and `ConnectEx` are Windows' own, under Windows names.
+3. **The handle is `SOCKET`.** `SocketDescriptor.rawValue` is a `SOCKET` (`UINT_PTR`) on Windows, where it's a
+   `CInt` elsewhere: the raw value is the one part of the shared type whose type differs, as `ProcessID`'s does
+   (section 12). It stays copyable, the raw currency type; an owner is the `OwnedFD` direction's question on every
+   platform.
+4. **Errors are `Win32.Error`.** Winsock's codes are system error codes (`WSAEWOULDBLOCK` is 10035), which
+   `FormatMessageW` describes, so the Windows module throws `Win32.Error`, and `Win32.Error` gains names for the
+   Winsock codes NIO tests (`wouldBlock`, `inProgress`, `connectionReset`, `connectionRefused`, `notConnected`, and
+   the like). The shared signatures then differ in their error type, as `DynamicLibrary`'s do (section 18).
+   Rejected: `Errno`, which would need a table, since Winsock numbers its BSD codes as Berkeley's errno plus 10000
+   (`WSAEWOULDBLOCK` is BSD's 35), not as the UCRT's errno (where `EWOULDBLOCK` is 140), and would lose the rest.
+5. **Startup is lazy.** The module calls `WSAStartup(2.2)` once per process before its first socket, as Rust's
+   standard library does, and doesn't call `WSACleanup`, which matters only to code that unloads Winsock (Rust's
+   runtime calls it at exit).
+6. **Sockets are created with `WSASocketW`**, with `WSA_FLAG_OVERLAPPED` and `WSA_FLAG_NO_HANDLE_INHERIT`, as Rust
+   creates them: overlapped, so they can join section 27's completion ports (which needs `associate` for a raw
+   handle), and not inherited, as `SOCK_CLOEXEC` gives POSIX. Winsock's own calls handle overlapped sockets, so
+   blocking `send` and `recv` stay safe on them, unlike `ReadFile` on an overlapped file.
+7. **Windows-only additions**: `WSAPoll` as `poll`'s counterpart, with the `POLLRDNORM` and `POLLWRNORM` events
+   NIO maps; `ioctlsocket(FIONBIO)` behind the shared nonblocking option; the extension functions (`WSARecvMsg`,
+   `WSASendMsg`, `AcceptEx`, `ConnectEx`, `TransmitFile`), looked up once per process and cached, where NIO looks
+   them up on every call.
+
+**How, in order.**
+- P0: decide the module structure. Two forms fit the proposal: SystemSockets' sources compiled for Windows over a
+  Winsock layer of `system_*` functions, as `FileDescriptor` reaches the UCRT through its adapters but without
+  emulating anything; or a Windows-only module that declares the same names. The first shares the code, and the
+  second the API alone, so the first is the default.
+- P1: the BSD core over Winsock: creation, binding, connecting, accepting, sending and receiving, options,
+  shutdown, closing, names, and `inet_pton`/`inet_ntop` for addresses, with tests that run on Windows.
+- P2: messages through `WSASendMsg` and `WSARecvMsg`, polling, nonblocking control, overlapped I/O through
+  completion ports, and Unix domain sockets as Windows has them.
+
+**Outside this lane's files**: a target in `Package.swift` that links `ws2_32`, its CMake list, and SystemSockets'
+`#error` for other platforms (`Sources/SystemSockets`), which a Windows port replaces.
+
+## 30. windows-3: findings
+
+- **`FileDescriptor`'s Windows canonicalization doesn't cover `CreateDirectoryW`'s limit** (P4).
+  `withCanonicalPathRepresentation` passes `PATHCCH_ALLOW_LONG_PATHS`, so the `mkdir` adapter, which
+  `withTemporaryFilePath`'s directories use on Windows, fails with `ERROR_FILENAME_EXCED_RANGE` for a path of 248
+  to 259 characters where the process isn't long-path aware. swift-subprocess's and swift-build's copies pass the
+  same flag; Foundation's adds the prefix always.
+- **Windows doesn't support the `\\?\` prefix for a current directory**, which Rust's `Command::current_dir` and
+  Foundation's `FileManager` both work around: `ProcessHandle.create` gave one to a current directory past
+  `MAX_PATH`, and no longer does (section 23).
+- **Swift can't spell `winerror.h`'s failures.** `E_FAIL` and the rest come through `_HRESULT_TYPEDEF_`, a
+  function-like macro, so they don't import, and a negative `HRESULT` cast directly, `((HRESULT)0x80004005)`,
+  imports as an overflowing literal, an error at each use; only `S_OK` and `S_FALSE` work. That's why no adopter
+  uses one, and why `Win32.HResult` names them (section 25).
+- **macOS's CoreFoundation declares `S_OK` and `S_FALSE` too**, so the harness's tests spell `WinSDK.S_OK`; on
+  Windows, where XCTest's Foundation is swift-corelibs-foundation, the bare names would do.
+
+## 31. windows-3: patches for files outside the lane
+
+**P3, continued: `Sources/System/CMakeLists.txt`.** The Win32 `target_sources` block as it should read with this
+lane's files. P3 itself landed with coverage-4 (`8caa741`); this block replaces the one it left, and is kept current
+with each commit.
+
+```cmake
+target_sources(SystemPackage PRIVATE
+  Win32/DynamicLibraryWindows.swift
+  Win32/FilePathResolutionWindows.swift
+  Win32/PathsWindows.swift
+  Win32/ProcessEnvironmentWindows.swift
+  Win32/ProcessIDWindows.swift
+  Win32/Win32.swift
+  Win32/Win32Console.swift
+  Win32/Win32Constants.swift
+  Win32/Win32Error.swift
+  Win32/Win32FiberLocal.swift
+  Win32/Win32FileDescriptorBridge.swift
+  Win32/Win32FileHandle.swift
+  Win32/Win32FileIO.swift
+  Win32/Win32FileInformation.swift
+  Win32/Win32FileType.swift
+  Win32/Win32FinalPath.swift
+  Win32/Win32HResult.swift
+  Win32/Win32HandleOperations.swift
+  Win32/Win32Locking.swift
+  Win32/Win32LongPaths.swift
+  Win32/Win32Open.swift
+  Win32/Win32OverlappedIO.swift
+  Win32/Win32PathOperations.swift
+  Win32/Win32Process.swift
+  Win32/Win32ProcessCreation.swift
+  Win32/Win32SecurityDescriptor.swift
+  Win32/Win32Synchronization.swift
+  Win32/Win32Syscalls.swift
+  Win32/Win32SystemInformation.swift
+  Win32/Win32Thread.swift
+  Win32/Win32ThreadCreation.swift
+  Win32/Win32Time.swift
+  Win32/Win32VolumeInformation.swift
+  Win32/Win32Wait.swift)
+```
+
+**P4, `Sources/System/FilePath/FilePathWindows.swift`: give the adapters section 23's prefix rule.** The sizing
+call's length counts the terminator. Not compiled by the harness (the file is outside `Win32/`); the patched
+function compiled in a scratch copy against `WindowsModel`, with stand-ins for `Errno`, `_mapWindowsErrorToErrno`
+and the overlay's `ERROR_SUCCESS`. It applies to this branch with `git apply`.
+
+```diff
+--- a/Sources/System/FilePath/FilePathWindows.swift
++++ b/Sources/System/FilePath/FilePathWindows.swift
+@@ -497,9 +497,14 @@
+       }
+ 
+       // 2. Canonicalize the path.
+-      // This will add the \\?\ prefix if needed based on the path's length.
++      // This adds the \\?\ prefix to a path that reaches CreateDirectoryW's
++      // limit of 248 characters, its terminator included, in any process.
++      // PATHCCH_ALLOW_LONG_PATHS alone adds it only past MAX_PATH, and only
++      // in a process that isn't long-path aware.
+       var pwszCanonicalPath: LPWSTR?
+-      let flags: ULONG = numericCast(PATHCCH_ALLOW_LONG_PATHS.rawValue)
++      let options = dwLength >= 248
++        ? PATHCCH_ENSURE_IS_EXTENDED_LENGTH_PATH : PATHCCH_ALLOW_LONG_PATHS
++      let flags: ULONG = numericCast(options.rawValue)
+       let result = PathAllocCanonicalize(pwszFullPath.baseAddress, flags, &pwszCanonicalPath)
+       if let pwszCanonicalPath {
+           defer { LocalFree(pwszCanonicalPath) }
+```
+
+A Windows run with P4 must check that `FileDescriptor.open` and `withTemporaryFilePath` work for paths of 248 to
+259 characters, and that `Win32OverlongPathTests` still throws.

@@ -125,6 +125,12 @@ internal func system_PathAllocCanonicalize(
   PathAllocCanonicalize(pszPathIn, dwFlags, ppszPathOut)
 }
 
+internal func system_PathCchStripPrefix(
+  _ pszPath: UnsafeMutablePointer<WCHAR>, _ cchPath: Int
+) -> HRESULT {
+  PathCchStripPrefix(pszPath, cchPath)
+}
+
 internal func system_ConvertStringSecurityDescriptorToSecurityDescriptorW(
   _ StringSecurityDescriptor: UnsafePointer<WCHAR>,
   _ StringSDRevision: DWORD,
@@ -219,6 +225,65 @@ internal func system_SetFileInformationByHandle(
   _ dwBufferSize: DWORD
 ) -> Bool {
   SetFileInformationByHandle(hFile, FileInformationClass, lpFileInformation, dwBufferSize)
+}
+
+// MARK: - Overlapped I/O
+
+internal func system_GetOverlappedResult(
+  _ hFile: HANDLE,
+  _ lpOverlapped: UnsafeMutablePointer<OVERLAPPED>,
+  _ lpNumberOfBytesTransferred: UnsafeMutablePointer<DWORD>,
+  _ bWait: Bool
+) -> Bool {
+  GetOverlappedResult(hFile, lpOverlapped, lpNumberOfBytesTransferred, bWait)
+}
+
+internal func system_GetOverlappedResultEx(
+  _ hFile: HANDLE,
+  _ lpOverlapped: UnsafeMutablePointer<OVERLAPPED>,
+  _ lpNumberOfBytesTransferred: UnsafeMutablePointer<DWORD>,
+  _ dwMilliseconds: DWORD,
+  _ bAlertable: Bool
+) -> Bool {
+  GetOverlappedResultEx(
+    hFile, lpOverlapped, lpNumberOfBytesTransferred, dwMilliseconds, bAlertable)
+}
+
+internal func system_CancelIoEx(
+  _ hFile: HANDLE, _ lpOverlapped: UnsafeMutablePointer<OVERLAPPED>?
+) -> Bool {
+  CancelIoEx(hFile, lpOverlapped)
+}
+
+internal func system_CreateIoCompletionPort(
+  _ FileHandle: HANDLE,
+  _ ExistingCompletionPort: HANDLE?,
+  _ CompletionKey: UInt,
+  _ NumberOfConcurrentThreads: DWORD
+) -> HANDLE? {
+  CreateIoCompletionPort(
+    FileHandle, ExistingCompletionPort, ULONG_PTR(CompletionKey), NumberOfConcurrentThreads)
+}
+
+internal func system_PostQueuedCompletionStatus(
+  _ CompletionPort: HANDLE,
+  _ dwNumberOfBytesTransferred: DWORD,
+  _ dwCompletionKey: UInt,
+  _ lpOverlapped: UnsafeMutablePointer<OVERLAPPED>?
+) -> Bool {
+  PostQueuedCompletionStatus(
+    CompletionPort, dwNumberOfBytesTransferred, ULONG_PTR(dwCompletionKey), lpOverlapped)
+}
+
+internal func system_GetQueuedCompletionStatus(
+  _ CompletionPort: HANDLE,
+  _ lpNumberOfBytesTransferred: UnsafeMutablePointer<DWORD>,
+  _ lpCompletionKey: UnsafeMutablePointer<ULONG_PTR>,
+  _ lpOverlapped: UnsafeMutablePointer<UnsafeMutablePointer<OVERLAPPED>?>,
+  _ dwMilliseconds: DWORD
+) -> Bool {
+  GetQueuedCompletionStatus(
+    CompletionPort, lpNumberOfBytesTransferred, lpCompletionKey, lpOverlapped, dwMilliseconds)
 }
 
 // MARK: - Byte-range locking
@@ -338,6 +403,58 @@ internal func system_ResumeThread(_ hThread: HANDLE) -> DWORD {
 
 internal func system_SuspendThread(_ hThread: HANDLE) -> DWORD {
   SuspendThread(hThread)
+}
+
+// Starts a thread that runs `_win32ThreadStart(context)`, which
+// Win32ThreadCreation.swift defines: a C function can't capture, so the
+// closure travels as the argument. No mock hook, unlike the other C runtime
+// calls: a mocked call would start no thread to run the closure.
+internal func system__beginthreadex(
+  _ security: UnsafeMutablePointer<SECURITY_ATTRIBUTES>,
+  _ stackSize: UInt32,
+  _ context: UnsafeMutableRawPointer,
+  _ flags: UInt32
+) -> UInt {
+  _beginthreadex(UnsafeMutableRawPointer(security), stackSize, { context in
+    _win32ThreadStart(context)
+    return 0
+  }, context, flags, nil)
+}
+
+internal func system_GetThreadDescription(
+  _ hThread: HANDLE, _ ppszThreadDescription: UnsafeMutablePointer<PWSTR?>
+) -> HRESULT {
+  GetThreadDescription(hThread, ppszThreadDescription)
+}
+
+internal func system_SetThreadDescription(
+  _ hThread: HANDLE, _ lpThreadDescription: UnsafePointer<WCHAR>
+) -> HRESULT {
+  SetThreadDescription(hThread, lpThreadDescription)
+}
+
+internal func system_SwitchToThread() -> Bool {
+  SwitchToThread()
+}
+
+// MARK: - Fiber-local storage
+
+// Allocates an index whose callback is `_win32FiberLocalDestructor`, which
+// Win32FiberLocal.swift defines.
+internal func system_FlsAlloc() -> DWORD {
+  FlsAlloc({ value in _win32FiberLocalDestructor(value) })
+}
+
+internal func system_FlsFree(_ dwFlsIndex: DWORD) -> Bool {
+  FlsFree(dwFlsIndex)
+}
+
+internal func system_FlsGetValue(_ dwFlsIndex: DWORD) -> UnsafeMutableRawPointer? {
+  FlsGetValue(dwFlsIndex)
+}
+
+internal func system_FlsSetValue(_ dwFlsIndex: DWORD, _ lpFlsData: UnsafeMutableRawPointer?) -> Bool {
+  FlsSetValue(dwFlsIndex, lpFlsData)
 }
 
 // MARK: - Creating processes
@@ -652,6 +769,88 @@ internal func system_SetFileAttributesW(
   _ lpFileName: UnsafePointer<WCHAR>, _ dwFileAttributes: DWORD
 ) -> Bool {
   SetFileAttributesW(lpFileName, dwFileAttributes)
+}
+
+// MARK: - System information
+
+internal func system_GetSystemInfo(_ lpSystemInfo: UnsafeMutablePointer<SYSTEM_INFO>) {
+  GetSystemInfo(lpSystemInfo)
+}
+
+internal func system_GetNativeSystemInfo(_ lpSystemInfo: UnsafeMutablePointer<SYSTEM_INFO>) {
+  GetNativeSystemInfo(lpSystemInfo)
+}
+
+internal func system_GetActiveProcessorCount(_ GroupNumber: WORD) -> DWORD {
+  GetActiveProcessorCount(GroupNumber)
+}
+
+internal func system_GetLogicalProcessorInformation(
+  _ Buffer: UnsafeMutablePointer<SYSTEM_LOGICAL_PROCESSOR_INFORMATION>?,
+  _ ReturnedLength: UnsafeMutablePointer<DWORD>
+) -> Bool {
+  GetLogicalProcessorInformation(Buffer, ReturnedLength)
+}
+
+internal func system_GetPhysicallyInstalledSystemMemory(
+  _ TotalMemoryInKilobytes: UnsafeMutablePointer<ULONGLONG>
+) -> Bool {
+  GetPhysicallyInstalledSystemMemory(TotalMemoryInKilobytes)
+}
+
+internal func system_GetComputerNameExW(
+  _ NameType: CInt, _ lpBuffer: UnsafeMutablePointer<WCHAR>?, _ nSize: UnsafeMutablePointer<DWORD>
+) -> Bool {
+  GetComputerNameExW(COMPUTER_NAME_FORMAT(rawValue: NameType), lpBuffer, nSize)
+}
+
+// MARK: - Path operations
+
+internal func system_CreateDirectoryW(
+  _ lpPathName: UnsafePointer<WCHAR>,
+  _ lpSecurityAttributes: UnsafeMutablePointer<SECURITY_ATTRIBUTES>?
+) -> Bool {
+  CreateDirectoryW(lpPathName, lpSecurityAttributes)
+}
+
+internal func system_RemoveDirectoryW(_ lpPathName: UnsafePointer<WCHAR>) -> Bool {
+  RemoveDirectoryW(lpPathName)
+}
+
+internal func system_DeleteFileW(_ lpFileName: UnsafePointer<WCHAR>) -> Bool {
+  DeleteFileW(lpFileName)
+}
+
+internal func system_MoveFileExW(
+  _ lpExistingFileName: UnsafePointer<WCHAR>,
+  _ lpNewFileName: UnsafePointer<WCHAR>?,
+  _ dwFlags: DWORD
+) -> Bool {
+  MoveFileExW(lpExistingFileName, lpNewFileName, dwFlags)
+}
+
+internal func system_CopyFile2(
+  _ pwszExistingFileName: UnsafePointer<WCHAR>,
+  _ pwszNewFileName: UnsafePointer<WCHAR>,
+  _ pExtendedParameters: UnsafeMutablePointer<COPYFILE2_EXTENDED_PARAMETERS>?
+) -> HRESULT {
+  CopyFile2(pwszExistingFileName, pwszNewFileName, pExtendedParameters)
+}
+
+internal func system_CreateSymbolicLinkW(
+  _ lpSymlinkFileName: UnsafePointer<WCHAR>,
+  _ lpTargetFileName: UnsafePointer<WCHAR>,
+  _ dwFlags: DWORD
+) -> BOOLEAN {
+  CreateSymbolicLinkW(lpSymlinkFileName, lpTargetFileName, dwFlags)
+}
+
+// The security attributes parameter is reserved, and always NULL.
+internal func system_CreateHardLinkW(
+  _ lpFileName: UnsafePointer<WCHAR>,
+  _ lpExistingFileName: UnsafePointer<WCHAR>
+) -> Bool {
+  CreateHardLinkW(lpFileName, lpExistingFileName, nil)
 }
 
 #endif // os(Windows)
