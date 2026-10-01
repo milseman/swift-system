@@ -62,6 +62,7 @@ export API_GRAPH_OUT="$RUN/out" API_GRAPH_WORK="$SPEED/work"
 
 loadavg() { sysctl -n vm.loadavg | tr -d '{}' | awk '{print $1, $2, $3}'; }
 freegb() { df -g "$ROOT" | awk 'NR == 2 {print $4}'; }
+power() { pmset -g ps | head -n 1 | sed -E "s/^Now drawing from '(.*)'$/\1/"; }
 (while sleep 60; do echo "$(date +%T) $(loadavg)"; done) > "$RUN/load.txt" &
 sampler=$!
 disown "$sampler"   # no "Terminated" line when it's stopped
@@ -69,6 +70,8 @@ trap 'kill $sampler 2>/dev/null || true' EXIT
 {
   echo "run: $NAME ($(date '+%F %T')); tool: $tool; base $BASE_REF, head $HEAD_REF"
   env | grep -E '^API_GRAPH_(ADOPTER_|BUILDS|CACHE)' | sort | sed 's/^/env: /'
+  echo "start: $(date '+%F %T')"
+  echo "power before: $(power)"
   echo "load before: $(loadavg)"
   echo "free before: $(freegb) GiB"
 } > "$RUN/meta.txt"
@@ -86,6 +89,8 @@ status=0
   2> "$RUN/time.txt" || status=$?
 kill "$sampler" 2>/dev/null || true
 {
+  echo "end: $(date '+%F %T')"
+  echo "power after: $(power)"
   echo "load after: $(loadavg)"
   echo "free after: $(freegb) GiB"
   echo "exit: $status"
