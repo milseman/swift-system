@@ -28,8 +28,18 @@
 #   API_GRAPH_ADOPTER_BUILDS    build (default): build a migration whose index
 #                        isn't cached; reuse: any cached index of the commit,
 #                        no builds; none: lexical only
+#   API_GRAPH_ADOPTER_JOBS      how many migrations to build at a time
+#                        (default 4), longest first
+#   API_GRAPH_ADOPTER_VALIDATE  declarations (default): a migration's index
+#                        cached against another System tree is reused if every
+#                        System declaration it names is unchanged; interface:
+#                        if System's whole public interface is; tree: never
 #   API_GRAPH_CACHE      the adopters' cached indexes (default
 #                        .build/api-graph-cache)
+#   API_GRAPH_BUILDS     the migrations' build directories, kept so that a
+#                        rebuild is incremental (default .build/api-graph-builds,
+#                        up to about 2 GB each); set it empty for scratch
+#                        builds, deleted once read
 #   API_GRAPH_MIN_FREE_GB  don't start an adopter build with less free disk
 #                        than this (default 15)
 #   API_GRAPH_KEEP_WORK  1 keeps the scratch directory after a successful run
@@ -186,6 +196,8 @@ if [ -n "$ADOPTERS" ] && [ ! -d "$ADOPTERS" ]; then ADOPTERS=""; fi
 if [ -n "$ECOSYSTEM" ] && [ ! -d "$ECOSYSTEM" ]; then ECOSYSTEM=""; fi
 if [ -n "$COVERAGE_RESULTS" ] && [ ! -d "$COVERAGE_RESULTS" ]; then COVERAGE_RESULTS=""; fi
 CACHE="$(abspath "${API_GRAPH_CACHE:-$REPO/.build/api-graph-cache}")"
+BUILDS="${API_GRAPH_BUILDS-$REPO/.build/api-graph-builds}"
+if [ -n "$BUILDS" ]; then BUILDS="$(abspath "$BUILDS")"; fi
 SNAPSHOTS="${API_GRAPH_SNAPSHOTS-$(dirname "$REPO")/api-graph-snapshots}"
 if [ -n "$SNAPSHOTS" ]; then
   SNAPSHOTS="$(abspath "$SNAPSHOTS")"
@@ -195,6 +207,14 @@ check_dir API_GRAPH_CACHE "$CACHE"
 for d in "$OUT" "$WORK"; do
   case "$CACHE/" in "$d"/*) fail "refusing API_GRAPH_CACHE=$CACHE: each run replaces $d" ;; esac
 done
+if [ -n "$BUILDS" ]; then
+  check_dir API_GRAPH_BUILDS "$BUILDS"
+  for d in "$OUT" "$WORK"; do
+    case "$BUILDS/" in "$d"/*) fail "refusing API_GRAPH_BUILDS=$BUILDS: each run replaces $d" ;; esac
+  done
+  case "$BUILDS/" in "$CACHE"/*) fail "refusing API_GRAPH_BUILDS=$BUILDS: it's inside API_GRAPH_CACHE" ;; esac
+  case "$CACHE/" in "$BUILDS"/*) fail "refusing API_GRAPH_CACHE=$CACHE: it's inside API_GRAPH_BUILDS" ;; esac
+fi
 if [ -f "$PREVIOUS" ]; then cp "$PREVIOUS" "$WORK/previous.json"; fi
 
 printf 'base: %s @ %s\nhead: %s @ %s\nrepository: %s\noutput: %s\nscratch: %s\n' \
@@ -296,9 +316,11 @@ if [ -n "$ADOPTERS$ECOSYSTEM" ]; then
   adopters=(--graph "$WORK/graph.json" --repo "$REPO" --head "$HEAD_COMMIT"
     --head-src "$WORK/head/src" --base-src "$WORK/base/src" --head-scan "$WORK/head/scan.json"
     --base-scan "$WORK/base/scan.json" --cnames "$WORK/cnames.json" --work "$WORK" --cache "$CACHE"
-    --out "$WORK/adopters.json"
+    --out "$WORK/adopters.json" --symbolgraphs "$DELTA/symbolgraphs/head"
     --branch "${API_GRAPH_ADOPTER_BRANCH:-migrate-darwin}" --builds "${API_GRAPH_ADOPTER_BUILDS:-build}"
+    --validate "${API_GRAPH_ADOPTER_VALIDATE:-declarations}" --jobs "${API_GRAPH_ADOPTER_JOBS:-4}"
     --min-free-gb "${API_GRAPH_MIN_FREE_GB:-15}")
+  if [ -n "$BUILDS" ]; then adopters+=(--builds-dir "$BUILDS"); fi
   if [ -n "$ADOPTERS" ]; then adopters+=(--adopters "$ADOPTERS"); fi
   if [ -n "$ECOSYSTEM" ]; then adopters+=(--ecosystem "$ECOSYSTEM"); fi
   if [ -n "$COVERAGE_RESULTS" ]; then adopters+=(--coverage-results "$COVERAGE_RESULTS"); fi

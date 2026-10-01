@@ -24,7 +24,7 @@ open .build/api-graph/API-GRAPH.md                                    # the inde
 | `BASE_REF` | `main` | The commit to compare against. |
 | `HEAD_REF` | `system-next` | The commit to map. |
 | `API_GRAPH_OUT` | `.build/api-graph` | The output. Each successful run replaces it. |
-| `API_GRAPH_WORK` | `.build/api-graph-work` | Scratch: both exports, api-delta's run, and the indexed build, about 1.3 GB, and one adopter's build at a time, up to 6 GB (SwiftPM's). It's deleted when the run succeeds, and by the next run when it doesn't. |
+| `API_GRAPH_WORK` | `.build/api-graph-work` | Scratch: both exports, api-delta's run, and the indexed build, about 1.3 GB (and, with `API_GRAPH_BUILDS` empty, one adopter's build at a time, up to about 2 GB). It's deleted when the run succeeds, and by the next run when it doesn't. |
 | `API_GRAPH_KEEP_WORK` | unset | `1` keeps the scratch directory after a successful run. |
 | `API_GRAPH_SNAPSHOTS` | `../api-graph-snapshots` | The snapshot store: one graph per head commit, and an index. It sits beside the repository, so it outlives worktrees. Set it empty to keep only the output's copy. |
 | `API_GRAPH_SNAPSHOT_PREVIOUS` | the store's previous snapshot of the same head ref | A snapshot to diff with, and to check the pitches' changes against. |
@@ -37,7 +37,10 @@ open .build/api-graph/API-GRAPH.md                                    # the inde
 | `API_GRAPH_COVERAGE_RESULTS` | `../coverage-results` | The coverage tools' results store, for the packages' C interfaces. |
 | `API_GRAPH_ADOPTER_BRANCH` | `migrate-darwin` | The migration branch. |
 | `API_GRAPH_ADOPTER_BUILDS` | `build` | `build` builds a migration whose index isn't cached; `reuse` takes any cached index of its commit and builds nothing; `none` matches lexically only. |
-| `API_GRAPH_CACHE` | `.build/api-graph-cache` | The migrations' cached index references, a few MB. Deleting it costs a rebuild. |
+| `API_GRAPH_ADOPTER_JOBS` | `4` | How many migrations are built at a time, longest first by each one's last recorded build. Each build runs as many compiler jobs as SwiftPM does on its own. |
+| `API_GRAPH_ADOPTER_VALIDATE` | `declarations` | When System has moved since a migration's index was cached: `declarations` reuses the index if every System declaration it names is unchanged (revalidated), `interface` if System's whole public interface is, and `tree` never does, rebuilding whenever System's sources change. |
+| `API_GRAPH_CACHE` | `.build/api-graph-cache` | The migrations' cached index references, a few MB: one entry per package commit, build settings and System tree built against. Deleting it costs a rebuild. |
+| `API_GRAPH_BUILDS` | `.build/api-graph-builds` | The migrations' build directories, kept so that a rebuild is incremental: one per package, with its export, SwiftPM's scratch directory and the last build's log, and System's export, which every build points at. Up to about 2 GB each; `GRAPH.md` gives the total. Deleting it costs cold builds. Set it empty to build each migration in the scratch directory and delete the build once it's read. |
 | `API_GRAPH_MIN_FREE_GB` | `15` | No adopter build starts with less free disk than this; the package is then matched lexically. |
 
 Refs resolve as in api-delta: in the worktree you run the script from, so `HEAD` is that worktree's. System's commits are exported with `git archive`, and the adopters' with `git archive` and `git show`, never from a working tree; only the pitch files are read from the working tree. Nothing tracked is modified, and the script deletes only directories it created.
@@ -84,6 +87,8 @@ A pitch chat edits `Prototype/Pitches/<id>.json`, reruns `regenerate.sh`, and re
 For each declaration, and so for each pitch and suggestion:
 
 - **Adopted**: where a package's migration branch (`migrate-darwin`) uses the declaration, file and line, with the hunk of the migration's diff (against the branch's merge base with the package's `main`) that introduced each use. A site is `precise` when the compiler's index resolved it: the tool exports the branch's commit, points its swift-system dependency at an export of the head commit, and builds it with an index store as the coverage tools build that package. Files the build doesn't compile (tests), lines in `#if` branches Darwin doesn't take, and packages that don't build are matched by name, `lexical`.
+  - The index is cached. When System has moved since, it's *revalidated*: kept if System's manifest and every System declaration it names are unchanged in the head commit's symbol graphs, and rebuilt otherwise. A use that would now resolve to a declaration System added isn't seen until the migration is rebuilt (`scripts/method.md`, decision 37). `GRAPH.md` lists each migration's index as reused, revalidated or rebuilt, and why.
+  - A rebuild is incremental: the build directory is kept, and the exports it builds are updated in place, only the files that changed (decision 38).
 - **Could use**: where a package calls a C interface the declaration newly wraps, from the coverage tools' extraction (`interfaces.json.gz` in their results store) joined with the C names in the declarations' doc comments. C names the base commit already covers don't count.
 
 **To add a package, clone it into `../ecosystem`, or, with a migration branch, into `../adopters`.** The next run picks it up. A clone's identity is its origin URL, so a package cloned in both is one package. A migration is built as the coverage tools' package file for it says (`Utilities/adopter-coverage/packages/`), or with a plain `swift build` when there's none. Its C interfaces are the coverage tools' extraction of its commit when their store has one, and a lexical scan of its library sources until then; `Utilities/adopter-coverage/ecosystem.sh survey` and `run` produce the extraction.
@@ -114,7 +119,17 @@ Each is read at run time; nothing else needs editing.
 
 ## Run time
 
-About four minutes on an M1 Max with Swift 6.2 when every adopter index is cached, and up to twice that while other builds compete for the CPU: api-delta's run and the indexed build of the head commit (about 45 seconds each, at the same time), the adopters step (one to three minutes: 58 packages' interface data, some of it scanned lexically), and the snapshot, pitches, suggestions and bundles (about 40 seconds). A migration whose index isn't cached is built: 20 seconds to 5 minutes each (swift-foundation's and SwiftPM's are the longest), about 25 minutes for all 15.
+Measured on an M1 Max with Swift 6.2, on 2026-09-30 and 2026-10-01, while other builds kept the load average between 25 and 200. Each run is in `Prototype/ApiGraphSpeed/REPORT.md`.
+
+- **Nothing to build**, every migration's index cached or revalidated: 3.5 to 6.5 minutes, depending on load. That's the usual case after a System change that no migration's System declarations see.
+  - api-delta's run and the indexed build of the head commit, at the same time: 75 to 120 seconds.
+  - The adopters step: 1.3 to 2.7 minutes. Half a minute of that is the 18 migrations' sites; the rest is the would-benefit scan of 99 packages' interface data, some of it scanned lexically.
+  - The snapshot, pitches, suggestions and bundles: about 40 seconds.
+- **Rebuilds in kept build directories**, for a failed build, a changed declaration or `API_GRAPH_ADOPTER_VALIDATE=tree`: incremental, 10 to 75 seconds each. All 18, four at a time, add about two minutes.
+- **Cold builds**, on a first run or after deleting `API_GRAPH_BUILDS`: 15 seconds to 12 minutes each under that load.
+  - All 18 took 13 to 15 minutes, four at a time or all at once, at loads of 130 to 190.
+  - One at a time, the old way, they took 30 minutes at a load of 117, and 21 minutes at 47.
+  - The build directories take about 12 GB.
 
 ## Requirements
 
