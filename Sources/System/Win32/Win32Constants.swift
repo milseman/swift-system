@@ -58,6 +58,26 @@ internal var _SDDL_REVISION_1: DWORD { 1 }
 @_alwaysEmitIntoClient
 internal var _win32MaxPath: Int { 260 }
 
+// MARK: - Long paths
+
+// The longest path CreateDirectoryW takes without the \\?\ prefix, with its
+// terminator: MAX_PATH less 12, room for an 8.3 file name. The SDK has no
+// name for it.
+@_alwaysEmitIntoClient
+internal var _win32DirectoryMaxPath: Int { 248 }
+
+@_alwaysEmitIntoClient
+internal var _PATHCCH_ALLOW_LONG_PATHS: ULONG { 0x0000_0001 }
+
+@_alwaysEmitIntoClient
+internal var _PATHCCH_ENSURE_IS_EXTENDED_LENGTH_PATH: ULONG { 0x0000_0010 }
+
+@_alwaysEmitIntoClient
+internal var _S_OK: HRESULT { 0 }
+
+@_alwaysEmitIntoClient
+internal var _S_FALSE: HRESULT { 1 }
+
 // MARK: - File I/O
 
 @_alwaysEmitIntoClient

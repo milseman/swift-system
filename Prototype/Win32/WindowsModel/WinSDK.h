@@ -383,9 +383,21 @@ FARPROC GetProcAddress(HMODULE hModule, LPCSTR lpProcName);
 typedef enum PATHCCH_OPTIONS : int {
   PATHCCH_NONE = 0x0,
   PATHCCH_ALLOW_LONG_PATHS = 0x01,
+  PATHCCH_FORCE_ENABLE_LONG_NAME_PROCESS = 0x02,
+  PATHCCH_FORCE_DISABLE_LONG_NAME_PROCESS = 0x04,
+  PATHCCH_DO_NOT_NORMALIZE_SEGMENTS = 0x08,
+  PATHCCH_ENSURE_IS_EXTENDED_LENGTH_PATH = 0x10,
+  PATHCCH_ENSURE_TRAILING_SLASH = 0x20,
 } PATHCCH_OPTIONS;
 
+#define PATHCCH_MAX_CCH 0x8000
+
 HRESULT PathAllocCanonicalize(PCWSTR pszPathIn, ULONG dwFlags, PWSTR *ppszPathOut);
+HRESULT PathCchStripPrefix(PWSTR pszPath, size_t cchPath);
+
+// winerror.h, as the SDK spells them, less the L suffixes.
+#define S_OK ((HRESULT)0)
+#define S_FALSE ((HRESULT)1)
 
 // sddl.h
 

@@ -125,6 +125,12 @@ internal func system_PathAllocCanonicalize(
   PathAllocCanonicalize(pszPathIn, dwFlags, ppszPathOut)
 }
 
+internal func system_PathCchStripPrefix(
+  _ pszPath: UnsafeMutablePointer<WCHAR>, _ cchPath: Int
+) -> HRESULT {
+  PathCchStripPrefix(pszPath, cchPath)
+}
+
 internal func system_ConvertStringSecurityDescriptorToSecurityDescriptorW(
   _ StringSecurityDescriptor: UnsafePointer<WCHAR>,
   _ StringSDRevision: DWORD,

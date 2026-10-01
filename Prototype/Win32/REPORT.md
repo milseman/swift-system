@@ -1,4 +1,4 @@
-# The windows-api and windows-2 lanes
+# The windows-api, windows-2 and windows-3 lanes
 
 System's Win32 namespace, from the drafts in `../win32-drafts/` (SYS-0010 to SYS-0016), in their order: the
 `Win32` namespace and `Win32.Error`, file handles, file types, file I/O, byte-range locking, volume information,
@@ -11,29 +11,29 @@ Darwin, before any change (`6a9833f`): XCTest 565 tests (4 skipped), swift-testi
 passing. After each commit: the same, since every new file compiles to nothing on Darwin.
 
 The windows-2 lane (sections 11 on, base system-next at `4365f83`) applies patches P1 and P2 of section 10, then
-adds API for the adopters' top Windows gaps of section 8, in its order, checked the same way.
+adds API for the adopters' top Windows gaps of section 8, in its order, checked the same way. The windows-3 lane
+(sections 23 on, base system-next at `bb950db`) continues that list, then the gaps the earlier sections left.
 
-**Resume here:** windows-api's parts are done (sections 1 to 10). windows-2 stopped at convergence, 2026-10-01,
-with nothing in progress. Done, one section and commit each: P1 and P2 (section 11, `037de61`, `5d843d5`),
-processes (12, `92a1dbd`), process creation and thread handles (13, `e84b953`), clocks and sleeping (14,
-`91b6894`), SRW locks and condition variables (15, `a3eb00c`), consoles and standard handles (16, `649fcd9`),
-well-known directories (17, `b63bce9`), dynamic loading (18, `257fb78`), environment variables (19, `0ed04ff`),
-and file information (20, the last commit); system-next was merged at `ed762e3`.
-- **Next**: the rest of section 8's list, in order: long paths (a public form of `_withCanonicalPath`, or
-  wrapping the calls that need it); threads (creating them, and fiber-local storage, on `Win32.ThreadHandle`);
-  `Win32.HResult`; path operations (create, remove, rename, copy, link, and the POSIX-semantics delete and rename
-  dispositions); overlapped I/O; system information; Winsock.
-- **Left within done gaps**: a Windows `BrokenDownTime` over the UCRT's time functions (14); a Windows
+**Resume here:** windows-api's parts are done (sections 1 to 10), and so are windows-2's (11 to 22: P1 and P2,
+then section 8's gaps from processes to file information). windows-3, in progress: long paths (section 23, the
+last commit).
+- **Next**: the rest of section 8's list, in order: threads (creating them, and fiber-local storage, on
+  `Win32.ThreadHandle`); `Win32.HResult`; path operations (create, remove, rename, copy, link, and the
+  POSIX-semantics delete and rename dispositions); overlapped I/O; system information; Winsock, last (design only
+  if time runs short, since the decisions triage gives Winsock a Windows-only module of its own).
+- **Then, left within done gaps**: a Windows `BrokenDownTime` over the UCRT's time functions (14); a Windows
   `ProcessID.exit(_:)` and `exitImmediately(_:)` (12); `CRITICAL_SECTION` (15); attaching, freeing and
   generating console events, and `SetStdHandle` (16); `AddDllDirectory` (18); a quoting helper for command lines
-  (13).
+  (13); and packages-5's Windows gaps (`../adopters/PACKAGES-5-REPORT.md`, "Gaps, across platforms"):
+  `ProcessID.ExitCode`'s `success` and `failure`, and `FileStream.setBuffering`.
 - **For other lanes**: P3 (section 22) must land with the next merge of this branch, or CI's CMake job fails on
-  system-next, which merged `b63bce9` without it. The PlatformEnum samples' Windows arms differ from
-  `Win32.ProcessHandle` (section 21).
-- **Tests**: no Windows test has run; each section lists what a Windows run must check. At the last commit:
-  Darwin `swift build` and `swift test`, XCTest 572 tests (5 skipped) and swift-testing 502 tests in 82 suites,
-  all passing; `check-windows.sh` compiles the Win32 files and the 19 Windows test files. No Linux build was run in
-  this lane.
+  system-next, which merged `b63bce9` without it; the windows-3 patches section has the list with this lane's files.
+  P4 there brings `FileDescriptor`'s Windows canonicalization to section 23's rule. The PlatformEnum samples'
+  Windows arms differ from `Win32.ProcessHandle` (section 21).
+- **Tests**: no Windows test has run; each section lists what a Windows run must check. At each commit, Darwin
+  `swift build` and `swift test` pass, with the same tests skipped as before the lane (for counts, see
+  `Prototype/Status/STATUS.md`), and `check-windows.sh` compiles the Win32 files and the Windows test files. No
+  Linux build was run in these lanes.
 
 ## How it was checked
 
@@ -1245,3 +1245,159 @@ P3 with the next merge of this branch, which brings the rest.
  target_link_libraries(SystemPackage PUBLIC
    CSystem)
 ```
+
+## 23. windows-3: long paths: this commit
+
+The ninth gap of section 8. swift-foundation, swift-subprocess and swift-build each carry a copy of the
+canonicalization that `FileDescriptor`'s Windows adapters use (`withCanonicalPathRepresentation`:
+`GetFullPathNameW`, device paths left alone, then `PathAllocCanonicalize`), swift-build's with the traps that P2
+fixed in System's. Foundation's always adds the `\\?\` prefix (`PATHCCH_ENSURE_IS_EXTENDED_LENGTH_PATH`), "since we
+don't know if this is a directory"; the other two add it past `MAX_PATH` (`PATHCCH_ALLOW_LONG_PATHS`). SwiftPM
+calls `GetFullPathNameW` alone, and its comment expects the prefix from it. swift-tools-support-core's
+`resolveSymlinks`, its `realpath`, and Foundation's `removingNTPathPrefix` remove the prefix with
+`PathCchStripPrefix`.
+
+What:
+- `Win32LongPaths.swift`: `Win32.ExtendedLengthPrefix` (`never`, `whenNeeded`, `always`);
+  `Win32.fullPath(of:extendedLengthPrefix:)` (`GetFullPathNameW`, then `PathAllocCanonicalize`); and
+  `Win32.removingExtendedLengthPrefix(from:)` (`PathCchStripPrefix`).
+- `FilePathResolutionWindows.swift`: `FilePath.canonicalized()`, and `canonicalized(_:)` for a C string of
+  `CInterop.PlatformChar`, on Windows, over `GetFinalPathNameByHandleW`.
+- The namespace's own canonicalization (`_withCanonicalPath`, in `Win32Open.swift`) adds the prefix by
+  `whenNeeded`'s rule, and `ProcessHandle.create`'s current directory gets none.
+
+Which API: **Win32, and `canonicalized()` shared.** A full path, with Windows' rules for the prefix, is a Win32
+concept. `realpath`'s, the absolute path of an existing file with its links resolved, is the same on Windows, so it
+shares `FilePath.canonicalized()`, which the packages-5 lane wants on Windows for indexstore-db's `URLUtils.swift`,
+and which swift-tools-support-core implements by hand.
+
+Design calls, with the alternatives rejected:
+- **The public form returns a path.** A path can be resolved once and passed to many calls, as
+  `FilePathWindows.swift`'s FIXME wishes the adapters did, and the call needs no closure. Rejected: a closure form,
+  as System's internal one and the adopters' copies are, which saves an allocation but needs a typed and an
+  untyped overload, since Swift 6.2 doesn't infer a closure's typed throws.
+- **The prefix starts at 248 characters with the terminator, `CreateDirectoryW`'s limit, in every process**, which
+  is Rust's rule (`get_long_path`'s `LEGACY_MAX_PATH`). Rejected: `PATHCCH_ALLOW_LONG_PATHS`'s rule, the adapters',
+  which adds the prefix only past `MAX_PATH` and only where the process isn't long-path aware, so a directory of
+  248 to 259 characters can't be created there; and Foundation's, always, which `.always` offers.
+- **The namespace follows the same rule**, so a path from `fullPath(of:)` resolves to itself: paths of 247 to 259
+  characters, and long paths in a long-path-aware process, now get the prefix where they didn't. File functions
+  take either form. The exception is a current directory, for which Windows doesn't support the prefix (Rust's
+  `Command::current_dir` removes it), so `ProcessHandle.create(currentDirectory:)` now passes the full path
+  without one, `.never`; before, a current directory past `MAX_PATH` got the prefix where the process wasn't
+  long-path aware.
+- **Three cases, not a `Bool`**: `never` is the form for a current directory, and for display, and it's what
+  SwiftPM's `_normalized` computes. A path that begins with `\\?\` or `\\.\` passes through in each, as it did.
+- **`removingExtendedLengthPrefix(from:)` doesn't throw.** `PathCchStripPrefix` fails only for a buffer over
+  32,768 characters, and the path comes back unchanged then, as from Foundation's `removingNTPathPrefix` on any
+  failure.
+- **`canonicalized()` opens the file with no access rights and backup semantics**, so an unreadable file and a
+  directory resolve, and asks for its normalized DOS path. Its doc says how the result differs from `realpath`'s:
+  `..` is removed before the lookup, so `link\..` is the link's own directory; a mapped drive's file gets a UNC
+  path; the case is the file system's. Errors are `Errno`, the signature's, through `Errno(approximating:)`.
+- **`canonicalized()` keeps the prefix only where `whenNeeded` would add it.** Rejected: removing it always, as
+  swift-tools-support-core does, which gives long results that only a long-path-aware process can use; and keeping
+  it, `finalPath`'s form, which no other platform's result resembles.
+
+Tests: `Win32LongPathsTests`. They change the process's current directory, which XCTest allows.
+
+A Windows run must check:
+- `testInternalConstantsMatchTheSDK`.
+- `testRelativePathsResolveAgainstTheCurrentDirectory`: dot segments, a forward slash, trailing dots and spaces; a
+  full path resolves to itself; `.never` and `.always`.
+- `testThePrefixStartsAtCreateDirectorysLimit` (246 characters get no prefix, 247 do) and
+  `testDirectoriesAtTheLimitCanBeCreated` (`CreateDirectoryW` of a 250-character path from `fullPath(of:)`).
+- `testUNCPaths`: `\\?\UNC\` for `.always`, lexically, with no server.
+- `testVerbatimAndDevicePathsAreUnchanged`, in all three cases; `NUL` resolves to `\\.\NUL`, which relies on
+  Windows still doing that for a bare device name.
+- `testRemovingThePrefix`: a drive path and a UNC path lose it, and a volume GUID path keeps it, which assumes
+  `PathCchStripPrefix` returns `S_FALSE` for one.
+- `testCurrentDirectoriesOfNewProcessesHaveNoPrefix`: a 250-character current directory works for cmd.exe.
+- `testCanonicalizedFiles` (relative, in the wrong case, through a missing directory's `..`, the C-string overload,
+  and ENOENT), `testCanonicalizedResolvesJunctions` (a junction made with `mklink /J`), and
+  `testCanonicalizedKeepsThePrefixWhereNeeded`.
+- `Win32FileHandleTests.testLongAndVerbatimPaths`, and the other tests' paths, which now get the prefix from 247
+  characters.
+- Not covered: a long-path-aware process, network shares and mapped drives, drive-relative paths (`D:file`), and
+  `fullPath(of:)` of an empty path.
+
+## 24. windows-3: findings
+
+- **`FileDescriptor`'s Windows canonicalization doesn't cover `CreateDirectoryW`'s limit** (P4).
+  `withCanonicalPathRepresentation` passes `PATHCCH_ALLOW_LONG_PATHS`, so the `mkdir` adapter, which
+  `withTemporaryFilePath`'s directories use on Windows, fails with `ERROR_FILENAME_EXCED_RANGE` for a path of 248
+  to 259 characters where the process isn't long-path aware. swift-subprocess's and swift-build's copies pass the
+  same flag; Foundation's adds the prefix always.
+- **Windows doesn't support the `\\?\` prefix for a current directory**, which Rust's `Command::current_dir` and
+  Foundation's `FileManager` both work around: `ProcessHandle.create` gave one to a current directory past
+  `MAX_PATH`, and no longer does (section 23).
+- **macOS's CoreFoundation declares `S_OK` and `S_FALSE` too**, so the harness's tests spell `WinSDK.S_OK`; on
+  Windows, where XCTest's Foundation is swift-corelibs-foundation, the bare names would do.
+
+## 25. windows-3: patches for files outside the lane
+
+**P3, continued: `Sources/System/CMakeLists.txt`.** The Win32 `target_sources` block as it should read with this
+lane's files, which coverage-4 applies with P3. It replaces the block whether or not P3 has landed. Kept current
+with each commit.
+
+```cmake
+target_sources(SystemPackage PRIVATE
+  Win32/DynamicLibraryWindows.swift
+  Win32/FilePathResolutionWindows.swift
+  Win32/PathsWindows.swift
+  Win32/ProcessEnvironmentWindows.swift
+  Win32/ProcessIDWindows.swift
+  Win32/Win32.swift
+  Win32/Win32Console.swift
+  Win32/Win32Constants.swift
+  Win32/Win32Error.swift
+  Win32/Win32FileDescriptorBridge.swift
+  Win32/Win32FileHandle.swift
+  Win32/Win32FileIO.swift
+  Win32/Win32FileInformation.swift
+  Win32/Win32FileType.swift
+  Win32/Win32FinalPath.swift
+  Win32/Win32HandleOperations.swift
+  Win32/Win32Locking.swift
+  Win32/Win32LongPaths.swift
+  Win32/Win32Open.swift
+  Win32/Win32Process.swift
+  Win32/Win32ProcessCreation.swift
+  Win32/Win32SecurityDescriptor.swift
+  Win32/Win32Synchronization.swift
+  Win32/Win32Syscalls.swift
+  Win32/Win32Thread.swift
+  Win32/Win32Time.swift
+  Win32/Win32VolumeInformation.swift
+  Win32/Win32Wait.swift)
+```
+
+**P4, `Sources/System/FilePath/FilePathWindows.swift`: give the adapters section 23's prefix rule.** The sizing
+call's length counts the terminator. Not compiled by the harness (the file is outside `Win32/`); the patched
+function compiled in a scratch copy against `WindowsModel`, with stand-ins for `Errno`, `_mapWindowsErrorToErrno`
+and the overlay's `ERROR_SUCCESS`. It applies to this branch with `git apply`.
+
+```diff
+--- a/Sources/System/FilePath/FilePathWindows.swift
++++ b/Sources/System/FilePath/FilePathWindows.swift
+@@ -497,9 +497,14 @@
+       }
+ 
+       // 2. Canonicalize the path.
+-      // This will add the \\?\ prefix if needed based on the path's length.
++      // This adds the \\?\ prefix to a path that reaches CreateDirectoryW's
++      // limit of 248 characters, its terminator included, in any process.
++      // PATHCCH_ALLOW_LONG_PATHS alone adds it only past MAX_PATH, and only
++      // in a process that isn't long-path aware.
+       var pwszCanonicalPath: LPWSTR?
+-      let flags: ULONG = numericCast(PATHCCH_ALLOW_LONG_PATHS.rawValue)
++      let options = dwLength >= 248
++        ? PATHCCH_ENSURE_IS_EXTENDED_LENGTH_PATH : PATHCCH_ALLOW_LONG_PATHS
++      let flags: ULONG = numericCast(options.rawValue)
+       let result = PathAllocCanonicalize(pwszFullPath.baseAddress, flags, &pwszCanonicalPath)
+       if let pwszCanonicalPath {
+           defer { LocalFree(pwszCanonicalPath) }
+```
+
+A Windows run with P4 must check that `FileDescriptor.open` and `withTemporaryFilePath` work for paths of 248 to
+259 characters, and that `Win32OverlongPathTests` still throws.
