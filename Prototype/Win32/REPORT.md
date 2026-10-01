@@ -17,10 +17,9 @@ adds API for the adopters' top Windows gaps of section 8, in its order, checked 
 **Resume here:** windows-api's parts are done (sections 1 to 10), and so are windows-2's (11 to 22: P1 and P2,
 then section 8's gaps from processes to file information). windows-3, in progress: long paths (section 23,
 `315f25b`), threads (24, `054e9e2`), `HRESULT` (25, `b89b78c`), path operations (26, `8326373`), overlapped I/O (27,
-`d479525`), and system information (28, the last commit).
-- **Next**: the rest of section 8's list: Winsock, last (design only
-  if time runs short, since the decisions triage gives Winsock a Windows-only module of its own).
-- **Then, left within done gaps**: a Windows `BrokenDownTime` over the UCRT's time functions (14); a Windows
+`d479525`), system information (28, `c04d6b1`), and Winsock, as a design (29, the last commit). Section 8's
+list is done.
+- **Next, left within done gaps**: a Windows `BrokenDownTime` over the UCRT's time functions (14); a Windows
   `ProcessID.exit(_:)` and `exitImmediately(_:)` (12); `CRITICAL_SECTION` (15); attaching, freeing and
   generating console events, and `SetStdHandle` (16); `AddDllDirectory` (18); a quoting helper for command lines
   (13); and packages-5's Windows gaps (`../adopters/PACKAGES-5-REPORT.md`, "Gaps, across platforms"):
@@ -1586,7 +1585,7 @@ A Windows run must check:
 - Not covered: a port waiter woken by the port's closing, packets of operations that finish in the call,
   disk files read past 4 GiB, and concurrency limits.
 
-## 28. windows-3: system information: this commit
+## 28. windows-3: system information: `c04d6b1`
 
 The next gap of section 8. swift-foundation reads the page size, the processor count and mask (`GetSystemInfo`),
 the installed memory (`GetPhysicallyInstalledSystemMemory`), the host name (`GetComputerNameExW` with
@@ -1637,7 +1636,70 @@ mask's bits equal to the count, the architecture matching the build's, the nativ
 with the host name); and `testOSVersion` (10.0, from build 10240). Not covered: more than one processor group,
 emulated processes, and clusters' virtual servers.
 
-## 29. windows-3: findings
+## 29. windows-3: Winsock, a design: this commit
+
+The last gap of section 8: two packages, but 23 files, nearly all NIO's. Not implemented: its natural shape needs
+files outside this lane, and its module structure waits on a decision (`../Claude outputs/decisions-triage.md`, item
+74, "No `SystemSockets` module: Unix sockets move into `SystemPackage`; Winsock gets its own Windows-only module",
+for after a meeting). This section is the design a later lane can start from.
+
+**What the adopters do.** NIO's `BSDSocketAPIWindows.swift` puts its BSD-shaped socket layer over Winsock. It
+aliases Winsock's structures to POSIX's names (`sockaddr = SOCKADDR`, `msghdr = WSAMSG`, `cmsghdr = WSACMSGHDR`,
+`sa_family_t = ADDRESS_FAMILY`), calls Winsock's BSD functions (`socket`, `bind`, `listen`, `accept`, `connect`,
+`shutdown`, `getpeername`, `getsockname`, and `getsockopt` and `recv` through C shims, since Winsock types their
+buffers `char *`), and replaces what Winsock lacks or renames: `close` with `closesocket`, `fcntl(O_NONBLOCK)` with
+`ioctlsocket(FIONBIO)`, `sendmsg` and `recvmsg` with `WSASendMsg` and `WSARecvMsg` (the latter found with
+`WSAIoctl(SIO_GET_EXTENSION_FUNCTION_POINTER)` on every call), `poll` with `WSAPoll`, `sendfile` with
+`TransmitFile`, and errno with `WSAGetLastError`. It deletes a Unix domain socket's file through its reparse point
+(section 26's disposition). swift-certificates parses IP addresses with `inet_pton` into `in_addr` and `in6_addr`.
+
+**The proposal.**
+1. **Share SystemSockets' names and shapes.** A socket, its address, its options and its messages are the same
+   concepts on Windows, and Winsock spells them as BSD does: the same functions, the same structure layouts and field
+   names (`sin_family`, `sin_addr`), and nearly the same constants. What differs is the handle type, the close and
+   control calls, and where errors come from. So Windows gets `SocketDescriptor`, `SocketAddress`,
+   `SocketDescriptor.Option` and the rest, with SystemSockets' signatures, and code written against them compiles on
+   both where the concept holds. A Windows-only API in a namespace, as `Win32` is for files, would make every NIO
+   call site a `#if`, which the shared spelling avoids.
+2. **Don't fake what Winsock lacks.** `socketpair`, `SCM_RIGHTS` over Unix domain sockets, abstract socket names,
+   `SO_PEERCRED`, `MSG_NOSIGNAL`, VM sockets and `sendfile` don't exist on Windows, so their API stays off it, as the
+   Vision draws the line; `TransmitFile`, `AcceptEx` and `ConnectEx` are Windows' own, under Windows names.
+3. **The handle is `SOCKET`.** `SocketDescriptor.rawValue` is a `SOCKET` (`UINT_PTR`) on Windows, where it's a
+   `CInt` elsewhere: the raw value is the one part of the shared type whose type differs, as `ProcessID`'s does
+   (section 12). It stays copyable, the raw currency type; an owner is the `OwnedFD` direction's question on every
+   platform.
+4. **Errors are `Win32.Error`.** Winsock's codes are system error codes (`WSAEWOULDBLOCK` is 10035), which
+   `FormatMessageW` describes, so the Windows module throws `Win32.Error`, and `Win32.Error` gains names for the
+   Winsock codes NIO tests (`wouldBlock`, `inProgress`, `connectionReset`, `connectionRefused`, `notConnected`, and
+   the like). The shared signatures then differ in their error type, as `DynamicLibrary`'s do (section 18).
+   Rejected: `Errno`, which would need a table, since Winsock numbers its BSD codes as Berkeley's errno plus 10000
+   (`WSAEWOULDBLOCK` is BSD's 35), not as the UCRT's errno (where `EWOULDBLOCK` is 140), and would lose the rest.
+5. **Startup is lazy.** The module calls `WSAStartup(2.2)` once per process before its first socket, as Rust's
+   standard library does, and doesn't call `WSACleanup`, which matters only to code that unloads Winsock (Rust's
+   runtime calls it at exit).
+6. **Sockets are created with `WSASocketW`**, with `WSA_FLAG_OVERLAPPED` and `WSA_FLAG_NO_HANDLE_INHERIT`, as Rust
+   creates them: overlapped, so they can join section 27's completion ports (which needs `associate` for a raw
+   handle), and not inherited, as `SOCK_CLOEXEC` gives POSIX. Winsock's own calls handle overlapped sockets, so
+   blocking `send` and `recv` stay safe on them, unlike `ReadFile` on an overlapped file.
+7. **Windows-only additions**: `WSAPoll` as `poll`'s counterpart, with the `POLLRDNORM` and `POLLWRNORM` events
+   NIO maps; `ioctlsocket(FIONBIO)` behind the shared nonblocking option; the extension functions (`WSARecvMsg`,
+   `WSASendMsg`, `AcceptEx`, `ConnectEx`, `TransmitFile`), looked up once per process and cached, where NIO looks
+   them up on every call.
+
+**How, in order.**
+- P0: decide the module structure. Two forms fit the proposal: SystemSockets' sources compiled for Windows over a
+  Winsock layer of `system_*` functions, as `FileDescriptor` reaches the UCRT through its adapters but without
+  emulating anything; or a Windows-only module that declares the same names. The first shares the code, and the
+  second the API alone, so the first is the default.
+- P1: the BSD core over Winsock: creation, binding, connecting, accepting, sending and receiving, options,
+  shutdown, closing, names, and `inet_pton`/`inet_ntop` for addresses, with tests that run on Windows.
+- P2: messages through `WSASendMsg` and `WSARecvMsg`, polling, nonblocking control, overlapped I/O through
+  completion ports, and Unix domain sockets as Windows has them.
+
+**Outside this lane's files**: a target in `Package.swift` that links `ws2_32`, its CMake list, and SystemSockets'
+`#error` for other platforms (`Sources/SystemSockets`), which a Windows port replaces.
+
+## 30. windows-3: findings
 
 - **`FileDescriptor`'s Windows canonicalization doesn't cover `CreateDirectoryW`'s limit** (P4).
   `withCanonicalPathRepresentation` passes `PATHCCH_ALLOW_LONG_PATHS`, so the `mkdir` adapter, which
@@ -1654,7 +1716,7 @@ emulated processes, and clusters' virtual servers.
 - **macOS's CoreFoundation declares `S_OK` and `S_FALSE` too**, so the harness's tests spell `WinSDK.S_OK`; on
   Windows, where XCTest's Foundation is swift-corelibs-foundation, the bare names would do.
 
-## 30. windows-3: patches for files outside the lane
+## 31. windows-3: patches for files outside the lane
 
 **P3, continued: `Sources/System/CMakeLists.txt`.** The Win32 `target_sources` block as it should read with this
 lane's files, which coverage-4 applies with P3. It replaces the block whether or not P3 has landed. Kept current
