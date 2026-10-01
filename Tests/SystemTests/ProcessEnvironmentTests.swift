@@ -7,7 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-#if !os(Windows) && !os(WASI)
+#if !os(Windows)
 
 import XCTest
 
@@ -23,6 +23,8 @@ import Darwin
 import Glibc
 #elseif canImport(Musl)
 import Musl
+#elseif canImport(WASILibc)
+import WASILibc
 #elseif canImport(Android)
 import Android
 #endif
@@ -33,7 +35,11 @@ import Android
 @available(System 199, *)
 final class ProcessEnvironmentTests: XCTestCase {
   private func name(_ suffix: String) -> String {
+    #if os(WASI) // WASI has no process IDs
+    "SYSTEM_TESTS_\(suffix)"
+    #else
     "SYSTEM_TESTS_\(suffix)_\(ProcessID.current.rawValue)"
+    #endif
   }
 
   func testSetValueAndRemove() throws {
@@ -146,4 +152,4 @@ final class ProcessEnvironmentTests: XCTestCase {
   #endif // ENABLE_MOCKING
 }
 
-#endif // !os(Windows) && !os(WASI)
+#endif // !os(Windows)

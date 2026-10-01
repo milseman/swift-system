@@ -8,17 +8,33 @@ other lanes'.
 
 ## Resume here
 
-- State: step 1 (builds) done: `Utilities/linux/cross.sh` builds for Musl and
-  WASI (section 1). Step 2: SystemPackage builds for Musl (aarch64 and x86_64)
-  and WASI, and SystemTests for WASI (section 2); the rest of the package
-  needs other lanes' files (section 5). The terminal API's storage and flags
-  are written for Android, FreeBSD and OpenBSD from their headers (2.3).
-- Blocked: Android needs an NDK, which this lane can't fetch (section 1.3):
-  waiting for Michael to put one in `../linux-logs/cross/ndk/`.
-- Next: step 3, the adopters' Musl, Bionic and WASILibc names (section 3).
-- Checks: `swift build && swift test` on Darwin; `Utilities/linux/cross.sh musl`,
-  `cross.sh musl build -- --target SystemPackage`, and
-  `cross.sh wasi build -- --target SystemTests`.
+Stopped at Michael's request (2026-10-01), at the end of step 3's WASI part.
+
+- **Done** (commits): `144b9ae` `Utilities/linux/cross.sh`, and SystemPackage
+  building for Musl and WASI (1, 2.1, 2.2); `3dce05e` the terminal API's
+  storage and flags for Android, FreeBSD and OpenBSD, from their headers
+  (2.3); `fb0fecb` poll, `ClockID`, `ProcessEnvironment`, `SystemConfig`,
+  `BrokenDownTime` and `DirectoryStream`/`DirectoryWalk` on WASI (3.1).
+- **In progress**: nothing uncommitted.
+- **Next**: the rest of step 3 (3.2): `DirectoryStreamTests` and
+  `DirectoryEntryTypeTests` on WASI; on Android, `CLocale` and `Spawn` from
+  Bionic's headers. Then Android's build, once an NDK is in
+  `../linux-logs/cross/ndk/` (1.3): `Utilities/linux/cross.sh android install`,
+  then `cross.sh android`.
+- **For other lanes**: section 5 (SystemSockets on Musl, Android and WASI;
+  the samples' imports; Package.swift for WASI; `BrokenDownTime`'s `Int`
+  seconds on 32-bit platforms; linux-2's README).
+- **Latest tests** (at `fb0fecb`): Darwin `swift build && swift test`: XCTest
+  572 tests, 5 skipped, 0 failures; swift-testing 502 tests passed.
+  `cross.sh wasi build -- --target SystemTests` and
+  `cross.sh musl build -- --target SystemPackage`: 0 errors. WASI tests under
+  WasmKit: no usable run (4). The whole package doesn't build for Musl or WASI
+  without section 5's changes.
+- **Checks**: `swift build && swift test` on Darwin; `Utilities/linux/cross.sh
+  musl build -- --target SystemPackage` (and `--triple x86_64-swift-linux-musl`);
+  `cross.sh wasi build -- --target SystemTests`. After a `--target` build of
+  another target in the same scratch path, delete its
+  `<triple>/debug/description.json` first (4).
 
 ## 1. Builds
 
@@ -32,7 +48,7 @@ exit status. Its `--help` has the options.
 | Platform | Builds here | How |
 |---|---|---|
 | Musl | yes | the Static Linux SDK 0.1.0 for Swift 6.2.4, `aarch64-swift-linux-musl` (default) or `x86_64-swift-linux-musl` |
-| WASI | yes, and tests run under WasmKit | the WebAssembly SDK for 6.2.4, `wasm32-unknown-wasip1` |
+| WASI | yes; the tests build, and run under WasmKit only in part (4) | the WebAssembly SDK for 6.2.4, `wasm32-unknown-wasip1` |
 | Android | not yet: needs an NDK (1.3) | the Android SDK for Swift 6.3.3, in `swift:6.3-noble` |
 | FreeBSD | no | swift.org publishes no FreeBSD Swift SDK |
 | OpenBSD | no | no Swift SDK at all |
@@ -155,20 +171,75 @@ Possible widenings: FreeBSD defines most of the Linux-only high baud rates
 
 ## 3. The adopters' needs
 
-Not started. From `../adopters-unix/INVENTORY.md`, the names whose class is
-(b) on Musl, Android or WASI: on Android, `SO_REUSEPORT` (SystemSockets) and
-`posix_spawn_file_actions_t`; on WASI, sockets, `mmap`, `poll`, `sysconf`,
-the allocator (done, 2.2), clocks, directory streams, `getenv`, `getuid`,
-`gmtime_r` and `strftime`, and pthreads.
+From `../adopters-unix/INVENTORY.md`, the names on the adopters' Musl, Bionic
+and WASILibc lines that System had only on other platforms. The inventory
+classed them against system-next before linux-api merged; since then
+linux-api's names (`POSIXErrorCode`, `maxSymbolicLinks`, `makeUniqueFile`,
+`dataSync`, `CLocale`, `FileWatcher`, `readPassphrase`) cover Musl, and all
+but `CLocale` cover Android. No name was missing on Musl alone.
+
+By sites on WASI lines (the inventory's (W: b)): sockets 86, the allocator
+37, pthreads 17, poll 10, directory streams 9, `mmap` 7, clocks 7,
+`gmtime_r`/`strftime`/`tm` 6, `getenv` 4, `sysconf` 4, `sched_yield` 1,
+`getuid` 1.
+
+### 3.1 Done on WASI
+
+`Memory` and `FileStream` (2.2), and in `fb0fecb`:
+
+- **poll** (WasmKit's `PALPoll.swift`): WASI has no priority data, so no
+  `POLLPRI`, `POLLRDBAND` or `POLLWRBAND`.
+- **`ClockID`** (WasmKit's `PALClock.swift`, Foundation's `Date.swift`,
+  `UUID.swift`, `ProcessInfo.swift`): only `realtime` and `monotonic`; WASI's
+  `clockid_t` is a pointer to a constant, so `ClockID` is `@unchecked Sendable`
+  there, and CSystemWASI.h returns the clocks.
+- **`ProcessEnvironment`** (Foundation, NIOCore, NIOEmbedded):
+  `csystem_environ` is wasi-libc's `__wasilibc_get_environ()`.
+- **`SystemConfig`** (NIOCore's `_SC_NPROCESSORS_ONLN`): every name.
+- **`BrokenDownTime`** (Foundation's `Date.swift`): local time is UTC, and
+  there's no `tzset`.
+- **`DirectoryStream`, `DirectoryWalk`, `FileType(directoryEntryType:)`**
+  (WasmKit's `PALFileDescriptor.swift`, Foundation's
+  `FileOperations+Enumeration.swift`): over CSystemWASI.h's copies of the
+  entries, with its `DT_` values.
+
+### 3.2 Left
+
+- **WASI, buildable here**: `DirectoryStreamTests` and
+  `DirectoryEntryTypeTests` still skip WASI, not yet widened;
+  `DirectoryEntryTypeTests` also reads `CInterop.DirectoryEntry`, which stays
+  off WASI (its `d_name` is a flexible array).
+- **WASI, not System's to fix here**: pthreads (none: wasm32-wasip1's
+  `libpthread.a` is empty, and `libc.a` has no `pthread_` symbol, so
+  `PThread`, `sched_yield`'s `PThread.yield()`, NIOLock's and WasmKit's
+  mutexes stay the C library's); `getuid` (wasi-libc has none); `mmap`
+  (wasi-libc's is `wasi-emulated-mman`, which needs `-D_WASI_EMULATED_MMAN`
+  and the library: section 5); sockets (SystemSockets: section 5).
+- **Android, from headers until an NDK is here**: `CLocale` (Foundation's
+  `Platform.swift` and `JSONEncoderTests.swift`: `newlocale`, `strtod_l`,
+  `strtof_l`, `strncasecmp_l`, `setlocale`); `Spawn`, `RawSpawn` and
+  `ChildProcess` (TSC's `Process.swift`: `posix_spawn_file_actions_t`), which
+  need `posix_spawn` and friends from API 28, through CSystem shims that
+  return `ENOSYS` below it, as `csystem_pthread_getname_np` does;
+  `SO_REUSEPORT` is SystemSockets' (section 5).
+- **BSDs**: section 2.3's possible widenings.
 
 ## 4. Findings
 
 - **WASI tests under WasmKit** (in a scratch copy without the socket targets,
   which don't build for WASI): XCTest traps (`unreachable`) in `Bundle.main`'s
-  initializer, called from `XCTMain`, before any test runs. swift-testing runs;
-  `statAccessors()` fails with `ENOENT` and `permissions()` with `ENOSYS`
-  (wasi-libc's `fchmod`), and then WasmKit itself exits with "Error: Bad file
-  descriptor" during the `Stat` suite, ending the run.
+  initializer, called from `XCTMain`, before any test runs. swift-testing runs
+  until WasmKit itself exits with "Error: Bad file descriptor", which ends the
+  run: at `144b9ae` after 18 tests passed (`statAccessors()` failed with
+  `ENOENT`, `permissions()` with `ENOSYS`, wasi-libc's `fchmod`), and at
+  `fb0fecb` before any passed. The host's WASI call seems to throw for a bad
+  descriptor rather than return `EBADF`, as the tests that use descriptor -1
+  expect. So nothing on WASI has run beyond those 18 tests.
+- **wasm32-wasip1 has no pthreads**: its `libpthread.a` is 8 bytes, and
+  `libc.a` defines no `pthread_` function (wasip1-threads would have them).
+- **32-bit `Int`**: `BrokenDownTime(secondsSinceEpoch:in:)` and
+  `secondsSinceEpoch(in:)` use `Int`, so on wasm32 and 32-bit ARM Android they
+  reach only 1901 to 2038, though `time_t` there is 64 bits on WASI.
 - **A stale build description**: after `swift build --target A` on a scratch
   path, `--target B` can fail with "No target named
   'B-<triple>-debug.module' in build description"; deleting
@@ -191,4 +262,15 @@ the allocator (done, 2.2), clocks, directory streams, `getenv`, `getuid`,
   Android, and Package.swift builds it everywhere, so neither `swift build` nor
   `swift test` finishes for WASI. Gating its files off WASI (an empty module),
   or excluding it there, would let the tests build.
+- **SystemSockets on Android**: `SocketOption.reusePort` (`SO_REUSEPORT`),
+  which Bionic has; NIO's `BSDSocketAPI.swift` keeps `import Android` for it.
+- **WASI's sockets** (NIOCore's `BSDSocketAPI.swift`, `SocketAddresses.swift`,
+  86 sites): SystemSockets would need a WASI branch; wasip1 has only
+  `accept`, `recv`, `send` and `shutdown` on preopened sockets.
+- **Package.swift for WASI**: `MemoryMapping` needs `-D_WASI_EMULATED_MMAN` in
+  CSystem's and SystemPackage's C settings and linking `wasi-emulated-mman`
+  (Foundation's `Data+Reading.swift` maps files on WASI); and SystemSockets
+  excluded, or empty, there (above).
+- **`BrokenDownTime`'s owner**: whether its seconds should be `Int64` or
+  `time_t`, for 32-bit platforms (4).
 - **`Utilities/linux/README.md`** (linux-2's): a line pointing to `cross.sh`.

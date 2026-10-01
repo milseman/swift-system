@@ -154,7 +154,7 @@ internal func system_timerfd_gettime(
 }
 #endif // os(Linux) || os(Android)
 
-#if !os(Windows) && !os(WASI)
+#if !os(Windows)
 // poll
 internal func system_poll(
   _ fds: UnsafeMutablePointer<pollfd>?, _ nfds: Int, _ timeout: CInt
@@ -168,4 +168,4 @@ internal func system_poll(
 #endif
   return poll(fds, nfds_t(nfds), timeout)
 }
-#endif // !os(Windows) && !os(WASI)
+#endif // !os(Windows)

@@ -9,7 +9,7 @@
 
 // Clocks and sleeping: clock_gettime, clock_getres and nanosleep.
 
-#if !os(Windows) && !os(WASI)
+#if !os(Windows)
 
 import CSystem
 #if SYSTEM_PACKAGE_DARWIN
@@ -18,6 +18,8 @@ import Darwin
 import Glibc
 #elseif canImport(Musl)
 import Musl
+#elseif canImport(WASILibc)
+import WASILibc
 #elseif canImport(Android)
 import Android
 #else
@@ -55,4 +57,4 @@ internal func system_nanosleep(
   return nanosleep(request, remaining)
 }
 
-#endif // !os(Windows) && !os(WASI)
+#endif // !os(Windows)

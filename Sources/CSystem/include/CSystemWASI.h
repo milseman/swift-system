@@ -15,6 +15,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h> // For NAME_MAX
+#include <time.h>
 
 // wasi-libc ships <sys/statvfs.h>, but the Swift WASILibc module does not
 // surface it. Re-export them through CSystem here.
@@ -42,6 +43,17 @@ static inline int32_t _getConst_POSIX_FADV_DONTNEED(void) { return POSIX_FADV_DO
 static inline int32_t _getConst_POSIX_FADV_NOREUSE(void) { return POSIX_FADV_NOREUSE; }
 
 static inline uint8_t _getConst_DT_DIR(void) { return DT_DIR; }
+static inline uint8_t _getConst_DT_UNKNOWN(void) { return DT_UNKNOWN; }
+static inline uint8_t _getConst_DT_FIFO(void) { return DT_FIFO; }
+static inline uint8_t _getConst_DT_CHR(void) { return DT_CHR; }
+static inline uint8_t _getConst_DT_BLK(void) { return DT_BLK; }
+static inline uint8_t _getConst_DT_REG(void) { return DT_REG; }
+static inline uint8_t _getConst_DT_LNK(void) { return DT_LNK; }
+static inline uint8_t _getConst_DT_SOCK(void) { return DT_SOCK; }
+
+// The clocks are the addresses of constants, which Swift can't import.
+static inline clockid_t _getConst_CLOCK_REALTIME(void) { return CLOCK_REALTIME; }
+static inline clockid_t _getConst_CLOCK_MONOTONIC(void) { return CLOCK_MONOTONIC; }
 
 // Modified dirent struct that can be imported to Swift
 struct _system_dirent {

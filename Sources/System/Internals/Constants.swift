@@ -944,7 +944,7 @@ internal var _F_SETPIPE_SZ: CInt { CSYSTEM_F_SETPIPE_SZ }
 
 // MARK: - sysconf and pathconf
 
-#if !os(Windows) && !os(WASI)
+#if !os(Windows)
 // These are macros on some platforms and enumerations on others.
 @_alwaysEmitIntoClient
 internal var __SC_ARG_MAX: CInt { CInt(_SC_ARG_MAX) }
@@ -1093,7 +1093,7 @@ internal var __PC_XATTR_SIZE_BITS: CInt { CInt(_PC_XATTR_SIZE_BITS) }
 @_alwaysEmitIntoClient
 internal var __PC_MIN_HOLE_SIZE: CInt { CInt(_PC_MIN_HOLE_SIZE) }
 #endif
-#endif // !os(Windows) && !os(WASI)
+#endif // !os(Windows)
 
 // MARK: - Process information
 

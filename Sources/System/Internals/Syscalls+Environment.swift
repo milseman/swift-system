@@ -10,7 +10,7 @@
 // The process's environment: setenv, unsetenv, and the environ array.
 // getenv's wrapper, system_getenv, is in Syscalls.swift.
 
-#if !os(Windows) && !os(WASI)
+#if !os(Windows)
 
 import CSystem
 #if SYSTEM_PACKAGE_DARWIN
@@ -19,6 +19,8 @@ import Darwin
 import Glibc
 #elseif canImport(Musl)
 import Musl
+#elseif canImport(WASILibc)
+import WASILibc
 #elseif canImport(Android)
 import Android
 #else
@@ -49,4 +51,4 @@ internal func system_environ() -> UnsafeMutablePointer<UnsafeMutablePointer<CCha
   csystem_environ()
 }
 
-#endif // !os(Windows) && !os(WASI)
+#endif // !os(Windows)

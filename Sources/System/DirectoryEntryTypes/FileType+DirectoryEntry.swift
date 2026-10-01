@@ -7,7 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-#if !os(Windows) && !os(WASI)
+#if !os(Windows)
 
 @available(System 199, *)
 extension FileType {
@@ -57,4 +57,4 @@ extension FileType {
   }
 }
 
-#endif // !os(Windows) && !os(WASI)
+#endif // !os(Windows)

@@ -7,7 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-#if !os(Windows) && !os(WASI)
+#if !os(Windows)
 
 /// A namespace for the process's environment variables.
 ///
@@ -202,4 +202,4 @@ internal func _environmentNameIsValid(_ name: String) -> Bool {
   !name.isEmpty && !name.utf8.contains(where: { $0 == 0 || $0 == UInt8(ascii: "=") })
 }
 
-#endif // !os(Windows) && !os(WASI)
+#endif // !os(Windows)

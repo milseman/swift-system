@@ -10,7 +10,7 @@
 // Broken-down time: gmtime_r, localtime_r, timegm, mktime, strftime and
 // tzset.
 
-#if !os(Windows) && !os(WASI)
+#if !os(Windows)
 
 import CSystem
 #if SYSTEM_PACKAGE_DARWIN
@@ -19,6 +19,8 @@ import Darwin
 import Glibc
 #elseif canImport(Musl)
 import Musl
+#elseif canImport(WASILibc)
+import WASILibc
 #elseif canImport(Android)
 import Android
 #else
@@ -79,8 +81,11 @@ internal func system_strftime(
   strftime(buffer, capacity, format, time)
 }
 
+// wasi-libc has no time zones, and no tzset: its local time is UTC.
 internal func system_tzset() {
+#if !os(WASI)
   tzset()
+#endif
 }
 
-#endif // !os(Windows) && !os(WASI)
+#endif // !os(Windows)

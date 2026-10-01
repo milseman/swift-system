@@ -7,7 +7,8 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-#if !os(Windows) && !os(WASI)
+// The tests' times need a 64-bit Int, which wasm32 and 32-bit ARM don't have.
+#if !os(Windows) && !os(WASI) && _pointerBitWidth(_64)
 
 import Testing
 
@@ -283,4 +284,4 @@ private struct SplitMix {
   }
 }
 
-#endif // !os(Windows) && !os(WASI)
+#endif // !os(Windows) && !os(WASI) && _pointerBitWidth(_64)

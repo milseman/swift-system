@@ -7,7 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-#if !os(Windows) && !os(WASI)
+#if !os(Windows)
 
 import Testing
 
@@ -23,6 +23,8 @@ import Darwin
 import Glibc
 #elseif canImport(Musl)
 import Musl
+#elseif canImport(WASILibc)
+import WASILibc
 #elseif canImport(Android)
 import Android
 #endif
@@ -31,10 +33,10 @@ import Android
 private struct ClockTests {
   @available(System 199, *)
   static var clocks: [(String, ClockID)] {
-    var clocks: [(String, ClockID)] = [
-      ("realtime", .realtime), ("monotonic", .monotonic),
-      ("processCPUTime", .processCPUTime), ("threadCPUTime", .threadCPUTime),
-    ]
+    var clocks: [(String, ClockID)] = [("realtime", .realtime), ("monotonic", .monotonic)]
+    #if !os(WASI)
+    clocks += [("processCPUTime", .processCPUTime), ("threadCPUTime", .threadCPUTime)]
+    #endif
     #if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
     clocks.append(("monotonicRaw", .monotonicRaw))
     #endif
@@ -85,6 +87,9 @@ private struct ClockTests {
     }
   }
 
+  // WASI has no processor-time clocks, its clocks are pointers to constants
+  // that a made-up clock can't stand in for, and it has no PThread.sleep.
+  #if !os(WASI)
   @available(System 199, *)
   @available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *)
   @Test func threadCPUTimeCountsWork() throws {
@@ -122,6 +127,7 @@ private struct ClockTests {
     try PThread.sleep(for: .zero)
     try PThread.sleep(for: .seconds(-5))
   }
+  #endif // !os(WASI)
 }
 
-#endif // !os(Windows) && !os(WASI)
+#endif // !os(Windows)
