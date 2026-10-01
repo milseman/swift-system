@@ -217,6 +217,63 @@ final class PThreadMockTests: XCTestCase {
     for test in syscallTestCases { test.runAllTests() }
   }
 
+  #if !SYSTEM_PACKAGE_DARWIN
+  final class MonotonicCondition: @unchecked Sendable {
+    let condition: PThread.Condition = {
+      var attributes = PThread.Condition.Attributes()
+      attributes.clock = .monotonic
+      return try! PThread.Condition(attributes: attributes)
+    }()
+  }
+
+  // Off Darwin, a relative wait reads the condition variable's clock, and
+  // waits until the deadline that the timeout gives on it. The mocked
+  // clock_gettime leaves the time it reads at zero, so the deadline is the
+  // timeout.
+  func testRelativeWaitReadsTheConditionsClock() {
+    let objects = Objects()
+    let monotonic = MonotonicCondition()
+    let borrowed = UnsafeMutablePointer<CInterop.PThreadCondition>.allocate(capacity: 1)
+    defer { borrowed.deallocate() }
+    MockingDriver.withMockingEnabled { mocking in
+      func expectWait(
+        clock: clockid_t, _ condition: UnsafeMutablePointer<CInterop.PThreadCondition>,
+        until seconds: Int, _ nanoseconds: Int, line: UInt = #line
+      ) {
+        let read = mocking.trace.dequeue()
+        XCTAssertTrue(
+          read?.matches(Trace.Entry(name: "clock_gettime", [clock, Wildcard()])) ?? false,
+          "\(String(describing: read))", line: line)
+        let wait = mocking.trace.dequeue()
+        XCTAssertTrue(
+          wait?.matches(
+            Trace.Entry(
+              name: "pthread_cond_timedwait",
+              [condition, objects.mutex.unsafeAddress, seconds, nanoseconds])) ?? false,
+          "\(String(describing: wait))", line: line)
+      }
+
+      _ = try? objects.condition.wait(on: objects.mutex, timeout: .milliseconds(5))
+      expectWait(clock: _CLOCK_REALTIME, objects.condition.unsafeAddress, until: 0, 5_000_000)
+      _ = try? monotonic.condition.wait(on: objects.mutex, timeout: .seconds(2))
+      expectWait(clock: _CLOCK_MONOTONIC, monotonic.condition.unsafeAddress, until: 2, 0)
+      PThread.Condition.withUnsafeCondition(at: borrowed, clock: .monotonic) { condition in
+        _ = try? condition.wait(on: objects.mutex, timeout: .seconds(-1))
+      }
+      expectWait(clock: _CLOCK_MONOTONIC, borrowed, until: 0, 0)
+      XCTAssertTrue(mocking.trace.isEmpty)
+
+      // An error reading the clock is thrown, without a wait.
+      mocking.forceErrno = .counted(errno: EINVAL, count: 1)
+      XCTAssertThrowsError(try objects.condition.wait(on: objects.mutex, timeout: .seconds(1))) {
+        XCTAssertEqual($0 as? Errno, .invalidArgument)
+      }
+      XCTAssertEqual(mocking.trace.dequeue()?.name, "clock_gettime")
+      XCTAssertTrue(mocking.trace.isEmpty)
+    }
+  }
+  #endif
+
   // MARK: Threads
 
   func testCreateFailureReleasesTheBody() {

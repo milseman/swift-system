@@ -55,6 +55,13 @@ extension PThread {
     @usableFromInline
     internal let _deallocates: Bool
 
+    #if !SYSTEM_PACKAGE_DARWIN
+    // The clock that the C condition variable's deadlines are on, which
+    // a relative wait reads; the C condition variable doesn't report it.
+    @usableFromInline
+    internal let _clock: clockid_t
+    #endif
+
     /// Creates a condition variable.
     ///
     /// - Parameter attributes: How the condition variable is shared,
@@ -66,6 +73,9 @@ extension PThread {
     public init(attributes: Attributes = Attributes()) throws(Errno) {
       self._address = try Condition._allocate(attributes).get()
       self._deallocates = true
+      #if !SYSTEM_PACKAGE_DARWIN
+      self._clock = attributes.clock.rawValue
+      #endif
     }
 
     /// Creates a condition variable in memory that the caller provides,
@@ -91,13 +101,27 @@ extension PThread {
       try Condition._initialize(address, attributes).get()
       self._address = address
       self._deallocates = false
+      #if !SYSTEM_PACKAGE_DARWIN
+      self._clock = attributes.clock.rawValue
+      #endif
     }
 
+    #if SYSTEM_PACKAGE_DARWIN
     @_alwaysEmitIntoClient
     internal init(_borrowing address: UnsafeMutablePointer<CInterop.PThreadCondition>) {
       self._address = address
       self._deallocates = false
     }
+    #else
+    @_alwaysEmitIntoClient
+    internal init(
+      _borrowing address: UnsafeMutablePointer<CInterop.PThreadCondition>, clock: Clock
+    ) {
+      self._address = address
+      self._deallocates = false
+      self._clock = clock.rawValue
+    }
+    #endif
 
     deinit {
       // deinit can't throw, so an error is dropped. The only one is EBUSY,
@@ -221,7 +245,6 @@ extension PThread.Condition {
   }
 }
 
-#if SYSTEM_PACKAGE_DARWIN
 // The timeout uses Duration, which needs a newer OS than System 199 means in
 // the default build, so this declaration carries both.
 @available(System 199, *)
@@ -234,8 +257,13 @@ extension PThread.Condition {
   ///     that the condition describes.
   ///     The calling thread must hold it.
   ///   - timeout: The longest time to wait.
-  ///     The system measures it independently of the time of day,
+  ///     On Darwin, the system measures it independently of the time of day,
   ///     so changing the clock doesn't shorten or lengthen the wait.
+  ///     Elsewhere, it's measured on the condition variable's clock,
+  ///     ``Attributes-swift.struct/clock``:
+  ///     on the default, ``Clock-swift.struct/realtime``,
+  ///     setting the clock during the wait shortens or lengthens it,
+  ///     and on ``Clock-swift.struct/monotonic`` it doesn't.
   ///     A timeout that isn't positive times out at once.
   /// - Returns: `false` if the timeout elapsed,
   ///   or `true` if the wait ended for another reason,
@@ -243,10 +271,9 @@ extension PThread.Condition {
   ///
   /// To wait until a time of day, call ``wait(on:until:)``.
   ///
-  /// The corresponding C function is `pthread_cond_timedwait_relative_np`.
-  /// - Note: Only available on Darwin. Elsewhere,
-  ///   create the condition variable with the `CLOCK_MONOTONIC` clock,
-  ///   and wait until a deadline on that clock.
+  /// The corresponding C function is `pthread_cond_timedwait_relative_np`
+  /// on Darwin, and elsewhere `pthread_cond_timedwait`,
+  /// with a deadline from `clock_gettime` on the condition variable's clock.
   @_alwaysEmitIntoClient
   @available(*, noasync, message: "Waiting blocks the calling thread")
   public func wait(
@@ -259,6 +286,7 @@ extension PThread.Condition {
   internal func _wait(
     on mutex: borrowing PThread.Mutex, timeout: Duration
   ) -> Result<Bool, Errno> {
+    #if SYSTEM_PACKAGE_DARWIN
     // A negative timeout would wait forever: Darwin 26 doesn't time out a
     // relative wait whose tv_sec is negative. A zero timeout times out at
     // once.
@@ -269,9 +297,46 @@ extension PThread.Condition {
       nothingOrReturnedErrno(retryOnInterrupt: false) {
         system_pthread_cond_timedwait_relative_np(_address, mutex._address, &timeout)
       })
+    #else
+    // There's no relative wait here, so wait until the deadline that the
+    // timeout gives on the condition variable's clock. The clock is one that
+    // pthread_condattr_setclock accepted, which clock_gettime reads, and
+    // clock_gettime can't be interrupted.
+    var now = timespec()
+    if case .failure(let error) = nothingOrErrno(retryOnInterrupt: false, {
+      system_clock_gettime(_clock, &now)
+    }) {
+      return .failure(error)
+    }
+    var deadline = PThread.Condition._deadline(after: now, timeout: timeout)
+    return PThread.Condition._timedOutAsFalse(
+      nothingOrReturnedErrno(retryOnInterrupt: false) {
+        system_pthread_cond_timedwait(_address, mutex._address, &deadline)
+      })
+    #endif
   }
+
+  #if !SYSTEM_PACKAGE_DARWIN
+  // The time `timeout` after `now`, or `now` for a timeout that isn't
+  // positive. A deadline past the last time that `time_t` holds is that
+  // time.
+  internal static func _deadline(after now: timespec, timeout: Duration) -> timespec {
+    let (seconds, nanoseconds) = _nanosecondComponents(max(timeout, .zero))
+    var (deadlineSeconds, overflow) = Int64(now.tv_sec).addingReportingOverflow(seconds)
+    var deadlineNanoseconds = Int64(now.tv_nsec) + nanoseconds
+    if deadlineNanoseconds >= 1_000_000_000 {
+      deadlineNanoseconds -= 1_000_000_000
+      if !overflow {
+        (deadlineSeconds, overflow) = deadlineSeconds.addingReportingOverflow(1)
+      }
+    }
+    guard !overflow, let tv_sec = time_t(exactly: deadlineSeconds) else {
+      return timespec(tv_sec: .max, tv_nsec: 999_999_999)
+    }
+    return timespec(tv_sec: tv_sec, tv_nsec: .init(deadlineNanoseconds))
+  }
+  #endif
 }
-#endif // SYSTEM_PACKAGE_DARWIN
 
 // MARK: - C interoperation
 
@@ -285,6 +350,7 @@ extension PThread.Condition {
   @_alwaysEmitIntoClient
   public var unsafeAddress: UnsafeMutablePointer<CInterop.PThreadCondition> { _address }
 
+  #if SYSTEM_PACKAGE_DARWIN
   /// Calls a closure with a condition variable that other code,
   /// such as a C library, initialized and will destroy.
   ///
@@ -313,6 +379,42 @@ extension PThread.Condition {
       throw error
     }
   }
+  #else
+  /// Calls a closure with a condition variable that other code,
+  /// such as a C library, initialized and will destroy.
+  ///
+  /// - Parameters:
+  ///   - address: The address of an initialized C condition variable.
+  ///     It must stay initialized until `body` returns.
+  ///   - clock: The clock that the C condition variable was initialized with,
+  ///     which ``wait(on:timeout:)`` measures its timeout on.
+  ///     The default is ``Clock-swift.struct/realtime``,
+  ///     which is a C condition variable's
+  ///     unless its attributes set another.
+  ///   - body: A closure that uses the condition variable.
+  ///     The condition variable is valid only for the duration of the call.
+  /// - Returns: The value that `body` returns.
+  ///
+  /// The `Condition` instance that `body` borrows doesn't own
+  /// the C condition variable: when `body` returns,
+  /// the C condition variable isn't destroyed.
+  @_alwaysEmitIntoClient
+  public static func withUnsafeCondition<R: ~Copyable>(
+    at address: UnsafeMutablePointer<CInterop.PThreadCondition>,
+    clock: Clock = .realtime,
+    _ body: (borrowing PThread.Condition) throws -> R
+  ) rethrows -> R {
+    let condition = PThread.Condition(_borrowing: address, clock: clock)
+    do {
+      let result = try body(condition)
+      condition._forget()
+      return result
+    } catch {
+      condition._forget()
+      throw error
+    }
+  }
+  #endif
 
   @_alwaysEmitIntoClient
   internal consuming func _forget() {
@@ -375,11 +477,13 @@ extension PThread.Condition {
 
     #if !SYSTEM_PACKAGE_DARWIN
     /// The clock that ``PThread/Condition/wait(on:until:)`` measures
-    /// its deadline on.
+    /// its deadline on,
+    /// and ``PThread/Condition/wait(on:timeout:)`` its timeout.
     ///
     /// The default is ``Clock-swift.struct/realtime``,
     /// the time of day, which can jump when the clock is set.
-    /// A deadline on ``Clock-swift.struct/monotonic`` can't.
+    /// A deadline or timeout on ``Clock-swift.struct/monotonic`` can't,
+    /// as a timeout on Darwin can't.
     ///
     /// The corresponding C function is `pthread_condattr_setclock`.
     /// - Note: Not available on Darwin,
