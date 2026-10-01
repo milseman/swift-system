@@ -15,9 +15,9 @@ adds API for the adopters' top Windows gaps of section 8, in its order, checked 
 
 **Resume here:** windows-api's parts are done (sections 1 to 10). windows-2: P1 and P2 are applied (section 11);
 processes (sections 12 and 13), clocks and sleeping (14), SRW locks and condition variables (15), consoles and
-standard handles (16), and well-known directories (17) are done. Next: dynamic loading, the sixth gap, then the
-rest of section 8's gaps in order. Findings and patches for other lanes' files are the last two sections; patch P3
-(the CMake source list) grows with each new file.
+standard handles (16), well-known directories (17), and dynamic loading (18) are done. Next: environment
+variables, the seventh gap, then the rest of section 8's gaps in order. Findings and patches for other lanes'
+files are the last two sections; patch P3 (the CMake source list) grows with each new file.
 
 ## How it was checked
 
@@ -972,7 +972,7 @@ A Windows run must check:
   `withStandardHandle` needs, is untested: lend a console's standard output to check it.
 - `testControlHandlers`.
 
-## 17. Well-known directories: this commit
+## 17. Well-known directories: `b63bce9`
 
 The fifth gap of section 8. Its files ask for the Windows directory (`GetWindowsDirectoryW`), mostly to reach
 `System32\where.exe`, the executable's path (`GetModuleFileNameW` with no module), the system directory, the
@@ -1026,7 +1026,52 @@ A Windows run must check:
 - `testWindowsAndSystemDirectories`: the Windows directory is `SystemRoot`, and the system directory is its
   `System32`, ignoring case.
 
-## 18. windows-2: findings
+## 18. Dynamic loading: this commit
+
+The sixth gap of section 8. Its files load a library by path (`LoadLibraryW`), look up a function
+(`GetProcAddress`), free the library (`FreeLibrary`), or find one that's loaded already (`GetModuleHandleW`), such as
+their own module, kernel32 or ntdll.
+
+What: `DynamicLibraryWindows.swift`: `DynamicLibrary` on Windows, owning an `HMODULE` reference, with
+`init(taking:)`, `init(_:options:)` for a `FilePath` and a C string of `CInterop.PlatformChar`
+(`LoadLibraryExW`), `init(alreadyLoaded:)` and `mainProgram()` (`GetModuleHandleExW`), `address(of:)` for a
+`String` and a C string (`GetProcAddress`), `handle`, `close()` (`FreeLibrary`), `relinquish()`, and a deinit that
+frees; and `DynamicLibrary.LoadOptions`, `LoadLibraryExW`'s search flags. `Win32.Error` gains the two codes these
+document, `moduleNotFound` (126) and `procedureNotFound` (127).
+
+Which API: **System's `DynamicLibrary`, with Windows' errors and options.** A loaded library and its symbols are
+the same concept as `dlopen`'s, so Windows shares the type and the shape of its API, and code that loads a
+library and looks up a symbol spells it the same everywhere. What differs is Windows': the options are
+`LoadLibraryExW`'s, and errors are `Win32.Error`.
+
+Design calls, with the alternatives rejected:
+- **Errors are `Win32.Error`**, where POSIX throws `DynamicLibrary.LoaderError`, `dlerror`'s message. Rejected: a
+  Windows `LoaderError` holding the code and its message, which would keep the signatures identical but add a
+  second error type for Win32 failures, which SYS-0010 argues against. Code that catches with a type needs an
+  `#if`; most callers print the error. There's no `takePendingError()`: Windows' last error isn't a pending error
+  to take, and SYS-0010 rejects a public last error.
+- **`init(alreadyLoaded:)` takes a reference**, with `GetModuleHandleExW`, where the adopters call
+  `GetModuleHandleW`, which takes none: the owner frees what it holds, and an unreferenced handle can be unloaded
+  under it, the owned-only hazard again. POSIX spells the same request `OpenOptions.noLoad`; Windows has no such
+  load flag, so it's an initializer rather than a faked option.
+- **`mainProgram()` searches the executable's own exports**, which is what `GetProcAddress` does with its module;
+  the doc says that it doesn't search the loaded libraries, as `dlopen(NULL)`'s handle does.
+- **The default options are none**, `LoadLibraryW`'s search, which includes the current directory and `PATH`. The
+  doc names the `search` options as the way to leave those out. Rejected: defaulting to
+  `searchDefaultDirectories`, which would break the adopters' libraries that are found through `PATH`.
+- **The shape follows POSIX's `DynamicLibrary`**, without the drafts' `@unsafe` annotations, since it's the same
+  type's Windows side: `init(taking:)`, `handle` and `relinquish()`, as there.
+- **Not wrapped**: `AddDllDirectory`, `SetDefaultDllDirectories`, lookup by ordinal, and data-file loads
+  (`LOAD_LIBRARY_AS_DATAFILE`, whose module has no symbols to look up).
+
+Tests: `Win32DynamicLibraryTests`, against kernel32 and ntdll, which every process has loaded.
+
+A Windows run must check: `testConstantsMatchTheSDK`, and the two new codes in `testCodesMatchTheSDK`;
+`testLoadingAndLookingUp` (a function looked up and called, a missing symbol `nil`);
+`testLoadOptionsAndTheCStringOverload`; `testMissingLibraries` (`moduleNotFound` both ways); `testAlreadyLoaded`;
+`testMainProgram` (the handle is `GetModuleHandleW(NULL)`'s); `testTakingAndRelinquishing`.
+
+## 19. windows-2: findings
 
 - **The PlatformEnum samples' Windows arms now reach System's `Win32.ProcessHandle`** (the stand-ins compile only
   with `SIMULATE_PLATFORMS`), and differ from it: `Platform.Process` reads `processID` as a property, where
@@ -1042,8 +1087,12 @@ A Windows run must check:
   `create` through a `var end: Win32.FileHandle? = pipe.writeEnd`, closed by assigning `nil`. `Optional.map` isn't
   available for a noncopyable wrapped type in Swift 6.2, and a closure that captures a partially consumed struct
   is "used after consume" even when it touches only a field that wasn't consumed.
+- **`String.withCString` and `Array.withUnsafeBufferPointer` can't return a noncopyable value** in Swift 6.2: a
+  closure whose one expression makes one, such as `try DynamicLibrary($0)`, is inferred to return `()`, with only
+  a warning that the constant has type `()`. Callers of the C-string overloads that make owners have to get the
+  pointer some other way; `Win32DynamicLibraryTests` allocates it.
 
-## 19. windows-2: patches for files outside the lane
+## 20. windows-2: patches for files outside the lane
 
 **P3, `Sources/System/CMakeLists.txt`: list the lane's new sources.** CI's CMake job fails when a SwiftPM source is
 missing from the list. Kept current with each commit; it applies to this branch with `git apply`.
@@ -1051,16 +1100,17 @@ missing from the list. Kept current with each commit; it applies to this branch 
 ```diff
 --- a/Sources/System/CMakeLists.txt
 +++ b/Sources/System/CMakeLists.txt
-@@ -355,5 +355,8 @@
+@@ -355,5 +355,9 @@
    VectoredIO/VectoredIO.swift)
  target_sources(SystemPackage PRIVATE
++  Win32/DynamicLibraryWindows.swift
 +  Win32/PathsWindows.swift
 +  Win32/ProcessIDWindows.swift
    Win32/Win32.swift
 +  Win32/Win32Console.swift
    Win32/Win32Constants.swift
    Win32/Win32Error.swift
-@@ -366,7 +369,13 @@
+@@ -366,7 +370,13 @@
    Win32/Win32Locking.swift
    Win32/Win32Open.swift
 +  Win32/Win32Process.swift

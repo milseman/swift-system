@@ -573,4 +573,24 @@ internal func system_GetSystemDirectoryW(
   GetSystemDirectoryW(lpBuffer, uSize)
 }
 
+// MARK: - Dynamic loading
+
+internal func system_LoadLibraryExW(
+  _ lpLibFileName: UnsafePointer<WCHAR>, _ hFile: HANDLE?, _ dwFlags: DWORD
+) -> HMODULE? {
+  LoadLibraryExW(lpLibFileName, hFile, dwFlags)
+}
+
+internal func system_FreeLibrary(_ hLibModule: HMODULE) -> Bool {
+  FreeLibrary(hLibModule)
+}
+
+internal func system_GetModuleHandleExW(
+  _ dwFlags: DWORD,
+  _ lpModuleName: UnsafePointer<WCHAR>?,
+  _ phModule: UnsafeMutablePointer<HMODULE?>
+) -> Bool {
+  GetModuleHandleExW(dwFlags, lpModuleName, phModule)
+}
+
 #endif // os(Windows)
