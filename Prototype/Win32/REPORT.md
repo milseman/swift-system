@@ -15,10 +15,9 @@ adds API for the adopters' top Windows gaps of section 8, in its order, checked 
 (sections 23 on, base system-next at `bb950db`) continues that list, then the gaps the earlier sections left.
 
 **Resume here:** windows-api's parts are done (sections 1 to 10), and so are windows-2's (11 to 22: P1 and P2,
-then section 8's gaps from processes to file information). windows-3, in progress: long paths (section 23, the
-last commit).
-- **Next**: the rest of section 8's list, in order: threads (creating them, and fiber-local storage, on
-  `Win32.ThreadHandle`); `Win32.HResult`; path operations (create, remove, rename, copy, link, and the
+then section 8's gaps from processes to file information). windows-3, in progress: long paths (section 23,
+`315f25b`) and threads (24, the last commit).
+- **Next**: the rest of section 8's list, in order: `Win32.HResult`; path operations (create, remove, rename, copy, link, and the
   POSIX-semantics delete and rename dispositions); overlapped I/O; system information; Winsock, last (design only
   if time runs short, since the decisions triage gives Winsock a Windows-only module of its own).
 - **Then, left within done gaps**: a Windows `BrokenDownTime` over the UCRT's time functions (14); a Windows
@@ -1246,7 +1245,7 @@ P3 with the next merge of this branch, which brings the rest.
    CSystem)
 ```
 
-## 23. windows-3: long paths: this commit
+## 23. windows-3: long paths: `315f25b`
 
 The ninth gap of section 8. swift-foundation, swift-subprocess and swift-build each carry a copy of the
 canonicalization that `FileDescriptor`'s Windows adapters use (`withCanonicalPathRepresentation`:
@@ -1321,7 +1320,78 @@ A Windows run must check:
 - Not covered: a long-path-aware process, network shares and mapped drives, drive-relative paths (`D:file`), and
   `fullPath(of:)` of an empty path.
 
-## 24. windows-3: findings
+## 24. windows-3: threads: this commit
+
+The tenth gap of section 8, the first of its last group. NIO starts its threads with `_beginthreadex`, names them
+(`SetThreadDescription`, `GetThreadDescription`), and keeps its thread-specific values in fiber-local storage
+(`FlsAlloc` with a destructor, `FlsGetValue`, `FlsSetValue`, `FlsFree`), as Foundation's `_ThreadLocal` does
+without a destructor; swift-subprocess starts its threads with `_beginthreadex`, and swift-tools-support-core
+yields with `SwitchToThread`. The thread handles and IDs they also use are section 13's.
+
+What:
+- `Win32ThreadCreation.swift`: `Win32.ThreadHandle.create(stackSize:suspended:inheritable:_:)` (`_beginthreadex`),
+  `name()` and `setName(_:)` (`GetThreadDescription`, `SetThreadDescription`), and `Win32.yield()`
+  (`SwitchToThread`).
+- `Win32FiberLocal.swift`: `Win32.FiberLocalKey<Value>`, with `init()` (`FlsAlloc`), `value()` (`FlsGetValue`),
+  `setValue(_:)` (`FlsSetValue`), and a deinit that frees the index (`FlsFree`).
+- `Win32.Error.notEnoughMemory` (8), which creating a thread can throw, and one of section 1's candidates.
+
+Which API: **Win32.** `PThread` wraps pthreads, which Windows doesn't have, so Windows' threads are
+`Win32.ThreadHandle`s, and its thread-specific storage is a Win32 type, both shaped like their `PThread`
+counterparts where the concepts agree.
+
+Design calls, with the alternatives rejected:
+- **`_beginthreadex`, not `CreateThread`.** Microsoft's documentation of `CreateThread` says that a thread that
+  calls the C runtime should come from `_beginthreadex`, or the C runtime can end the process when it can't
+  allocate the thread's data, and Swift's runtime calls the C runtime; NIO and swift-subprocess follow it.
+  Rejected: `CreateThread`, as Rust's standard library calls it. The errors are still Win32's: `_beginthreadex`
+  leaves `CreateThread`'s last error, and its own failure, an allocation, leaves none, for which System throws
+  `notEnoughMemory`.
+- **The closure returns nothing, and the exit code is 0**, as `PThread`'s closure returns nothing. Rejected: a
+  closure that returns the exit code, which swift-subprocess's helper takes, and whose callers all return 0.
+- **The handle doesn't wait for the thread.** It's section 13's owner, whose deinit closes the handle and lets the
+  thread run, where `PThread`'s deinit joins; waiting is `waitForExit()`. Rejected: a second thread owner that
+  waits in its deinit, which would reopen `PThread`'s deinit question (`Prototype/ThreadDeinit`) for a type that
+  section 13 settled.
+- **`stackSize` is the stack's reservation** (`STACK_SIZE_PARAM_IS_A_RESERVATION`), as Rust passes it, since what
+  a caller limits is how far the stack grows; without the flag, it's the initial commitment. `nil` is the
+  executable's default, and a size a `DWORD` can't hold is `invalidParameter`.
+- **No mock hook for `_beginthreadex`**, unlike the other C runtime calls: a mocked call would start no thread to
+  run the closure. `PThread`'s hook releases the closure and reports the calling thread as the new one.
+- **The names are `name()` and `setName(_:)`**, `PThread.ID`'s for the same concept, rather than Windows'
+  "description", which reads as `CustomStringConvertible`'s. They need a handle, so there's no `setCurrentName`;
+  `ThreadHandle.current()` gives one. They're linked directly, as NIO links them; Windows 10 1607 exports them
+  from KernelBase.dll alone, which is why Rust looks them up at run time.
+- **`FiberLocalKey` is fiber-local storage, not thread-local**: FLS calls a destructor, and TLS (`TlsAlloc`)
+  doesn't, and both adopters use FLS. Its shape is `PThread.Key`'s, a boxed value per thread that the C callback
+  releases, and what differs is documented: destroying a key destroys every thread's value, on the destroying
+  thread, as `FlsFree` does, where POSIX leaks the other threads'. Rejected: nesting it in `ThreadHandle`, as
+  `PThread.Key` is in `PThread`, since a key belongs to no handle; and a name for threads, which a thread that runs
+  fibers contradicts.
+- **`yield()` returns whether another thread ran**, as `SwitchToThread` reports, and is `@discardableResult`;
+  `PThread.yield()` is its POSIX counterpart.
+- **Not wrapped**: `ExitThread` and `_endthreadex`, `PThread.exit()`'s counterparts (a thread from `create` ends by
+  returning); priorities and affinity; `CompareObjectHandles`, with which NIO compares thread handles, and which
+  `threadID()` replaces; TLS; and fibers themselves.
+
+Tests: `Win32ThreadCreationTests`, with threads from `create` itself, and Dispatch's semaphores.
+
+A Windows run must check:
+- `testInternalConstantsMatchTheSDK`, and `notEnoughMemory` in `Win32ErrorTests.testCodesMatchTheSDK`.
+- `testCreatingAThread` (the closure runs on another thread, the exit code is 0, and `inheritable`),
+  `testClosingTheHandleLetsTheThreadRun`, and `testSuspendedThreads` (nothing runs until `resume()`, which returns
+  1).
+- `testStackReservation`: a 4 MiB reservation is what `GetCurrentThreadStackLimits` reports, which assumes its
+  limits span the whole reservation; `testInvalidStackSizesAreRejected`.
+- `testNames`: an unnamed thread's name is empty, a name with a non-ASCII character round-trips, a null character
+  is rejected, and a `.synchronize`-only handle gets `accessDenied`, through `E_ACCESSDENIED`'s Win32 code.
+- `testYield`, only that it returns.
+- `testFiberLocalValues`, `testReplacedValuesAreDestroyed`, `testValuesAreDestroyedWhenTheirThreadExits`, and
+  `testDestroyingAKeyDestroysEveryThreadsValue`, which relies on `FlsFree` calling the callback for a value of
+  another thread that's still running.
+- Not covered: running out of FLS indexes, fibers, and a thread that ends through `ExitThread`.
+
+## 25. windows-3: findings
 
 - **`FileDescriptor`'s Windows canonicalization doesn't cover `CreateDirectoryW`'s limit** (P4).
   `withCanonicalPathRepresentation` passes `PATHCCH_ALLOW_LONG_PATHS`, so the `mkdir` adapter, which
@@ -1334,7 +1404,7 @@ A Windows run must check:
 - **macOS's CoreFoundation declares `S_OK` and `S_FALSE` too**, so the harness's tests spell `WinSDK.S_OK`; on
   Windows, where XCTest's Foundation is swift-corelibs-foundation, the bare names would do.
 
-## 25. windows-3: patches for files outside the lane
+## 26. windows-3: patches for files outside the lane
 
 **P3, continued: `Sources/System/CMakeLists.txt`.** The Win32 `target_sources` block as it should read with this
 lane's files, which coverage-4 applies with P3. It replaces the block whether or not P3 has landed. Kept current
@@ -1351,6 +1421,7 @@ target_sources(SystemPackage PRIVATE
   Win32/Win32Console.swift
   Win32/Win32Constants.swift
   Win32/Win32Error.swift
+  Win32/Win32FiberLocal.swift
   Win32/Win32FileDescriptorBridge.swift
   Win32/Win32FileHandle.swift
   Win32/Win32FileIO.swift
@@ -1367,6 +1438,7 @@ target_sources(SystemPackage PRIVATE
   Win32/Win32Synchronization.swift
   Win32/Win32Syscalls.swift
   Win32/Win32Thread.swift
+  Win32/Win32ThreadCreation.swift
   Win32/Win32Time.swift
   Win32/Win32VolumeInformation.swift
   Win32/Win32Wait.swift)

@@ -89,6 +89,12 @@ extension Win32.Error {
   @_alwaysEmitIntoClient
   public static var invalidHandle: Win32.Error { Win32.Error(rawValue: 6) }
 
+  /// There isn't enough memory to process the command.
+  ///
+  /// The corresponding C constant is `ERROR_NOT_ENOUGH_MEMORY`.
+  @_alwaysEmitIntoClient
+  public static var notEnoughMemory: Win32.Error { Win32.Error(rawValue: 8) }
+
   /// The device isn't ready.
   ///
   /// The corresponding C constant is `ERROR_NOT_READY`.
@@ -386,6 +392,7 @@ extension Win32.Error {
     case 3: return "ERROR_PATH_NOT_FOUND"
     case 5: return "ERROR_ACCESS_DENIED"
     case 6: return "ERROR_INVALID_HANDLE"
+    case 8: return "ERROR_NOT_ENOUGH_MEMORY"
     case 21: return "ERROR_NOT_READY"
     case 23: return "ERROR_CRC"
     case 29: return "ERROR_WRITE_FAULT"

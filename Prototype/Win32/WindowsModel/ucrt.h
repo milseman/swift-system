@@ -48,3 +48,10 @@ int _wchdir(const unsigned short *_Path);
 typedef int errno_t;
 errno_t _wputenv_s(const unsigned short *_Name, const unsigned short *_Value);
 unsigned short *_wgetenv(const unsigned short *_VarName);
+
+// process.h. The start routine is __stdcall, which is the one calling
+// convention on x64 and ARM64.
+typedef unsigned (*_beginthreadex_proc_type)(void *);
+uintptr_t _beginthreadex(void *_Security, unsigned _StackSize,
+                         _beginthreadex_proc_type _StartAddress, void *_ArgList,
+                         unsigned _InitFlag, unsigned *_ThrdAddr);

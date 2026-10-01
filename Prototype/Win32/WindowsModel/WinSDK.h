@@ -32,6 +32,7 @@ typedef unsigned long long ULONGLONG;
 typedef long long INT_PTR;
 typedef unsigned long long ULONG_PTR;
 typedef ULONG_PTR DWORD_PTR;
+typedef ULONG_PTR *PULONG_PTR;
 typedef unsigned int UINT;
 typedef unsigned short WCHAR;
 typedef char CHAR;
@@ -159,6 +160,7 @@ typedef union _LARGE_INTEGER {
 #define ERROR_PATH_NOT_FOUND 3
 #define ERROR_ACCESS_DENIED 5
 #define ERROR_INVALID_HANDLE 6
+#define ERROR_NOT_ENOUGH_MEMORY 8
 #define ERROR_NOT_READY 21
 #define ERROR_CRC 23
 #define ERROR_WRITE_FAULT 29
@@ -560,6 +562,23 @@ int CompareStringOrdinal(LPCWCH lpString1, int cchCount1, LPCWCH lpString2,
 
 HANDLE GetCurrentThread(void);
 DWORD GetCurrentThreadId(void);
+BOOL SwitchToThread(void);
+HRESULT SetThreadDescription(HANDLE hThread, PCWSTR lpThreadDescription);
+HRESULT GetThreadDescription(HANDLE hThread, PWSTR *ppszThreadDescription);
+void GetCurrentThreadStackLimits(PULONG_PTR LowLimit, PULONG_PTR HighLimit);
+
+#define STACK_SIZE_PARAM_IS_A_RESERVATION 0x00010000
+
+// fibersapi.h, winbase.h, winnt.h: fiber-local storage
+
+typedef void (*PFLS_CALLBACK_FUNCTION)(PVOID lpFlsData);
+
+#define FLS_OUT_OF_INDEXES ((DWORD)0xFFFFFFFF)
+
+DWORD FlsAlloc(PFLS_CALLBACK_FUNCTION lpCallback);
+BOOL FlsFree(DWORD dwFlsIndex);
+PVOID FlsGetValue(DWORD dwFlsIndex);
+BOOL FlsSetValue(DWORD dwFlsIndex, PVOID lpFlsData);
 HANDLE OpenThread(DWORD dwDesiredAccess, BOOL bInheritHandle, DWORD dwThreadId);
 DWORD GetThreadId(HANDLE Thread);
 BOOL GetExitCodeThread(HANDLE hThread, LPDWORD lpExitCode);

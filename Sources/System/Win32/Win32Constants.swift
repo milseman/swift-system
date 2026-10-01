@@ -113,6 +113,19 @@ internal var _WAIT_OBJECT_0: DWORD { 0x0 }
 @_alwaysEmitIntoClient
 internal var _WAIT_TIMEOUT: DWORD { 0x102 }
 
+// MARK: - Creating threads
+
+@_alwaysEmitIntoClient
+internal var _CREATE_SUSPENDED: DWORD { 0x0000_0004 }
+
+@_alwaysEmitIntoClient
+internal var _STACK_SIZE_PARAM_IS_A_RESERVATION: DWORD { 0x0001_0000 }
+
+// MARK: - Fiber-local storage
+
+@_alwaysEmitIntoClient
+internal var _FLS_OUT_OF_INDEXES: DWORD { 0xFFFF_FFFF }
+
 // MARK: - Creating processes
 
 @_alwaysEmitIntoClient

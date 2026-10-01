@@ -30,6 +30,7 @@ final class Win32ErrorTests: XCTestCase {
       (.pathNotFound, DWORD(WinSDK.ERROR_PATH_NOT_FOUND)),
       (.accessDenied, DWORD(WinSDK.ERROR_ACCESS_DENIED)),
       (.invalidHandle, DWORD(WinSDK.ERROR_INVALID_HANDLE)),
+      (.notEnoughMemory, DWORD(WinSDK.ERROR_NOT_ENOUGH_MEMORY)),
       (.deviceNotReady, DWORD(WinSDK.ERROR_NOT_READY)),
       (.cyclicRedundancyCheck, DWORD(WinSDK.ERROR_CRC)),
       (.writeFault, DWORD(WinSDK.ERROR_WRITE_FAULT)),

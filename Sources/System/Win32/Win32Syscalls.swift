@@ -346,6 +346,58 @@ internal func system_SuspendThread(_ hThread: HANDLE) -> DWORD {
   SuspendThread(hThread)
 }
 
+// Starts a thread that runs `_win32ThreadStart(context)`, which
+// Win32ThreadCreation.swift defines: a C function can't capture, so the
+// closure travels as the argument. No mock hook, unlike the other C runtime
+// calls: a mocked call would start no thread to run the closure.
+internal func system__beginthreadex(
+  _ security: UnsafeMutablePointer<SECURITY_ATTRIBUTES>,
+  _ stackSize: UInt32,
+  _ context: UnsafeMutableRawPointer,
+  _ flags: UInt32
+) -> UInt {
+  _beginthreadex(UnsafeMutableRawPointer(security), stackSize, { context in
+    _win32ThreadStart(context)
+    return 0
+  }, context, flags, nil)
+}
+
+internal func system_GetThreadDescription(
+  _ hThread: HANDLE, _ ppszThreadDescription: UnsafeMutablePointer<PWSTR?>
+) -> HRESULT {
+  GetThreadDescription(hThread, ppszThreadDescription)
+}
+
+internal func system_SetThreadDescription(
+  _ hThread: HANDLE, _ lpThreadDescription: UnsafePointer<WCHAR>
+) -> HRESULT {
+  SetThreadDescription(hThread, lpThreadDescription)
+}
+
+internal func system_SwitchToThread() -> Bool {
+  SwitchToThread()
+}
+
+// MARK: - Fiber-local storage
+
+// Allocates an index whose callback is `_win32FiberLocalDestructor`, which
+// Win32FiberLocal.swift defines.
+internal func system_FlsAlloc() -> DWORD {
+  FlsAlloc({ value in _win32FiberLocalDestructor(value) })
+}
+
+internal func system_FlsFree(_ dwFlsIndex: DWORD) -> Bool {
+  FlsFree(dwFlsIndex)
+}
+
+internal func system_FlsGetValue(_ dwFlsIndex: DWORD) -> UnsafeMutableRawPointer? {
+  FlsGetValue(dwFlsIndex)
+}
+
+internal func system_FlsSetValue(_ dwFlsIndex: DWORD, _ lpFlsData: UnsafeMutableRawPointer?) -> Bool {
+  FlsSetValue(dwFlsIndex, lpFlsData)
+}
+
 // MARK: - Creating processes
 
 internal func system_CreateProcessW(
