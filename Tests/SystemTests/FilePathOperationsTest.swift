@@ -236,6 +236,40 @@ final class FilePathOperationsTest: XCTestCase {
         }
       },
 
+      MockTestCase(
+        name: "readlink", .interruptable,
+        "a path", Wildcard(), FilePath._initialSymbolicLinkCapacity
+      ) { retryOnInterrupt in
+        _ = try path.readSymbolicLinkPlatformString(retryOnInterrupt: retryOnInterrupt)
+      },
+
+      MockTestCase(
+        name: "readlink", .interruptable,
+        "a path", Wildcard(), FilePath._initialSymbolicLinkCapacity
+      ) { retryOnInterrupt in
+        _ = try "a path".withCString {
+          try FilePath.readSymbolicLinkPlatformString($0, retryOnInterrupt: retryOnInterrupt)
+        }
+      },
+
+      MockTestCase(
+        name: "readlinkat", .interruptable,
+        42, "a path", Wildcard(), FilePath._initialSymbolicLinkCapacity
+      ) { retryOnInterrupt in
+        _ = try path.readSymbolicLinkPlatformString(
+          relativeTo: dir, retryOnInterrupt: retryOnInterrupt)
+      },
+
+      MockTestCase(
+        name: "readlinkat", .interruptable,
+        42, "a path", Wildcard(), FilePath._initialSymbolicLinkCapacity
+      ) { retryOnInterrupt in
+        _ = try "a path".withCString {
+          try FilePath.readSymbolicLinkPlatformString(
+            $0, relativeTo: dir, retryOnInterrupt: retryOnInterrupt)
+        }
+      },
+
       MockTestCase(name: "truncate", .interruptable, "a path", 6) { retryOnInterrupt in
         try path.resize(to: 6, retryOnInterrupt: retryOnInterrupt)
       },
@@ -971,6 +1005,58 @@ final class FilePathOperationsTest: XCTestCase {
           try "long".withCString { try FilePath.readSymbolicLink($0, relativeTo: dir) },
           long)
         XCTAssertThrowsError(try FilePath("missing").readSymbolicLink(relativeTo: dir)) {
+          XCTAssertEqual($0 as? Errno, .noSuchFileOrDirectory)
+        }
+      }
+    }
+  }
+
+  /// The contents, unlike the FilePath, keep the stored target's redundant
+  /// and trailing separators, so a copy made with them is the same link.
+  @available(System 199, *)
+  func testReadSymbolicLinkPlatformString() throws {
+    try withTemporaryFilePath(basename: "testReadSymbolicLinkPlatformString") { path in
+      // A FilePath target would be "a/b" already.
+      let link = path.appending("link")
+      try link.withCString { try FilePath.makeSymbolicLink($0, to: "a//b/") }
+      XCTAssertEqual(try link.readSymbolicLink(), "a/b")
+      let contents = try link.readSymbolicLinkPlatformString()
+      XCTAssertEqual(contents, Array("a//b/".utf8CString))
+      XCTAssertEqual(try link.withCString { try FilePath.readSymbolicLinkPlatformString($0) }, contents)
+      XCTAssertEqual(FilePath(platformString: contents), try link.readSymbolicLink())
+
+      let copy = path.appending("copy")
+      try copy.withCString { try FilePath.makeSymbolicLink($0, to: contents) }
+      XCTAssertEqual(try copy.readSymbolicLinkPlatformString(), contents)
+
+      // A target longer than the first buffer is read in full.
+      let long = repeatElement("component", count: 60).joined(separator: "//")
+      XCTAssertGreaterThan(long.utf8.count, FilePath._initialSymbolicLinkCapacity)
+      try long.withCString { target in
+        try path.appending("long").withCString { try FilePath.makeSymbolicLink($0, to: target) }
+      }
+      XCTAssertEqual(
+        try path.appending("long").readSymbolicLinkPlatformString(), Array(long.utf8CString))
+
+      XCTAssertThrowsError(try path.readSymbolicLinkPlatformString()) {
+        XCTAssertEqual($0 as? Errno, .invalidArgument)
+      }
+      XCTAssertThrowsError(try path.appending("missing").readSymbolicLinkPlatformString()) {
+        XCTAssertEqual($0 as? Errno, .noSuchFileOrDirectory)
+      }
+
+      let dir = try FileDescriptor.open(path, .readOnly, options: .directory)
+      try dir.closeAfter {
+        XCTAssertEqual(
+          try FilePath("link").readSymbolicLinkPlatformString(relativeTo: dir), contents)
+        XCTAssertEqual(
+          try "long".withCString {
+            try FilePath.readSymbolicLinkPlatformString($0, relativeTo: dir)
+          },
+          Array(long.utf8CString))
+        XCTAssertThrowsError(
+          try FilePath("missing").readSymbolicLinkPlatformString(relativeTo: dir)
+        ) {
           XCTAssertEqual($0 as? Errno, .noSuchFileOrDirectory)
         }
       }

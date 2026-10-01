@@ -1028,6 +1028,8 @@ extension FilePath {
   /// The link stores `target` as is. The target doesn't need to exist.
   /// A relative target is resolved when the link is followed,
   /// relative to the directory that contains the link.
+  /// A ``FilePath`` has no redundant or trailing separators:
+  /// to store a target with them, pass it as a C string.
   ///
   /// The corresponding C function is `symlink`.
   @_alwaysEmitIntoClient
@@ -1092,6 +1094,8 @@ extension FilePath {
   /// The target doesn't need to exist.
   /// A relative target is resolved when the link is followed,
   /// relative to the directory that contains the link.
+  /// A ``FilePath`` has no redundant or trailing separators:
+  /// to store a target with them, pass it as a C string.
   ///
   /// If this path is absolute (starts with a forward slash), then `fd` is ignored.
   /// If this path is relative, it is resolved against the directory given by `fd`.
@@ -1270,13 +1274,23 @@ extension FilePath {
   /// The buffer capacity for the first attempt to read a symbolic link.
   internal static var _initialSymbolicLinkCapacity: Int { 256 }
 
-  // Calls readlinkat if `fd` is non-nil, and readlink otherwise.
   @usableFromInline
   internal static func _readSymbolicLink(
     _ path: UnsafePointer<CChar>,
     relativeTo fd: FileDescriptor?,
     retryOnInterrupt: Bool
   ) -> Result<FilePath, Errno> {
+    _readSymbolicLinkContents(path, relativeTo: fd, retryOnInterrupt: retryOnInterrupt)
+      .map { FilePath($0) }
+  }
+
+  // Calls readlinkat if `fd` is non-nil, and readlink otherwise, and returns
+  // the link's contents as they are.
+  internal static func _readSymbolicLinkContents(
+    _ path: UnsafePointer<CChar>,
+    relativeTo fd: FileDescriptor?,
+    retryOnInterrupt: Bool
+  ) -> Result<SystemString, Errno> {
     // The link's contents aren't null-terminated, and a buffer that's too
     // small silently truncates them. Grow the buffer until they fit
     // with room left over for the null terminator.
@@ -1307,11 +1321,148 @@ extension FilePath {
       case .failure(let error):
         return .failure(error)
       case .success(let length) where length < capacity:
-        return .success(FilePath(SystemString(nullTerminated: chars)))
+        return .success(SystemString(nullTerminated: chars))
       case .success:
         capacity *= 2
       }
     }
+  }
+}
+
+@available(System 199, *)
+extension FilePath {
+  /// Returns the contents of the symbolic link at this path,
+  /// byte for byte.
+  ///
+  /// - Parameters:
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  /// - Returns: The path stored in the link, as a null-terminated C string.
+  ///
+  /// A ``FilePath`` drops a path's redundant separators and a trailing one,
+  /// so the target that ``readSymbolicLink(retryOnInterrupt:)`` returns
+  /// can differ from the one stored: a link to `a//b/` reads as `a/b`.
+  /// A trailing separator matters, since a link to `b/` resolves only
+  /// if `b` is a directory.
+  /// To copy a link exactly, make the copy with these contents,
+  /// as ``makeSymbolicLink(_:to:retryOnInterrupt:)`` takes them.
+  /// `FilePath(platformString:)` makes the same path from them
+  /// as ``readSymbolicLink(retryOnInterrupt:)`` returns.
+  ///
+  /// If this path doesn't name a symbolic link,
+  /// this method throws ``Errno/invalidArgument``.
+  ///
+  /// The corresponding C function is `readlink`.
+  @_alwaysEmitIntoClient
+  public func readSymbolicLinkPlatformString(
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) -> [CInterop.PlatformChar] {
+    try withPlatformString {
+      FilePath._readSymbolicLinkPlatformString(
+        $0, relativeTo: nil, retryOnInterrupt: retryOnInterrupt)
+    }.get()
+  }
+
+  /// Returns the contents of the symbolic link at the given path,
+  /// byte for byte.
+  ///
+  /// - Parameters:
+  ///   - path: The location of the symbolic link.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  /// - Returns: The path stored in the link, as a null-terminated C string.
+  ///
+  /// For more about the contents, see ``readSymbolicLinkPlatformString(retryOnInterrupt:)``.
+  ///
+  /// If `path` doesn't name a symbolic link,
+  /// this method throws ``Errno/invalidArgument``.
+  ///
+  /// The corresponding C function is `readlink`.
+  @_alwaysEmitIntoClient
+  public static func readSymbolicLinkPlatformString(
+    _ path: UnsafePointer<CChar>,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) -> [CInterop.PlatformChar] {
+    try _readSymbolicLinkPlatformString(
+      path, relativeTo: nil, retryOnInterrupt: retryOnInterrupt
+    ).get()
+  }
+
+  /// Returns the contents of the symbolic link at this path, byte for byte,
+  /// resolving a relative path against a directory.
+  ///
+  /// - Parameters:
+  ///   - fd: The directory against which a relative path is resolved.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  /// - Returns: The path stored in the link, as a null-terminated C string.
+  ///
+  /// For more about the contents, see ``readSymbolicLinkPlatformString(retryOnInterrupt:)``.
+  ///
+  /// If this path doesn't name a symbolic link,
+  /// this method throws ``Errno/invalidArgument``.
+  ///
+  /// If this path is absolute (starts with a forward slash), then `fd` is ignored.
+  /// If this path is relative, it is resolved against the directory given by `fd`.
+  ///
+  /// The corresponding C function is `readlinkat`.
+  @_alwaysEmitIntoClient
+  public func readSymbolicLinkPlatformString(
+    relativeTo fd: FileDescriptor,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) -> [CInterop.PlatformChar] {
+    try withPlatformString {
+      FilePath._readSymbolicLinkPlatformString(
+        $0, relativeTo: fd, retryOnInterrupt: retryOnInterrupt)
+    }.get()
+  }
+
+  /// Returns the contents of the symbolic link at the given path,
+  /// byte for byte, resolving a relative path against a directory.
+  ///
+  /// - Parameters:
+  ///   - path: The location of the symbolic link.
+  ///   - fd: The directory against which a relative `path` is resolved.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  /// - Returns: The path stored in the link, as a null-terminated C string.
+  ///
+  /// For more about the contents, see ``readSymbolicLinkPlatformString(retryOnInterrupt:)``.
+  ///
+  /// If `path` doesn't name a symbolic link,
+  /// this method throws ``Errno/invalidArgument``.
+  ///
+  /// If `path` is absolute (starts with a forward slash), then `fd` is ignored.
+  /// If `path` is relative, it is resolved against the directory given by `fd`.
+  ///
+  /// The corresponding C function is `readlinkat`.
+  @_alwaysEmitIntoClient
+  public static func readSymbolicLinkPlatformString(
+    _ path: UnsafePointer<CChar>,
+    relativeTo fd: FileDescriptor,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) -> [CInterop.PlatformChar] {
+    try _readSymbolicLinkPlatformString(
+      path, relativeTo: fd, retryOnInterrupt: retryOnInterrupt
+    ).get()
+  }
+
+  @usableFromInline
+  internal static func _readSymbolicLinkPlatformString(
+    _ path: UnsafePointer<CChar>,
+    relativeTo fd: FileDescriptor?,
+    retryOnInterrupt: Bool
+  ) -> Result<[CInterop.PlatformChar], Errno> {
+    _readSymbolicLinkContents(path, relativeTo: fd, retryOnInterrupt: retryOnInterrupt)
+      .map { $0.nullTerminatedStorage.map(\.rawValue) }
   }
 }
 
