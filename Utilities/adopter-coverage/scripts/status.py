@@ -43,6 +43,7 @@ sys.path.insert(0, os.path.join(HERE, "..", "..", "api-delta", "scripts"))
 from scan_sources import strip_comments_and_strings  # noqa: E402
 
 import check  # noqa: E402
+import abi  # noqa: E402
 import ecosystem  # noqa: E402
 import platforms  # noqa: E402
 
@@ -1179,6 +1180,102 @@ def api_section(api_dir):
     return meta, "\n".join(report[start:end]).rstrip()
 
 
+def abi_section(w, a, head, api_dir, meta):
+    """Section 1's ABI part: what each module's release build exports at the
+    api-delta's base and at HEAD, by kind, and the added declarations whose
+    code only forwards a C header value."""
+    w("## ABI: exported symbols")
+    w("")
+    os.makedirs(a.abi_work, exist_ok=True)
+    base = meta["baseCommit"]
+    now, then = abi.exports(a.repo, head, a.abi_work, "head"), abi.exports(a.repo, base, a.abi_work, "base")
+    abi.prune(a.abi_work, {now["key"], then["key"]})
+    for side, r in (("HEAD", now), (f"`{meta['baseRef']}`", then)):
+        if r["error"]:
+            w(f"The ABI count reads {side}'s release build, and {r['error']}.")
+            w("")
+    if now["error"] or then["error"]:
+        return
+    # Each side's public declarations, by module, from api-delta's graphs.
+    usrs = {}
+    for side in ("base", "head"):
+        usrs[side] = collections.defaultdict(set)
+        graphs = os.path.join(api_dir, "symbolgraphs", side)
+        for path in sorted(os.listdir(graphs)) if os.path.isdir(graphs) else []:
+            if path.endswith(".symbols.json"):
+                with open(os.path.join(graphs, path)) as f:
+                    usrs[side][path.split("@")[0].split(".")[0]] |= {
+                        s["identifier"]["precise"] for s in json.load(f)["symbols"]}
+    columns = ("property descriptors", "conformances", "types", "public", "other")
+
+    def counts(symbols, module, side):
+        c = collections.Counter()
+        for sym, dem in zip(symbols, abi.demangle(symbols)):
+            kind = abi.symbol_kind(dem)
+            if kind in ("code", "initial values"):
+                sym = sym[1:] if sym.startswith("_") else sym
+                kind = "public" if abi.usr_of(sym, usrs[side][module]) else "other"
+            c[kind] += 1
+        return c
+
+    w(f"What each module's release build exports, at `{meta['baseRef']}` (`{short(base)}`) → HEAD "
+      f"(`{short(head)}`), beside the API points above: `nm`'s external symbols in the objects of "
+      "`swift build -c release`, built from an export of the commit. Every public property exports a property "
+      "descriptor, `@_alwaysEmitIntoClient` or not (the SDK's System does too), so the descriptors grow with the "
+      "API. *Code* is functions and accessors, what `@_alwaysEmitIntoClient` leaves to the client: of *public* "
+      "declarations, in the symbol graphs, and *other*, which the graphs don't show (`@usableFromInline` "
+      "internals, synthesized Equatable and Hashable members, deinitializers, stored properties' initial values).")
+    w("")
+    w("| Module | Exported | Property descriptors | Conformances | Types | Code, public | Code, other |")
+    w("|---|---:|---:|---:|---:|---:|---:|")
+    for m in abi.MODULES:
+        if m not in now["modules"]:
+            continue
+        before = then["modules"].get(m)
+        b = counts(before, m, "base") if before is not None else None
+        c = counts(now["modules"][m], m, "head")
+        cells = [arrow(len(before) if before is not None else "—", len(now["modules"][m]))]
+        cells += [arrow(b[k] if b is not None else "—", c[k]) for k in columns]
+        w(f"| {m} | " + " | ".join(str(x) for x in cells) + " |")
+    w("")
+
+    # The candidates: added declarations whose exported code only forwards.
+    with open(os.path.join(api_dir, "api-delta.json")) as f:
+        entries = [e for e in json.load(f)["entries"] if e["status"] == "added" and e.get("usr") and e.get("file")]
+    exported = {m: set(s[1:] if s.startswith("_") else s for s in syms) for m, syms in now["modules"].items()}
+    found = []
+    for e in entries:
+        code = abi.code_symbols(e["usr"], exported.get(e["module"], set()))
+        if code:
+            found.append((e, code))
+    texts = read_blobs(a.repo, [f"{head}:{e['file']}" for e, _ in found])
+    rows = []
+    for e, code in found:
+        fw = abi.forwarding(texts.get(f"{head}:{e['file']}", ""), e["line"], e["kind"])
+        if fw:
+            rows.append((e, code, fw))
+    w("### Candidates for `@_alwaysEmitIntoClient`")
+    w("")
+    by_module = collections.Counter(e["module"] for e, _, _ in rows)
+    w(f"Of the {len(found)} declarations added since `{meta['baseRef']}` that export code, {len(rows)} only "
+      "forward a C header value" +
+      (" (" + ", ".join(f"{m} {by_module[m]}" for m in abi.MODULES if by_module[m]) + ")" if rows else "") +
+      ": a *constant* is a static member that reads a C macro or enumerator, a *raw value* an initializer that "
+      "stores one (or its getter), and an *accessor* an instance member that reads a C struct's field or tests a "
+      "C constant, through conversions at most. With `@_alwaysEmitIntoClient`, the client would compile that "
+      "code; a property keeps its descriptor. The other declarations' code is stored properties' accessors and "
+      "code that does more than forward.")
+    w("")
+    if rows:
+        w("| Module | Declaration | Forwards | Exports | Where |")
+        w("|---|---|---|---|---|")
+        for e, code, (what, names) in rows:
+            forwards = what + (" " + ", ".join(f"`{n}`" for n in names) if names else "")
+            exports = ", ".join(dict.fromkeys(x for _, x in code))
+            w(f"| {e['module']} | `{cell(e['path'])}` | {forwards} | {exports} | `{e['file']}:{e['line']}` |")
+        w("")
+
+
 def platform_section(w, a, branches, branches_for):
     """Section 4, the platform imports of the main scheme's repositories,
     each adopter read at the first of `branches` (or of its own list in
@@ -1306,6 +1403,7 @@ def main():
     ap.add_argument("--system-next", default="system-next")
     ap.add_argument("--vocab")
     ap.add_argument("--cache", required=True)
+    ap.add_argument("--abi-work", required=True, help="the release builds' scratch and results, for the ABI count")
     ap.add_argument("--date", default=datetime.date.today().isoformat())
     ap.add_argument("--dump-markers", action="store_true", help="print each marker's interfaces and stop")
     a = ap.parse_args()
@@ -1394,6 +1492,7 @@ def main():
     w("")
     w(api_text)
     w("")
+    abi_section(w, a, head, a.api_delta, meta)
 
     # ---- 2. Adoption
     w("# 2. Adoption")
@@ -1639,11 +1738,27 @@ def main():
 
 METHOD = """
 `Utilities/adopter-coverage/status.sh` makes this file from commits, with git and the existing tools, and no
-reading of reports for meaning. It takes about as long as api-delta when System's sources have changed since
-api-delta's last run, and a few seconds when they haven't.
+reading of reports for meaning. It takes about as long as api-delta and a release build when System's sources
+have changed since their last runs, and a few seconds when they haven't.
 
 - **API** is api-delta's own report (`BASE_REF=main HEAD_REF=HEAD`), its Summary and *By area* table copied
   verbatim. api-delta reruns only when `Sources/`, `Package.swift` or the tool changed since its last run.
+- **ABI symbols** are the external symbols, less the private externs, that `nm` finds in each module's objects
+  from `swift build -c release`, built from a `git archive` export of HEAD and of api-delta's base commit, with
+  the manifest patched as api-delta patches it (no Samples, so no network). A result is cached by the commit's
+  `Sources` and `Package.swift` trees, so only a change to either rebuilds. Each symbol is sorted by its demangled
+  form into property descriptors, conformances (descriptors and witness tables), types (metadata and
+  descriptors) and code (functions, accessors, initial values). Code is *public* when it belongs to a
+  declaration in api-delta's symbol graphs, by USR: a function's symbol is its USR's mangling, and a property's
+  accessors replace the USR's `vp` with `vg`, `vs`, `vM` and the like. A *candidate* is an added declaration
+  that exports code and whose body, on the lines the macOS release build compiles, is one expression (a getter
+  and a setter for a property; for an initializer, stores into `rawValue` or a delegation to
+  `init(rawValue:)`) that calls nothing but conversions (a type's initializer, `numericCast`, Duration's unit
+  factories) and reads a C name: an all-caps macro or enumerator or System's `_`-prefixed accessor for one, or a
+  snake_case field, which System's own names never are. Rejected: swift-api-digester's ABI mode (`-dump-sdk
+  -abi`), which lists declarations, not what a build exports (no property descriptors, conformances or
+  metadata, and an `@_alwaysEmitIntoClient` function that exports nothing); and a library-evolution build, as
+  the SDK's is, which a check exported nearly the same set from (REPORT.md section 50).
 - **Package targets** come from `swift package dump-package` on the package's manifests at each commit, cached
   by the manifests' blob ids, with SwiftPM's default paths (`Sources/<target>`, `Tests/<target>`) where a
   target gives none, and its `sources` and `exclude`. A manifest that doesn't evaluate falls back to

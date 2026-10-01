@@ -1,6 +1,7 @@
 #!/bin/bash
 # Regenerates Prototype/Status/STATUS.md: System's public API against main
-# (api-delta's Summary and By-area table, copied verbatim), how far the
+# (api-delta's Summary and By-area table, copied verbatim) and the symbols
+# its release builds export (scripts/abi.py), how far the
 # adopters in ../adopters have moved off the Darwin module on their
 # migration branches (migrate-darwin, and swift-foundation's no-darwin;
 # against each branch's merge base with main), every SYSTEM-GAP marker they
@@ -9,9 +10,9 @@
 # mapping.ini), and which of update-checkout's repositories still import a
 # platform C module in library code, per platform, with each adopter at its
 # newest migration branch. It's cheap enough to rerun after every merge:
-# api-delta runs again only when System's sources changed since its last
-# run, and each package manifest is evaluated once. See README.md in this
-# directory.
+# api-delta and the release builds run again only when System's sources
+# changed since their last runs, and each package manifest is evaluated
+# once. See README.md in this directory.
 #
 #   Utilities/adopter-coverage/status.sh
 #
@@ -29,7 +30,7 @@
 #   STATUS_BASE         the branch it's compared with, at their merge base (default main)
 #   STATUS_SYSTEM_NEXT  System's integration branch (default system-next)
 #   STATUS_OUT          the report (default Prototype/Status/STATUS.md in this worktree)
-#   STATUS_WORK         scratch and caches (default .build/status)
+#   STATUS_WORK         scratch and caches, the release builds' in abi/ (default .build/status)
 #   STATUS_API_DELTA=1  rerun api-delta even when its last run is current
 #   STATUS_SWIFT        more `swift` executables to evaluate manifests with, colon-separated
 #                       (installed toolchains are tried anyway, after the default one)
@@ -106,5 +107,5 @@ for b in $BRANCHES; do branch_for+=(--branch-for "$b"); done
 for b in $PLATFORM_BRANCHES_FOR; do branch_for+=(--platform-branches-for "$b"); done
 python3 "$S/status.py" --repo "$REPO" --adopters "$ADOPTERS" --api-delta "$API" --out "$OUT" \
   --branch "$BRANCH" ${branch_for[@]+"${branch_for[@]}"} --base "$BASE" --system-next "$NEXT" \
-  --cache "$WORK/manifests" ${VOCAB:+--vocab "$VOCAB"} --ecosystem "$ECO" \
+  --cache "$WORK/manifests" --abi-work "$WORK/abi" ${VOCAB:+--vocab "$VOCAB"} --ecosystem "$ECO" \
   --platform-branches "$(echo $PLATFORM_BRANCHES | tr ' ' ',')"

@@ -19,8 +19,8 @@ brief, rows C1 to C4:
 
 | # | Item | State |
 |---|---|---|
-| C1 | STATUS.md section 4 per platform, each adopter at its newest migration branch | done (section 49) |
-| C2 | Section 1: the symbols the built SystemPackage exports, and the added declarations that export one only to forward a C value | open |
+| C1 | STATUS.md section 4 per platform, each adopter at its newest migration branch | done (section 49, `30007dd`) |
+| C2 | Section 1: the symbols the built SystemPackage exports, and the added declarations that export one only to forward a C value | done (section 50); a need for the Threads owner (its finding 2) |
 | C3 | windows-2's patch P3, the Win32 sources in `Sources/System/CMakeLists.txt` | done (section 48, `8caa741`) |
 | C4 | A `_SystemPackageForPlugin` product (O2 below) | open |
 
@@ -1264,7 +1264,7 @@ describe` and the file's `add_library` and `target_sources` lists. Before, the t
 missing from CMake; after, none is, and CMake's only extras are the Linux-only IORing files in its conditional block.
 Nothing builds CMake here.
 
-## 49. STATUS.md's section 4, per platform: this commit
+## 49. STATUS.md's section 4, per platform: `30007dd`
 
 Section 4 now counts what each platform's build compiles, not each import in any branch.
 
@@ -1301,3 +1301,55 @@ platform code with `#if !$Embedded`, so those files were dead on every platform,
 `$Feature` now answers as hasFeature does: false for FALSE_FEATURES (Embedded), true otherwise. check.sh's and
 ecosystem.sh's extractions of WasmKit change the same way at their next runs, which are full runs anyway: these edits
 change adopter-coverage's tool id.
+
+## 50. Section 1's ABI symbols: this commit
+
+Michael's ask: beside the API points, the number of symbols the built SystemPackage exports, and the added public
+declarations that export a symbol although they only forward a C header value, the candidates for
+`@_alwaysEmitIntoClient`. Sources are unchanged; the list is STATUS.md's.
+
+- **What's counted.** `scripts/abi.py` builds HEAD and api-delta's base commit (`swift build -c release --target
+  SystemSockets`, from a `git archive` export patched as api-delta patches it, so no network), and `nm -gUm` lists
+  each module's external symbols, less the private externs. A result is cached by the commit's `Sources` and
+  `Package.swift` trees, so main builds again only when it moves. The table sorts them by their demangled form:
+  property descriptors, conformances, types, and code (functions and accessors), public when it belongs to a
+  declaration of api-delta's symbol graphs (by USR) and other when it doesn't (`@usableFromInline` internals,
+  synthesized Equatable and Hashable members, deinitializers, initial values). SystemSockets is counted too, since
+  it holds a fifth of the additions.
+- **nm, not swift-api-digester.** The digester's ABI mode (`-dump-sdk -abi`) runs with Swift 6.2, but it lists
+  declarations, not what the build exports: no property descriptors, conformance records or metadata, and the
+  `@_alwaysEmitIntoClient` declarations that export nothing are in it. A release build, since a debug build's
+  `-enable-testing` exports internal declarations too.
+- **Not library evolution.** The SDK's System is built with it, but SystemPackage doesn't build with
+  `-enable-library-evolution` (finding 2). With that file patched in a scratch copy, it exported nearly the same set
+  as the plain release build: a few variable initializers and synthesized equality functions one way, their
+  operator forms the other. Alternative, once the file is fixed: count the library-evolution build, which would
+  match the SDK's own.
+- **Candidates.** An added declaration that exports code and whose body, on the lines the macOS release build
+  compiles, is one expression (a getter and a setter for a property; stores into `rawValue` or a delegation to
+  `init(rawValue:)` for an initializer) that calls nothing but conversions (a type's initializer, `numericCast`,
+  Duration's unit factories) and reads a C name: an all-caps macro or enumerator, System's `_`-prefixed accessor
+  for one, or a snake_case field. Each row says which kind, the C names, what it exports and where. Rejected: a
+  list of every exporting declaration without AEIC, which would put stored properties (which can't be AEIC) and
+  `description`s beside the constants.
+
+Findings:
+
+1. **A property descriptor comes with every public property, `@_alwaysEmitIntoClient` or not**, and they're most of
+   what System exports. The SDK's own `libswiftSystem.tbd` (macOS 26) has them for `Errno`'s and
+   `FileDescriptor.AccessMode`'s constants, which are AEIC. AEIC removes a property's accessors, not its descriptor.
+2. **SystemPackage doesn't build with library evolution.** `Threads/PThreadReadWriteLock.swift` uses
+   `CInterop.PThreadReadWriteLock` (Darwin's `pthread_rwlock_t`, from `_DarwinFoundation2`) in `@usableFromInline`
+   and `@_alwaysEmitIntoClient` code without importing a platform module, and library evolution requires the file
+   to import the module its inlinable code names. Seven errors, that file only. Its siblings, such as
+   PThreadMutex.swift, have the `#if SYSTEM_PACKAGE_DARWIN import Darwin ... #endif` block it lacks. A need outside
+   this lane's files, for the Threads owner; nothing in CI builds with library evolution.
+3. **Every candidate is SystemSockets'.** SystemPackage's additions mark their forwarding code
+   `@_alwaysEmitIntoClient`; what they export is stored properties' accessors, `description`s, attribute-buffer
+   readers and the like. SystemSockets' candidates are `ResolutionFlags`' and `ReverseResolutionFlags`' constants
+   and raw-value initializers, `TCPConnectionInfo`'s fields, and the ancillary message header's level and type.
+   They stay as they are: the brief asked for the list, and SystemSockets is outside this lane's files.
+
+Checks: no Swift changed. A run of status.py into a scratch file printed both parts, and the candidate rules were
+read against every added declaration that exports code: those they turn down are buffer readers, string
+conversions, `description`s, memberwise and failable initializers, and stored properties.
