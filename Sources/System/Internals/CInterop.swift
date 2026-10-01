@@ -133,17 +133,8 @@ extension CInterop {
   /// The C `speed_t` type for baud rate values.
   public typealias SpeedT = speed_t
 
-  #if canImport(Glibc)
-  // Named through Glibc's module, as CInterop.TimeSpec is: the Swift
-  // runtime's SwiftOverlayShims module includes <sys/ioctl.h> too, and a
-  // client that loads its copy first can't read ws_xpixel without
-  // importing it.
-  /// The C `winsize` structure for terminal window dimensions.
-  public typealias WinSize = Glibc.winsize
-  #else
   /// The C `winsize` structure for terminal window dimensions.
   public typealias WinSize = winsize
-  #endif
 }
 #endif // !os(WASI)
 
