@@ -680,6 +680,9 @@ extension Win32.DirectoryHandle {
 
 @available(System 199, *)
 extension Win32 {
+  /// Opens a file with `CreateFileW`. For a handle with synchronous I/O,
+  /// the default, it rejects `FILE_FLAG_OVERLAPPED`; for an overlapped one,
+  /// it adds the flag.
   @usableFromInline
   internal static func _createFile(
     _ path: FilePath,
@@ -689,12 +692,18 @@ extension Win32 {
     flagsAndAttributes: DWORD,
     inheritable: Bool,
     securityDescriptor: PSECURITY_DESCRIPTOR?,
-    templateFile: HANDLE?
+    templateFile: HANDLE?,
+    overlapped: Bool = false
   ) -> Result<(handle: HANDLE, lastError: DWORD), Win32.Error> {
-    // Checked on the combined value, so the bit can't arrive through
-    // FileAttributes(rawValue:) either.
-    guard flagsAndAttributes & _FILE_FLAG_OVERLAPPED == 0 else {
-      return .failure(.invalidParameter)
+    var flagsAndAttributes = flagsAndAttributes
+    if overlapped {
+      flagsAndAttributes |= _FILE_FLAG_OVERLAPPED
+    } else {
+      // Checked on the combined value, so the bit can't arrive through
+      // FileAttributes(rawValue:) either.
+      guard flagsAndAttributes & _FILE_FLAG_OVERLAPPED == 0 else {
+        return .failure(.invalidParameter)
+      }
     }
     return _withCanonicalPath(path) { path in
       var securityAttributes = SECURITY_ATTRIBUTES(

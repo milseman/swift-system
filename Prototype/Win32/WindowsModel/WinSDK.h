@@ -878,3 +878,23 @@ BOOLEAN CreateSymbolicLinkW(LPCWSTR lpSymlinkFileName, LPCWSTR lpTargetFileName,
                             DWORD dwFlags);
 BOOL CreateHardLinkW(LPCWSTR lpFileName, LPCWSTR lpExistingFileName,
                      LPSECURITY_ATTRIBUTES lpSecurityAttributes);
+
+// ioapiset.h, minwinbase.h, winerror.h: overlapped I/O and completion ports
+
+#define ERROR_IO_INCOMPLETE 996
+#define ERROR_NOT_FOUND 1168
+#define ERROR_ABANDONED_WAIT_0 735
+
+BOOL GetOverlappedResult(HANDLE hFile, LPOVERLAPPED lpOverlapped,
+                         LPDWORD lpNumberOfBytesTransferred, BOOL bWait);
+BOOL GetOverlappedResultEx(HANDLE hFile, LPOVERLAPPED lpOverlapped,
+                           LPDWORD lpNumberOfBytesTransferred, DWORD dwMilliseconds,
+                           BOOL bAlertable);
+BOOL CancelIoEx(HANDLE hFile, LPOVERLAPPED lpOverlapped);
+HANDLE CreateIoCompletionPort(HANDLE FileHandle, HANDLE ExistingCompletionPort,
+                              ULONG_PTR CompletionKey, DWORD NumberOfConcurrentThreads);
+BOOL PostQueuedCompletionStatus(HANDLE CompletionPort, DWORD dwNumberOfBytesTransferred,
+                                ULONG_PTR dwCompletionKey, LPOVERLAPPED lpOverlapped);
+BOOL GetQueuedCompletionStatus(HANDLE CompletionPort, LPDWORD lpNumberOfBytesTransferred,
+                               PULONG_PTR lpCompletionKey, LPOVERLAPPED *lpOverlapped,
+                               DWORD dwMilliseconds);

@@ -83,6 +83,14 @@ internal var _S_FALSE: HRESULT { 1 }
 @_alwaysEmitIntoClient
 internal var _FILE_TYPE_DISK: DWORD { 0x1 }
 
+// MARK: - Overlapped I/O
+
+@_alwaysEmitIntoClient
+internal var _ERROR_IO_INCOMPLETE: DWORD { 996 }
+
+@_alwaysEmitIntoClient
+internal var _ERROR_NOT_FOUND: DWORD { 1168 }
+
 // MARK: - Byte-range locking
 
 @_alwaysEmitIntoClient

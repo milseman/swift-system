@@ -227,6 +227,65 @@ internal func system_SetFileInformationByHandle(
   SetFileInformationByHandle(hFile, FileInformationClass, lpFileInformation, dwBufferSize)
 }
 
+// MARK: - Overlapped I/O
+
+internal func system_GetOverlappedResult(
+  _ hFile: HANDLE,
+  _ lpOverlapped: UnsafeMutablePointer<OVERLAPPED>,
+  _ lpNumberOfBytesTransferred: UnsafeMutablePointer<DWORD>,
+  _ bWait: Bool
+) -> Bool {
+  GetOverlappedResult(hFile, lpOverlapped, lpNumberOfBytesTransferred, bWait)
+}
+
+internal func system_GetOverlappedResultEx(
+  _ hFile: HANDLE,
+  _ lpOverlapped: UnsafeMutablePointer<OVERLAPPED>,
+  _ lpNumberOfBytesTransferred: UnsafeMutablePointer<DWORD>,
+  _ dwMilliseconds: DWORD,
+  _ bAlertable: Bool
+) -> Bool {
+  GetOverlappedResultEx(
+    hFile, lpOverlapped, lpNumberOfBytesTransferred, dwMilliseconds, bAlertable)
+}
+
+internal func system_CancelIoEx(
+  _ hFile: HANDLE, _ lpOverlapped: UnsafeMutablePointer<OVERLAPPED>?
+) -> Bool {
+  CancelIoEx(hFile, lpOverlapped)
+}
+
+internal func system_CreateIoCompletionPort(
+  _ FileHandle: HANDLE,
+  _ ExistingCompletionPort: HANDLE?,
+  _ CompletionKey: UInt,
+  _ NumberOfConcurrentThreads: DWORD
+) -> HANDLE? {
+  CreateIoCompletionPort(
+    FileHandle, ExistingCompletionPort, ULONG_PTR(CompletionKey), NumberOfConcurrentThreads)
+}
+
+internal func system_PostQueuedCompletionStatus(
+  _ CompletionPort: HANDLE,
+  _ dwNumberOfBytesTransferred: DWORD,
+  _ dwCompletionKey: UInt,
+  _ lpOverlapped: UnsafeMutablePointer<OVERLAPPED>?
+) -> Bool {
+  PostQueuedCompletionStatus(
+    CompletionPort, dwNumberOfBytesTransferred, ULONG_PTR(dwCompletionKey), lpOverlapped)
+}
+
+internal func system_GetQueuedCompletionStatus(
+  _ CompletionPort: HANDLE,
+  _ lpNumberOfBytesTransferred: UnsafeMutablePointer<DWORD>,
+  _ lpCompletionKey: UnsafeMutablePointer<ULONG_PTR>,
+  _ lpOverlapped: UnsafeMutablePointer<UnsafeMutablePointer<OVERLAPPED>?>,
+  _ dwMilliseconds: DWORD
+) -> Bool {
+  GetQueuedCompletionStatus(
+    CompletionPort, lpNumberOfBytesTransferred, lpCompletionKey, lpOverlapped, dwMilliseconds)
+}
+
 // MARK: - Byte-range locking
 
 internal func system_LockFileEx(

@@ -16,8 +16,9 @@ adds API for the adopters' top Windows gaps of section 8, in its order, checked 
 
 **Resume here:** windows-api's parts are done (sections 1 to 10), and so are windows-2's (11 to 22: P1 and P2,
 then section 8's gaps from processes to file information). windows-3, in progress: long paths (section 23,
-`315f25b`), threads (24, `054e9e2`), `HRESULT` (25, `b89b78c`), and path operations (26, the last commit).
-- **Next**: the rest of section 8's list, in order: overlapped I/O; system information; Winsock, last (design only
+`315f25b`), threads (24, `054e9e2`), `HRESULT` (25, `b89b78c`), path operations (26, `8326373`), and overlapped I/O (27,
+the last commit).
+- **Next**: the rest of section 8's list, in order: system information; Winsock, last (design only
   if time runs short, since the decisions triage gives Winsock a Windows-only module of its own).
 - **Then, left within done gaps**: a Windows `BrokenDownTime` over the UCRT's time functions (14); a Windows
   `ProcessID.exit(_:)` and `exitImmediately(_:)` (12); `CRITICAL_SECTION` (15); attaching, freeing and
@@ -1441,7 +1442,7 @@ their values, and `E_OUTOFMEMORY`'s Win32 code against `ERROR_OUTOFMEMORY`); `te
 `FormatMessageW` resolving an `HRESULT` in `FACILITY_WIN32`, and a customer code (bit 29) has none;
 `testTypedThrows`; and `testWin32ErrorsFromHRESULTs`.
 
-## 26. windows-3: path operations: this commit
+## 26. windows-3: path operations: `8326373`
 
 The next gap of section 8. swift-foundation's `FileManager` creates and removes directories (`CreateDirectoryW`,
 `RemoveDirectoryW`), deletes, moves and copies files (`DeleteFileW`, `MoveFileExW`, `CopyFile2`, `CopyFileW`), makes
@@ -1513,7 +1514,79 @@ A Windows run must check:
 - Not covered: moves and hard links across volumes (`notSameDevice`), FAT volumes, `delayUntilReboot`,
   `ignoreReadOnlyAttribute`, and paths past `MAX_PATH`, beyond the canonicalization section 23 checks.
 
-## 27. windows-3: findings
+## 27. windows-3: overlapped I/O: this commit
+
+The next gap of section 8, and SYS-0011 and SYS-0013's largest future direction. swift-subprocess reads and writes
+its pipes with overlapped I/O: it opens them with `FILE_FLAG_OVERLAPPED`, associates them with a completion port
+(`CreateIoCompletionPort`) that a thread of its own drains (`GetQueuedCompletionStatus`), wakes that thread with
+`PostQueuedCompletionStatus`, cancels with `CancelIoEx`, settles a canceled operation with `GetOverlappedResult`
+before freeing its `OVERLAPPED`, and keeps a completion off the port by setting the low bit of its event.
+swift-tools-support-core waits on a completion port for a job's processes, and watches directories with
+`ReadDirectoryChangesW` on an overlapped directory handle.
+
+What: `Win32OverlappedIO.swift`.
+- `Win32.OverlappedFileHandle`, an owner like `FileHandle`, whose `open` adds `FILE_FLAG_OVERLAPPED`, with
+  `read(into:fromAbsoluteOffset:overlapped:)` and `write(_:toAbsoluteOffset:overlapped:)` (`ReadFile`, `WriteFile`),
+  `result(of:wait:)` and `result(of:timeout:)` (`GetOverlappedResult`, `GetOverlappedResultEx`), `cancel(_:)` and
+  `cancelAll()` (`CancelIoEx`).
+- `Win32.CompletionPort`, an owner, with `create(concurrentThreads:)` and `associate(_:key:)`
+  (`CreateIoCompletionPort`), `post(bytesTransferred:key:overlapped:)` (`PostQueuedCompletionStatus`), and
+  `dequeue(timeout:)` (`GetQueuedCompletionStatus`), which returns a `Win32.Completion`: the bytes, the key, the
+  `OVERLAPPED`, and the operation's error.
+
+Which API: **Win32**, as SYS-0011 directs: "An overlapped handle should have its own type that applies
+`FILE_FLAG_OVERLAPPED` implicitly", and withholds the synchronous operations, which fail on one.
+
+Design calls, with the alternatives rejected:
+- **The operations that take an `OVERLAPPED` are `@unsafe`, with raw pointers for it and the buffer.** Windows
+  uses both until the operation finishes, which can be after the call returns, the handle closes, or the caller's
+  scope ends, and no Swift lifetime says so; the inherent hazard stays visible, as the Vision asks, rather than
+  being half-hidden. `IORing`'s unregistered buffers are raw buffer pointers for the same reason. The incidental
+  hazards are removed: the last error is read at once, `ERROR_IO_PENDING` is a `nil` result rather than a failure,
+  `ERROR_IO_INCOMPLETE` and `WAIT_TIMEOUT` mean "not yet", an offset can't be a sentinel, and a missing
+  operation to cancel is `false`, not an error. Rejected: an owned operation object that holds the `OVERLAPPED`
+  and the buffer and whose deinit cancels and waits, as swift-subprocess's `settlePendingOverlapped` does by hand,
+  which can't work with a completion port, whose packets arrive on another thread, without a registry of
+  operations; and a scoped `withOverlappedRead` that waits before returning, which is synchronous I/O again. Both
+  are candidates for a layer above.
+- **The `OVERLAPPED` isn't read after an operation starts**, not even for the count of one that finished in the
+  call: a completion port's waiter can take the packet and free the structure first. The count comes from the
+  call's own argument, which Windows writes during the call.
+- **Reads report the end of the data as failures** (`endOfFile`, `brokenPipe`), where `FileHandle`'s return 0:
+  `result(of:)` can't tell a read from a write, and a completion port reports them as failures too.
+  `ERROR_MORE_DATA`, a longer message from a message-mode pipe, is a short read, as in SYS-0013.
+- **The offset is a parameter**, which the method writes into the `OVERLAPPED` with its status cleared, since an
+  overlapped handle has no file pointer; the event stays the caller's.
+- **`Completion` carries the operation's error rather than throwing it**, since a packet for a failed operation is
+  still the operation's result; `dequeue` throws only when the wait fails, and returns `nil` at its time-out.
+  `Completion` isn't `Sendable`: it holds a raw pointer.
+- **Only `GetQueuedCompletionStatus`.** An entry from `GetQueuedCompletionStatusEx` has no documented status:
+  only a reserved field, or the `OVERLAPPED` itself, which System can't read for a posted packet whose pointer
+  isn't one. libuv reads the `OVERLAPPED`'s status, since every packet it queues has a real one.
+- **`associate` takes an `OverlappedFileHandle`.** Rejected for now: raw handles, for sockets and the like, which
+  Winsock's API would bring.
+- **Not wrapped**: `SetFileCompletionNotificationModes` (`FILE_SKIP_COMPLETION_PORT_ON_SUCCESS`),
+  `ReadFileEx`/`WriteFileEx` and alertable waits, scatter/gather (`ReadFileScatter`, `WriteFileGather`), overlapped
+  named pipes and directory handles (the pipes and directory-notification gaps), and the metadata queries of
+  `FileHandle`, which an overlapped handle could take: open the file again synchronously for those.
+
+Tests: `Win32OverlappedIOTests`, with an overlapped named pipe for pending operations.
+
+A Windows run must check:
+- `testInternalConstantsMatchTheSDK`; `testOpeningAddsTheFlag` (`_isSynchronous` is false for the overlapped
+  handle and true for a `FileHandle` of the same file).
+- `testFileReadsAndWrites` (a write at 0 and a read at 1, finishing at once or not, and `endOfFile` past the end)
+  and `testInvalidRequestsAreRejected`.
+- `testPendingReadsSignalTheirEvent`: a pending read, its event signaled by the client's write, and its result.
+- `testCancelingAPendingRead`: `result(of:timeout:)` returns `nil`, `cancel` returns true, the result is
+  `operationAborted`, and nothing is left to cancel.
+- `testCompletionPort` (the packet's key, `OVERLAPPED` and count; a posted packet; a second association is
+  `invalidParameter`) and `testCompletionPortReportsFailures` (cancellation's `operationAborted` and a closed
+  writer's `brokenPipe` arrive as packets).
+- Not covered: a port waiter woken by the port's closing, packets of operations that finish in the call,
+  disk files read past 4 GiB, and concurrency limits.
+
+## 28. windows-3: findings
 
 - **`FileDescriptor`'s Windows canonicalization doesn't cover `CreateDirectoryW`'s limit** (P4).
   `withCanonicalPathRepresentation` passes `PATHCCH_ALLOW_LONG_PATHS`, so the `mkdir` adapter, which
@@ -1530,7 +1603,7 @@ A Windows run must check:
 - **macOS's CoreFoundation declares `S_OK` and `S_FALSE` too**, so the harness's tests spell `WinSDK.S_OK`; on
   Windows, where XCTest's Foundation is swift-corelibs-foundation, the bare names would do.
 
-## 28. windows-3: patches for files outside the lane
+## 29. windows-3: patches for files outside the lane
 
 **P3, continued: `Sources/System/CMakeLists.txt`.** The Win32 `target_sources` block as it should read with this
 lane's files, which coverage-4 applies with P3. It replaces the block whether or not P3 has landed. Kept current
@@ -1559,6 +1632,7 @@ target_sources(SystemPackage PRIVATE
   Win32/Win32Locking.swift
   Win32/Win32LongPaths.swift
   Win32/Win32Open.swift
+  Win32/Win32OverlappedIO.swift
   Win32/Win32PathOperations.swift
   Win32/Win32Process.swift
   Win32/Win32ProcessCreation.swift
