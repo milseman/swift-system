@@ -15,7 +15,9 @@
 #if !os(Windows)
 
 #if os(Linux)
-import CSystem
+// @preconcurrency too, since CSystem re-exports glibc's module, which its
+// header imports (CSystemLinux.h).
+@preconcurrency import CSystem
 #endif
 
 // glibc, Musl and Bionic declare stdin, stdout and stderr as mutable
