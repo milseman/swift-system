@@ -44,6 +44,8 @@ final class Win32ErrorTests: XCTestCase {
       (.invalidParameter, DWORD(WinSDK.ERROR_INVALID_PARAMETER)),
       (.insufficientBuffer, DWORD(WinSDK.ERROR_INSUFFICIENT_BUFFER)),
       (.invalidName, DWORD(WinSDK.ERROR_INVALID_NAME)),
+      (.moduleNotFound, DWORD(WinSDK.ERROR_MOD_NOT_FOUND)),
+      (.procedureNotFound, DWORD(WinSDK.ERROR_PROC_NOT_FOUND)),
       (.badPathName, DWORD(WinSDK.ERROR_BAD_PATHNAME)),
       (.alreadyExists, DWORD(WinSDK.ERROR_ALREADY_EXISTS)),
       (.fileTooLarge, DWORD(WinSDK.ERROR_FILE_TOO_LARGE)),

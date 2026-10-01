@@ -418,9 +418,13 @@ extension Win32 {
 
 @available(System 199, *)
 extension Win32 {
-  /// File attributes to apply when a file is created.
+  /// A file's attributes: those to apply when a file is created, and those
+  /// that queries such as ``Win32/FileHandle/information()`` report.
   ///
-  /// Only the attributes here are meaningful at creation.
+  /// Only some are meaningful at creation: ``normal``, ``readOnly``,
+  /// ``hidden``, ``system``, ``archive``, ``temporary``, ``offline``, and
+  /// ``encrypted``. The others, such as ``directory`` and
+  /// ``reparsePoint``, describe a file that exists.
   ///
   /// The corresponding C parameter of `CreateFileW` is the
   /// `FILE_ATTRIBUTE_*` part of `dwFlagsAndAttributes`.

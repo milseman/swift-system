@@ -78,6 +78,12 @@ extension String {
   public init(platformString: UnsafePointer<CInterop.PlatformChar>) { // mirrors: Sources/System/PlatformString.swift
     self = FilePath(platformString: platformString).string
   }
+
+  internal init( // mirrors: Sources/System/Internals/Exports.swift
+    _errorCorrectingPlatformString platformString: UnsafePointer<CInterop.PlatformChar>
+  ) {
+    self = FilePath(platformString: platformString).string
+  }
 }
 
 internal func withTemporaryFilePath<R>( // mirrors: Sources/System/FilePath/FilePathTemp.swift
@@ -237,6 +243,10 @@ internal func nothingOrErrno<I: FixedWidthInteger>( // mirrors: Sources/System/U
 internal var mockingEnabled: Bool { false } // mirrors: Sources/System/Internals/Mocking.swift
 
 internal func _mock( // mirrors: Sources/System/Internals/Mocking.swift
+  name: String = #function, path: UnsafePointer<CInterop.PlatformChar>? = nil, _ args: AnyHashable...
+) -> CInt { 0 }
+
+internal func _mockReturningErrno( // mirrors: Sources/System/Internals/Mocking.swift
   name: String = #function, path: UnsafePointer<CInterop.PlatformChar>? = nil, _ args: AnyHashable...
 ) -> CInt { 0 }
 

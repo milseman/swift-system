@@ -136,4 +136,9 @@ internal var _CONDITION_VARIABLE_LOCKMODE_SHARED: ULONG { 0x1 }
 @_alwaysEmitIntoClient
 internal var _ERROR_TIMEOUT: DWORD { 1460 }
 
+// MARK: - Environment variables
+
+@_alwaysEmitIntoClient
+internal var _ERROR_ENVVAR_NOT_FOUND: DWORD { 203 }
+
 #endif // os(Windows)

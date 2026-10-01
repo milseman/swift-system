@@ -185,6 +185,20 @@ extension Win32.Error {
   @_alwaysEmitIntoClient
   public static var invalidName: Win32.Error { Win32.Error(rawValue: 123) }
 
+  /// The specified module couldn't be found: a library to load, or one it
+  /// depends on, isn't where the search looked, or isn't loaded.
+  ///
+  /// The corresponding C constant is `ERROR_MOD_NOT_FOUND`.
+  @_alwaysEmitIntoClient
+  public static var moduleNotFound: Win32.Error { Win32.Error(rawValue: 126) }
+
+  /// The specified procedure couldn't be found: a library doesn't export
+  /// the symbol.
+  ///
+  /// The corresponding C constant is `ERROR_PROC_NOT_FOUND`.
+  @_alwaysEmitIntoClient
+  public static var procedureNotFound: Win32.Error { Win32.Error(rawValue: 127) }
+
   /// The specified path is invalid.
   ///
   /// The corresponding C constant is `ERROR_BAD_PATHNAME`.
@@ -385,6 +399,8 @@ extension Win32.Error {
     case 112: return "ERROR_DISK_FULL"
     case 122: return "ERROR_INSUFFICIENT_BUFFER"
     case 123: return "ERROR_INVALID_NAME"
+    case 126: return "ERROR_MOD_NOT_FOUND"
+    case 127: return "ERROR_PROC_NOT_FOUND"
     case 131: return "ERROR_NEGATIVE_SEEK"
     case 158: return "ERROR_NOT_LOCKED"
     case 161: return "ERROR_BAD_PATHNAME"

@@ -13,11 +13,27 @@ passing. After each commit: the same, since every new file compiles to nothing o
 The windows-2 lane (sections 11 on, base system-next at `4365f83`) applies patches P1 and P2 of section 10, then
 adds API for the adopters' top Windows gaps of section 8, in its order, checked the same way.
 
-**Resume here:** windows-api's parts are done (sections 1 to 10). windows-2: P1 and P2 are applied (section 11);
-processes (sections 12 and 13), clocks and sleeping (14), SRW locks and condition variables (15), consoles and
-standard handles (16), and well-known directories (17) are done. Next: dynamic loading, the sixth gap, then the
-rest of section 8's gaps in order. Findings and patches for other lanes' files are the last two sections; patch P3
-(the CMake source list) grows with each new file.
+**Resume here:** windows-api's parts are done (sections 1 to 10). windows-2 stopped at convergence, 2026-10-01,
+with nothing in progress. Done, one section and commit each: P1 and P2 (section 11, `037de61`, `5d843d5`),
+processes (12, `92a1dbd`), process creation and thread handles (13, `e84b953`), clocks and sleeping (14,
+`91b6894`), SRW locks and condition variables (15, `a3eb00c`), consoles and standard handles (16, `649fcd9`),
+well-known directories (17, `b63bce9`), dynamic loading (18, `257fb78`), environment variables (19, `0ed04ff`),
+and file information (20, the last commit); system-next was merged at `ed762e3`.
+- **Next**: the rest of section 8's list, in order: long paths (a public form of `_withCanonicalPath`, or
+  wrapping the calls that need it); threads (creating them, and fiber-local storage, on `Win32.ThreadHandle`);
+  `Win32.HResult`; path operations (create, remove, rename, copy, link, and the POSIX-semantics delete and rename
+  dispositions); overlapped I/O; system information; Winsock.
+- **Left within done gaps**: a Windows `BrokenDownTime` over the UCRT's time functions (14); a Windows
+  `ProcessID.exit(_:)` and `exitImmediately(_:)` (12); `CRITICAL_SECTION` (15); attaching, freeing and
+  generating console events, and `SetStdHandle` (16); `AddDllDirectory` (18); a quoting helper for command lines
+  (13).
+- **For other lanes**: P3 (section 22) must land with the next merge of this branch, or CI's CMake job fails on
+  system-next, which merged `b63bce9` without it. The PlatformEnum samples' Windows arms differ from
+  `Win32.ProcessHandle` (section 21).
+- **Tests**: no Windows test has run; each section lists what a Windows run must check. At the last commit:
+  Darwin `swift build` and `swift test`, XCTest 572 tests (5 skipped) and swift-testing 502 tests in 82 suites,
+  all passing; `check-windows.sh` compiles the Win32 files and the 19 Windows test files. No Linux build was run in
+  this lane.
 
 ## How it was checked
 
@@ -972,7 +988,7 @@ A Windows run must check:
   `withStandardHandle` needs, is untested: lend a console's standard output to check it.
 - `testControlHandlers`.
 
-## 17. Well-known directories: this commit
+## 17. Well-known directories: `b63bce9`
 
 The fifth gap of section 8. Its files ask for the Windows directory (`GetWindowsDirectoryW`), mostly to reach
 `System32\where.exe`, the executable's path (`GetModuleFileNameW` with no module), the system directory, the
@@ -1026,7 +1042,146 @@ A Windows run must check:
 - `testWindowsAndSystemDirectories`: the Windows directory is `SystemRoot`, and the system directory is its
   `System32`, ignoring case.
 
-## 18. windows-2: findings
+## 18. Dynamic loading: `257fb78`
+
+The sixth gap of section 8. Its files load a library by path (`LoadLibraryW`), look up a function
+(`GetProcAddress`), free the library (`FreeLibrary`), or find one that's loaded already (`GetModuleHandleW`), such as
+their own module, kernel32 or ntdll.
+
+What: `DynamicLibraryWindows.swift`: `DynamicLibrary` on Windows, owning an `HMODULE` reference, with
+`init(taking:)`, `init(_:options:)` for a `FilePath` and a C string of `CInterop.PlatformChar`
+(`LoadLibraryExW`), `init(alreadyLoaded:)` and `mainProgram()` (`GetModuleHandleExW`), `address(of:)` for a
+`String` and a C string (`GetProcAddress`), `handle`, `close()` (`FreeLibrary`), `relinquish()`, and a deinit that
+frees; and `DynamicLibrary.LoadOptions`, `LoadLibraryExW`'s search flags. `Win32.Error` gains the two codes these
+document, `moduleNotFound` (126) and `procedureNotFound` (127).
+
+Which API: **System's `DynamicLibrary`, with Windows' errors and options.** A loaded library and its symbols are
+the same concept as `dlopen`'s, so Windows shares the type and the shape of its API, and code that loads a
+library and looks up a symbol spells it the same everywhere. What differs is Windows': the options are
+`LoadLibraryExW`'s, and errors are `Win32.Error`.
+
+Design calls, with the alternatives rejected:
+- **Errors are `Win32.Error`**, where POSIX throws `DynamicLibrary.LoaderError`, `dlerror`'s message. Rejected: a
+  Windows `LoaderError` holding the code and its message, which would keep the signatures identical but add a
+  second error type for Win32 failures, which SYS-0010 argues against. Code that catches with a type needs an
+  `#if`; most callers print the error. There's no `takePendingError()`: Windows' last error isn't a pending error
+  to take, and SYS-0010 rejects a public last error.
+- **`init(alreadyLoaded:)` takes a reference**, with `GetModuleHandleExW`, where the adopters call
+  `GetModuleHandleW`, which takes none: the owner frees what it holds, and an unreferenced handle can be unloaded
+  under it, the owned-only hazard again. POSIX spells the same request `OpenOptions.noLoad`; Windows has no such
+  load flag, so it's an initializer rather than a faked option.
+- **`mainProgram()` searches the executable's own exports**, which is what `GetProcAddress` does with its module;
+  the doc says that it doesn't search the loaded libraries, as `dlopen(NULL)`'s handle does.
+- **The default options are none**, `LoadLibraryW`'s search, which includes the current directory and `PATH`. The
+  doc names the `search` options as the way to leave those out. Rejected: defaulting to
+  `searchDefaultDirectories`, which would break the adopters' libraries that are found through `PATH`.
+- **The shape follows POSIX's `DynamicLibrary`**, without the drafts' `@unsafe` annotations, since it's the same
+  type's Windows side: `init(taking:)`, `handle` and `relinquish()`, as there.
+- **Not wrapped**: `AddDllDirectory`, `SetDefaultDllDirectories`, lookup by ordinal, and data-file loads
+  (`LOAD_LIBRARY_AS_DATAFILE`, whose module has no symbols to look up).
+
+Tests: `Win32DynamicLibraryTests`, against kernel32 and ntdll, which every process has loaded.
+
+A Windows run must check: `testConstantsMatchTheSDK`, and the two new codes in `testCodesMatchTheSDK`;
+`testLoadingAndLookingUp` (a function looked up and called, a missing symbol `nil`);
+`testLoadOptionsAndTheCStringOverload`; `testMissingLibraries` (`moduleNotFound` both ways); `testAlreadyLoaded`;
+`testMainProgram` (the handle is `GetModuleHandleW(NULL)`'s); `testTakingAndRelinquishing`.
+
+## 19. Environment variables: `0ed04ff`
+
+The seventh gap of section 8. Its files read a variable (`GetEnvironmentVariableW`), set or remove one
+(`SetEnvironmentVariableW`, and the C runtime's `_putenv`, `_putenv_s` and `_wputenv_s`), and copy the whole
+environment (`GetEnvironmentStringsW`, `FreeEnvironmentStringsW`). SwiftPM's `Environment.set` already calls
+`ProcessEnvironment` on POSIX, and on Windows calls `SetEnvironmentVariableW` and then `_putenv` to keep the C
+runtime's copy in step.
+
+What: `ProcessEnvironmentWindows.swift`: `ProcessEnvironment` on Windows, with `value(of:)`
+(`GetEnvironmentVariableW`), `set(_:to:overwrite:)` and `remove(_:)` (`_wputenv_s`, then
+`SetEnvironmentVariableW`), `entries()` (`GetEnvironmentStringsW`), and `withUnsafeEntries(_:)`, which lends the
+block that `CreateProcessW` takes.
+
+Which API: **System's `ProcessEnvironment`.** Environment variables are the same concept everywhere, and the
+namespace's signatures carry over unchanged but one: `withUnsafeEntries` lends a Windows environment block, the
+form `CreateProcessW` takes, where POSIX lends `environ`, the form `execve` takes.
+
+Design calls, with the alternatives rejected:
+- **Reads use the system's copy; writes change both copies**, as SwiftPM does by hand. The system's copy is what
+  new processes inherit and what every writer, Win32 or C runtime, updates; the C runtime's copy is what C
+  libraries' `getenv` reads, and only C runtime writes reach it. Rejected: the Win32 calls alone, as Rust's
+  `std::env` does, which leaves `getenv` in the same process reading old values; and the C runtime alone, which
+  can't hold an empty value and misses `SetEnvironmentVariableW`'s changes on reads.
+- **An empty value is empty in the system's copy and absent from the C runtime's**, which can't hold one:
+  `_wputenv_s` with an empty value removes the variable, so `set` calls it first and `SetEnvironmentVariableW`
+  second. POSIX's `setenv` stores an empty value.
+- **`overwrite: false` checks, then sets**, since Windows has no conditional set; another thread can set the
+  variable in between. The doc says so.
+- **Errors stay `Errno`**, the signature's type: the C runtime's errors are `errno` values already, and a Win32
+  failure goes through the mapping the `FileDescriptor` adapters use.
+- **`entries()` includes the variables whose names begin with `=`**, such as `=C:`, as `GetEnvironmentStringsW`
+  returns them; a name ends at the first `=` after its first character, as the creation block's sort reads it.
+- **Name rules as on POSIX**: not empty, no `=`, no null character.
+- `_wputenv_s` has a mock hook, as the C runtime calls do; no mock test, since `set` also calls the unmocked
+  `SetEnvironmentVariableW`.
+- **Not wrapped**: `ExpandEnvironmentStringsW`, and `ProcessEnvironment.secureValue(of:)`, which is POSIX's
+  set-user-ID rule.
+
+Tests: `Win32EnvironmentTests`, each with variables of its own.
+
+A Windows run must check: `testSetReadAndRemove` (case-insensitive names, both copies changed, `overwrite: false`,
+removing a missing variable); `testEmptyValues` (empty in the system's copy and in `entries()`, absent from the C
+runtime's, which relies on `_wputenv_s` removing a variable it's given an empty value for);
+`testLongValues` (past the first buffer); `testInvalidNamesAndValues`; `testEntriesAndTheBlock`;
+`testChildrenInherit` (a child created afterward sees the variable).
+
+## 20. File information: this commit
+
+The eighth gap of section 8, and the first two stages SYS-0010's roadmap leaves to future proposals. Its files test
+attributes (`FILE_ATTRIBUTE_DIRECTORY`, `FILE_ATTRIBUTE_REPARSE_POINT`, `FILE_ATTRIBUTE_READONLY`), read
+`BY_HANDLE_FILE_INFORMATION` (`GetFileInformationByHandle`) and `WIN32_FILE_ATTRIBUTE_DATA`
+(`GetFileAttributesExW`), get and set attributes by path, set times (`SetFileTime`), and, in swift-foundation, read
+`FileIdInfo`, `FileBasicInfo` and `FileAttributeTagInfo`.
+
+What: `Win32FileInformation.swift`.
+- `Win32.FileAttributes` gains the attributes that describe an existing file (`directory`, `reparsePoint`,
+  `sparseFile`, `compressed`, and eight more); its doc says which ones creation applies.
+- `Win32.FileInformation` (`BY_HANDLE_FILE_INFORMATION`): attributes, the three times as `Win32.FileTime`,
+  volume serial number, size, link count, and file index. `Win32.FileBasicInformation` (`FILE_BASIC_INFO`),
+  `Win32.FileStandardInformation` (`FILE_STANDARD_INFO`), `Win32.FileID` (`FILE_ID_INFO`, the 128-bit ID as a
+  `UInt128`), `Win32.ReparseTag` (symbolic link, mount point, app execution alias, Unix domain socket, and the
+  Microsoft and name-surrogate bits), and `Win32.FileAttributeTagInformation`.
+- On both handle types: `information()`, `basicInformation()`, `fileID()`, `attributeTagInformation()`,
+  `setTimes(creation:lastAccess:lastWrite:change:)` and `setAttributes(_:)`; on `FileHandle`,
+  `standardInformation()` too.
+- By path: `Win32.fileAttributes(of:)`, `Win32.fileAttributeData(of:)` and `Win32.setFileAttributes(_:of:)`
+  (`GetFileAttributesW`, `GetFileAttributesExW`, `SetFileAttributesW`), with `open`'s path canonicalization.
+
+Which API: **Win32.** SYS-0006 keeps `Stat` POSIX-only and calls for Windows types instead, and SYS-0010's roadmap
+puts them in the namespace. A cross-platform `FileInfo` over both stays SYS-0006's future direction.
+
+Design calls, with the alternatives rejected:
+- **Information types wrap their C structs** with read-only properties, as `ConsoleScreenBufferInfo` and System's
+  other C-struct wrappers do; `FileID` is a plain value instead, since an identity needs `Hashable`.
+- **Times are `Win32.FileTime`**, section 14's type, from both `FILETIME` and `FILE_BASIC_INFO`'s
+  `LARGE_INTEGER`s.
+- **Setting goes through `FILE_BASIC_INFO`** with optional times, nil for "leave it", as POSIX's `setTimes` takes
+  `nil` for `UTIME_OMIT`; `SetFileTime` would need a separate path for the change time. A zero time means "leave
+  it" there, so the start of 1601 can't be set, which the doc says. Empty attributes become
+  `FILE_ATTRIBUTE_NORMAL`, since zero means "leave them".
+- **The path queries are namespace functions** taking a `FilePath`, as the drafts' API takes paths; they don't
+  open the file, and report a reparse point's own attributes.
+- **Not done**: the other information classes (names, streams, compression, alignment, remote protocol,
+  directory enumeration), and setting the delete and rename dispositions with POSIX semantics
+  (`FileDispositionInfoEx`, `FileRenameInfoEx`), which belong with the path operations gap.
+
+Tests: `Win32FileInformationTests`.
+
+A Windows run must check: `testConstantsMatchTheSDK` (the attributes and the four reparse tags);
+`testFileInformation` (size, links, times, the three information classes agreeing, the same `FileID` for two
+opens and a different one for another file); `testDirectoryInformation`; `testSettingTimesAndAttributes` (a
+time set and the others left, attributes set and cleared); `testQueriesByPath` (`fileNotFound` and
+`pathNotFound`); `testFileIDBytes` (the little-endian reading). `fileID()` on FAT, which throws, isn't covered.
+
+## 21. windows-2: findings
 
 - **The PlatformEnum samples' Windows arms now reach System's `Win32.ProcessHandle`** (the stand-ins compile only
   with `SIMULATE_PLATFORMS`), and differ from it: `Platform.Process` reads `processID` as a property, where
@@ -1042,25 +1197,39 @@ A Windows run must check:
   `create` through a `var end: Win32.FileHandle? = pipe.writeEnd`, closed by assigning `nil`. `Optional.map` isn't
   available for a noncopyable wrapped type in Swift 6.2, and a closure that captures a partially consumed struct
   is "used after consume" even when it touches only a field that wasn't consumed.
+- **`String.withCString` and `Array.withUnsafeBufferPointer` can't return a noncopyable value** in Swift 6.2: a
+  closure whose one expression makes one, such as `try DynamicLibrary($0)`, is inferred to return `()`, with only
+  a warning that the constant has type `()`. Callers of the C-string overloads that make owners have to get the
+  pointer some other way; `Win32DynamicLibraryTests` allocates it.
 
-## 19. windows-2: patches for files outside the lane
+## 22. windows-2: patches for files outside the lane
 
 **P3, `Sources/System/CMakeLists.txt`: list the lane's new sources.** CI's CMake job fails when a SwiftPM source is
-missing from the list. Kept current with each commit; it applies to this branch with `git apply`.
+missing from the list. Kept current with each commit; it applies to this branch with `git apply`. system-next at
+`70e1766` merged this branch at `b63bce9` without it, so system-next's list lacks the files through `b63bce9`; apply
+P3 with the next merge of this branch, which brings the rest.
 
 ```diff
 --- a/Sources/System/CMakeLists.txt
 +++ b/Sources/System/CMakeLists.txt
-@@ -355,5 +355,8 @@
+@@ -355,5 +355,10 @@
    VectoredIO/VectoredIO.swift)
  target_sources(SystemPackage PRIVATE
++  Win32/DynamicLibraryWindows.swift
 +  Win32/PathsWindows.swift
++  Win32/ProcessEnvironmentWindows.swift
 +  Win32/ProcessIDWindows.swift
    Win32/Win32.swift
 +  Win32/Win32Console.swift
    Win32/Win32Constants.swift
    Win32/Win32Error.swift
-@@ -366,7 +369,13 @@
+@@ -361,4 +366,5 @@
+   Win32/Win32FileHandle.swift
+   Win32/Win32FileIO.swift
++  Win32/Win32FileInformation.swift
+   Win32/Win32FileType.swift
+   Win32/Win32FinalPath.swift
+@@ -366,7 +372,13 @@
    Win32/Win32Locking.swift
    Win32/Win32Open.swift
 +  Win32/Win32Process.swift

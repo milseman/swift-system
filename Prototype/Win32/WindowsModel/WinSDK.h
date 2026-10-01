@@ -172,6 +172,8 @@ typedef union _LARGE_INTEGER {
 #define ERROR_DISK_FULL 112
 #define ERROR_INSUFFICIENT_BUFFER 122
 #define ERROR_INVALID_NAME 123
+#define ERROR_MOD_NOT_FOUND 126
+#define ERROR_PROC_NOT_FOUND 127
 #define ERROR_NEGATIVE_SEEK 131
 #define ERROR_NOT_LOCKED 158
 #define ERROR_BAD_PATHNAME 161
@@ -664,3 +666,99 @@ DWORD GetTempPathW(DWORD nBufferLength, LPWSTR lpBuffer);
 UINT GetWindowsDirectoryW(LPWSTR lpBuffer, UINT uSize);
 UINT GetSystemDirectoryW(LPWSTR lpBuffer, UINT uSize);
 DWORD GetCurrentDirectoryW(DWORD nBufferLength, LPWSTR lpBuffer);
+
+// libloaderapi.h: dynamic loading
+
+#define LOAD_WITH_ALTERED_SEARCH_PATH 0x00000008
+#define LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR 0x00000100
+#define LOAD_LIBRARY_SEARCH_APPLICATION_DIR 0x00000200
+#define LOAD_LIBRARY_SEARCH_USER_DIRS 0x00000400
+#define LOAD_LIBRARY_SEARCH_SYSTEM32 0x00000800
+#define LOAD_LIBRARY_SEARCH_DEFAULT_DIRS 0x00001000
+
+HMODULE LoadLibraryW(LPCWSTR lpLibFileName);
+HMODULE LoadLibraryExW(LPCWSTR lpLibFileName, HANDLE hFile, DWORD dwFlags);
+BOOL FreeLibrary(HMODULE hLibModule);
+BOOL GetModuleHandleExW(DWORD dwFlags, LPCWSTR lpModuleName, HMODULE *phModule);
+
+#define ERROR_ENVVAR_NOT_FOUND 203
+
+typedef WCHAR *LPWCH;
+
+BOOL SetEnvironmentVariableW(LPCWSTR lpName, LPCWSTR lpValue);
+LPWCH GetEnvironmentStringsW(void);
+BOOL FreeEnvironmentStringsW(LPWCH penv);
+
+// fileapi.h, minwinbase.h, winbase.h, winnt.h: file information
+
+#define FILE_ATTRIBUTE_DEVICE 0x00000040
+#define FILE_ATTRIBUTE_SPARSE_FILE 0x00000200
+#define FILE_ATTRIBUTE_REPARSE_POINT 0x00000400
+#define FILE_ATTRIBUTE_COMPRESSED 0x00000800
+#define FILE_ATTRIBUTE_NOT_CONTENT_INDEXED 0x00002000
+#define FILE_ATTRIBUTE_INTEGRITY_STREAM 0x00008000
+#define FILE_ATTRIBUTE_NO_SCRUB_DATA 0x00020000
+#define FILE_ATTRIBUTE_RECALL_ON_OPEN 0x00040000
+#define FILE_ATTRIBUTE_PINNED 0x00080000
+#define FILE_ATTRIBUTE_UNPINNED 0x00100000
+#define FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS 0x00400000
+
+#define IO_REPARSE_TAG_MOUNT_POINT 0xA0000003
+#define IO_REPARSE_TAG_SYMLINK 0xA000000C
+#define IO_REPARSE_TAG_APPEXECLINK 0x8000001B
+#define IO_REPARSE_TAG_AF_UNIX 0x80000023
+
+typedef struct _BY_HANDLE_FILE_INFORMATION {
+  DWORD dwFileAttributes;
+  FILETIME ftCreationTime;
+  FILETIME ftLastAccessTime;
+  FILETIME ftLastWriteTime;
+  DWORD dwVolumeSerialNumber;
+  DWORD nFileSizeHigh;
+  DWORD nFileSizeLow;
+  DWORD nNumberOfLinks;
+  DWORD nFileIndexHigh;
+  DWORD nFileIndexLow;
+} BY_HANDLE_FILE_INFORMATION, *PBY_HANDLE_FILE_INFORMATION, *LPBY_HANDLE_FILE_INFORMATION;
+
+typedef struct _FILE_BASIC_INFO {
+  LARGE_INTEGER CreationTime;
+  LARGE_INTEGER LastAccessTime;
+  LARGE_INTEGER LastWriteTime;
+  LARGE_INTEGER ChangeTime;
+  DWORD FileAttributes;
+} FILE_BASIC_INFO, *PFILE_BASIC_INFO;
+
+typedef struct _FILE_ID_128 {
+  BYTE Identifier[16];
+} FILE_ID_128, *PFILE_ID_128;
+
+typedef struct _FILE_ID_INFO {
+  ULONGLONG VolumeSerialNumber;
+  FILE_ID_128 FileId;
+} FILE_ID_INFO, *PFILE_ID_INFO;
+
+typedef struct _FILE_ATTRIBUTE_TAG_INFO {
+  DWORD FileAttributes;
+  DWORD ReparseTag;
+} FILE_ATTRIBUTE_TAG_INFO, *PFILE_ATTRIBUTE_TAG_INFO;
+
+typedef struct _WIN32_FILE_ATTRIBUTE_DATA {
+  DWORD dwFileAttributes;
+  FILETIME ftCreationTime;
+  FILETIME ftLastAccessTime;
+  FILETIME ftLastWriteTime;
+  DWORD nFileSizeHigh;
+  DWORD nFileSizeLow;
+} WIN32_FILE_ATTRIBUTE_DATA, *LPWIN32_FILE_ATTRIBUTE_DATA;
+
+typedef enum _GET_FILEEX_INFO_LEVELS : int {
+  GetFileExInfoStandard,
+  GetFileExMaxInfoLevel
+} GET_FILEEX_INFO_LEVELS;
+
+BOOL GetFileInformationByHandle(HANDLE hFile,
+                                LPBY_HANDLE_FILE_INFORMATION lpFileInformation);
+BOOL GetFileAttributesExW(LPCWSTR lpFileName, GET_FILEEX_INFO_LEVELS fInfoLevelId,
+                          LPVOID lpFileInformation);
+BOOL SetFileAttributesW(LPCWSTR lpFileName, DWORD dwFileAttributes);
