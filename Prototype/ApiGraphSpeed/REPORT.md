@@ -1,6 +1,6 @@
 # api-graph-speed: regenerate.sh fast after a System change
 
-Lane `api-graph-speed`, base `3f9f9e1` (system-next), merged with system-next `6a9833f` at `943c479` and `4365f83` at `2c474b4`. Owns `Utilities/api-graph/` and `Prototype/ApiGraphSpeed/`.
+Lane `api-graph-speed`, base `3f9f9e1` (system-next), merged with system-next `6a9833f` at `943c479`, `4365f83` at `2c474b4` and `70e1766` at `52946ea`. Owns `Utilities/api-graph/` and `Prototype/ApiGraphSpeed/`.
 
 ## Resume here
 
@@ -9,7 +9,8 @@ Stopped 2026-10-01. All three steps are committed and measured, every run's adop
 **Commits** (base `3f9f9e1`):
 - Merges of system-next:
   - `943c479`, of `6a9833f`;
-  - `2c474b4`, of `4365f83`.
+  - `2c474b4`, of `4365f83`;
+  - `52946ea`, of `70e1766`, at the stop. It touched none of the lane's files.
 - The three steps:
   - `f12d631`, step 1;
   - `ae57686`, step 2;
@@ -248,7 +249,8 @@ These two packages are small, so an incremental build after a real System change
 
 - `swift build && swift test` before: XCTest ran 565 tests with 4 skipped and 0 failures; swift-testing ran 496 tests in 80 suites, all passed.
 - After, with steps 1 and 2 committed and step 3 in the working tree: the same. The lane changes no Swift.
-- At the stop, on the merge of system-next `4365f83` with all three steps: XCTest ran 571 tests with 5 skipped and 0 failures; swift-testing ran 502 tests in 82 suites, all passed. The merge brought the extra tests.
+- On the merge of system-next `4365f83`, with all three steps: XCTest ran 571 tests with 5 skipped and 0 failures; swift-testing ran 502 tests in 82 suites, all passed. The merge brought the extra tests.
+- At the stop, on the merge of `70e1766`: XCTest ran 572 tests with 5 skipped and 0 failures; swift-testing ran 502 tests in 82 suites, all passed.
 - Script checks:
   - `bash -n`, `py_compile` and pyflakes. pyflakes caught a duplicated `builds` key in adopters.json's meta, which would have dropped the build directories' sizes. It was fixed before the step 2 commit, and the key is now `buildDirectories`.
   - `sync_export` against a scratch repository. Unchanged files kept their dates. It handled changed, removed and relinked files, a file that became a directory and back, and a cleared executable bit, and it kept `Package.resolved`.
