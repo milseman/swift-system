@@ -399,4 +399,50 @@ internal func system_CompareStringOrdinal(
   CompareStringOrdinal(lpString1, cchCount1, lpString2, cchCount2, bIgnoreCase)
 }
 
+// MARK: - Clocks and sleeping
+
+internal func system_GetSystemTimePreciseAsFileTime(
+  _ lpSystemTimeAsFileTime: UnsafeMutablePointer<FILETIME>
+) {
+  GetSystemTimePreciseAsFileTime(lpSystemTimeAsFileTime)
+}
+
+internal func system_GetSystemTimeAsFileTime(
+  _ lpSystemTimeAsFileTime: UnsafeMutablePointer<FILETIME>
+) {
+  GetSystemTimeAsFileTime(lpSystemTimeAsFileTime)
+}
+
+internal func system_GetTickCount64() -> ULONGLONG {
+  GetTickCount64()
+}
+
+internal func system_QueryInterruptTimePrecise(
+  _ lpInterruptTimePrecise: UnsafeMutablePointer<ULONGLONG>
+) {
+  QueryInterruptTimePrecise(lpInterruptTimePrecise)
+}
+
+internal func system_QueryUnbiasedInterruptTimePrecise(
+  _ lpUnbiasedInterruptTimePrecise: UnsafeMutablePointer<ULONGLONG>
+) {
+  QueryUnbiasedInterruptTimePrecise(lpUnbiasedInterruptTimePrecise)
+}
+
+internal func system_QueryPerformanceCounter(
+  _ lpPerformanceCount: UnsafeMutablePointer<LARGE_INTEGER>
+) -> Bool {
+  QueryPerformanceCounter(lpPerformanceCount)
+}
+
+internal func system_QueryPerformanceFrequency(
+  _ lpFrequency: UnsafeMutablePointer<LARGE_INTEGER>
+) -> Bool {
+  QueryPerformanceFrequency(lpFrequency)
+}
+
+internal func system_Sleep(_ dwMilliseconds: DWORD) {
+  Sleep(dwMilliseconds)
+}
+
 #endif // os(Windows)

@@ -14,9 +14,9 @@ The windows-2 lane (sections 11 on, base system-next at `4365f83`) applies patch
 adds API for the adopters' top Windows gaps of section 8, in its order, checked the same way.
 
 **Resume here:** windows-api's parts are done (sections 1 to 10). windows-2: P1 and P2 are applied (section 11);
-processes have `ProcessID` and `Win32.ProcessHandle` (section 12), creation and thread handles (section 13). Next:
-clocks and sleeping, the second gap, then the rest of section 8's gaps in order. Findings and patches for other lanes' files are the last two sections;
-patch P3 (the CMake source list) grows with each new file.
+processes (sections 12 and 13) and clocks and sleeping (section 14) are done. Next: SRW locks and condition
+variables, the third gap, then the rest of section 8's gaps in order. Findings and patches for other lanes' files
+are the last two sections; patch P3 (the CMake source list) grows with each new file.
 
 ## How it was checked
 
@@ -735,7 +735,7 @@ A Windows run must check:
 - Not covered: ending the calling process, waits beyond 49.7 days, and a process of another user, where
   `queryLimitedInformation` is granted and `queryInformation` isn't.
 
-## 13. Creating processes, and thread handles: this commit
+## 13. Creating processes, and thread handles: `e84b953`
 
 What:
 - `Win32ProcessCreation.swift`: `Win32.ProcessCreationFlags` (`suspended`, `detached`, `newConsole`,
@@ -807,7 +807,63 @@ A Windows run must check:
 - Not covered: consoles (`newConsole`, `detached`), breaking away from a job, a command line at the limit of
   32,767 characters, and callers whose standard handles are console handles.
 
-## 14. windows-2: findings
+## 14. Clocks and sleeping: this commit
+
+The second gap of section 8. Most of its files call `Sleep`, many of them tests; next come the system time
+(`GetSystemTimePreciseAsFileTime`, `GetSystemTimeAsFileTime`) and `GetTickCount64`, then one file each for the
+performance counter and the unbiased interrupt time. Time zones and the C runtime's broken-down time are in two
+packages' files.
+
+What: `Win32Time.swift`.
+- `Win32.FileTime`, a count of 100-nanosecond intervals since 1601 (`rawValue: Int64`), `Comparable`, with
+  `init(_:)` from a `FILETIME` and `fileTime` back, `durationSinceUnixEpoch` and `init?(durationSinceUnixEpoch:)`,
+  and `now` (`GetSystemTimePreciseAsFileTime`) and `coarseNow` (`GetSystemTimeAsFileTime`).
+- `Win32.tickCount()` (`GetTickCount64`), `interruptTime()` (`QueryInterruptTimePrecise`) and
+  `unbiasedInterruptTime()` (`QueryUnbiasedInterruptTimePrecise`), each a `Duration` since the system started;
+  `performanceCounter()` and `performanceFrequency()` (`QueryPerformanceCounter`, `QueryPerformanceFrequency`),
+  as `Int64` ticks.
+- `Win32.sleep(for:)` (`Sleep`), `noasync` like POSIX's `PThread.sleep(for:retryOnInterrupt:)`.
+
+Which API: **Win32.**
+- POSIX's `ClockID` wraps `clockid_t`, and its sleep is hosted on `PThread`. Windows has neither: its clocks are
+  separate functions with their own epochs and units. A Windows `ClockID` would fake a POSIX type over the one
+  clock the UCRT has (`timespec_get` with `TIME_UTC`), which `Next/Vision.md` rules out.
+- Swift's `ContinuousClock` and `SuspendingClock` already measure elapsed time on Windows, and `Task.sleep`
+  sleeps without blocking; these are for code that needs a particular Windows clock, or blocks on purpose, as
+  the adopters' tests do.
+- **Broken-down time is the cross-platform candidate**, not done here: the UCRT's `_gmtime64_s`,
+  `_localtime64_s`, `_mkgmtime64` and `strftime` are POSIX-shaped, so `BrokenDownTime` could have a Windows
+  implementation. Its `tm` has no `tm_gmtoff` or `tm_zone`, which `utcOffset` and `timeZoneAbbreviation` read, so
+  those would come from `_get_timezone`, `_get_dstbias` and `_get_tzname`; and two packages use it.
+
+Design calls, with the alternatives rejected:
+- **`FileTime` is a signed count**, as `FILE_BASIC_INFO` stores times (`LARGE_INTEGER`), so the file information
+  gap can share it. Rejected: `rawValue: FILETIME`, the C struct, as System's request types wrap theirs, since a
+  time needs `Hashable` and `Comparable`; and `UInt64`, which no Windows time needs.
+- **`durationSinceUnixEpoch` is the bridge**, the duration POSIX's `ClockID.realtime.currentTime()` returns. The
+  way back rounds down to 100 nanoseconds, so a time maps to the interval that holds it, and returns `nil`
+  outside about 29,000 years either side of 1601, rather than trapping.
+- **`now` and `coarseNow` are properties**, like `Date.now`. Rejected: `Win32.systemTime()` functions, and a
+  `now(precise:)`.
+- **A sleep of zero or less calls `Sleep(0)`**, which yields, as NIO's spin loop uses it; POSIX's
+  `PThread.sleep` returns at once for those. A positive duration rounds up to a millisecond. Windows can end a
+  sleep shorter than the timer's period early, which the doc says. Rejected: a high-resolution waitable timer,
+  which Rust's `thread::sleep` uses where Windows has one: a policy over `Sleep`, not its wrapper.
+- **Not wrapped**: `SleepEx` (alertable sleeps), `SwitchToThread`, the coarse `QueryInterruptTime` and
+  `QueryUnbiasedInterruptTime`, `timeBeginPeriod`, and `GetTimeZoneInformation`.
+
+Tests: `Win32TimeTests`, with lower bounds only on elapsed times. The `FileTime` conversions and the interval
+durations also ran on macOS, copied into a scratch program, including round trips at `Int64.min` and `Int64.max`.
+
+A Windows run must check:
+- `testFileTimeHalves`, `testUnixEpochConversions`, `testIntervalsAsDurations`.
+- `testSystemTime`: after 2026; precise and coarse within a second; the C runtime's `_time64` within two seconds.
+- `testMonotonicClocks`: each clock advances at least 20 ms across a sleep of 50 ms, the frequency is positive,
+  and the unbiased interrupt time doesn't exceed the biased one. That the two precise interrupt-time functions
+  link through the WinSDK module, as swift-foundation's call to the unbiased one does.
+- `testSleepYieldsForNonpositiveDurations`.
+
+## 15. windows-2: findings
 
 - **The PlatformEnum samples' Windows arms now reach System's `Win32.ProcessHandle`** (the stand-ins compile only
   with `SIMULATE_PLATFORMS`), and differ from it: `Platform.Process` reads `processID` as a property, where
@@ -824,7 +880,7 @@ A Windows run must check:
   available for a noncopyable wrapped type in Swift 6.2, and a closure that captures a partially consumed struct
   is "used after consume" even when it touches only a field that wasn't consumed.
 
-## 15. windows-2: patches for files outside the lane
+## 16. windows-2: patches for files outside the lane
 
 **P3, `Sources/System/CMakeLists.txt`: list the lane's new sources.** CI's CMake job fails when a SwiftPM source is
 missing from the list. Kept current with each commit; it applies to this branch with `git apply`.
@@ -838,7 +894,7 @@ missing from the list. Kept current with each commit; it applies to this branch 
 +  Win32/ProcessIDWindows.swift
    Win32/Win32.swift
    Win32/Win32Constants.swift
-@@ -366,7 +367,11 @@
+@@ -366,7 +367,12 @@
    Win32/Win32Locking.swift
    Win32/Win32Open.swift
 +  Win32/Win32Process.swift
@@ -847,6 +903,7 @@ missing from the list. Kept current with each commit; it applies to this branch 
    Win32/Win32Syscalls.swift
 -  Win32/Win32VolumeInformation.swift)
 +  Win32/Win32Thread.swift
++  Win32/Win32Time.swift
 +  Win32/Win32VolumeInformation.swift
 +  Win32/Win32Wait.swift)
  target_link_libraries(SystemPackage PUBLIC

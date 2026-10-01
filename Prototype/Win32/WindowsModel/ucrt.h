@@ -31,3 +31,7 @@ int _write(int _FileHandle, const void *_Buf, unsigned int _MaxCharCount);
 #define _O_U8TEXT 0x40000
 
 #define _MAX_PATH 260
+
+// time.h
+typedef long long __time64_t;
+__time64_t _time64(__time64_t *_Time);

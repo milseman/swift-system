@@ -555,3 +555,22 @@ DWORD SuspendThread(HANDLE hThread);
 // processenv.h: environment variables
 
 DWORD GetEnvironmentVariableW(LPCWSTR lpName, LPWSTR lpBuffer, DWORD nSize);
+
+// minwinbase.h, sysinfoapi.h, realtimeapiset.h, profileapi.h, synchapi.h:
+// clocks and sleeping
+
+typedef ULONGLONG *PULONGLONG;
+
+typedef struct _FILETIME {
+  DWORD dwLowDateTime;
+  DWORD dwHighDateTime;
+} FILETIME, *PFILETIME, *LPFILETIME;
+
+void GetSystemTimePreciseAsFileTime(LPFILETIME lpSystemTimeAsFileTime);
+void GetSystemTimeAsFileTime(LPFILETIME lpSystemTimeAsFileTime);
+ULONGLONG GetTickCount64(void);
+void QueryInterruptTimePrecise(PULONGLONG lpInterruptTimePrecise);
+void QueryUnbiasedInterruptTimePrecise(PULONGLONG lpUnbiasedInterruptTimePrecise);
+BOOL QueryPerformanceCounter(LARGE_INTEGER *lpPerformanceCount);
+BOOL QueryPerformanceFrequency(LARGE_INTEGER *lpFrequency);
+void Sleep(DWORD dwMilliseconds);
