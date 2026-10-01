@@ -15,9 +15,9 @@ adds API for the adopters' top Windows gaps of section 8, in its order, checked 
 
 **Resume here:** windows-api's parts are done (sections 1 to 10). windows-2: P1 and P2 are applied (section 11);
 processes (sections 12 and 13), clocks and sleeping (14), SRW locks and condition variables (15), consoles and
-standard handles (16), well-known directories (17), and dynamic loading (18) are done. Next: environment
-variables, the seventh gap, then the rest of section 8's gaps in order. Findings and patches for other lanes'
-files are the last two sections; patch P3 (the CMake source list) grows with each new file.
+standard handles (16), well-known directories (17), dynamic loading (18), and environment variables (19) are
+done. Next: file information, the eighth gap, then the rest of section 8's gaps in order. Findings and patches for
+other lanes' files are the last two sections; patch P3 (the CMake source list) grows with each new file.
 
 ## How it was checked
 
@@ -1026,7 +1026,7 @@ A Windows run must check:
 - `testWindowsAndSystemDirectories`: the Windows directory is `SystemRoot`, and the system directory is its
   `System32`, ignoring case.
 
-## 18. Dynamic loading: this commit
+## 18. Dynamic loading: `257fb78`
 
 The sixth gap of section 8. Its files load a library by path (`LoadLibraryW`), look up a function
 (`GetProcAddress`), free the library (`FreeLibrary`), or find one that's loaded already (`GetModuleHandleW`), such as
@@ -1071,7 +1071,53 @@ A Windows run must check: `testConstantsMatchTheSDK`, and the two new codes in `
 `testLoadOptionsAndTheCStringOverload`; `testMissingLibraries` (`moduleNotFound` both ways); `testAlreadyLoaded`;
 `testMainProgram` (the handle is `GetModuleHandleW(NULL)`'s); `testTakingAndRelinquishing`.
 
-## 19. windows-2: findings
+## 19. Environment variables: this commit
+
+The seventh gap of section 8. Its files read a variable (`GetEnvironmentVariableW`), set or remove one
+(`SetEnvironmentVariableW`, and the C runtime's `_putenv`, `_putenv_s` and `_wputenv_s`), and copy the whole
+environment (`GetEnvironmentStringsW`, `FreeEnvironmentStringsW`). SwiftPM's `Environment.set` already calls
+`ProcessEnvironment` on POSIX, and on Windows calls `SetEnvironmentVariableW` and then `_putenv` to keep the C
+runtime's copy in step.
+
+What: `ProcessEnvironmentWindows.swift`: `ProcessEnvironment` on Windows, with `value(of:)`
+(`GetEnvironmentVariableW`), `set(_:to:overwrite:)` and `remove(_:)` (`_wputenv_s`, then
+`SetEnvironmentVariableW`), `entries()` (`GetEnvironmentStringsW`), and `withUnsafeEntries(_:)`, which lends the
+block that `CreateProcessW` takes.
+
+Which API: **System's `ProcessEnvironment`.** Environment variables are the same concept everywhere, and the
+namespace's signatures carry over unchanged but one: `withUnsafeEntries` lends a Windows environment block, the
+form `CreateProcessW` takes, where POSIX lends `environ`, the form `execve` takes.
+
+Design calls, with the alternatives rejected:
+- **Reads use the system's copy; writes change both copies**, as SwiftPM does by hand. The system's copy is what
+  new processes inherit and what every writer, Win32 or C runtime, updates; the C runtime's copy is what C
+  libraries' `getenv` reads, and only C runtime writes reach it. Rejected: the Win32 calls alone, as Rust's
+  `std::env` does, which leaves `getenv` in the same process reading old values; and the C runtime alone, which
+  can't hold an empty value and misses `SetEnvironmentVariableW`'s changes on reads.
+- **An empty value is empty in the system's copy and absent from the C runtime's**, which can't hold one:
+  `_wputenv_s` with an empty value removes the variable, so `set` calls it first and `SetEnvironmentVariableW`
+  second. POSIX's `setenv` stores an empty value.
+- **`overwrite: false` checks, then sets**, since Windows has no conditional set; another thread can set the
+  variable in between. The doc says so.
+- **Errors stay `Errno`**, the signature's type: the C runtime's errors are `errno` values already, and a Win32
+  failure goes through the mapping the `FileDescriptor` adapters use.
+- **`entries()` includes the variables whose names begin with `=`**, such as `=C:`, as `GetEnvironmentStringsW`
+  returns them; a name ends at the first `=` after its first character, as the creation block's sort reads it.
+- **Name rules as on POSIX**: not empty, no `=`, no null character.
+- `_wputenv_s` has a mock hook, as the C runtime calls do; no mock test, since `set` also calls the unmocked
+  `SetEnvironmentVariableW`.
+- **Not wrapped**: `ExpandEnvironmentStringsW`, and `ProcessEnvironment.secureValue(of:)`, which is POSIX's
+  set-user-ID rule.
+
+Tests: `Win32EnvironmentTests`, each with variables of its own.
+
+A Windows run must check: `testSetReadAndRemove` (case-insensitive names, both copies changed, `overwrite: false`,
+removing a missing variable); `testEmptyValues` (empty in the system's copy and in `entries()`, absent from the C
+runtime's, which relies on `_wputenv_s` removing a variable it's given an empty value for);
+`testLongValues` (past the first buffer); `testInvalidNamesAndValues`; `testEntriesAndTheBlock`;
+`testChildrenInherit` (a child created afterward sees the variable).
+
+## 20. windows-2: findings
 
 - **The PlatformEnum samples' Windows arms now reach System's `Win32.ProcessHandle`** (the stand-ins compile only
   with `SIMULATE_PLATFORMS`), and differ from it: `Platform.Process` reads `processID` as a property, where
@@ -1092,7 +1138,7 @@ A Windows run must check: `testConstantsMatchTheSDK`, and the two new codes in `
   a warning that the constant has type `()`. Callers of the C-string overloads that make owners have to get the
   pointer some other way; `Win32DynamicLibraryTests` allocates it.
 
-## 20. windows-2: patches for files outside the lane
+## 21. windows-2: patches for files outside the lane
 
 **P3, `Sources/System/CMakeLists.txt`: list the lane's new sources.** CI's CMake job fails when a SwiftPM source is
 missing from the list. Kept current with each commit; it applies to this branch with `git apply`.
@@ -1100,17 +1146,18 @@ missing from the list. Kept current with each commit; it applies to this branch 
 ```diff
 --- a/Sources/System/CMakeLists.txt
 +++ b/Sources/System/CMakeLists.txt
-@@ -355,5 +355,9 @@
+@@ -355,5 +355,10 @@
    VectoredIO/VectoredIO.swift)
  target_sources(SystemPackage PRIVATE
 +  Win32/DynamicLibraryWindows.swift
 +  Win32/PathsWindows.swift
++  Win32/ProcessEnvironmentWindows.swift
 +  Win32/ProcessIDWindows.swift
    Win32/Win32.swift
 +  Win32/Win32Console.swift
    Win32/Win32Constants.swift
    Win32/Win32Error.swift
-@@ -366,7 +370,13 @@
+@@ -366,7 +371,13 @@
    Win32/Win32Locking.swift
    Win32/Win32Open.swift
 +  Win32/Win32Process.swift

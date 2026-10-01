@@ -43,3 +43,8 @@ int _isatty(int _FileHandle);
 // spells it as WinSDK.h's WCHAR.
 unsigned short *_wgetcwd(unsigned short *_DstBuf, int _SizeInWords);
 int _wchdir(const unsigned short *_Path);
+
+// stdlib.h, with wchar_t spelled as WinSDK.h's WCHAR.
+typedef int errno_t;
+errno_t _wputenv_s(const unsigned short *_Name, const unsigned short *_Value);
+unsigned short *_wgetenv(const unsigned short *_VarName);

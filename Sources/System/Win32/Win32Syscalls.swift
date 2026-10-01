@@ -593,4 +593,39 @@ internal func system_GetModuleHandleExW(
   GetModuleHandleExW(dwFlags, lpModuleName, phModule)
 }
 
+// MARK: - Environment variables
+
+internal func system_GetEnvironmentVariableW(
+  _ lpName: UnsafePointer<WCHAR>, _ lpBuffer: UnsafeMutablePointer<WCHAR>, _ nSize: DWORD
+) -> DWORD {
+  GetEnvironmentVariableW(lpName, lpBuffer, nSize)
+}
+
+internal func system_SetEnvironmentVariableW(
+  _ lpName: UnsafePointer<WCHAR>, _ lpValue: UnsafePointer<WCHAR>?
+) -> Bool {
+  SetEnvironmentVariableW(lpName, lpValue)
+}
+
+internal func system_GetEnvironmentStringsW() -> UnsafeMutablePointer<WCHAR>? {
+  GetEnvironmentStringsW()
+}
+
+internal func system_FreeEnvironmentStringsW(_ penv: UnsafeMutablePointer<WCHAR>) -> Bool {
+  FreeEnvironmentStringsW(penv)
+}
+
+// Returns an error number, rather than setting errno.
+internal func system__wputenv_s(
+  _ varname: UnsafePointer<WCHAR>, _ value_string: UnsafePointer<WCHAR>
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled {
+    return _mockReturningErrno(
+      path: varname, String(_errorCorrectingPlatformString: value_string))
+  }
+#endif
+  return _wputenv_s(varname, value_string)
+}
+
 #endif // os(Windows)

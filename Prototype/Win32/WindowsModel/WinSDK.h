@@ -680,3 +680,11 @@ HMODULE LoadLibraryW(LPCWSTR lpLibFileName);
 HMODULE LoadLibraryExW(LPCWSTR lpLibFileName, HANDLE hFile, DWORD dwFlags);
 BOOL FreeLibrary(HMODULE hLibModule);
 BOOL GetModuleHandleExW(DWORD dwFlags, LPCWSTR lpModuleName, HMODULE *phModule);
+
+#define ERROR_ENVVAR_NOT_FOUND 203
+
+typedef WCHAR *LPWCH;
+
+BOOL SetEnvironmentVariableW(LPCWSTR lpName, LPCWSTR lpValue);
+LPWCH GetEnvironmentStringsW(void);
+BOOL FreeEnvironmentStringsW(LPWCH penv);
