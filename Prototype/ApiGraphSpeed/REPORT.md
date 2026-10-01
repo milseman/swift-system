@@ -4,38 +4,31 @@ Lane `api-graph-speed`, base `3f9f9e1` (system-next), merged with system-next `6
 
 ## Resume here
 
-2026-09-30: steps 1 and 2 are measured and checked; step 3 is committed, and its timed runs are in progress. The runs go through now, since Michael put the allow rules this report proposed into the worktree's `.claude/settings.local.json`. Before that, the auto mode classifier had denied three runs, one of them after Michael approved them in chat, because it goes by allow rules, not by the conversation.
+Stopped 2026-10-01. All three steps are committed and measured, every run's adopter links match the old tool's, and the scratch is deleted.
 
-**Committed:**
-- `943c479`: the merge of system-next `6a9833f`.
-- `f12d631`: step 1, with `pin.sh`, `measure.sh`, `summarize.sh` and `compare.py`.
-- `ae57686`: step 2, with `check_builds.py`.
-- `279c229`: the scratch commit for c. It rewords one comment in `Syscalls.swift`, so its Sources differ from 3f9f9e1's by that line. `cdb9e87` reverts it, and the measurements keep using `279c229` as a head commit.
-- `2c474b4`: the merge of system-next `4365f83`. It came after the scratch commit, so that commit's Sources are still 3f9f9e1's plus one comment. None of the merge's Utilities changes touch what the api-graph tool reads.
-- `e4a2730`: `measure.sh NAME [COMMIT] [VAR=value ...]`, so that every run's command starts with the script.
-- `d1f856c`: step 3, parallel builds, with the docs' build sizes corrected to what step 2 measured.
-- `1f204c8`: each run records its power source and its start and end, and `summarize.sh` flags a run the machine slept through.
+**Commits** (base `3f9f9e1`):
+- Merges of system-next:
+  - `943c479`, of `6a9833f`;
+  - `2c474b4`, of `4365f83`.
+- The three steps:
+  - `f12d631`, step 1;
+  - `ae57686`, step 2;
+  - `d1f856c`, step 3.
+- `279c229`: the scratch change to one comment under Sources, used as the head of the trivial-change runs. `cdb9e87` reverts it.
+- Measurement tools: `e4a2730`, `1f204c8`, and the last commit (the README's "Run time", `verify_pin.py`, the re-pin and this report).
 
-**Done:**
-- `check_builds.py` passes all 16 checks, the fix included.
-- b1 and c1 match the baseline (step 1, below).
-- s2-cold and s2-incr match it too (step 2, below). s2's builds directory is deleted.
-- The first d4 run (step 3 cold, 4 jobs) built all 18, and its links match the baseline's. That's what step 3's commit rests on. Its time isn't a measurement, because the machine slept through it (step 3, below).
+**Deleted at the stop:**
+- `.build/speed`, 24 GB: two kept builds directories, of 12 GB and 11 GB, the runs' outputs, and the caches.
+- `${TMPDIR}api-graph-speed`: the pin, made of APFS clones, 3.4 GB apparent.
 
-**Next:**
-1. Step 3, the tool at `d1f856c` or later:
-   - Done: d4 again, run from 20:57 to 21:15 (step 3, below). The machine was in clamshell sleep from 20:02 to 20:55. `builds-d4` is deleted, and `cache-d4` is kept for the run with history.
-   - Done: d18, from 21:17 to 21:34 (step 3, below). `cache-d18` and `builds-d18` are kept for (b), (c) and the forced rebuild.
-   - Next: d4h, d4 with history: `measure.sh d4h API_GRAPH_ADOPTER_JOBS=4 API_GRAPH_CACHE=<speed>/cache-d4 API_GRAPH_BUILDS=<speed>/builds-d4h API_GRAPH_ADOPTER_VALIDATE=tree HEAD_REF=279c229`. That's cold builds in a fresh builds directory, ordered longest first by d4's recorded times.
-   - Then (b), nothing changed, (c), `HEAD_REF=279c229`, and a forced rebuild with 4 jobs, `API_GRAPH_ADOPTER_VALIDATE=tree HEAD_REF=279c229`, all three against `d18`'s cache and builds.
-   - Update the README's "Run time".
-2. At the stop, delete `.build/speed` and `${TMPDIR}api-graph-speed`, except a persistent builds directory, whose place and size go here.
+No persistent builds directory is kept. The measurement builds were against pinned copies whose commits, and whose path dependencies' absolute paths, a real run doesn't share, so a real run would start most of them over anyway. A real run's builds go in `.build/api-graph-builds`, about 12 GB.
 
-**Scratch in use:**
-- `.build/speed/cache`: the baseline's entries, upgraded by b1.
-- `.build/speed/runs/*/out`: the runs' outputs and snapshots. `compare.py` compares against `a-old`'s.
-- `.build/speed/snapshots`.
-- `${TMPDIR}api-graph-speed`: the pinned inputs, as APFS clones, almost no disk. The cache keys hold the pinned adopters' absolute paths, so a pin anywhere else would miss the cache.
+**Possible next steps,** none of them started:
+1. **The would-benefit scan.** It's now most of a run with nothing to build: 55 to 134 s of an adopters step of 77 to 163 s. It's outside this lane's three steps.
+2. **Fewer manifest datings.** Date the manifests only when a dependency's list of files changed, so a change inside existing files doesn't make SwiftPM plan again (step 2).
+3. **A run on a real merge**, such as system-next `4365f83`, to see how few migrations revalidation rebuilds when declarations change.
+4. **Longest-first on a quiet machine.** The run with history (d4h) was inconclusive at a load of 148.
+5. **Pin outside `$TMPDIR`**, or re-pin with `pin.sh` every few days (see Measurement setup).
 
 ## Measurement setup
 
@@ -53,6 +46,43 @@ Lane `api-graph-speed`, base `3f9f9e1` (system-next), merged with system-next `6
   - `summarize.sh` writes `summary.txt`.
   - The body is one bash block, so editing the script during a run can't change the run. An edit during the baseline broke its summary step, not the run itself, and that summary was rebuilt from the log.
 - The Sources and manifest of 3f9f9e1 and of system-next's tip, 6a9833f, are the same.
+- `verify_pin.py ADOPTERS_JSON [--fix]` checks a pin against a run's `adopters.json`. With `--fix` it puts the pin back to that run's state:
+  - each migration's tip and main;
+  - an adopters clone's branch, and an ecosystem clone's HEAD;
+  - clones the run didn't have;
+  - coverage extractions that would now be picked instead of the recorded one, or of a lexical scan, including one of a migration's merge base, which is tried first.
+- Three hazards turned up, each now caught:
+  - **`$TMPDIR` cleanup.** macOS deleted files from the pin overnight, between 2026-09-30 21:34 and 2026-10-01 06:06: files under `$TMPDIR` not accessed for a few days, and an APFS clone keeps its original's access time. swift-nio's and swift-subprocess's copies lost their git `HEAD` and `config`, and the coverage results lost about 1500 of 5311 files. A run that morning saw 16 migrations instead of 18, so it was stopped. `pin.sh` now sets the copies' access times to now.
+  - **Live clones move.** Re-pinned, nine `migrate-darwin` tips had moved overnight, sourcekit-lsp had grown a migration, and the coverage lanes had added 100 extractions that would have been picked. `verify_pin.py --fix` against the baseline's `adopters.json` put all of it back. The next run's links matched the baseline's exactly, which checks the restored pin.
+  - **A closed lid.** The machine sleeps, and a run's wall time then includes the sleep. Each run now records its power source and its start and end, and `summarize.sh` counts the power log's Sleep entries in between. Only the first d4 run had any.
+
+## The runs
+
+Every run is regenerate.sh with `BASE_REF=1b452c2` on the pinned inputs. The head is 3f9f9e1, or `279c229` (one comment changed under Sources). Load is the mean of the one-minute load average, sampled each minute, from other lanes' builds as well as this run's. Every run's adopter links, sites and hunks are identical to a-old's.
+
+| Run | Tool | What | Wall | Adopters step | Load | Power |
+|---|---|---|---|---|---|---|
+| a-old | old (`943c479`) | (a): cold, one build at a time | 1375.8 s | 1252 s | 47.4 | AC |
+| b1 | step 1 | (b): unchanged tree, the old cache: 18 reused | 221.1 s | 82 s | 57.5 | AC |
+| c1 | step 1 | (c): `279c229`: 18 revalidated | 287.2 s | 95 s | 76.1 | AC |
+| s2-cold | step 2 | cold, serial, filling the builds | 1966.4 s | 1804 s | 116.9 | AC |
+| s2-incr | step 2 | forced rebuild (`tree`) on `279c229`: 18 incremental | 540.8 s | 421 s | 23.7 | AC |
+| d4 | step 3 | (d): cold, 4 jobs | 1059.2 s | 907 s | 129.4 | battery |
+| d18 | step 3 | (d): cold, 18 jobs | 973.9 s | 791 s | 194.0 | battery |
+| b3 | step 3 | (b): unchanged tree, d18's cache: 18 reused | 382.8 s | 163 s | 66.2 | battery |
+| c3 | step 3 | (c): `279c229`: 18 revalidated | 242.1 s | 77 s | 43.2 | battery |
+| i3 | step 3 | forced rebuild (`tree`), 4 jobs: 18 incremental | 330.5 s | 183 s | 36.5 | battery |
+| d4h | step 3 | cold, 4 jobs, with history: 17 built, 1 reused | 1205.4 s | 896 s | 148.2 | battery |
+
+Not in the table: the first d4 run, which slept, and a stopped run on the damaged pin (Measurement setup).
+
+**What each step bought:**
+- **Step 1 is most of it.** After a System change that leaves the migrations' declarations alone, the run is 4 to 5 minutes and builds nothing: c1 took 287 s and c3 242 s, where the old tool's (a) took 1376 s.
+- **Step 2** makes the rebuilds that remain incremental. s2-incr's 18 builds took 337 s, where they took 1125 s cold in (a); each recompiled only SystemPackage. The builds directory takes about 12 GB.
+- **Step 3**:
+  - It overlaps the builds. The cold adopters step at a load of 117 to 129 fell from 1804 s serially (s2-cold) to 907 s with 4 jobs (d4), and to 791 s with 18 (d18, at a load of 194). The forced incremental rebuild fell from 421 s (s2-incr) to 183 s (i3).
+  - Under this load, the order mattered less than the total CPU work. d4h, longest first, and d4, alphabetical, spent about the same 810 s building.
+- **(b), nothing changed, isn't faster than before.** Nothing builds either way. b3 took longer than b1 because its would-benefit scan, unchanged code, ran at about twice the load.
 
 ## Step 1: validate cached indexes instead of keying on System's tree (committed `f12d631`; measured)
 
@@ -160,7 +190,7 @@ These two packages are small, so an incremental build after a real System change
 - What step 2 bought: a rebuild that step 1 can't avoid (a failed build, a changed declaration, `tree`) costs what SwiftPM's incremental build costs, about a third of the cold builds here, instead of a cold build. It doesn't help the cold case, and it keeps 11.8 GB on disk.
 - A possible next step: date the manifests only when System's or a dependency's list of files changed since the package's last build. Then a change inside existing files wouldn't make SwiftPM plan again. Not tried.
 
-## Step 3: parallel adopter builds (committed `d1f856c`; being measured)
+## Step 3: parallel adopter builds (committed `d1f856c`; measured)
 
 **What:**
 - Every plan is made first.
@@ -200,17 +230,35 @@ These two packages are small, so an incremental build after a real System change
   - Load: 33.2 at the start; the per-minute mean was 194.0 (median 209, max 395), the highest of any run. Swap reached 8.2 GB.
   - The build directories took 12.1 GB.
   - Against d4: 85 s less wall time at half again d4's load. Most of the gain is that no build waits to start.
+- b3, (b) for the final tool: d18's cache and builds, nothing changed.
+  - 382.8 s wall; the adopters step took 163 s, and all 18 were reused. Load 66.2.
+  - Its migrations part took 27 s, as b1's did (26 s): the extraction is Python, which runs one thread at a time. The would-benefit scan took 134 s against 55 s at about twice the load.
+  - b3 was the first run on the restored pin, so its matching links also check the pin.
+- c3, (c) for the final tool, on `279c229`: 242.1 s wall; the adopters step took 77 s, and all 18 were revalidated. Load 43.2.
+- i3, a forced rebuild (`tree`) on `279c229`, 4 jobs, in d18's build directories.
+  - 330.5 s wall; the adopters step took 183 s.
+  - All 18 were incremental, from swift-argument-parser's 9 s to swift-foundation's 76 s, all done within about 120 s. Serially, s2-incr's builds took about 370 s.
+  - Load 36.5.
+- d4h, cold with history: `cache-d4` for the order, a fresh builds directory, `tree` on `279c229`.
+  - 1205.4 s wall; the adopters step took 896 s. Load 148.2.
+  - It built 17, not 18: swift-syntax was reused from an entry the stopped run on the damaged pin had stored for `279c229`'s tree.
+  - Longest first put swift-foundation (620 s) and swift-package-manager (559 s) in the first group. The builds still spanned about 810 s, as d4's alphabetical ones did. With the CPUs saturated by other lanes, order changed little, and this one run is no measurement of it.
 
 ## Tests
 
 - `swift build && swift test` before: XCTest ran 565 tests with 4 skipped and 0 failures; swift-testing ran 496 tests in 80 suites, all passed.
 - After, with steps 1 and 2 committed and step 3 in the working tree: the same. The lane changes no Swift.
+- At the stop, on the merge of system-next `4365f83` with all three steps: XCTest ran 571 tests with 5 skipped and 0 failures; swift-testing ran 502 tests in 82 suites, all passed. The merge brought the extra tests.
 - Script checks:
   - `bash -n`, `py_compile` and pyflakes. pyflakes caught a duplicated `builds` key in adopters.json's meta, which would have dropped the build directories' sizes. It was fixed before the step 2 commit, and the key is now `buildDirectories`.
   - `sync_export` against a scratch repository. Unchanged files kept their dates. It handled changed, removed and relinked files, a file that became a directory and back, and a cleared executable bit, and it kept `Package.resolved`.
   - `check_builds.py`, as above.
+  - `compare.py` on every run (the table above).
 
 ## Findings
 
 - SwiftPM's incremental builds and path dependencies: see step 2.
+- macOS's `$TMPDIR` cleanup, live clones that move, and a closed lid: see Measurement setup.
+- The auto mode classifier goes by allow rules, not by the conversation. Three runs were denied, the last after Michael approved them in chat. The allow rules for `measure.sh`, `check_builds.py` and `compare.py` in the worktree's `.claude/settings.local.json` cleared it. `measure.sh` takes its settings as `VAR=value` arguments, so that each command starts with the script.
+- At these loads, a build sharing the CPUs took 1.3 to 4 times as long as it did alone. Parallel builds still won: at about the same load, 4 jobs halved the cold adopters step.
 - The adopters' own extension members on System types, such as `s:13SystemPackage14FileDescriptorV5NIOFSE…`, carry System-prefixed USRs, but System's symbol graphs don't list them, so revalidation treats them as not System's. Implicit accessor references map to their properties.

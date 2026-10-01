@@ -12,6 +12,12 @@
 #
 # Keep DEST the same for every run that shares a cache: the cache keys hold
 # the absolute paths of the path dependencies that aren't clones.
+#
+# macOS deletes files under $TMPDIR that haven't been accessed for a few
+# days, and an APFS clone keeps its original's access time: one night after
+# the first pin, the copies had lost git configs, HEADs and objects. So the
+# copies' access times are set to now (not their modification times, which
+# adopters.py goes by to pick a coverage extraction). Re-pin after a few days.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd -P)"
 SRC="$(dirname "$ROOT")"
@@ -59,4 +65,5 @@ for dir in ecosystem coverage-results; do
     echo "$dir: $(find "$DEST/$dir" -maxdepth 1 -mindepth 1 | wc -l | tr -d ' ') entries"
   fi
 done
+find "$DEST" -exec touch -a -h {} + 2>/dev/null || true
 echo "pinned into $DEST"

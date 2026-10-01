@@ -119,7 +119,17 @@ Each is read at run time; nothing else needs editing.
 
 ## Run time
 
-About four minutes on an M1 Max with Swift 6.2 when every adopter index is cached, and up to twice that while other builds compete for the CPU: api-delta's run and the indexed build of the head commit (about 45 seconds each, at the same time), the adopters step (one to three minutes: 58 packages' interface data, some of it scanned lexically), and the snapshot, pitches, suggestions and bundles (about 40 seconds). A migration whose index isn't cached is built: 20 seconds to 5 minutes each (swift-foundation's and SwiftPM's are the longest), about 25 minutes for all 15.
+Measured on an M1 Max with Swift 6.2, on 2026-09-30 and 2026-10-01, while other builds kept the load average between 25 and 200. Each run is in `Prototype/ApiGraphSpeed/REPORT.md`.
+
+- **Nothing to build**, every migration's index cached or revalidated: 3.5 to 6.5 minutes, depending on load. That's the usual case after a System change that no migration's System declarations see.
+  - api-delta's run and the indexed build of the head commit, at the same time: 75 to 120 seconds.
+  - The adopters step: 1.3 to 2.7 minutes. Half a minute of that is the 18 migrations' sites; the rest is the would-benefit scan of 99 packages' interface data, some of it scanned lexically.
+  - The snapshot, pitches, suggestions and bundles: about 40 seconds.
+- **Rebuilds in kept build directories**, for a failed build, a changed declaration or `API_GRAPH_ADOPTER_VALIDATE=tree`: incremental, 10 to 75 seconds each. All 18, four at a time, add about two minutes.
+- **Cold builds**, on a first run or after deleting `API_GRAPH_BUILDS`: 15 seconds to 12 minutes each under that load.
+  - All 18 took 13 to 15 minutes, four at a time or all at once, at loads of 130 to 190.
+  - One at a time, the old way, they took 30 minutes at a load of 117, and 21 minutes at 47.
+  - The build directories take about 12 GB.
 
 ## Requirements
 
