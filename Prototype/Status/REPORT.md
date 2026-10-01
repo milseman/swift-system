@@ -19,9 +19,9 @@ brief, rows C1 to C4:
 
 | # | Item | State |
 |---|---|---|
-| C1 | STATUS.md section 4 per platform, each adopter at its newest migration branch | in progress |
+| C1 | STATUS.md section 4 per platform, each adopter at its newest migration branch | done (section 49) |
 | C2 | Section 1: the symbols the built SystemPackage exports, and the added declarations that export one only to forward a C value | open |
-| C3 | windows-2's patch P3, the Win32 sources in `Sources/System/CMakeLists.txt` | done (section 48) |
+| C3 | windows-2's patch P3, the Win32 sources in `Sources/System/CMakeLists.txt` | done (section 48, `8caa741`) |
 | C4 | A `_SystemPackageForPlugin` product (O2 below) | open |
 
 coverage-3 stopped 2026-09-30, done: section 40's rows are all closed (sections 41 to 43), both queues are empty and
@@ -1247,7 +1247,7 @@ per kind, and a module-by-kind table the totals. The counts are there, not here.
 - `--branch-for` (`STATUS_BRANCHES`) sets a package's migration branch for the adoption and gaps sections too, whose
   header names it when it isn't the default; `STATUS_ECOSYSTEM` points at the clones.
 
-## 48. coverage-4: windows-2's P3, the Win32 sources in CMake: this commit
+## 48. coverage-4: windows-2's P3, the Win32 sources in CMake: `8caa741`
 
 The coverage-4 lane (worktree `../coverage-4`, from system-next `bb950db`, after the 2026-10-01 convergence merge) took
 four rows: STATUS.md's section 4 per platform, ABI symbols in section 1, windows-2's CMake patch, and the plugin
@@ -1263,3 +1263,41 @@ Check: CI's comparison (`.github/workflows/pull_request.yml`, CMake Validation),
 describe` and the file's `add_library` and `target_sources` lists. Before, the twelve were SwiftPM's only sources
 missing from CMake; after, none is, and CMake's only extras are the Linux-only IORing files in its conditional block.
 Nothing builds CMake here.
+
+## 49. STATUS.md's section 4, per platform: this commit
+
+Section 4 now counts what each platform's build compiles, not each import in any branch.
+
+- **Branches.** Each adopter is read at its newest migration branch, the first of migrate-all, migrate-unix and
+  migrate-darwin that its checkout in `../adopters` has (swift-foundation: migrate-unix, else no-darwin), named in the
+  table's *Read at*. `../adopters-unix`'s checkouts are worktrees of `../adopters`' and share their branches, so
+  nothing reads them. `--platform-branches` and `--platform-branches-for` (`STATUS_PLATFORM_BRANCHES`,
+  `STATUS_PLATFORM_BRANCHES_FOR`) set the lists. Sections 2 and 3 stay on migrate-darwin (swift-foundation's
+  no-darwin) against main: they measure the Darwin migration and its markers. Rejected: moving them to the newest
+  branches too, which would mix other platforms' work into the Darwin migration's merge-base comparison.
+- **Evaluation.** Each library file's `#if`s are evaluated by platforms.py for its eight families (Darwin as macOS,
+  Linux as glibc, Musl, Android, WASI, FreeBSD, OpenBSD, Windows), with FOUNDATION_FRAMEWORK false as in section 2.
+  A file counts for a platform when that platform's build compiles one of its platform-module imports. An unknown
+  flag or trait makes an import *maybe*, which counts, and the cell says how many: the evaluator's own rule, and
+  the goal's, since an import that some configuration compiles is still there. Rejected: counting only what surely
+  compiles, which would drop WasmKit's trait-gated files that its default builds compile. A file whose conditions
+  don't parse counts as maybe everywhere, as section 2's fallback does.
+- **The lexical count stands beside it**: per repository, the library files with any import; per platform, in the
+  summary, the files that import the platform's own modules (Glibc for Linux, FreeBSD and OpenBSD), so the
+  difference is the dead branches. Tests, other code and nested packages stay lexical, as counts, and the
+  module-by-kind table stays as it was.
+- **A summary by platform** opens the section: the library files whose build imports one, the repositories with
+  any, and the lexical count. The per-repository module lists are gone; the platform columns say more.
+- `canImport` finds the platform's own modules and platforms.py's cross-platform ones, but not a package's own or
+  its dependencies' (no manifest is read). Checked at the adopters' commits of 2026-10-01: the only `canImport` of
+  any other module that guards a platform import is swift-foundation's EmscriptenLibc, false on all eight, rightly.
+- Spot checks: swift-nio's NIOLock.swift imports Glibc only under `#elseif canImport(Glibc)`, after a branch for
+  `canImport(Darwin) || os(Linux) || os(Android)`, so it counts for FreeBSD and OpenBSD, not Linux;
+  Subprocess+BSD.swift's Glibc is FreeBSD's and OpenBSD's; swift-foundation's three Darwin imports that Darwin doesn't
+  compile are under FOUNDATION_FRAMEWORK.
+
+**Finding: platforms.py read `$Embedded` as true.** It took every `$Feature` atom as true, and WasmKit guards its
+platform code with `#if !$Embedded`, so those files were dead on every platform, here and in section 2's macOS count.
+`$Feature` now answers as hasFeature does: false for FALSE_FEATURES (Embedded), true otherwise. check.sh's and
+ecosystem.sh's extractions of WasmKit change the same way at their next runs, which are full runs anyway: these edits
+change adopter-coverage's tool id.

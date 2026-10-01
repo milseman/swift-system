@@ -7,7 +7,8 @@
 # have, by interface, with what System covers now (or, for what it
 # doesn't, the standard library's answer or another module's, from
 # mapping.ini), and which of update-checkout's repositories still import a
-# platform C module. It's cheap enough to rerun after every merge:
+# platform C module in library code, per platform, with each adopter at its
+# newest migration branch. It's cheap enough to rerun after every merge:
 # api-delta runs again only when System's sources changed since its last
 # run, and each package manifest is evaluated once. See README.md in this
 # directory.
@@ -21,6 +22,10 @@
 #                       space-separated (default swift-foundation=no-darwin)
 #   STATUS_ECOSYSTEM    the ecosystem's clones and scheme-main.tsv, for section 4's
 #                       platform imports (default: ecosystem next to this worktree)
+#   STATUS_PLATFORM_BRANCHES      section 4's branches, newest first: each adopter is read at
+#                       the first one it has (default migrate-all migrate-unix migrate-darwin)
+#   STATUS_PLATFORM_BRANCHES_FOR  packages with their own list, as NAME=BRANCH,BRANCH...,
+#                       space-separated (default swift-foundation=migrate-unix,no-darwin)
 #   STATUS_BASE         the branch it's compared with, at their merge base (default main)
 #   STATUS_SYSTEM_NEXT  System's integration branch (default system-next)
 #   STATUS_OUT          the report (default Prototype/Status/STATUS.md in this worktree)
@@ -54,6 +59,8 @@ ADOPTERS="$(abspath "${STATUS_ADOPTERS:-$REPO/../adopters}")"
 BRANCH="${STATUS_BRANCH:-migrate-darwin}"
 BRANCHES="${STATUS_BRANCHES-swift-foundation=no-darwin}"
 ECO="$(abspath "${STATUS_ECOSYSTEM:-$REPO/../ecosystem}")"
+PLATFORM_BRANCHES="${STATUS_PLATFORM_BRANCHES:-migrate-all migrate-unix migrate-darwin}"
+PLATFORM_BRANCHES_FOR="${STATUS_PLATFORM_BRANCHES_FOR-swift-foundation=migrate-unix,no-darwin}"
 BASE="${STATUS_BASE:-main}"
 NEXT="${STATUS_SYSTEM_NEXT:-system-next}"
 OUT="$(abspath "${STATUS_OUT:-$REPO/Prototype/Status/STATUS.md}")"
@@ -96,6 +103,8 @@ VOCAB="$(ls -t "$RESULTS"/vocab/*.json.gz 2>/dev/null | head -1 || true)"
 log "status: $ADOPTERS ($BRANCH against $BASE)"
 branch_for=()
 for b in $BRANCHES; do branch_for+=(--branch-for "$b"); done
+for b in $PLATFORM_BRANCHES_FOR; do branch_for+=(--platform-branches-for "$b"); done
 python3 "$S/status.py" --repo "$REPO" --adopters "$ADOPTERS" --api-delta "$API" --out "$OUT" \
   --branch "$BRANCH" ${branch_for[@]+"${branch_for[@]}"} --base "$BASE" --system-next "$NEXT" \
-  --cache "$WORK/manifests" ${VOCAB:+--vocab "$VOCAB"} --ecosystem "$ECO"
+  --cache "$WORK/manifests" ${VOCAB:+--vocab "$VOCAB"} --ecosystem "$ECO" \
+  --platform-branches "$(echo $PLATFORM_BRANCHES | tr ' ' ',')"

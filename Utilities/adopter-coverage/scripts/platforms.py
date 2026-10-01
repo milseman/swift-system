@@ -145,8 +145,11 @@ def swift_atom(tok, env, build):
         if fn in ("hasFeature", "hasAttribute"):
             return T
         return M
+    # `$Feature`, like hasFeature(Feature), is true but for the features that
+    # no build modeled here enables: `#if !$Embedded` guards code that each of
+    # them compiles.
     if tok.startswith("$"):
-        return T
+        return F if tok[1:] in FALSE_FEATURES else T
     if tok == "true":
         return T
     if tok == "false":
