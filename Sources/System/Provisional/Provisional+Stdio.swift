@@ -455,6 +455,8 @@ extension FileStream {
   ///     The default is `nil`.
   ///
   /// Call this method before reading or writing the stream.
+  /// With a buffer smaller than 128 bytes, glibc sends some writes,
+  /// the stream's first among them, straight to the file descriptor.
   ///
   /// The corresponding C function is `setvbuf`.
   @_alwaysEmitIntoClient

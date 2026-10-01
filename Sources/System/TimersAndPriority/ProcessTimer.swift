@@ -232,6 +232,8 @@ extension ProcessTimer {
   /// - Returns: The timer's schedule before this call.
   ///
   /// The system can round the times up to its timer's resolution.
+  /// Linux adds a scheduler tick, 1 to 10 ms,
+  /// to the ``virtual`` and ``profiling`` timers' next expiration.
   ///
   /// The corresponding C function is `setitimer`.
   @_alwaysEmitIntoClient

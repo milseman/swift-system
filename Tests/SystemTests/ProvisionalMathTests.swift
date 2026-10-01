@@ -39,7 +39,8 @@ private struct ProvisionalMathTests {
     #expect(abs(Math.atan2(1.0, -1.0) - 3 * Double.pi / 4) < 1e-15)
     #expect(Math.pow(2.0, 10.0) == 1024 && Math.pow(Float(2), 10) == 1024)
     #expect(Math.exp2(10.0) == 1024 && Math.log2(1024.0) == 10 && Math.log10(1000.0) == 3)
-    #expect(Math.hypot(3.0, 4.0) == 5 && Math.cbrt(-27.0) == -3)
+    // glibc's cbrt isn't correctly rounded.
+    #expect(Math.hypot(3.0, 4.0) == 5 && abs(Math.cbrt(-27.0) + 3) < 1e-15)
     #expect(Math.expm1(0.0) == 0 && Math.log1p(0.0) == 0 && Math.exp(0.0) == 1 && Math.log(1.0) == 0)
     #expect(Math.acosh(1.0) == 0 && Math.asinh(0.0) == 0 && Math.atanh(0.0) == 0)
     #expect(Math.sinh(0.0) == 0 && Math.cosh(0.0) == 1 && Math.tanh(0.0) == 0)

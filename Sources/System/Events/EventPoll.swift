@@ -30,6 +30,13 @@ import Android
 extension CInterop {
   /// The C `epoll_event` type, which describes an event
   /// that an epoll instance watches for or reports.
+  ///
+  /// glibc's Swift module doesn't include `<sys/epoll.h>`,
+  /// so the type comes from CSystem, System's own C module,
+  /// which a client can't import;
+  /// under MemberImportVisibility, its C fields and initializer need it.
+  /// ``EventPoll/Event``, whose one stored property is this type,
+  /// reads and writes them.
   public typealias EPollEvent = epoll_event
 }
 

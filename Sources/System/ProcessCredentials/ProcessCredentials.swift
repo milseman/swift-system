@@ -100,6 +100,8 @@ extension GroupID {
   ///
   /// These are the groups that
   /// ``UserID/setSupplementary(forUser:including:)`` sets.
+  /// Darwin's list has the user's primary group whatever `group` is;
+  /// glibc's has it only if the group database lists the user in it.
   /// A user that the group database doesn't know
   /// is in no groups but `group`.
   /// Darwin also lists `(gid_t)-1` for such a user,
