@@ -38,3 +38,8 @@ __time64_t _time64(__time64_t *_Time);
 
 // io.h
 int _isatty(int _FileHandle);
+
+// direct.h. wchar_t is 16 bits on Windows, and 32 on macOS, so the model
+// spells it as WinSDK.h's WCHAR.
+unsigned short *_wgetcwd(unsigned short *_DstBuf, int _SizeInWords);
+int _wchdir(const unsigned short *_Path);

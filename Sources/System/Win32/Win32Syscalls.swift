@@ -527,4 +527,50 @@ internal func system_SetConsoleCtrlHandler(_ HandlerRoutine: PHANDLER_ROUTINE?, 
   SetConsoleCtrlHandler(HandlerRoutine, Add)
 }
 
+// MARK: - Directories and paths
+
+internal func system__wgetcwd(
+  _ buffer: UnsafeMutablePointer<WCHAR>, _ size: CInt
+) -> UnsafeMutablePointer<WCHAR>? {
+#if ENABLE_MOCKING
+  if mockingEnabled {
+    guard _mock(buffer, size) == 0 else { return nil }
+    buffer.initialize(to: 0)
+    return buffer
+  }
+#endif
+  return _wgetcwd(buffer, size)
+}
+
+internal func system__wchdir(_ path: UnsafePointer<WCHAR>) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(path: path) }
+#endif
+  return _wchdir(path)
+}
+
+internal func system_GetModuleFileNameW(
+  _ hModule: HMODULE?, _ lpFilename: UnsafeMutablePointer<WCHAR>, _ nSize: DWORD
+) -> DWORD {
+  GetModuleFileNameW(hModule, lpFilename, nSize)
+}
+
+internal func system_GetTempPathW(
+  _ nBufferLength: DWORD, _ lpBuffer: UnsafeMutablePointer<WCHAR>
+) -> DWORD {
+  GetTempPathW(nBufferLength, lpBuffer)
+}
+
+internal func system_GetWindowsDirectoryW(
+  _ lpBuffer: UnsafeMutablePointer<WCHAR>, _ uSize: UINT
+) -> UINT {
+  GetWindowsDirectoryW(lpBuffer, uSize)
+}
+
+internal func system_GetSystemDirectoryW(
+  _ lpBuffer: UnsafeMutablePointer<WCHAR>, _ uSize: UINT
+) -> UINT {
+  GetSystemDirectoryW(lpBuffer, uSize)
+}
+
 #endif // os(Windows)

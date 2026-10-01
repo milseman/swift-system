@@ -14,10 +14,10 @@ The windows-2 lane (sections 11 on, base system-next at `4365f83`) applies patch
 adds API for the adopters' top Windows gaps of section 8, in its order, checked the same way.
 
 **Resume here:** windows-api's parts are done (sections 1 to 10). windows-2: P1 and P2 are applied (section 11);
-processes (sections 12 and 13), clocks and sleeping (14), SRW locks and condition variables (15), and consoles and
-standard handles (16) are done. Next: well-known directories, the fifth gap, then the rest of section 8's gaps in
-order. Findings and patches for other lanes' files are the last two sections; patch P3 (the CMake source list)
-grows with each new file.
+processes (sections 12 and 13), clocks and sleeping (14), SRW locks and condition variables (15), consoles and
+standard handles (16), and well-known directories (17) are done. Next: dynamic loading, the sixth gap, then the
+rest of section 8's gaps in order. Findings and patches for other lanes' files are the last two sections; patch P3
+(the CMake source list) grows with each new file.
 
 ## How it was checked
 
@@ -912,7 +912,7 @@ either way while it's held); `testSharedLock` (two shared holders; no exclusive 
 `testWithLockRethrowsAndReleases`; `testConditionVariableWakesAWaiter`; `testWaitTimesOut` and `testSharedWait`
 (the lock is held again, the same way, after a time-out); `testWakeAll` (three waiters).
 
-## 16. Consoles and standard handles: this commit
+## 16. Consoles and standard handles: `649fcd9`
 
 The fourth gap of section 8. Its files read a standard handle (`GetStdHandle`), ask whether a stream is a
 terminal (`isatty`), measure the console window (`GetConsoleScreenBufferInfo`), change console modes
@@ -972,7 +972,61 @@ A Windows run must check:
   `withStandardHandle` needs, is untested: lend a console's standard output to check it.
 - `testControlHandlers`.
 
-## 17. windows-2: findings
+## 17. Well-known directories: this commit
+
+The fifth gap of section 8. Its files ask for the Windows directory (`GetWindowsDirectoryW`), mostly to reach
+`System32\where.exe`, the executable's path (`GetModuleFileNameW` with no module), the system directory, the
+temporary directory (`GetTempPathW`, `GetTempPath2W`), and the current directory (`GetCurrentDirectoryW`,
+`SetCurrentDirectoryW`, `getcwd`).
+
+What: `PathsWindows.swift`.
+- `FilePath.currentWorkingDirectory()`, and `setCurrentWorkingDirectory(_:retryOnInterrupt:)` for a `FilePath`
+  and for a C string of `CInterop.PlatformChar`, over the UCRT's `_wgetcwd` and `_wchdir`.
+- `FilePath.temporaryDirectory()`, over `GetTempPath2W` where kernel32 exports it, else `GetTempPathW`.
+- `FilePath.currentExecutable()`, over `GetModuleFileNameW(NULL)`.
+- `Win32.windowsDirectory()` and `Win32.systemDirectory()` (`GetWindowsDirectoryW`, `GetSystemDirectoryW`).
+
+Which API: **System's cross-platform names for the first four, Win32 for the last two.**
+- The current directory, the temporary directory and the executable's path are the same concepts everywhere, and
+  System names them on POSIX (`FilePathOperations.swift`, `UniqueFiles.swift`, and `CurrentExecutable.swift` on
+  Darwin), so Windows gets the same names and signatures: `throws(Errno)` for the working directory, and no
+  `throws` for the other two, as on POSIX. The working directory uses the UCRT's POSIX-shaped calls, which report
+  `errno` as the signature does, and which also record the drive's current directory in the `=C:` variable that
+  drive-relative paths resolve against; `SetCurrentDirectoryW` alone doesn't.
+- `FilePath.setCurrentWorkingDirectory(_:)` for a `FileDescriptor` (`fchdir`) isn't there: Windows can't set the
+  current directory from a handle, and resolving the handle's path first would fake it.
+- The Windows and system directories are Windows concepts, so they're Win32 API.
+
+Design calls, with the alternatives rejected:
+- **The non-throwing pair keeps the POSIX signature** and documents its fallbacks: `temporaryDirectory()` falls back
+  to the Windows directory, then `.`, and `currentExecutable()` to an empty path, where Windows documents no
+  failure. Rejected: throwing on Windows only, which cross-platform callers would have to `try` with a warning
+  elsewhere.
+- **`GetTempPath2W` is looked up at run time**, as `NtQueryInformationFile` is: linking it would stop System from
+  loading on Windows 10. It gives a process running as SYSTEM `SystemTemp`, which other accounts can't reach;
+  otherwise it's `GetTempPathW`'s answer.
+- **`retryOnInterrupt` stays**, as on the other platforms' signatures and the `FileDescriptor` operations on
+  Windows; Windows doesn't interrupt the call.
+- **The paths come back as Windows gives them**: a short (8.3) name or a `\\?\` prefix the process was created
+  with stays.
+- The two Win32 calls share an internal helper for Win32's "the size you need" convention, with `finalPath`'s.
+
+Tests: `Win32PathsTests`, which changes the process's working directory and restores it, and a mock test of the
+`_wchdir` call.
+
+A Windows run must check:
+- `testCurrentWorkingDirectory`: the directory matches `GetCurrentDirectoryW`, before and after a change; a
+  relative path resolves in the new directory; the C-string overload restores it.
+- `testSettingAMissingWorkingDirectoryFails`: `ENOENT`, and the directory is unchanged.
+- `testSettingTheWorkingDirectoryCallsTheCRuntime` (mock).
+- `testTemporaryDirectory`: an existing directory, `GetTempPathW`'s unless the process runs as SYSTEM.
+  `GetTempPathW` returns a trailing backslash, which `FilePath` drops; the comparison relies on both sides
+  dropping it alike.
+- `testCurrentExecutable`: matches `GetModuleFileNameW`, and is a file.
+- `testWindowsAndSystemDirectories`: the Windows directory is `SystemRoot`, and the system directory is its
+  `System32`, ignoring case.
+
+## 18. windows-2: findings
 
 - **The PlatformEnum samples' Windows arms now reach System's `Win32.ProcessHandle`** (the stand-ins compile only
   with `SIMULATE_PLATFORMS`), and differ from it: `Platform.Process` reads `processID` as a property, where
@@ -989,7 +1043,7 @@ A Windows run must check:
   available for a noncopyable wrapped type in Swift 6.2, and a closure that captures a partially consumed struct
   is "used after consume" even when it touches only a field that wasn't consumed.
 
-## 18. windows-2: patches for files outside the lane
+## 19. windows-2: patches for files outside the lane
 
 **P3, `Sources/System/CMakeLists.txt`: list the lane's new sources.** CI's CMake job fails when a SwiftPM source is
 missing from the list. Kept current with each commit; it applies to this branch with `git apply`.
@@ -997,15 +1051,16 @@ missing from the list. Kept current with each commit; it applies to this branch 
 ```diff
 --- a/Sources/System/CMakeLists.txt
 +++ b/Sources/System/CMakeLists.txt
-@@ -355,5 +355,7 @@
+@@ -355,5 +355,8 @@
    VectoredIO/VectoredIO.swift)
  target_sources(SystemPackage PRIVATE
++  Win32/PathsWindows.swift
 +  Win32/ProcessIDWindows.swift
    Win32/Win32.swift
 +  Win32/Win32Console.swift
    Win32/Win32Constants.swift
    Win32/Win32Error.swift
-@@ -366,7 +368,13 @@
+@@ -366,7 +369,13 @@
    Win32/Win32Locking.swift
    Win32/Win32Open.swift
 +  Win32/Win32Process.swift

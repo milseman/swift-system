@@ -656,3 +656,11 @@ BOOL SetConsoleMode(HANDLE hConsoleHandle, DWORD dwMode);
 BOOL GetConsoleScreenBufferInfo(HANDLE hConsoleOutput,
                                 PCONSOLE_SCREEN_BUFFER_INFO lpConsoleScreenBufferInfo);
 BOOL SetConsoleCtrlHandler(PHANDLER_ROUTINE HandlerRoutine, BOOL Add);
+
+// libloaderapi.h, fileapi.h, sysinfoapi.h, processenv.h: well-known paths
+
+DWORD GetModuleFileNameW(HMODULE hModule, LPWSTR lpFilename, DWORD nSize);
+DWORD GetTempPathW(DWORD nBufferLength, LPWSTR lpBuffer);
+UINT GetWindowsDirectoryW(LPWSTR lpBuffer, UINT uSize);
+UINT GetSystemDirectoryW(LPWSTR lpBuffer, UINT uSize);
+DWORD GetCurrentDirectoryW(DWORD nBufferLength, LPWSTR lpBuffer);
