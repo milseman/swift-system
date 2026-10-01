@@ -853,12 +853,7 @@ internal func _withCanonicalizedPath<Success>(
 /// and Windows treats such a code as an `HRESULT` wherever it expects a
 /// system error code.
 internal func _win32Error(fromHRESULT result: HRESULT) -> DWORD {
-  let bits = DWORD(bitPattern: result)
-  // HRESULT_FACILITY: bits 16 through 28.
-  if (bits >> 16) & 0x1FFF == _FACILITY_WIN32 {
-    return bits & 0xFFFF
-  }
-  return bits
+  Win32.HResult(rawValue: result).win32Error?.rawValue ?? DWORD(bitPattern: result)
 }
 
 #endif // os(Windows)

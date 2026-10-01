@@ -16,8 +16,8 @@ adds API for the adopters' top Windows gaps of section 8, in its order, checked 
 
 **Resume here:** windows-api's parts are done (sections 1 to 10), and so are windows-2's (11 to 22: P1 and P2,
 then section 8's gaps from processes to file information). windows-3, in progress: long paths (section 23,
-`315f25b`) and threads (24, the last commit).
-- **Next**: the rest of section 8's list, in order: `Win32.HResult`; path operations (create, remove, rename, copy, link, and the
+`315f25b`), threads (24, `054e9e2`), and `HRESULT` (25, the last commit).
+- **Next**: the rest of section 8's list, in order: path operations (create, remove, rename, copy, link, and the
   POSIX-semantics delete and rename dispositions); overlapped I/O; system information; Winsock, last (design only
   if time runs short, since the decisions triage gives Winsock a Windows-only module of its own).
 - **Then, left within done gaps**: a Windows `BrokenDownTime` over the UCRT's time functions (14); a Windows
@@ -1320,7 +1320,7 @@ A Windows run must check:
 - Not covered: a long-path-aware process, network shares and mapped drives, drive-relative paths (`D:file`), and
   `fullPath(of:)` of an empty path.
 
-## 24. windows-3: threads: this commit
+## 24. windows-3: threads: `054e9e2`
 
 The tenth gap of section 8, the first of its last group. NIO starts its threads with `_beginthreadex`, names them
 (`SetThreadDescription`, `GetThreadDescription`), and keeps its thread-specific values in fiber-local storage
@@ -1391,7 +1391,58 @@ A Windows run must check:
   another thread that's still running.
 - Not covered: running out of FLS indexes, fibers, and a thread that ends through `ExitThread`.
 
-## 25. windows-3: findings
+## 25. windows-3: HRESULT: this commit
+
+The next gap of section 8, and SYS-0010's future direction. swift-foundation, swift-build and swift-subprocess
+each define `SUCCEEDED`, `HRESULT_CODE`, `HRESULT_FACILITY` and `WIN32_FROM_HRESULT` for themselves, Foundation's
+and swift-build's with the conversions P2 fixed in System (`DWORD(hr)` traps on a failure, and their
+`HRESULT_FACILITY` shifts left); they compare results with `S_OK`; SwiftPM and swift-build test `SHGetKnownFolderPath`'s
+result with their own `SUCCEEDED`; and swift-subprocess's `WindowsError` has a case for an `HRESULT`.
+
+What: `Win32HResult.swift`: `Win32.HResult`, a `@frozen` struct over `HRESULT` (`RawRepresentable`,
+`Swift.Error`, `Sendable`, `Hashable`, `Codable`), with:
+- `init(rawValue:)`, `init(_:)`, and `init(win32Error:)` (`HRESULT_FROM_WIN32`);
+- `isSuccess` and `isFailure` (`SUCCEEDED`, `FAILED`), `facility` and `code` (`HRESULT_FACILITY`,
+  `HRESULT_CODE`), and `win32Error`, the Win32 code of a failure in `FACILITY_WIN32`, as SYS-0010 sketches it;
+- `ok` and `false` (`S_OK`, `S_FALSE`), and the ten failures of Microsoft's "Common HRESULT values":
+  `aborted`, `accessDenied`, `unspecifiedFailure`, `invalidHandle`, `invalidArgument`, `noInterface`,
+  `notImplemented`, `outOfMemory`, `invalidPointer` and `unexpectedFailure`;
+- `description`, the system's message (`FormatMessageW`), and `debugDescription`, such as
+  `E_ACCESSDENIED (0x80070005)`, or `HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND) (0x80070002)` for a Win32 code
+  that `Win32.Error` names.
+
+System's internal conversion of a failed `HRESULT` to a `Win32.Error` (`_win32Error(fromHRESULT:)`, for
+`PathAllocCanonicalize` and the thread names) now goes through `win32Error`; its results are unchanged.
+
+Design calls, with the alternatives rejected:
+- **System's API keeps throwing `Win32.Error`**, as SYS-0010 has it, where a function it wraps returns an
+  `HRESULT`: one error type for the namespace. `HResult` is for the functions System doesn't wrap, the Shell's and
+  COM's, so it conforms to `Swift.Error` for code that throws what such a function returns, as swift-subprocess's
+  error type holds one. Rejected: throwing `HResult` from System's `HRESULT`-returning wrappers, which would give
+  callers two error types to catch from one namespace.
+- **No `~=` for untyped catches**, unlike `Win32.Error`'s: `HResult` names `accessDenied` and `invalidHandle` as
+  `Win32.Error` does, and a second disfavored operator would make `catch .accessDenied` depend on overload ranking
+  again (section 1). A typed catch matches through `Equatable`; an untyped one casts.
+- **The codes are literals**, as `Win32.Error`'s are, and here must be: Swift imports no failure code from
+  `winerror.h`, which spells them through `_HRESULT_TYPEDEF_`, a function-like macro, and a negative `HRESULT`'s
+  literal overflows even when cast directly (checked on macOS with the SDK's spelling). Only `S_OK` and `S_FALSE`
+  import, so the tests check the others against `winerror.h`'s values and the Win32 codes they carry.
+- **`facility` and `code` are `UInt16`**, the widths of the 13- and 16-bit fields, rather than a `Facility` type
+  with names; `win32Error` covers the one facility the adopters test.
+- **Names**: Swift names for the C ones (`unspecifiedFailure` for `E_FAIL`, `invalidPointer` for `E_POINTER`);
+  `false` is `S_FALSE`'s, a success that means "no", spelled with backticks where it's declared.
+- **`init(win32Error:)` is `HRESULT_FROM_WIN32`'s rule**: `success` becomes `ok`, and a code with bit 31 set, such
+  as System's `incompleteTransfer`, stays as it is, which is why SYS-0010 gives System's codes that bit.
+
+Tests: `Win32HResultTests`.
+
+A Windows run must check: `testConstantsMatchTheSDK` (`S_OK` and `S_FALSE` against the SDK, the rest against
+their values, and `E_OUTOFMEMORY`'s Win32 code against `ERROR_OUTOFMEMORY`); `testParts`; `testFromWin32Errors`;
+`testDescriptions`, where `E_ACCESSDENIED`'s system message is `ERROR_ACCESS_DENIED`'s, which relies on
+`FormatMessageW` resolving an `HRESULT` in `FACILITY_WIN32`, and a customer code (bit 29) has none;
+`testTypedThrows`; and `testWin32ErrorsFromHRESULTs`.
+
+## 26. windows-3: findings
 
 - **`FileDescriptor`'s Windows canonicalization doesn't cover `CreateDirectoryW`'s limit** (P4).
   `withCanonicalPathRepresentation` passes `PATHCCH_ALLOW_LONG_PATHS`, so the `mkdir` adapter, which
@@ -1401,10 +1452,14 @@ A Windows run must check:
 - **Windows doesn't support the `\\?\` prefix for a current directory**, which Rust's `Command::current_dir` and
   Foundation's `FileManager` both work around: `ProcessHandle.create` gave one to a current directory past
   `MAX_PATH`, and no longer does (section 23).
+- **Swift can't spell `winerror.h`'s failures.** `E_FAIL` and the rest come through `_HRESULT_TYPEDEF_`, a
+  function-like macro, so they don't import, and a negative `HRESULT` cast directly, `((HRESULT)0x80004005)`,
+  imports as an overflowing literal, an error at each use; only `S_OK` and `S_FALSE` work. That's why no adopter
+  uses one, and why `Win32.HResult` names them (section 25).
 - **macOS's CoreFoundation declares `S_OK` and `S_FALSE` too**, so the harness's tests spell `WinSDK.S_OK`; on
   Windows, where XCTest's Foundation is swift-corelibs-foundation, the bare names would do.
 
-## 26. windows-3: patches for files outside the lane
+## 27. windows-3: patches for files outside the lane
 
 **P3, continued: `Sources/System/CMakeLists.txt`.** The Win32 `target_sources` block as it should read with this
 lane's files, which coverage-4 applies with P3. It replaces the block whether or not P3 has landed. Kept current
@@ -1428,6 +1483,7 @@ target_sources(SystemPackage PRIVATE
   Win32/Win32FileInformation.swift
   Win32/Win32FileType.swift
   Win32/Win32FinalPath.swift
+  Win32/Win32HResult.swift
   Win32/Win32HandleOperations.swift
   Win32/Win32Locking.swift
   Win32/Win32LongPaths.swift

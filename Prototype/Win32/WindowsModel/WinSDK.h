@@ -397,9 +397,24 @@ typedef enum PATHCCH_OPTIONS : int {
 HRESULT PathAllocCanonicalize(PCWSTR pszPathIn, ULONG dwFlags, PWSTR *ppszPathOut);
 HRESULT PathCchStripPrefix(PWSTR pszPath, size_t cchPath);
 
-// winerror.h, as the SDK spells them, less the L suffixes.
+// winerror.h, as the SDK spells them, less the L suffixes. Swift imports
+// S_OK and S_FALSE, and none of the failures: the function-like macro is
+// unsupported, and a negative HRESULT's literal overflows.
+#define _HRESULT_TYPEDEF_(_sc) ((HRESULT)_sc)
 #define S_OK ((HRESULT)0)
 #define S_FALSE ((HRESULT)1)
+#define E_NOTIMPL _HRESULT_TYPEDEF_(0x80004001)
+#define E_NOINTERFACE _HRESULT_TYPEDEF_(0x80004002)
+#define E_POINTER _HRESULT_TYPEDEF_(0x80004003)
+#define E_ABORT _HRESULT_TYPEDEF_(0x80004004)
+#define E_FAIL _HRESULT_TYPEDEF_(0x80004005)
+#define E_UNEXPECTED _HRESULT_TYPEDEF_(0x8000FFFF)
+#define E_ACCESSDENIED _HRESULT_TYPEDEF_(0x80070005)
+#define E_HANDLE _HRESULT_TYPEDEF_(0x80070006)
+#define E_OUTOFMEMORY _HRESULT_TYPEDEF_(0x8007000E)
+#define E_INVALIDARG _HRESULT_TYPEDEF_(0x80070057)
+#define FACILITY_NULL 0
+#define ERROR_OUTOFMEMORY 14
 
 // sddl.h
 
