@@ -67,6 +67,20 @@ private struct ClockTests {
   }
 
   @available(System 199, *)
+  @Test func everyClockReadsAsATimeSpec() throws {
+    for (name, clock) in Self.clocks {
+      let reading = try clock.currentTimeSpec()
+      #expect(reading.seconds >= 0, "\(name)")
+      #expect((0..<1_000_000_000).contains(reading.nanoseconds), "\(name)")
+    }
+    let before: CInterop.Time = time(nil)
+    let now = try ClockID.realtime.currentTimeSpec()
+    let after: CInterop.Time = time(nil)
+    #expect(Int64(now.seconds) >= Int64(before))
+    #expect(Int64(now.seconds) <= Int64(after))
+  }
+
+  @available(System 199, *)
   @available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *)
   @Test func realtimeIsTheTimeSinceTheEpoch() throws {
     let before = time(nil)
