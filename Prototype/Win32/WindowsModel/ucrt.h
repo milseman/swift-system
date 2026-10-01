@@ -31,3 +31,15 @@ int _write(int _FileHandle, const void *_Buf, unsigned int _MaxCharCount);
 #define _O_U8TEXT 0x40000
 
 #define _MAX_PATH 260
+
+// time.h
+typedef long long __time64_t;
+__time64_t _time64(__time64_t *_Time);
+
+// io.h
+int _isatty(int _FileHandle);
+
+// direct.h. wchar_t is 16 bits on Windows, and 32 on macOS, so the model
+// spells it as WinSDK.h's WCHAR.
+unsigned short *_wgetcwd(unsigned short *_DstBuf, int _SizeInWords);
+int _wchdir(const unsigned short *_Path);

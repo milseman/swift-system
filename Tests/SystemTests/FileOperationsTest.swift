@@ -355,7 +355,7 @@ final class FileOperationsTest: XCTestCase {
   }
 #endif // !os(WASI)
 
-#if !os(Windows)
+#if !os(Windows) && !os(WASI) // WASI has no dup
   func testAdHocDuplicate2() throws {
     try withTemporaryFilePath(basename: "test") {
       let path = $0.appending("foo2.txt")
@@ -429,7 +429,7 @@ final class FileOperationsTest: XCTestCase {
       }
     }
   }
-#endif // !os(Windows)
+#endif // !os(Windows) && !os(WASI)
 
   func testAdHocOpen() {
     // Ad-hoc test touching a file system.

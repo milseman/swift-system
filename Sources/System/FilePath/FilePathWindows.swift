@@ -479,6 +479,9 @@ extension UnsafePointer where Pointee == CInterop.PlatformChar {
     // of the registry or process setting to enable long paths (but it will also
     // not add the \\?\ prefix required by other functions under these conditions).
     let dwLength: DWORD = GetFullPathNameW(self, 0, nil, nil)
+    guard dwLength > 0 else {
+      throw Errno(rawValue: _mapWindowsErrorToErrno(GetLastError()))
+    }
     return try withUnsafeTemporaryAllocation(of: WCHAR.self, capacity: Int(dwLength)) { pwszFullPath in
       guard (1..<dwLength).contains(GetFullPathNameW(self, DWORD(pwszFullPath.count), pwszFullPath.baseAddress, nil)) else {
         throw Errno(rawValue: _mapWindowsErrorToErrno(GetLastError()))
@@ -512,12 +515,12 @@ extension UnsafePointer where Pointee == CInterop.PlatformChar {
 
 @inline(__always)
 fileprivate func HRESULT_CODE(_ hr: HRESULT) -> DWORD {
-    DWORD(hr) & 0xffff
+    DWORD(bitPattern: hr) & 0xffff
 }
 
 @inline(__always)
 fileprivate func HRESULT_FACILITY(_ hr: HRESULT) -> DWORD {
-    DWORD(hr >> 16) & 0x1fff
+    (DWORD(bitPattern: hr) >> 16) & 0x1fff
 }
 
 @inline(__always)
@@ -533,6 +536,6 @@ fileprivate func WIN32_FROM_HRESULT(_ hr: HRESULT) -> DWORD {
     if HRESULT_FACILITY(hr) == FACILITY_WIN32 {
         return HRESULT_CODE(hr)
     }
-    return DWORD(hr)
+    return DWORD(bitPattern: hr)
 }
 #endif

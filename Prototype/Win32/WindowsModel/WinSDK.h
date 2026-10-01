@@ -409,3 +409,258 @@ typedef enum _FILE_INFORMATION_CLASS : int {
 
 #define FILE_SYNCHRONOUS_IO_ALERT 0x00000010
 #define FILE_SYNCHRONOUS_IO_NONALERT 0x00000020
+
+// processthreadsapi.h, synchapi.h, winbase.h, winnt.h: processes and waiting
+
+#define PROCESS_TERMINATE 0x0001
+#define PROCESS_CREATE_THREAD 0x0002
+#define PROCESS_VM_OPERATION 0x0008
+#define PROCESS_VM_READ 0x0010
+#define PROCESS_VM_WRITE 0x0020
+#define PROCESS_DUP_HANDLE 0x0040
+#define PROCESS_CREATE_PROCESS 0x0080
+#define PROCESS_SET_QUOTA 0x0100
+#define PROCESS_SET_INFORMATION 0x0200
+#define PROCESS_QUERY_INFORMATION 0x0400
+#define PROCESS_SUSPEND_RESUME 0x0800
+#define PROCESS_QUERY_LIMITED_INFORMATION 0x1000
+#define PROCESS_SET_LIMITED_INFORMATION 0x2000
+#define STANDARD_RIGHTS_REQUIRED 0x000F0000
+#define PROCESS_ALL_ACCESS (STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | 0xFFFF)
+
+// As the SDK spells them, casts and all, less the L suffixes.
+#define STATUS_WAIT_0 ((DWORD)0x00000000)
+#define STATUS_ABANDONED_WAIT_0 ((DWORD)0x00000080)
+#define STATUS_PENDING ((DWORD)0x00000103)
+#define WAIT_OBJECT_0 ((STATUS_WAIT_0) + 0)
+#define WAIT_ABANDONED ((STATUS_ABANDONED_WAIT_0) + 0)
+#define WAIT_TIMEOUT 258
+#define WAIT_FAILED ((DWORD)0xFFFFFFFF)
+#define STILL_ACTIVE STATUS_PENDING
+
+#define CREATE_SUSPENDED 0x00000004
+#define CREATE_NO_WINDOW 0x08000000
+
+typedef BYTE *LPBYTE;
+
+typedef struct _STARTUPINFOW {
+  DWORD cb;
+  LPWSTR lpReserved;
+  LPWSTR lpDesktop;
+  LPWSTR lpTitle;
+  DWORD dwX;
+  DWORD dwY;
+  DWORD dwXSize;
+  DWORD dwYSize;
+  DWORD dwXCountChars;
+  DWORD dwYCountChars;
+  DWORD dwFillAttribute;
+  DWORD dwFlags;
+  WORD wShowWindow;
+  WORD cbReserved2;
+  LPBYTE lpReserved2;
+  HANDLE hStdInput;
+  HANDLE hStdOutput;
+  HANDLE hStdError;
+} STARTUPINFOW, *LPSTARTUPINFOW;
+
+typedef struct _PROCESS_INFORMATION {
+  HANDLE hProcess;
+  HANDLE hThread;
+  DWORD dwProcessId;
+  DWORD dwThreadId;
+} PROCESS_INFORMATION, *PPROCESS_INFORMATION, *LPPROCESS_INFORMATION;
+
+BOOL CreateProcessW(LPCWSTR lpApplicationName, LPWSTR lpCommandLine,
+                    LPSECURITY_ATTRIBUTES lpProcessAttributes,
+                    LPSECURITY_ATTRIBUTES lpThreadAttributes, BOOL bInheritHandles,
+                    DWORD dwCreationFlags, LPVOID lpEnvironment,
+                    LPCWSTR lpCurrentDirectory, LPSTARTUPINFOW lpStartupInfo,
+                    LPPROCESS_INFORMATION lpProcessInformation);
+HANDLE OpenProcess(DWORD dwDesiredAccess, BOOL bInheritHandle, DWORD dwProcessId);
+DWORD GetProcessId(HANDLE Process);
+BOOL GetExitCodeProcess(HANDLE hProcess, LPDWORD lpExitCode);
+BOOL TerminateProcess(HANDLE hProcess, UINT uExitCode);
+DWORD WaitForSingleObject(HANDLE hHandle, DWORD dwMilliseconds);
+
+// processthreadsapi.h, processenv.h, stringapiset.h, winnt.h: threads and
+// creating processes
+
+#define THREAD_TERMINATE 0x0001
+#define THREAD_SUSPEND_RESUME 0x0002
+#define THREAD_GET_CONTEXT 0x0008
+#define THREAD_SET_CONTEXT 0x0010
+#define THREAD_SET_INFORMATION 0x0020
+#define THREAD_QUERY_INFORMATION 0x0040
+#define THREAD_SET_THREAD_TOKEN 0x0080
+#define THREAD_IMPERSONATE 0x0100
+#define THREAD_DIRECT_IMPERSONATION 0x0200
+#define THREAD_SET_LIMITED_INFORMATION 0x0400
+#define THREAD_QUERY_LIMITED_INFORMATION 0x0800
+#define THREAD_RESUME 0x1000
+#define THREAD_ALL_ACCESS (STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | 0xFFFF)
+
+#define DEBUG_PROCESS 0x00000001
+#define DETACHED_PROCESS 0x00000008
+#define CREATE_NEW_CONSOLE 0x00000010
+#define CREATE_NEW_PROCESS_GROUP 0x00000200
+#define CREATE_UNICODE_ENVIRONMENT 0x00000400
+#define EXTENDED_STARTUPINFO_PRESENT 0x00080000
+#define CREATE_BREAKAWAY_FROM_JOB 0x01000000
+#define CREATE_DEFAULT_ERROR_MODE 0x04000000
+#define STARTF_USESTDHANDLES 0x00000100
+
+// As the SDK spells them.
+#define STD_INPUT_HANDLE ((DWORD)-10)
+#define STD_OUTPUT_HANDLE ((DWORD)-11)
+#define STD_ERROR_HANDLE ((DWORD)-12)
+
+#define CSTR_LESS_THAN 1
+#define CSTR_EQUAL 2
+#define CSTR_GREATER_THAN 3
+
+typedef ULONG_PTR SIZE_T, *PSIZE_T;
+typedef const WCHAR *LPCWCH;
+
+struct _PROC_THREAD_ATTRIBUTE_LIST;
+typedef struct _PROC_THREAD_ATTRIBUTE_LIST *PPROC_THREAD_ATTRIBUTE_LIST,
+    *LPPROC_THREAD_ATTRIBUTE_LIST;
+
+typedef struct _STARTUPINFOEXW {
+  STARTUPINFOW StartupInfo;
+  LPPROC_THREAD_ATTRIBUTE_LIST lpAttributeList;
+} STARTUPINFOEXW, *LPSTARTUPINFOEXW;
+
+BOOL InitializeProcThreadAttributeList(LPPROC_THREAD_ATTRIBUTE_LIST lpAttributeList,
+                                       DWORD dwAttributeCount, DWORD dwFlags,
+                                       PSIZE_T lpSize);
+BOOL UpdateProcThreadAttribute(LPPROC_THREAD_ATTRIBUTE_LIST lpAttributeList,
+                               DWORD dwFlags, DWORD_PTR Attribute, PVOID lpValue,
+                               SIZE_T cbSize, PVOID lpPreviousValue,
+                               PSIZE_T lpReturnSize);
+void DeleteProcThreadAttributeList(LPPROC_THREAD_ATTRIBUTE_LIST lpAttributeList);
+HANDLE GetStdHandle(DWORD nStdHandle);
+BOOL SetStdHandle(DWORD nStdHandle, HANDLE hHandle);
+int CompareStringOrdinal(LPCWCH lpString1, int cchCount1, LPCWCH lpString2,
+                         int cchCount2, BOOL bIgnoreCase);
+
+HANDLE GetCurrentThread(void);
+DWORD GetCurrentThreadId(void);
+HANDLE OpenThread(DWORD dwDesiredAccess, BOOL bInheritHandle, DWORD dwThreadId);
+DWORD GetThreadId(HANDLE Thread);
+BOOL GetExitCodeThread(HANDLE hThread, LPDWORD lpExitCode);
+DWORD ResumeThread(HANDLE hThread);
+DWORD SuspendThread(HANDLE hThread);
+
+// processenv.h: environment variables
+
+DWORD GetEnvironmentVariableW(LPCWSTR lpName, LPWSTR lpBuffer, DWORD nSize);
+
+// minwinbase.h, sysinfoapi.h, realtimeapiset.h, profileapi.h, synchapi.h:
+// clocks and sleeping
+
+typedef ULONGLONG *PULONGLONG;
+
+typedef struct _FILETIME {
+  DWORD dwLowDateTime;
+  DWORD dwHighDateTime;
+} FILETIME, *PFILETIME, *LPFILETIME;
+
+void GetSystemTimePreciseAsFileTime(LPFILETIME lpSystemTimeAsFileTime);
+void GetSystemTimeAsFileTime(LPFILETIME lpSystemTimeAsFileTime);
+ULONGLONG GetTickCount64(void);
+void QueryInterruptTimePrecise(PULONGLONG lpInterruptTimePrecise);
+void QueryUnbiasedInterruptTimePrecise(PULONGLONG lpUnbiasedInterruptTimePrecise);
+BOOL QueryPerformanceCounter(LARGE_INTEGER *lpPerformanceCount);
+BOOL QueryPerformanceFrequency(LARGE_INTEGER *lpFrequency);
+void Sleep(DWORD dwMilliseconds);
+
+// synchapi.h, winnt.h: SRW locks and condition variables
+
+typedef struct _RTL_SRWLOCK {
+  PVOID Ptr;
+} RTL_SRWLOCK, *PRTL_SRWLOCK;
+typedef RTL_SRWLOCK SRWLOCK, *PSRWLOCK;
+
+typedef struct _RTL_CONDITION_VARIABLE {
+  PVOID Ptr;
+} RTL_CONDITION_VARIABLE, *PRTL_CONDITION_VARIABLE;
+typedef RTL_CONDITION_VARIABLE CONDITION_VARIABLE, *PCONDITION_VARIABLE;
+
+#define CONDITION_VARIABLE_LOCKMODE_SHARED 0x1
+#define ERROR_TIMEOUT 1460
+
+void InitializeSRWLock(PSRWLOCK SRWLock);
+void AcquireSRWLockExclusive(PSRWLOCK SRWLock);
+void AcquireSRWLockShared(PSRWLOCK SRWLock);
+BOOLEAN TryAcquireSRWLockExclusive(PSRWLOCK SRWLock);
+BOOLEAN TryAcquireSRWLockShared(PSRWLOCK SRWLock);
+void ReleaseSRWLockExclusive(PSRWLOCK SRWLock);
+void ReleaseSRWLockShared(PSRWLOCK SRWLock);
+void InitializeConditionVariable(PCONDITION_VARIABLE ConditionVariable);
+BOOL SleepConditionVariableSRW(PCONDITION_VARIABLE ConditionVariable, PSRWLOCK SRWLock,
+                               DWORD dwMilliseconds, ULONG Flags);
+void WakeConditionVariable(PCONDITION_VARIABLE ConditionVariable);
+void WakeAllConditionVariable(PCONDITION_VARIABLE ConditionVariable);
+
+// consoleapi.h, consoleapi2.h, wincon.h: consoles
+
+typedef short SHORT;
+
+typedef struct _COORD {
+  SHORT X;
+  SHORT Y;
+} COORD, *PCOORD;
+
+typedef struct _SMALL_RECT {
+  SHORT Left;
+  SHORT Top;
+  SHORT Right;
+  SHORT Bottom;
+} SMALL_RECT, *PSMALL_RECT;
+
+typedef struct _CONSOLE_SCREEN_BUFFER_INFO {
+  COORD dwSize;
+  COORD dwCursorPosition;
+  WORD wAttributes;
+  SMALL_RECT srWindow;
+  COORD dwMaximumWindowSize;
+} CONSOLE_SCREEN_BUFFER_INFO, *PCONSOLE_SCREEN_BUFFER_INFO;
+
+typedef BOOL (*PHANDLER_ROUTINE)(DWORD CtrlType);
+
+#define ENABLE_PROCESSED_INPUT 0x0001
+#define ENABLE_LINE_INPUT 0x0002
+#define ENABLE_ECHO_INPUT 0x0004
+#define ENABLE_WINDOW_INPUT 0x0008
+#define ENABLE_MOUSE_INPUT 0x0010
+#define ENABLE_INSERT_MODE 0x0020
+#define ENABLE_QUICK_EDIT_MODE 0x0040
+#define ENABLE_EXTENDED_FLAGS 0x0080
+#define ENABLE_AUTO_POSITION 0x0100
+#define ENABLE_VIRTUAL_TERMINAL_INPUT 0x0200
+#define ENABLE_PROCESSED_OUTPUT 0x0001
+#define ENABLE_WRAP_AT_EOL_OUTPUT 0x0002
+#define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
+#define DISABLE_NEWLINE_AUTO_RETURN 0x0008
+#define ENABLE_LVB_GRID_WORLDWIDE 0x0010
+
+#define CTRL_C_EVENT 0
+#define CTRL_BREAK_EVENT 1
+#define CTRL_CLOSE_EVENT 2
+#define CTRL_LOGOFF_EVENT 5
+#define CTRL_SHUTDOWN_EVENT 6
+
+BOOL GetConsoleMode(HANDLE hConsoleHandle, LPDWORD lpMode);
+BOOL SetConsoleMode(HANDLE hConsoleHandle, DWORD dwMode);
+BOOL GetConsoleScreenBufferInfo(HANDLE hConsoleOutput,
+                                PCONSOLE_SCREEN_BUFFER_INFO lpConsoleScreenBufferInfo);
+BOOL SetConsoleCtrlHandler(PHANDLER_ROUTINE HandlerRoutine, BOOL Add);
+
+// libloaderapi.h, fileapi.h, sysinfoapi.h, processenv.h: well-known paths
+
+DWORD GetModuleFileNameW(HMODULE hModule, LPWSTR lpFilename, DWORD nSize);
+DWORD GetTempPathW(DWORD nBufferLength, LPWSTR lpBuffer);
+UINT GetWindowsDirectoryW(LPWSTR lpBuffer, UINT uSize);
+UINT GetSystemDirectoryW(LPWSTR lpBuffer, UINT uSize);
+DWORD GetCurrentDirectoryW(DWORD nBufferLength, LPWSTR lpBuffer);

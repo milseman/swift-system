@@ -33,6 +33,9 @@ import Android
 #error("Unsupported Platform")
 #endif
 
+// wasi-libc's FILE is an incomplete type, which Swift doesn't import, so
+// WASI has no CInterop.File, and a stream's rawValue is an OpaquePointer.
+#if !os(WASI)
 @available(System 199, *)
 extension CInterop {
   /// The state of a C standard I/O stream.
@@ -42,6 +45,7 @@ extension CInterop {
   /// - Note: Provisional: C standard I/O may move to the Swift standard library.
   public typealias File = FILE
 }
+#endif
 
 /// A C standard I/O stream: a buffered stream of bytes over a file descriptor.
 ///
@@ -69,6 +73,18 @@ extension CInterop {
 @frozen
 @available(System 199, *)
 public struct FileStream: RawRepresentable, Hashable, @unchecked Sendable {
+  #if os(WASI)
+  /// The C stream.
+  ///
+  /// WASI's `FILE` is an incomplete type,
+  /// so Swift imports a pointer to one as `OpaquePointer`.
+  @_alwaysEmitIntoClient
+  public var rawValue: OpaquePointer
+
+  /// Creates a stream from a C stream.
+  @_alwaysEmitIntoClient
+  public init(rawValue: OpaquePointer) { self.rawValue = rawValue }
+  #else
   /// The C stream.
   @_alwaysEmitIntoClient
   public var rawValue: UnsafeMutablePointer<CInterop.File>
@@ -76,6 +92,7 @@ public struct FileStream: RawRepresentable, Hashable, @unchecked Sendable {
   /// Creates a stream from a C stream.
   @_alwaysEmitIntoClient
   public init(rawValue: UnsafeMutablePointer<CInterop.File>) { self.rawValue = rawValue }
+  #endif
 }
 
 // MARK: - The standard streams
@@ -364,6 +381,17 @@ extension FileStream {
     try _flush(nil).get()
   }
 
+  #if os(WASI)
+  @usableFromInline
+  internal static func _flush(_ stream: OpaquePointer?) -> Result<(), Errno> {
+    nothingOrErrno(retryOnInterrupt: false) { system_fflush(stream) }
+  }
+
+  @usableFromInline
+  internal func _flush(_ stream: OpaquePointer) -> Result<(), Errno> {
+    FileStream._flush(stream)
+  }
+  #else
   @usableFromInline
   internal static func _flush(_ stream: UnsafeMutablePointer<CInterop.File>?) -> Result<(), Errno> {
     nothingOrErrno(retryOnInterrupt: false) { system_fflush(stream) }
@@ -373,6 +401,7 @@ extension FileStream {
   internal func _flush(_ stream: UnsafeMutablePointer<CInterop.File>) -> Result<(), Errno> {
     FileStream._flush(stream)
   }
+  #endif
 
   /// Whether a read or write on the stream has failed,
   /// until ``clearError()``.

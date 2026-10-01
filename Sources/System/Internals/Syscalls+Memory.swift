@@ -15,7 +15,7 @@
 // forced; otherwise it allocates for real, so that the caller can use the
 // block and free it, as system_realpath's mock returns real memory.
 
-#if !os(Windows) && !os(WASI)
+#if !os(Windows)
 
 import CSystem
 #if SYSTEM_PACKAGE_DARWIN
@@ -24,6 +24,8 @@ import Darwin
 import Glibc
 #elseif canImport(Musl)
 import Musl
+#elseif canImport(WASILibc)
+import WASILibc
 #elseif canImport(Android)
 import Android
 #else
@@ -321,4 +323,4 @@ internal func system_explicit_bzero(_ start: UnsafeMutableRawPointer, _ count: I
 }
 #endif
 
-#endif // !os(Windows) && !os(WASI)
+#endif // !os(Windows)

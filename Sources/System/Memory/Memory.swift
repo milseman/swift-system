@@ -7,7 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-#if !os(Windows) && !os(WASI)
+#if !os(Windows)
 
 #if SYSTEM_PACKAGE_DARWIN
 import Darwin
@@ -15,6 +15,8 @@ import Darwin
 import Glibc
 #elseif canImport(Musl)
 import Musl
+#elseif canImport(WASILibc)
+import WASILibc
 #elseif canImport(Android)
 import Android
 #else
@@ -398,6 +400,8 @@ extension Memory {
       Glibc.free(pointer)
       #elseif canImport(Musl)
       Musl.free(pointer)
+      #elseif canImport(WASILibc)
+      WASILibc.free(pointer)
       #elseif canImport(Android)
       Android.free(pointer)
       #endif
@@ -422,4 +426,4 @@ extension Memory {
   }
 }
 
-#endif // !os(Windows) && !os(WASI)
+#endif // !os(Windows)

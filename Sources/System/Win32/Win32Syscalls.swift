@@ -276,4 +276,301 @@ internal func system_GetFinalPathNameByHandleW(
   GetFinalPathNameByHandleW(hFile, lpszFilePath, cchFilePath, dwFlags)
 }
 
+// MARK: - Processes
+
+internal func system_GetCurrentProcessId() -> DWORD {
+  GetCurrentProcessId()
+}
+
+internal func system_OpenProcess(
+  _ dwDesiredAccess: DWORD, _ bInheritHandle: Bool, _ dwProcessId: DWORD
+) -> HANDLE? {
+  OpenProcess(dwDesiredAccess, bInheritHandle, dwProcessId)
+}
+
+internal func system_GetProcessId(_ Process: HANDLE) -> DWORD {
+  GetProcessId(Process)
+}
+
+internal func system_GetExitCodeProcess(
+  _ hProcess: HANDLE, _ lpExitCode: UnsafeMutablePointer<DWORD>
+) -> Bool {
+  GetExitCodeProcess(hProcess, lpExitCode)
+}
+
+internal func system_TerminateProcess(_ hProcess: HANDLE, _ uExitCode: UINT) -> Bool {
+  TerminateProcess(hProcess, uExitCode)
+}
+
+internal func system_WaitForSingleObject(_ hHandle: HANDLE, _ dwMilliseconds: DWORD) -> DWORD {
+  WaitForSingleObject(hHandle, dwMilliseconds)
+}
+
+// MARK: - Threads
+
+internal func system_GetCurrentThread() -> HANDLE {
+  GetCurrentThread()
+}
+
+internal func system_GetCurrentThreadId() -> DWORD {
+  GetCurrentThreadId()
+}
+
+internal func system_OpenThread(
+  _ dwDesiredAccess: DWORD, _ bInheritHandle: Bool, _ dwThreadId: DWORD
+) -> HANDLE? {
+  OpenThread(dwDesiredAccess, bInheritHandle, dwThreadId)
+}
+
+internal func system_GetThreadId(_ Thread: HANDLE) -> DWORD {
+  GetThreadId(Thread)
+}
+
+internal func system_GetExitCodeThread(
+  _ hThread: HANDLE, _ lpExitCode: UnsafeMutablePointer<DWORD>
+) -> Bool {
+  GetExitCodeThread(hThread, lpExitCode)
+}
+
+internal func system_ResumeThread(_ hThread: HANDLE) -> DWORD {
+  ResumeThread(hThread)
+}
+
+internal func system_SuspendThread(_ hThread: HANDLE) -> DWORD {
+  SuspendThread(hThread)
+}
+
+// MARK: - Creating processes
+
+internal func system_CreateProcessW(
+  _ lpApplicationName: UnsafePointer<WCHAR>?,
+  _ lpCommandLine: UnsafeMutablePointer<WCHAR>?,
+  _ lpProcessAttributes: UnsafeMutablePointer<SECURITY_ATTRIBUTES>?,
+  _ lpThreadAttributes: UnsafeMutablePointer<SECURITY_ATTRIBUTES>?,
+  _ bInheritHandles: Bool,
+  _ dwCreationFlags: DWORD,
+  _ lpEnvironment: UnsafeMutableRawPointer?,
+  _ lpCurrentDirectory: UnsafePointer<WCHAR>?,
+  _ lpStartupInfo: UnsafeMutablePointer<STARTUPINFOW>,
+  _ lpProcessInformation: UnsafeMutablePointer<PROCESS_INFORMATION>
+) -> Bool {
+  CreateProcessW(
+    lpApplicationName, lpCommandLine, lpProcessAttributes, lpThreadAttributes,
+    bInheritHandles, dwCreationFlags, lpEnvironment, lpCurrentDirectory, lpStartupInfo,
+    lpProcessInformation)
+}
+
+internal func system_InitializeProcThreadAttributeList(
+  _ lpAttributeList: LPPROC_THREAD_ATTRIBUTE_LIST?,
+  _ dwAttributeCount: DWORD,
+  _ dwFlags: DWORD,
+  _ lpSize: UnsafeMutablePointer<SIZE_T>
+) -> Bool {
+  InitializeProcThreadAttributeList(lpAttributeList, dwAttributeCount, dwFlags, lpSize)
+}
+
+internal func system_UpdateProcThreadAttribute(
+  _ lpAttributeList: LPPROC_THREAD_ATTRIBUTE_LIST,
+  _ dwFlags: DWORD,
+  _ Attribute: DWORD_PTR,
+  _ lpValue: UnsafeMutableRawPointer,
+  _ cbSize: SIZE_T
+) -> Bool {
+  UpdateProcThreadAttribute(lpAttributeList, dwFlags, Attribute, lpValue, cbSize, nil, nil)
+}
+
+internal func system_DeleteProcThreadAttributeList(
+  _ lpAttributeList: LPPROC_THREAD_ATTRIBUTE_LIST
+) {
+  DeleteProcThreadAttributeList(lpAttributeList)
+}
+
+internal func system_GetStdHandle(_ nStdHandle: DWORD) -> HANDLE? {
+  GetStdHandle(nStdHandle)
+}
+
+internal func system_CompareStringOrdinal(
+  _ lpString1: UnsafePointer<WCHAR>,
+  _ cchCount1: CInt,
+  _ lpString2: UnsafePointer<WCHAR>,
+  _ cchCount2: CInt,
+  _ bIgnoreCase: Bool
+) -> CInt {
+  CompareStringOrdinal(lpString1, cchCount1, lpString2, cchCount2, bIgnoreCase)
+}
+
+// MARK: - Clocks and sleeping
+
+internal func system_GetSystemTimePreciseAsFileTime(
+  _ lpSystemTimeAsFileTime: UnsafeMutablePointer<FILETIME>
+) {
+  GetSystemTimePreciseAsFileTime(lpSystemTimeAsFileTime)
+}
+
+internal func system_GetSystemTimeAsFileTime(
+  _ lpSystemTimeAsFileTime: UnsafeMutablePointer<FILETIME>
+) {
+  GetSystemTimeAsFileTime(lpSystemTimeAsFileTime)
+}
+
+internal func system_GetTickCount64() -> ULONGLONG {
+  GetTickCount64()
+}
+
+internal func system_QueryInterruptTimePrecise(
+  _ lpInterruptTimePrecise: UnsafeMutablePointer<ULONGLONG>
+) {
+  QueryInterruptTimePrecise(lpInterruptTimePrecise)
+}
+
+internal func system_QueryUnbiasedInterruptTimePrecise(
+  _ lpUnbiasedInterruptTimePrecise: UnsafeMutablePointer<ULONGLONG>
+) {
+  QueryUnbiasedInterruptTimePrecise(lpUnbiasedInterruptTimePrecise)
+}
+
+internal func system_QueryPerformanceCounter(
+  _ lpPerformanceCount: UnsafeMutablePointer<LARGE_INTEGER>
+) -> Bool {
+  QueryPerformanceCounter(lpPerformanceCount)
+}
+
+internal func system_QueryPerformanceFrequency(
+  _ lpFrequency: UnsafeMutablePointer<LARGE_INTEGER>
+) -> Bool {
+  QueryPerformanceFrequency(lpFrequency)
+}
+
+internal func system_Sleep(_ dwMilliseconds: DWORD) {
+  Sleep(dwMilliseconds)
+}
+
+// MARK: - Locks and condition variables
+
+internal func system_InitializeSRWLock(_ SRWLock: UnsafeMutablePointer<SRWLOCK>) {
+  InitializeSRWLock(SRWLock)
+}
+
+internal func system_AcquireSRWLockExclusive(_ SRWLock: UnsafeMutablePointer<SRWLOCK>) {
+  AcquireSRWLockExclusive(SRWLock)
+}
+
+internal func system_AcquireSRWLockShared(_ SRWLock: UnsafeMutablePointer<SRWLOCK>) {
+  AcquireSRWLockShared(SRWLock)
+}
+
+internal func system_TryAcquireSRWLockExclusive(
+  _ SRWLock: UnsafeMutablePointer<SRWLOCK>
+) -> BOOLEAN {
+  TryAcquireSRWLockExclusive(SRWLock)
+}
+
+internal func system_TryAcquireSRWLockShared(_ SRWLock: UnsafeMutablePointer<SRWLOCK>) -> BOOLEAN {
+  TryAcquireSRWLockShared(SRWLock)
+}
+
+internal func system_ReleaseSRWLockExclusive(_ SRWLock: UnsafeMutablePointer<SRWLOCK>) {
+  ReleaseSRWLockExclusive(SRWLock)
+}
+
+internal func system_ReleaseSRWLockShared(_ SRWLock: UnsafeMutablePointer<SRWLOCK>) {
+  ReleaseSRWLockShared(SRWLock)
+}
+
+internal func system_InitializeConditionVariable(
+  _ ConditionVariable: UnsafeMutablePointer<CONDITION_VARIABLE>
+) {
+  InitializeConditionVariable(ConditionVariable)
+}
+
+internal func system_SleepConditionVariableSRW(
+  _ ConditionVariable: UnsafeMutablePointer<CONDITION_VARIABLE>,
+  _ SRWLock: UnsafeMutablePointer<SRWLOCK>,
+  _ dwMilliseconds: DWORD,
+  _ Flags: ULONG
+) -> Bool {
+  SleepConditionVariableSRW(ConditionVariable, SRWLock, dwMilliseconds, Flags)
+}
+
+internal func system_WakeConditionVariable(
+  _ ConditionVariable: UnsafeMutablePointer<CONDITION_VARIABLE>
+) {
+  WakeConditionVariable(ConditionVariable)
+}
+
+internal func system_WakeAllConditionVariable(
+  _ ConditionVariable: UnsafeMutablePointer<CONDITION_VARIABLE>
+) {
+  WakeAllConditionVariable(ConditionVariable)
+}
+
+// MARK: - Consoles
+
+internal func system_GetConsoleMode(
+  _ hConsoleHandle: HANDLE, _ lpMode: UnsafeMutablePointer<DWORD>
+) -> Bool {
+  GetConsoleMode(hConsoleHandle, lpMode)
+}
+
+internal func system_SetConsoleMode(_ hConsoleHandle: HANDLE, _ dwMode: DWORD) -> Bool {
+  SetConsoleMode(hConsoleHandle, dwMode)
+}
+
+internal func system_GetConsoleScreenBufferInfo(
+  _ hConsoleOutput: HANDLE,
+  _ lpConsoleScreenBufferInfo: UnsafeMutablePointer<CONSOLE_SCREEN_BUFFER_INFO>
+) -> Bool {
+  GetConsoleScreenBufferInfo(hConsoleOutput, lpConsoleScreenBufferInfo)
+}
+
+internal func system_SetConsoleCtrlHandler(_ HandlerRoutine: PHANDLER_ROUTINE?, _ Add: Bool) -> Bool {
+  SetConsoleCtrlHandler(HandlerRoutine, Add)
+}
+
+// MARK: - Directories and paths
+
+internal func system__wgetcwd(
+  _ buffer: UnsafeMutablePointer<WCHAR>, _ size: CInt
+) -> UnsafeMutablePointer<WCHAR>? {
+#if ENABLE_MOCKING
+  if mockingEnabled {
+    guard _mock(buffer, size) == 0 else { return nil }
+    buffer.initialize(to: 0)
+    return buffer
+  }
+#endif
+  return _wgetcwd(buffer, size)
+}
+
+internal func system__wchdir(_ path: UnsafePointer<WCHAR>) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(path: path) }
+#endif
+  return _wchdir(path)
+}
+
+internal func system_GetModuleFileNameW(
+  _ hModule: HMODULE?, _ lpFilename: UnsafeMutablePointer<WCHAR>, _ nSize: DWORD
+) -> DWORD {
+  GetModuleFileNameW(hModule, lpFilename, nSize)
+}
+
+internal func system_GetTempPathW(
+  _ nBufferLength: DWORD, _ lpBuffer: UnsafeMutablePointer<WCHAR>
+) -> DWORD {
+  GetTempPathW(nBufferLength, lpBuffer)
+}
+
+internal func system_GetWindowsDirectoryW(
+  _ lpBuffer: UnsafeMutablePointer<WCHAR>, _ uSize: UINT
+) -> UINT {
+  GetWindowsDirectoryW(lpBuffer, uSize)
+}
+
+internal func system_GetSystemDirectoryW(
+  _ lpBuffer: UnsafeMutablePointer<WCHAR>, _ uSize: UINT
+) -> UINT {
+  GetSystemDirectoryW(lpBuffer, uSize)
+}
+
 #endif // os(Windows)

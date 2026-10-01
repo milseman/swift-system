@@ -503,7 +503,15 @@ internal func system_pthread_mutexattr_setprotocol(
 internal func system_pthread_mutexattr_setprioceiling(
   _ attributes: UnsafeMutablePointer<_PThreadMutexAttrStorage>, _ ceiling: CInt
 ) -> CInt {
+#if canImport(Musl)
+  // musl declares pthread_mutexattr_setprioceiling but doesn't define it,
+  // so a call wouldn't link, and it doesn't support PTHREAD_PRIO_PROTECT,
+  // the ceiling's protocol. (Its pthread_mutex_setprioceiling fails with
+  // EINVAL, which could serve here too, or the property could go on Musl.)
+  _ENOTSUP
+#else
   pthread_mutexattr_setprioceiling(attributes, ceiling)
+#endif
 }
 #endif
 
