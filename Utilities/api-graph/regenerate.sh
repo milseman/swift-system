@@ -28,6 +28,8 @@
 #   API_GRAPH_ADOPTER_BUILDS    build (default): build a migration whose index
 #                        isn't cached; reuse: any cached index of the commit,
 #                        no builds; none: lexical only
+#   API_GRAPH_ADOPTER_JOBS      how many migrations to build at a time
+#                        (default 4), longest first
 #   API_GRAPH_ADOPTER_VALIDATE  declarations (default): a migration's index
 #                        cached against another System tree is reused if every
 #                        System declaration it names is unchanged; interface:
@@ -36,8 +38,8 @@
 #                        .build/api-graph-cache)
 #   API_GRAPH_BUILDS     the migrations' build directories, kept so that a
 #                        rebuild is incremental (default .build/api-graph-builds,
-#                        several GB each); set it empty for scratch builds,
-#                        deleted once read
+#                        up to about 2 GB each); set it empty for scratch
+#                        builds, deleted once read
 #   API_GRAPH_MIN_FREE_GB  don't start an adopter build with less free disk
 #                        than this (default 15)
 #   API_GRAPH_KEEP_WORK  1 keeps the scratch directory after a successful run
@@ -316,7 +318,8 @@ if [ -n "$ADOPTERS$ECOSYSTEM" ]; then
     --base-scan "$WORK/base/scan.json" --cnames "$WORK/cnames.json" --work "$WORK" --cache "$CACHE"
     --out "$WORK/adopters.json" --symbolgraphs "$DELTA/symbolgraphs/head"
     --branch "${API_GRAPH_ADOPTER_BRANCH:-migrate-darwin}" --builds "${API_GRAPH_ADOPTER_BUILDS:-build}"
-    --validate "${API_GRAPH_ADOPTER_VALIDATE:-declarations}" --min-free-gb "${API_GRAPH_MIN_FREE_GB:-15}")
+    --validate "${API_GRAPH_ADOPTER_VALIDATE:-declarations}" --jobs "${API_GRAPH_ADOPTER_JOBS:-4}"
+    --min-free-gb "${API_GRAPH_MIN_FREE_GB:-15}")
   if [ -n "$BUILDS" ]; then adopters+=(--builds-dir "$BUILDS"); fi
   if [ -n "$ADOPTERS" ]; then adopters+=(--adopters "$ADOPTERS"); fi
   if [ -n "$ECOSYSTEM" ]; then adopters+=(--ecosystem "$ECOSYSTEM"); fi

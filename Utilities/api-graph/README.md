@@ -24,7 +24,7 @@ open .build/api-graph/API-GRAPH.md                                    # the inde
 | `BASE_REF` | `main` | The commit to compare against. |
 | `HEAD_REF` | `system-next` | The commit to map. |
 | `API_GRAPH_OUT` | `.build/api-graph` | The output. Each successful run replaces it. |
-| `API_GRAPH_WORK` | `.build/api-graph-work` | Scratch: both exports, api-delta's run, and the indexed build, about 1.3 GB (and, with `API_GRAPH_BUILDS` empty, one adopter's build at a time, up to 6 GB). It's deleted when the run succeeds, and by the next run when it doesn't. |
+| `API_GRAPH_WORK` | `.build/api-graph-work` | Scratch: both exports, api-delta's run, and the indexed build, about 1.3 GB (and, with `API_GRAPH_BUILDS` empty, one adopter's build at a time, up to about 2 GB). It's deleted when the run succeeds, and by the next run when it doesn't. |
 | `API_GRAPH_KEEP_WORK` | unset | `1` keeps the scratch directory after a successful run. |
 | `API_GRAPH_SNAPSHOTS` | `../api-graph-snapshots` | The snapshot store: one graph per head commit, and an index. It sits beside the repository, so it outlives worktrees. Set it empty to keep only the output's copy. |
 | `API_GRAPH_SNAPSHOT_PREVIOUS` | the store's previous snapshot of the same head ref | A snapshot to diff with, and to check the pitches' changes against. |
@@ -37,9 +37,10 @@ open .build/api-graph/API-GRAPH.md                                    # the inde
 | `API_GRAPH_COVERAGE_RESULTS` | `../coverage-results` | The coverage tools' results store, for the packages' C interfaces. |
 | `API_GRAPH_ADOPTER_BRANCH` | `migrate-darwin` | The migration branch. |
 | `API_GRAPH_ADOPTER_BUILDS` | `build` | `build` builds a migration whose index isn't cached; `reuse` takes any cached index of its commit and builds nothing; `none` matches lexically only. |
+| `API_GRAPH_ADOPTER_JOBS` | `4` | How many migrations are built at a time, longest first by each one's last recorded build. Each build runs as many compiler jobs as SwiftPM does on its own. |
 | `API_GRAPH_ADOPTER_VALIDATE` | `declarations` | When System has moved since a migration's index was cached: `declarations` reuses the index if every System declaration it names is unchanged (revalidated), `interface` if System's whole public interface is, and `tree` never does, rebuilding whenever System's sources change. |
 | `API_GRAPH_CACHE` | `.build/api-graph-cache` | The migrations' cached index references, a few MB: one entry per package commit, build settings and System tree built against. Deleting it costs a rebuild. |
-| `API_GRAPH_BUILDS` | `.build/api-graph-builds` | The migrations' build directories, kept so that a rebuild is incremental: one per package, with its export, SwiftPM's scratch directory and the last build's log, and System's export, which every build points at. Several GB each; `GRAPH.md` gives the total. Deleting it costs cold builds. Set it empty to build each migration in the scratch directory and delete the build once it's read. |
+| `API_GRAPH_BUILDS` | `.build/api-graph-builds` | The migrations' build directories, kept so that a rebuild is incremental: one per package, with its export, SwiftPM's scratch directory and the last build's log, and System's export, which every build points at. Up to about 2 GB each; `GRAPH.md` gives the total. Deleting it costs cold builds. Set it empty to build each migration in the scratch directory and delete the build once it's read. |
 | `API_GRAPH_MIN_FREE_GB` | `15` | No adopter build starts with less free disk than this; the package is then matched lexically. |
 
 Refs resolve as in api-delta: in the worktree you run the script from, so `HEAD` is that worktree's. System's commits are exported with `git archive`, and the adopters' with `git archive` and `git show`, never from a working tree; only the pitch files are read from the working tree. Nothing tracked is modified, and the script deletes only directories it created.

@@ -54,14 +54,15 @@ Usage: adopters.py --graph graph.json --repo DIR --head COMMIT
                    --cnames cnames.json
                    --work DIR --cache DIR --out adopters.json
                    [--symbolgraphs DIR] [--validate declarations|interface|tree]
-                   [--builds-dir DIR]
+                   [--builds-dir DIR] [--jobs 4]
                    [--adopters DIR] [--ecosystem DIR] [--coverage-results DIR]
                    [--branch migrate-darwin] [--builds build|reuse|none]
                    [--rebuild] [--min-free-gb 15] [--only KEY,...]
   --symbolgraphs is api-delta's symbol graphs of the head commit
   (symbolgraphs/head), what cached indexes are revalidated against.
   --builds-dir keeps a build directory per migration, and System's export,
-  for the next build to be incremental.
+  for the next build to be incremental. --jobs is how many migrations are
+  built at a time, longest first.
 """
 
 import sys
@@ -71,6 +72,7 @@ sys.dont_write_bytecode = True   # nothing written into the coverage tool's scri
 import argparse  # noqa: E402
 import bisect  # noqa: E402
 import collections  # noqa: E402
+import concurrent.futures  # noqa: E402
 import datetime  # noqa: E402
 import fcntl  # noqa: E402
 import glob  # noqa: E402
@@ -83,6 +85,7 @@ import re  # noqa: E402
 import shutil  # noqa: E402
 import stat  # noqa: E402
 import subprocess  # noqa: E402
+import threading  # noqa: E402
 import time  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -129,6 +132,19 @@ COMMON_TYPES = set("""
     Result Entry Event Events Attributes Info Status State Iterator Element Index Handle Name Priority
     Policy Action Filter Descriptor Queue Configuration Options Identifier ID Group User Owner Scope Level
 """.split())
+
+
+PRINT_LOCK = threading.Lock()
+# libIndexStore's thread safety isn't documented, and reading a store is
+# Python callbacks under the GIL anyway: one store at a time.
+READ_LOCK = threading.Lock()
+
+
+def say(line):
+    """A line of the log, whole, from any thread."""
+    with PRINT_LOCK:
+        sys.stdout.write(line + "\n")
+        sys.stdout.flush()
 
 
 def load_json(path):
@@ -759,8 +775,22 @@ class Builder:
         with gzip.open(os.path.join(cache_dir, name), "wt", encoding="utf-8") as f:
             json.dump(result, f)
 
+    def last_seconds(self, pkg):
+        """How long the package's last recorded build took, from its newest
+        cache entry, which the builds are ordered by; None if it has none."""
+        for path in sorted(glob.glob(os.path.join(self.a.cache, pkg["key"], "*.json.gz")),
+                           key=os.path.getmtime, reverse=True):
+            try:
+                seconds = (load_json(path).get("build") or {}).get("seconds")
+            except (OSError, ValueError):
+                continue
+            if seconds is not None:
+                return seconds
+        return None
+
     def index(self, pkg, plan):
-        """{status, files, symbols, build}, from the cache or a build."""
+        """{status, files, symbols, build}, from the cache or a build. Safe to
+        run for several packages at once, once system() has run."""
         a = self.a
         info = pkg["adopters"]
         s, swift_exec, base_key = plan["settings"], plan["swiftExec"], plan["key"]
@@ -879,7 +909,8 @@ class Builder:
         if store:
             def keep(usr, rel, is_c):
                 return not is_c and any(m in usr for m in SYSTEM_MODULES)
-            files, symbols, _defs, n_records = index_refs.read_store(store, src, keep, definitions_too=False)
+            with READ_LOCK:
+                files, symbols, _defs, n_records = index_refs.read_store(store, src, keep, definitions_too=False)
             if status == "failed" and files:
                 status = "partial"
         elif status == "indexed":
@@ -906,7 +937,7 @@ class Builder:
                            "date": datetime.date.today().isoformat()}, f, indent=1)
             result["build"]["diskMB"] = round(kb / 1024) if kb else None
         else:
-            # A scratch build: gone as soon as it's read (SwiftPM's is several GB).
+            # A scratch build: gone as soon as it's read (SwiftPM's is up to about 2 GB).
             shutil.rmtree(w, ignore_errors=True)
         result["build"] = dict(result["build"], decision="rebuilt", decisionReason=plan["reason"],
                                builtAgainst=a.head)
@@ -1516,6 +1547,117 @@ def lexical_interfaces(commit_obj, kinds, library):
     return [{"name": n, "sites": v} for n, v in sorted(sites.items())]
 
 
+# ---------------------------------------------------------------- adopted sites
+
+def migration_sites(key, p, idx, branch, usr_node, matcher, conds):
+    """One migration's adopted sites, from its index and lexically, with
+    the hunks they cite: {sites, hunks, adopted}. `conds` is the caller's
+    own, since its parser keeps state."""
+    info = p["adopters"]
+    repo, commit, base = info["path"], info["commit"], info["base"]
+    co = Commit(repo, commit)
+    diff_text = git(repo, "-c", "core.quotePath=false", "diff", "--no-ext-diff", "--no-textconv", "--no-color",
+                    "--src-prefix=a/", "--dst-prefix=b/", "--find-renames", "-U3", base, commit) if base else ""
+    diff = parse_diff(diff_text)
+    swift_changed = sorted(f for f in diff if f.endswith(".swift"))
+    indexed = set(idx["files"])
+    symbols = idx["symbols"]
+    own = declared_names(co)
+    sites, hunks = [], {}
+
+    # Hunk ids, per file, in order.
+    hunk_at = {}
+    for f, fd in diff.items():
+        for k, h in enumerate(fd["hunks"]):
+            hid = f"{key}:{f}#{k}"
+            hunk_at.setdefault(f, []).append((h["newStart"], h["newStart"] + max(h["newCount"], 1) - 1, hid, h))
+
+    def hunk_for(f, line):
+        for s_, e_, hid, h in hunk_at.get(f, []):
+            if s_ <= line <= e_:
+                if hid not in hunks:
+                    hunks[hid] = {"package": key, "file": f, "oldFile": diff[f]["old"], "header": h["header"],
+                                  "oldStart": h["oldStart"], "oldCount": h["oldCount"],
+                                  "newStart": h["newStart"], "newCount": h["newCount"], "lines": h["lines"]}
+                return hid
+        return None
+
+    seen = set()
+    counts = collections.Counter()
+
+    def add(f, line, col, nid, resolution, how=None, qualifier=False):
+        k_ = (f, line, nid)
+        if k_ in seen:
+            return
+        seen.add(k_)
+        lines = co.lines(f)
+        text = lines[line - 1].strip() if 0 < line <= len(lines) else ""
+        introduced = line in diff.get(f, {}).get("added", ())
+        sites.append({"package": key, "file": f, "line": line, "column": col, "node": nid,
+                      "resolution": resolution, "how": how, "qualifier": qualifier, "introduced": introduced,
+                      "hunk": hunk_for(f, line), "text": text[:240]})
+        counts["qualifier" if qualifier else resolution] += 1
+
+    # Precise: the index's references to the nodes' USRs. A type named
+    # only to qualify another reference right after it (`PThread` in
+    # `PThread.Mutex`) is recorded as a qualifier, and implicit
+    # references (accessors a property use calls) are dropped.
+    for rel, fdata in sorted(idx["files"].items()):
+        refs = fdata["references"]
+        at_col = {(l_, c_) for l_, c_, _u, _f in refs}
+        lines = co.lines(rel)
+        for line, col, usr, flags in refs:
+            if flags & ROLE_IMPLICIT:
+                continue
+            nid = usr_node.get(usr)
+            if not nid:
+                continue
+            name = re.sub(r"\(.*$", "", symbols.get(usr, {}).get("name", ""))
+            text = lines[line - 1] if 0 < line <= len(lines) else ""
+            qual = False
+            if name and text[col - 1:col - 1 + len(name)] == name:
+                after = col + len(name)
+                if text[after - 1:after] == "." and (line, after + 1) in at_col:
+                    qual = True
+            add(rel, line, col, nid, "precise", qualifier=qual)
+
+    # Lexical: the lines the migration added, in files the build didn't
+    # compile, and in `#if` branches the Darwin build doesn't take.
+    for rel in swift_changed:
+        added = sorted(diff[rel]["added"])
+        if not added:
+            continue
+        raw = co.text(rel)
+        if raw is None:
+            continue
+        code = ss.strip_comments_and_strings(raw)[0]
+        code_lines = code.split("\n")
+        starts = [0]
+        for ln in code_lines:
+            starts.append(starts[-1] + len(ln) + 1)
+        darwin = conds.darwin_lines(code_lines) if rel in indexed else None
+        for line in added:
+            if line > len(code_lines):
+                continue
+            if darwin is not None and darwin[line] is not False:
+                continue   # the index decides here
+            for nid, col, how in matcher.match(code, starts[line - 1], starts[line] - 1, own):
+                add(rel, line, col, nid, "lexical", how=how)
+    co.close()
+
+    resolution = {"indexed": "index", "partial": "partial index"}.get(idx["status"], "lexical")
+    adopted = {
+        "path": info["path"], "dir": info["dir"], "branch": branch, "commit": commit,
+        "subject": info["subject"], "mainRef": info["mainRef"], "mainCommit": info["mainCommit"],
+        "base": base, "baseSubject": info["baseSubject"], "commits": info["commits"],
+        "swiftFilesChanged": len(swift_changed), "indexedFilesChanged": len([f for f in swift_changed
+                                                                             if f in indexed]),
+        "resolution": resolution, "build": idx["build"],
+        "sites": {"precise": counts["precise"], "lexical": counts["lexical"], "qualifier": counts["qualifier"]},
+    }
+    return {"sites": sites, "hunks": hunks, "adopted": adopted}
+
+
 # ---------------------------------------------------------------- main
 
 def main():
@@ -1541,6 +1683,7 @@ def main():
     ap.add_argument("--symbolgraphs", help="api-delta's symbol graphs of the head commit (symbolgraphs/head)")
     ap.add_argument("--validate", choices=("declarations", "interface", "tree"), default="declarations")
     ap.add_argument("--builds-dir", help="persistent build directories, one per migration")
+    ap.add_argument("--jobs", type=int, default=4, help="migrations built at a time")
     ap.add_argument("--min-free-gb", type=float, default=15)
     ap.add_argument("--only", default="")
     a = ap.parse_args()
@@ -1569,158 +1712,76 @@ def main():
         base_names.add(t["name"].split(".")[-1])
     os.makedirs(a.cache, exist_ok=True)
     matcher = LexicalMatcher(nodes, base_names, library_names(a.cache, compiler))
-    conds = Conditions()
     decls = None
     if a.symbolgraphs and glob.glob(os.path.join(a.symbolgraphs, "*.symbols.json")):
         decls = SystemDeclarations(a.symbolgraphs)
     builder = Builder(a, pkgs, compiler, decls)
-    if a.builds_dir:
-        # One run at a time per builds directory; the lock goes with the process.
-        os.makedirs(a.builds_dir, exist_ok=True)
-        lock = open(os.path.join(a.builds_dir, ".lock"), "w")
-        try:
-            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
-            print(f"adopters: waiting for another run to finish with {a.builds_dir}", flush=True)
-            fcntl.flock(lock, fcntl.LOCK_EX)
     # Every migration's plan first, since one whose build compiles another
     # migration is revalidated only with it.
     plans = {k: builder.plan(p) for k, p in sorted(pkgs.items()) if (p["adopters"] or {}).get("migrated")}
     follow_dependencies(plans, pkgs)
 
-    adopted_sites, hunks = [], {}
-    by_node_adopted = collections.defaultdict(list)
     pkg_out = []
-
     for key in sorted(pkgs):
         p = pkgs[key]
         rec = {"key": key, "name": p["name"], "remote": p["remote"], "adopted": None, "benefit": None}
         pkg_out.append(rec)
         info = p["adopters"]
-        if not info or not info.get("migrated"):
-            if info:
-                rec["adoptersClone"] = {"path": info["path"], "branch": info.get("branch"),
-                                        "note": "no commits past the merge base" if info.get("branch") else
-                                        f"no {a.branch} branch"}
-            continue
+        if info and not info.get("migrated"):
+            rec["adoptersClone"] = {"path": info["path"], "branch": info.get("branch"),
+                                    "note": "no commits past the merge base" if info.get("branch") else
+                                    f"no {a.branch} branch"}
+    recs = {r["key"]: r for r in pkg_out}
+
+    # The builds, API_GRAPH_ADOPTER_JOBS at a time, longest first (by the
+    # package's last recorded build; one with none first, since it could be
+    # anything), then the cached indexes. Each worker builds or reads its
+    # migration's index and finds its sites; they're merged in key order, so
+    # the output doesn't depend on which finished first.
+    last = {k: builder.last_seconds(pkgs[k]) for k in plans if plans[k]["entry"] is None}
+    order = sorted(last, key=lambda k: (last[k] is not None, -(last[k] or 0), k)) + \
+        sorted(k for k in plans if plans[k]["entry"] is not None)
+    jobs = max(1, a.jobs)
+    if last and a.builds == "build":
+        if a.builds_dir:
+            # One run at a time builds in a builds directory; the lock goes with the process.
+            os.makedirs(a.builds_dir, exist_ok=True)
+            lock = open(os.path.join(a.builds_dir, ".lock"), "w")
+            try:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                say(f"adopters: waiting for another run to finish with {a.builds_dir}")
+                fcntl.flock(lock, fcntl.LOCK_EX)
+        builder.system()   # before the workers, which all build against it
+        say(f"adopters: {len(plans)} migrations: {len(last)} to build, {min(jobs, len(last))} at a time, longest "
+            f"first ({', '.join(k + (f' {last[k]} s' if last[k] is not None else '') for k in order[:len(last)])}), "
+            f"{len(plans) - len(last)} from the cache")
+
+    def work(key):
         t0 = time.time()
-        print(f"adopters: {key}: {a.branch} @ {info['commit'][:10]}, {info['commits']} commits past "
-              f"{info['base'][:10] if info['base'] else '?'}", flush=True)
-        repo, commit, base = info["path"], info["commit"], info["base"]
-        co = Commit(repo, commit)
-        diff_text = git(repo, "-c", "core.quotePath=false", "diff", "--no-ext-diff", "--no-textconv", "--no-color",
-                        "--src-prefix=a/", "--dst-prefix=b/", "--find-renames", "-U3", base, commit) if base else ""
-        diff = parse_diff(diff_text)
-        swift_changed = sorted(f for f in diff if f.endswith(".swift"))
-        idx = builder.index(p, plans[key])
-        indexed = set(idx["files"])
-        symbols = idx["symbols"]
-        own = declared_names(co)
+        idx = builder.index(pkgs[key], plans[key])
+        out = migration_sites(key, pkgs[key], idx, a.branch, usr_node, matcher, Conditions())
+        out["adopted"]["seconds"] = round(time.time() - t0)
+        b, n = idx["build"], out["adopted"]["sites"]
+        info = pkgs[key]["adopters"]
+        say(f"adopters: {key}: {b.get('decision')} ({b.get('decisionReason')}); {out['adopted']['resolution']} "
+            f"({b.get('status')}{': ' + b['reason'] if b.get('reason') else ''}"
+            f"{'; ' + b['start'] if not b.get('cached') and b.get('start') else ''}); "
+            f"{n['precise']} precise and {n['lexical']} lexical sites, {n['qualifier']} qualifiers; "
+            f"{out['adopted']['seconds']} s ({a.branch} at {info['commit'][:10]}, {info['commits']} commits)")
+        return out
 
-        # Hunk ids, per file, in order.
-        hunk_at = {}
-        for f, fd in diff.items():
-            for k, h in enumerate(fd["hunks"]):
-                hid = f"{key}:{f}#{k}"
-                hunk_at.setdefault(f, []).append((h["newStart"], h["newStart"] + max(h["newCount"], 1) - 1, hid, h))
-
-        def hunk_for(f, line):
-            for s_, e_, hid, h in hunk_at.get(f, []):
-                if s_ <= line <= e_:
-                    if hid not in hunks:
-                        hunks[hid] = {"package": key, "file": f, "oldFile": diff[f]["old"], "header": h["header"],
-                                      "oldStart": h["oldStart"], "oldCount": h["oldCount"],
-                                      "newStart": h["newStart"], "newCount": h["newCount"], "lines": h["lines"]}
-                    return hid
-            return None
-
-        seen = set()
-        n_precise = n_lexical = n_qualifier = 0
-
-        def add(f, line, col, nid, resolution, how=None, qualifier=False):
-            nonlocal n_precise, n_lexical, n_qualifier
-            k_ = (f, line, nid)
-            if k_ in seen:
-                return
-            seen.add(k_)
-            lines = co.lines(f)
-            text = lines[line - 1].strip() if 0 < line <= len(lines) else ""
-            introduced = line in diff.get(f, {}).get("added", ())
-            site = {"package": key, "file": f, "line": line, "column": col, "node": nid,
-                    "resolution": resolution, "how": how, "qualifier": qualifier, "introduced": introduced,
-                    "hunk": hunk_for(f, line), "text": text[:240]}
-            by_node_adopted[nid].append(len(adopted_sites))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as pool:
+        results = dict(zip(order, pool.map(work, order)))
+    adopted_sites, hunks = [], {}
+    by_node_adopted = collections.defaultdict(list)
+    for key in sorted(results):
+        r = results[key]
+        for site in r["sites"]:
+            by_node_adopted[site["node"]].append(len(adopted_sites))
             adopted_sites.append(site)
-            if qualifier:
-                n_qualifier += 1
-            elif resolution == "precise":
-                n_precise += 1
-            else:
-                n_lexical += 1
-
-        # Precise: the index's references to the nodes' USRs. A type named
-        # only to qualify another reference right after it (`PThread` in
-        # `PThread.Mutex`) is recorded as a qualifier, and implicit
-        # references (accessors a property use calls) are dropped.
-        for rel, fdata in sorted(idx["files"].items()):
-            refs = fdata["references"]
-            at_col = {(l_, c_) for l_, c_, _u, _f in refs}
-            lines = co.lines(rel)
-            for line, col, usr, flags in refs:
-                if flags & ROLE_IMPLICIT:
-                    continue
-                nid = usr_node.get(usr)
-                if not nid:
-                    continue
-                name = re.sub(r"\(.*$", "", symbols.get(usr, {}).get("name", ""))
-                text = lines[line - 1] if 0 < line <= len(lines) else ""
-                qual = False
-                if name and text[col - 1:col - 1 + len(name)] == name:
-                    after = col + len(name)
-                    if text[after - 1:after] == "." and (line, after + 1) in at_col:
-                        qual = True
-                add(rel, line, col, nid, "precise", qualifier=qual)
-
-        # Lexical: the lines the migration added, in files the build didn't
-        # compile, and in `#if` branches the Darwin build doesn't take.
-        for rel in swift_changed:
-            added = sorted(diff[rel]["added"])
-            if not added:
-                continue
-            raw = co.text(rel)
-            if raw is None:
-                continue
-            code = ss.strip_comments_and_strings(raw)[0]
-            code_lines = code.split("\n")
-            starts = [0]
-            for ln in code_lines:
-                starts.append(starts[-1] + len(ln) + 1)
-            darwin = conds.darwin_lines(code_lines) if rel in indexed else None
-            for line in added:
-                if line > len(code_lines):
-                    continue
-                if darwin is not None and darwin[line] is not False:
-                    continue   # the index decides here
-                for nid, col, how in matcher.match(code, starts[line - 1], starts[line] - 1, own):
-                    add(rel, line, col, nid, "lexical", how=how)
-
-        resolution = {"indexed": "index", "partial": "partial index"}.get(idx["status"], "lexical")
-        rec["adopted"] = {
-            "path": info["path"], "dir": info["dir"], "branch": a.branch, "commit": commit,
-            "subject": info["subject"], "mainRef": info["mainRef"], "mainCommit": info["mainCommit"],
-            "base": base, "baseSubject": info["baseSubject"], "commits": info["commits"],
-            "swiftFilesChanged": len(swift_changed), "indexedFilesChanged": len([f for f in swift_changed
-                                                                                 if f in indexed]),
-            "resolution": resolution, "build": idx["build"],
-            "sites": {"precise": n_precise, "lexical": n_lexical, "qualifier": n_qualifier},
-            "seconds": round(time.time() - t0),
-        }
-        co.close()
-        b = idx["build"]
-        print(f"adopters: {key}: {b.get('decision')} ({b.get('decisionReason')}); {resolution} ({b.get('status')}"
-              f"{': ' + b['reason'] if b.get('reason') else ''}); "
-              f"{n_precise} precise and {n_lexical} lexical sites, {n_qualifier} qualifiers, "
-              f"{round(time.time() - t0)} s", flush=True)
+        hunks.update(r["hunks"])
+        recs[key]["adopted"] = r["adopted"]
 
     # ------------------------------------------------------------ would benefit
     # A site counts for every C name the graph wraps (so the graph can say
@@ -1841,7 +1902,7 @@ def main():
                  "coverageResults": a.coverage_results, "headCommit": a.head, "systemTree": builder.system_tree,
                  "systemManifest": builder.system_manifest, "validate": a.validate,
                  "systemDeclarations": len(decls.fingerprint) if decls else None,
-                 "decisions": dict(sorted(decisions.items())), "buildDirectories": build_dirs,
+                 "decisions": dict(sorted(decisions.items())), "buildDirectories": build_dirs, "jobs": a.jobs,
                  "swift": compiler, "builds": a.builds, "date": datetime.date.today().isoformat(),
                  "seconds": round(time.time() - t_start)},
         "packages": pkg_out,
