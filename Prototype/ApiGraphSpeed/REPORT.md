@@ -4,7 +4,7 @@ Lane `api-graph-speed`, base `3f9f9e1` (system-next), merged with system-next `6
 
 ## Resume here
 
-2026-09-30: steps 1 and 2 are measured and checked; step 3's runs are next. The runs go through now, since Michael put the allow rules this report proposed into the worktree's `.claude/settings.local.json`. Before that, the auto mode classifier had denied three runs, one of them after Michael approved them in chat, because it goes by allow rules, not by the conversation.
+2026-09-30: steps 1 and 2 are measured and checked; step 3 is committed, and its timed runs are in progress. The runs go through now, since Michael put the allow rules this report proposed into the worktree's `.claude/settings.local.json`. Before that, the auto mode classifier had denied three runs, one of them after Michael approved them in chat, because it goes by allow rules, not by the conversation.
 
 **Committed:**
 - `943c479`: the merge of system-next `6a9833f`.
@@ -13,17 +13,18 @@ Lane `api-graph-speed`, base `3f9f9e1` (system-next), merged with system-next `6
 - `279c229`: the scratch commit for c. It rewords one comment in `Syscalls.swift`, so its Sources differ from 3f9f9e1's by that line. `cdb9e87` reverts it, and the measurements keep using `279c229` as a head commit.
 - `2c474b4`: the merge of system-next `4365f83`. It came after the scratch commit, so that commit's Sources are still 3f9f9e1's plus one comment. None of the merge's Utilities changes touch what the api-graph tool reads.
 - `e4a2730`: `measure.sh NAME [COMMIT] [VAR=value ...]`, so that every run's command starts with the script.
-
-**Uncommitted in the working tree:** step 3, parallel builds (`adopters.py`, `regenerate.sh`, `README.md`, `method.md` decision 39). It has never run.
+- `d1f856c`: step 3, parallel builds, with the docs' build sizes corrected to what step 2 measured.
+- `1f204c8`: each run records its power source and its start and end, and `summarize.sh` flags a run the machine slept through.
 
 **Done:**
 - `check_builds.py` passes all 16 checks, the fix included.
 - b1 and c1 match the baseline (step 1, below).
 - s2-cold and s2-incr match it too (step 2, below). s2's builds directory is deleted.
+- The first d4 run (step 3 cold, 4 jobs) built all 18, and its links match the baseline's. That's what step 3's commit rests on. Its time isn't a measurement, because the machine slept through it (step 3, below).
 
 **Next:**
-1. Step 3, the working tree's tool:
-   - `measure.sh d4 API_GRAPH_ADOPTER_JOBS=4 API_GRAPH_CACHE=<speed>/cache-d4 API_GRAPH_BUILDS=<speed>/builds-d4`, cold. Commit step 3 once it passes, then delete `builds-d4`.
+1. Step 3, the tool at `d1f856c` or later:
+   - d4 again (in progress at 20:05): `measure.sh d4 API_GRAPH_ADOPTER_JOBS=4 API_GRAPH_CACHE=<speed>/cache-d4 API_GRAPH_BUILDS=<speed>/builds-d4`, after deleting both directories. Then delete `builds-d4`.
    - The same with `=18`, into `cache-d18` and `builds-d18`.
    - Then (b), nothing changed, (c), `HEAD_REF=279c229`, and a forced rebuild with 4 jobs, `API_GRAPH_ADOPTER_VALIDATE=tree HEAD_REF=279c229`, all three against `d18`'s cache and builds.
    - Update the README's "Run time".
@@ -158,7 +159,7 @@ These two packages are small, so an incremental build after a real System change
 - What step 2 bought: a rebuild that step 1 can't avoid (a failed build, a changed declaration, `tree`) costs what SwiftPM's incremental build costs, about a third of the cold builds here, instead of a cold build. It doesn't help the cold case, and it keeps 11.8 GB on disk.
 - A possible next step: date the manifests only when System's or a dependency's list of files changed since the package's last build. Then a change inside existing files wouldn't make SwiftPM plan again. Not tried.
 
-## Step 3: parallel adopter builds (uncommitted; never run)
+## Step 3: parallel adopter builds (committed `d1f856c`; being measured)
 
 **What:**
 - Every plan is made first.
@@ -177,6 +178,14 @@ These two packages are small, so an incremental build after a real System change
   - ordering the builds by the migrations' path dependencies (each build compiles its own exports);
   - limiting each build's `-j` (not tried).
 - A known gap: the free-disk check runs at each build's start, so builds running at once can together take the disk below the minimum.
+
+**Measurements:**
+- First d4: the working tree's tool before the commit, cold, 4 jobs, fresh cache and builds directory.
+  - It built all 18, and its adopter links, sites and hunks are identical to the baseline's. Its build directories took 11.8 GB, as s2-cold's did.
+  - 12466 s wall, but this isn't a measurement. The power log shows the machine entering clamshell sleep at 12:35, three minutes in, then dark wakes on and off until the run finished. Over the run, the power log has 24 Sleep entries, and the machine was on battery afterwards.
+  - The load samples have gaps of up to 50 minutes, and their "load" of 191 (max 377) is the backlog at each wake.
+  - With no cache entries, the order was alphabetical, as designed: unknown builds first.
+- The runs before it, a-old to s2-incr, had no sleep in the power log, all on AC power.
 
 ## Tests
 
