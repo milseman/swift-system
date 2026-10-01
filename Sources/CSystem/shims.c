@@ -652,8 +652,13 @@ extern int csystem_recvmmsg(int fd, void *msgvec, unsigned int vlen, int flags, 
 
 // MARK: - Locales
 
-#if defined(__linux__) && !defined(__ANDROID__)
+#ifdef __linux__
 #include <locale.h>
+
+int _system_get_LC_ALL_MASK(void) { return LC_ALL_MASK; }
+#endif // __linux__
+
+#if defined(__linux__) && !defined(__ANDROID__)
 #include <stdlib.h>
 
 // With _GNU_SOURCE, which this file defines on Linux, <stdlib.h> declares
@@ -665,8 +670,6 @@ extern double csystem_strtod_l(const char *string, char **end, void *locale) {
 extern float csystem_strtof_l(const char *string, char **end, void *locale) {
   return strtof_l(string, end, (locale_t)locale);
 }
-
-int _system_get_LC_ALL_MASK(void) { return LC_ALL_MASK; }
 
 // MARK: - Time zone files
 

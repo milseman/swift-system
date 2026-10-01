@@ -11,12 +11,14 @@
 // (Provisional+Locale.swift). The <xlocale.h> calls come from CSystem's
 // Darwin header, since the Darwin module doesn't export them. On Linux,
 // glibc and Musl declare strtod_l and strtof_l only with _GNU_SOURCE, so
-// they're CSystem shims.
+// they're CSystem shims. On Android, Bionic's strtod_l, strtof_l and
+// strncasecmp_l, which it declares only from API levels 26, 26 and 23, are
+// strtod, strtof and strncasecmp, ignoring the locale, so these call those.
 //
 // In a mock test, a locale that newlocale "created" is a placeholder
 // address, so freelocale is mocked too, and neither touches it.
 
-#if SYSTEM_PACKAGE_DARWIN || os(Linux)
+#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
 import CSystem
 #if SYSTEM_PACKAGE_DARWIN
 import Darwin
@@ -24,6 +26,8 @@ import Darwin
 import Glibc
 #elseif canImport(Musl)
 import Musl
+#elseif canImport(Android)
+import Android
 #endif
 
 #if ENABLE_MOCKING
@@ -90,6 +94,8 @@ internal func system_strtod_l(
 ) -> Double {
 #if SYSTEM_PACKAGE_DARWIN
   strtod_l(string, end, locale)
+#elseif os(Android)
+  strtod(string, end)
 #else
   if _isGlobalLocale(locale) { return strtod(string, end) }
   return csystem_strtod_l(string, end, UnsafeMutableRawPointer(locale ?? _posixLocale))
@@ -104,6 +110,8 @@ internal func system_strtof_l(
 ) -> Float {
 #if SYSTEM_PACKAGE_DARWIN
   strtof_l(string, end, locale)
+#elseif os(Android)
+  strtof(string, end)
 #else
   if _isGlobalLocale(locale) { return strtof(string, end) }
   return csystem_strtof_l(string, end, UnsafeMutableRawPointer(locale ?? _posixLocale))
@@ -116,10 +124,12 @@ internal func system_strncasecmp_l(
 ) -> CInt {
 #if SYSTEM_PACKAGE_DARWIN
   strncasecmp_l(a, b, count, locale)
+#elseif os(Android)
+  strncasecmp(a, b, count)
 #else
   if _isGlobalLocale(locale) { return strncasecmp(a, b, count) }
   return strncasecmp_l(a, b, count, locale ?? _posixLocale)
 #endif
 }
 
-#endif // SYSTEM_PACKAGE_DARWIN || os(Linux)
+#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)

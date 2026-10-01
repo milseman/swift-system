@@ -9,12 +9,12 @@
 
 // The C library constants that System's provisional API uses (see
 // Sources/System/Provisional): stdio's buffering modes and standard streams,
-// and on Darwin and Linux the locale categories, which on Darwin come from
-// CSystem's Darwin header (see Syscalls+ProvisionalLocale.swift).
+// and on Darwin, Linux and Android the locale categories, which on Darwin
+// come from CSystem's Darwin header (see Syscalls+ProvisionalLocale.swift).
 
 #if !os(Windows)
 
-#if os(Linux)
+#if os(Linux) || os(Android)
 import CSystem
 #endif
 
@@ -76,7 +76,7 @@ internal var _stderr: _CFilePointer {
 #endif // !os(Windows)
 
 // The locale categories and their masks, for Provisional+Locale.swift.
-#if SYSTEM_PACKAGE_DARWIN || os(Linux)
+#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
 @_alwaysEmitIntoClient
 internal var _LC_ALL: CInt { LC_ALL }
 
@@ -116,10 +116,10 @@ internal var _LC_NUMERIC_MASK: CInt { LC_NUMERIC_MASK }
 @_alwaysEmitIntoClient
 internal var _LC_TIME_MASK: CInt { LC_TIME_MASK }
 
-#if os(Linux)
-// glibc's LC_ALL_MASK ORs its twelve categories' masks, which Swift can't
-// import; see shims.c.
+#if os(Linux) || os(Android)
+// glibc's and Bionic's LC_ALL_MASK ORs their twelve categories' masks, which
+// Swift can't import; see shims.c.
 @_alwaysEmitIntoClient
 internal var _LC_ALL_MASK: CInt { _system_get_LC_ALL_MASK() }
 #endif
-#endif // SYSTEM_PACKAGE_DARWIN || os(Linux)
+#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
