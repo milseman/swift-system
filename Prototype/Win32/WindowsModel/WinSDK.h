@@ -898,3 +898,111 @@ BOOL PostQueuedCompletionStatus(HANDLE CompletionPort, DWORD dwNumberOfBytesTran
 BOOL GetQueuedCompletionStatus(HANDLE CompletionPort, LPDWORD lpNumberOfBytesTransferred,
                                PULONG_PTR lpCompletionKey, LPOVERLAPPED *lpOverlapped,
                                DWORD dwMilliseconds);
+
+// sysinfoapi.h, winnt.h, winbase.h: system information
+
+typedef unsigned short USHORT;
+
+typedef struct _SYSTEM_INFO {
+  union {
+    DWORD dwOemId;
+    struct {
+      WORD wProcessorArchitecture;
+      WORD wReserved;
+    };
+  };
+  DWORD dwPageSize;
+  LPVOID lpMinimumApplicationAddress;
+  LPVOID lpMaximumApplicationAddress;
+  DWORD_PTR dwActiveProcessorMask;
+  DWORD dwNumberOfProcessors;
+  DWORD dwProcessorType;
+  DWORD dwAllocationGranularity;
+  WORD wProcessorLevel;
+  WORD wProcessorRevision;
+} SYSTEM_INFO, *LPSYSTEM_INFO;
+
+#define PROCESSOR_ARCHITECTURE_INTEL 0
+#define PROCESSOR_ARCHITECTURE_ARM 5
+#define PROCESSOR_ARCHITECTURE_IA64 6
+#define PROCESSOR_ARCHITECTURE_AMD64 9
+#define PROCESSOR_ARCHITECTURE_ARM64 12
+#define PROCESSOR_ARCHITECTURE_UNKNOWN 0xFFFF
+#define ALL_PROCESSOR_GROUPS 0xffff
+
+typedef enum _LOGICAL_PROCESSOR_RELATIONSHIP : int {
+  RelationProcessorCore,
+  RelationNumaNode,
+  RelationCache,
+  RelationProcessorPackage,
+  RelationGroup,
+  RelationAll = 0xffff
+} LOGICAL_PROCESSOR_RELATIONSHIP;
+
+typedef enum _PROCESSOR_CACHE_TYPE : int {
+  CacheUnified,
+  CacheInstruction,
+  CacheData,
+  CacheTrace
+} PROCESSOR_CACHE_TYPE;
+
+typedef struct _CACHE_DESCRIPTOR {
+  BYTE Level;
+  BYTE Associativity;
+  WORD LineSize;
+  DWORD Size;
+  PROCESSOR_CACHE_TYPE Type;
+} CACHE_DESCRIPTOR, *PCACHE_DESCRIPTOR;
+
+typedef struct _SYSTEM_LOGICAL_PROCESSOR_INFORMATION {
+  ULONG_PTR ProcessorMask;
+  LOGICAL_PROCESSOR_RELATIONSHIP Relationship;
+  union {
+    struct {
+      BYTE Flags;
+    } ProcessorCore;
+    struct {
+      DWORD NodeNumber;
+    } NumaNode;
+    CACHE_DESCRIPTOR Cache;
+    ULONGLONG Reserved[2];
+  };
+} SYSTEM_LOGICAL_PROCESSOR_INFORMATION, *PSYSTEM_LOGICAL_PROCESSOR_INFORMATION;
+
+typedef enum _COMPUTER_NAME_FORMAT : int {
+  ComputerNameNetBIOS,
+  ComputerNameDnsHostname,
+  ComputerNameDnsDomain,
+  ComputerNameDnsFullyQualified,
+  ComputerNamePhysicalNetBIOS,
+  ComputerNamePhysicalDnsHostname,
+  ComputerNamePhysicalDnsDomain,
+  ComputerNamePhysicalDnsFullyQualified,
+  ComputerNameMax
+} COMPUTER_NAME_FORMAT;
+
+typedef struct _OSVERSIONINFOEXW {
+  DWORD dwOSVersionInfoSize;
+  DWORD dwMajorVersion;
+  DWORD dwMinorVersion;
+  DWORD dwBuildNumber;
+  DWORD dwPlatformId;
+  WCHAR szCSDVersion[128];
+  WORD wServicePackMajor;
+  WORD wServicePackMinor;
+  WORD wSuiteMask;
+  BYTE wProductType;
+  BYTE wReserved;
+} OSVERSIONINFOEXW, *POSVERSIONINFOEXW, RTL_OSVERSIONINFOEXW, *PRTL_OSVERSIONINFOEXW;
+
+#define VER_NT_WORKSTATION 0x0000001
+#define VER_NT_DOMAIN_CONTROLLER 0x0000002
+#define VER_NT_SERVER 0x0000003
+
+void GetSystemInfo(LPSYSTEM_INFO lpSystemInfo);
+void GetNativeSystemInfo(LPSYSTEM_INFO lpSystemInfo);
+DWORD GetActiveProcessorCount(WORD GroupNumber);
+BOOL GetLogicalProcessorInformation(PSYSTEM_LOGICAL_PROCESSOR_INFORMATION Buffer,
+                                    PDWORD ReturnedLength);
+BOOL GetPhysicallyInstalledSystemMemory(PULONGLONG TotalMemoryInKilobytes);
+BOOL GetComputerNameExW(COMPUTER_NAME_FORMAT NameType, LPWSTR lpBuffer, LPDWORD nSize);

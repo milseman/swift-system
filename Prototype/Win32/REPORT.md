@@ -16,9 +16,9 @@ adds API for the adopters' top Windows gaps of section 8, in its order, checked 
 
 **Resume here:** windows-api's parts are done (sections 1 to 10), and so are windows-2's (11 to 22: P1 and P2,
 then section 8's gaps from processes to file information). windows-3, in progress: long paths (section 23,
-`315f25b`), threads (24, `054e9e2`), `HRESULT` (25, `b89b78c`), path operations (26, `8326373`), and overlapped I/O (27,
-the last commit).
-- **Next**: the rest of section 8's list, in order: system information; Winsock, last (design only
+`315f25b`), threads (24, `054e9e2`), `HRESULT` (25, `b89b78c`), path operations (26, `8326373`), overlapped I/O (27,
+`d479525`), and system information (28, the last commit).
+- **Next**: the rest of section 8's list: Winsock, last (design only
   if time runs short, since the decisions triage gives Winsock a Windows-only module of its own).
 - **Then, left within done gaps**: a Windows `BrokenDownTime` over the UCRT's time functions (14); a Windows
   `ProcessID.exit(_:)` and `exitImmediately(_:)` (12); `CRITICAL_SECTION` (15); attaching, freeing and
@@ -1514,7 +1514,7 @@ A Windows run must check:
 - Not covered: moves and hard links across volumes (`notSameDevice`), FAT volumes, `delayUntilReboot`,
   `ignoreReadOnlyAttribute`, and paths past `MAX_PATH`, beyond the canonicalization section 23 checks.
 
-## 27. windows-3: overlapped I/O: this commit
+## 27. windows-3: overlapped I/O: `d479525`
 
 The next gap of section 8, and SYS-0011 and SYS-0013's largest future direction. swift-subprocess reads and writes
 its pipes with overlapped I/O: it opens them with `FILE_FLAG_OVERLAPPED`, associates them with a completion port
@@ -1586,7 +1586,58 @@ A Windows run must check:
 - Not covered: a port waiter woken by the port's closing, packets of operations that finish in the call,
   disk files read past 4 GiB, and concurrency limits.
 
-## 28. windows-3: findings
+## 28. windows-3: system information: this commit
+
+The next gap of section 8. swift-foundation reads the page size, the processor count and mask (`GetSystemInfo`),
+the installed memory (`GetPhysicallyInstalledSystemMemory`), the host name (`GetComputerNameExW` with
+`ComputerNameDnsHostname`) and the Windows version (`RtlGetVersion`, looked up in ntdll, for `wProductType` and
+the build number); swift-subprocess reads the page size, swift-build the processor architecture, and NIO counts
+cores (`GetLogicalProcessorInformation`, `RelationProcessorCore`).
+
+What: `Win32SystemInformation.swift`.
+- `Win32.ProcessorArchitecture`, and `Win32.SystemInformation` (`SYSTEM_INFO`: architecture, page size,
+  allocation granularity, application addresses, processor mask and count, level and revision), from
+  `Win32.systemInformation()` and `nativeSystemInformation()` (`GetSystemInfo`, `GetNativeSystemInfo`);
+  `Win32.activeProcessorCount()` (`GetActiveProcessorCount` with `ALL_PROCESSOR_GROUPS`).
+- `Win32.ProcessorRelationship` and `Win32.LogicalProcessorInformation`, from
+  `Win32.logicalProcessorInformation()` (`GetLogicalProcessorInformation`).
+- `Win32.installedMemory()` (`GetPhysicallyInstalledSystemMemory`), in bytes.
+- `Win32.ComputerNameFormat` and `Win32.computerName(_:)` (`GetComputerNameExW`).
+- `Win32.ProductType` and `Win32.OSVersion` (`RTL_OSVERSIONINFOEXW`), from `Win32.osVersion()` (`RtlGetVersion`).
+
+Which API: **Win32.** `SystemConfig` is `sysconf`, and `SystemIdentity` is `uname`'s structure; neither has a
+Windows counterpart to share a name with, and faking `sysconf`'s names or `uname`'s fields over these calls is
+the emulation the Vision rules out. `SystemIdentity.hostName()` is the one shared concept, but it's a member of
+`uname`'s structure, which Windows would have to declare without its fields; `computerName(.dnsHostName)` is
+Windows' spelling.
+
+Design calls, with the alternatives rejected:
+- **C-struct wrappers**, as section 20's information types are: `rawValue` and named, read-only properties in
+  Swift types (`Int` for sizes and counts, `UInt` for masks and addresses). `SystemInformation` is
+  `@unchecked Sendable`: its two pointers are address bounds, never dereferenced.
+- **Functions, not properties**, as `Win32.tickCount()` is: each call asks Windows again.
+- **`installedMemory()` reports bytes**, where the C function reports kilobytes, so its unit matches every other
+  size here; the doc says so.
+- **`osVersion()` looks up `RtlGetVersion` at run time**, as Foundation does and System does for
+  `NtQueryInformationFile` (section 2): ntdll isn't linked. It throws only if the lookup fails, which it
+  doesn't on any Windows NT. Rejected: `GetVersionExW`, which reports no more than the version the program's
+  manifest names.
+- **`logicalProcessorInformation()` is the group-limited function**, as NIO calls it; a system with more than 64
+  logical processors needs `GetLogicalProcessorInformationEx`, whose entries vary in size. Not wrapped yet.
+- **Not wrapped**: `GlobalMemoryStatusEx`, `IsWow64Process2` and the PE machine types (`IMAGE_FILE_MACHINE_*`,
+  which swift-driver reads from a file's header), processor groups and NUMA queries, and the registry's
+  release names ("23H2").
+
+Tests: `Win32SystemInformationTests`.
+
+A Windows run must check: `testConstantsMatchTheSDK`; `testSystemInformation` (4 KiB pages, 64 KiB granularity, the
+mask's bits equal to the count, the architecture matching the build's, the native architecture x64 or ARM64);
+`testActiveProcessorCount`; `testLogicalProcessors` (cores and packages, and the cores' masks covering the group's);
+`testInstalledMemory`; `testComputerName` (the NetBIOS name is `COMPUTERNAME`'s, and the fully qualified name begins
+with the host name); and `testOSVersion` (10.0, from build 10240). Not covered: more than one processor group,
+emulated processes, and clusters' virtual servers.
+
+## 29. windows-3: findings
 
 - **`FileDescriptor`'s Windows canonicalization doesn't cover `CreateDirectoryW`'s limit** (P4).
   `withCanonicalPathRepresentation` passes `PATHCCH_ALLOW_LONG_PATHS`, so the `mkdir` adapter, which
@@ -1603,7 +1654,7 @@ A Windows run must check:
 - **macOS's CoreFoundation declares `S_OK` and `S_FALSE` too**, so the harness's tests spell `WinSDK.S_OK`; on
   Windows, where XCTest's Foundation is swift-corelibs-foundation, the bare names would do.
 
-## 29. windows-3: patches for files outside the lane
+## 30. windows-3: patches for files outside the lane
 
 **P3, continued: `Sources/System/CMakeLists.txt`.** The Win32 `target_sources` block as it should read with this
 lane's files, which coverage-4 applies with P3. It replaces the block whether or not P3 has landed. Kept current
@@ -1639,6 +1690,7 @@ target_sources(SystemPackage PRIVATE
   Win32/Win32SecurityDescriptor.swift
   Win32/Win32Synchronization.swift
   Win32/Win32Syscalls.swift
+  Win32/Win32SystemInformation.swift
   Win32/Win32Thread.swift
   Win32/Win32ThreadCreation.swift
   Win32/Win32Time.swift

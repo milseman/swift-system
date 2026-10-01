@@ -83,6 +83,11 @@ internal var _S_FALSE: HRESULT { 1 }
 @_alwaysEmitIntoClient
 internal var _FILE_TYPE_DISK: DWORD { 0x1 }
 
+// MARK: - System information
+
+@_alwaysEmitIntoClient
+internal var _ALL_PROCESSOR_GROUPS: WORD { 0xFFFF }
+
 // MARK: - Overlapped I/O
 
 @_alwaysEmitIntoClient

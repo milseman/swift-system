@@ -771,6 +771,39 @@ internal func system_SetFileAttributesW(
   SetFileAttributesW(lpFileName, dwFileAttributes)
 }
 
+// MARK: - System information
+
+internal func system_GetSystemInfo(_ lpSystemInfo: UnsafeMutablePointer<SYSTEM_INFO>) {
+  GetSystemInfo(lpSystemInfo)
+}
+
+internal func system_GetNativeSystemInfo(_ lpSystemInfo: UnsafeMutablePointer<SYSTEM_INFO>) {
+  GetNativeSystemInfo(lpSystemInfo)
+}
+
+internal func system_GetActiveProcessorCount(_ GroupNumber: WORD) -> DWORD {
+  GetActiveProcessorCount(GroupNumber)
+}
+
+internal func system_GetLogicalProcessorInformation(
+  _ Buffer: UnsafeMutablePointer<SYSTEM_LOGICAL_PROCESSOR_INFORMATION>?,
+  _ ReturnedLength: UnsafeMutablePointer<DWORD>
+) -> Bool {
+  GetLogicalProcessorInformation(Buffer, ReturnedLength)
+}
+
+internal func system_GetPhysicallyInstalledSystemMemory(
+  _ TotalMemoryInKilobytes: UnsafeMutablePointer<ULONGLONG>
+) -> Bool {
+  GetPhysicallyInstalledSystemMemory(TotalMemoryInKilobytes)
+}
+
+internal func system_GetComputerNameExW(
+  _ NameType: CInt, _ lpBuffer: UnsafeMutablePointer<WCHAR>?, _ nSize: UnsafeMutablePointer<DWORD>
+) -> Bool {
+  GetComputerNameExW(COMPUTER_NAME_FORMAT(rawValue: NameType), lpBuffer, nSize)
+}
+
 // MARK: - Path operations
 
 internal func system_CreateDirectoryW(
