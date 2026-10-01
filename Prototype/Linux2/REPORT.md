@@ -6,10 +6,22 @@ with logs in `../linux-logs/linux-2-<commit>-<what>.log`.
 
 ## Resume here
 
-- State: steps 1 to 3 are done (sections 1 to 3). Step 4: swift-nio's `migrate-unix` (`cc819b01`) is built
-  and tested on Linux (section 4.1), and what fails is under "For unix-adopt", with the tested fixes in
-  Appendix A. swift-foundation's `bde165fd` needs a toolchain newer than the 6.3 image (section 4.2); a
-  nightly image's pull was refused, and waits for Michael. The other unix-adopt worktrees have no commits yet.
+- State: steps 1 to 4 are done but swift-foundation (sections 1 to 4). swift-nio's `migrate-unix`
+  (`cc819b01`) is built and tested on Linux (section 4.1); what fails is under "For unix-adopt", with the
+  tested fixes in Appendix A. swift-foundation's `bde165fd` needs a toolchain newer than the 6.3 image
+  (section 4.2): a nightly image's pull was refused, and waits for Michael. The other unix-adopt worktrees
+  have no commits yet. Nothing is uncommitted; system-next hasn't moved from `4365f83`.
+- At `3ac2c29`: Darwin, XCTest 571 tests, 5 skipped, 0 failures; swift-testing 502 tests in 82 suites passed.
+  Linux as root (`linux-2-3ac2c29-root.log`), XCTest 481 tests, 6 skipped, 0 failures; swift-testing 463
+  tests in 78 suites passed; as 1000:1000 (`linux-2-3ac2c29-user.log`), 481 tests, 4 skipped, 0 failures,
+  and 463 tests in 78 suites passed.
+- Next: Foundation, if Michael allows a newer image: a scratch copy of the commit
+  (`git -C ../adopters-unix/swift-foundation archive bde165fd`, under `.build/foundation-scratch/adopters-unix/swift-foundation`,
+  with an empty `.build/foundation-scratch/swift-system`), then `Utilities/linux/build.sh --quiet --image
+  <image> --root .build/foundation-scratch --dir adopters-unix/swift-foundation --mount .:swift-system --log
+  <absolute log path> build-tests`, then section 2.2's tests there; then WasmKit and the rest as unix-adopt
+  commits them.
+- This lane's scratch paths (`.build`, the NIO and Foundation copies, the probe package) are deleted.
 - System's Linux run: `container system start >/dev/null 2>&1; Utilities/linux/build.sh --quiet --log
   ../linux-logs/linux-2-$(git rev-parse --short HEAD)-<what>.log test`, with `--user 1000:1000` for the
   unprivileged run and `-- --filter <Suite>` to narrow. Commit first: the log is named for HEAD.
@@ -130,6 +142,7 @@ section 1's runs, with no change here:
   runs as the thread ends.
 
 Not here: O1's Windows and WASI halves (the windows-2 and other-platforms lanes), and Musl (no static SDK run).
+No code changed for this step, so section 1's Darwin and Linux summaries are its own.
 
 ## 3. build.sh: another package, with the packages beside it: `cf4ef08`
 
@@ -164,6 +177,7 @@ Checks:
   passing. The second passes only with this lane's timer fix, which the swift-system checkout (system-next
   `4365f83`) doesn't have, so the overlay is what the container built; that checkout's status stayed clean, and
   SwiftPM rewrote no `Package.resolved`.
+- No Swift changed, so section 1's Darwin and Linux summaries stand for this step.
 
 ## 4. unix-adopt's rewrites on Linux
 
@@ -232,6 +246,9 @@ Design calls:
   accessors on `CInterop.EPollEvent`, which as extensions of a C type would vanish just as fix 1's do whenever
   CNIOLinux's copy of `epoll_event` loads first.
 - No System change was needed beyond the doc: everything NIO's Linux branches call is built on Linux.
+
+System's changes in this step: `CInterop.EPollEvent`'s doc (`67a8a8d`), and README.md's two Linux pitfalls
+(`3ac2c29`). Darwin and Linux after are the summaries in "Resume here", at `3ac2c29`.
 
 ### 4.2 swift-foundation
 
