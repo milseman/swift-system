@@ -63,6 +63,10 @@ struct _system_dirent {
   char d_name[NAME_MAX + 1];
 };
 
+// malloc_usable_size, which wasi-libc declares in <malloc.h>, which its
+// Swift module doesn't include; see shims.c.
+extern size_t csystem_malloc_usable_size(const void *pointer);
+
 // Convert WASI dirent with d_name[] to _system_dirent
 static inline
 struct _system_dirent *

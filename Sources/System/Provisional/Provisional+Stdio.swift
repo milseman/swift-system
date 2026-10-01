@@ -582,7 +582,12 @@ extension FileStream.Buffering: CustomStringConvertible, CustomDebugStringConver
 
 // MARK: - Locking
 
-#if !os(WASI)
+// wasi-libc declares flockfile, funlockfile and ftrylockfile, but defines
+// them only with threads (wasm32-wasip1-threads). Open question: on WASI
+// without threads, where no other thread can come between a stream's
+// calls, these could do nothing instead, so that a caller needn't test for
+// threads; they're left out there, as WASI's C library leaves them out.
+#if !os(WASI) || _runtime(_multithreaded)
 @available(System 199, *)
 extension FileStream {
   /// Locks the stream,
@@ -597,7 +602,7 @@ extension FileStream {
   ///
   /// The corresponding C function is `flockfile`.
   ///
-  /// - Note: Not available on WASI.
+  /// - Note: Not available on WASI without threads.
   @_alwaysEmitIntoClient
   public func lock() {
     _lock()
@@ -612,7 +617,7 @@ extension FileStream {
   ///
   /// The corresponding C function is `funlockfile`.
   ///
-  /// - Note: Not available on WASI.
+  /// - Note: Not available on WASI without threads.
   @_alwaysEmitIntoClient
   public func unlock() {
     _unlock()
@@ -629,7 +634,7 @@ extension FileStream {
   ///
   /// The corresponding C function is `ftrylockfile`.
   ///
-  /// - Note: Not available on WASI.
+  /// - Note: Not available on WASI without threads.
   @_alwaysEmitIntoClient
   public func tryLock() -> Bool {
     _tryLock()
@@ -649,7 +654,7 @@ extension FileStream {
   ///
   /// The corresponding C functions are `flockfile` and `funlockfile`.
   ///
-  /// - Note: Not available on WASI.
+  /// - Note: Not available on WASI without threads.
   @_alwaysEmitIntoClient
   public func withLock<R>(_ body: () throws -> R) rethrows -> R {
     _lock()
@@ -657,6 +662,6 @@ extension FileStream {
     return try body()
   }
 }
-#endif // !os(WASI)
+#endif // !os(WASI) || _runtime(_multithreaded)
 
 #endif // !os(Windows)

@@ -14,8 +14,14 @@
 // `_mockReturningErrno`. None of them return EINTR. The attribute functions
 // only fill in a local structure, so they aren't mockable, and neither are
 // the calls that can't fail.
+//
+// WASI has pthreads only with threads (wasm32-wasip1-threads), and its
+// wasi-libc has no pthread_exit, no scheduling, no guard size and no
+// priority ceilings: it declares some of those without defining them, so
+// they're left out here, where a call would fail only at an executable's
+// link (wasi-libc's expected/wasm32-wasip1-threads/defined-symbols.txt).
 
-#if !os(Windows) && !os(WASI)
+#if !os(Windows) && (!os(WASI) || _runtime(_multithreaded))
 
 import CSystem
 #if SYSTEM_PACKAGE_DARWIN
@@ -24,6 +30,9 @@ import Darwin
 import Glibc
 #elseif canImport(Musl)
 import Musl
+#elseif canImport(WASILibc)
+import WASILibc
+import wasi_pthread
 #elseif canImport(Android)
 import Android
 #else
@@ -64,9 +73,9 @@ internal var _pthreadRWLockAttrZero: _PThreadRWLockAttrStorage { pthread_rwlocka
 #endif
 
 // `pthread_create` stores the new thread through a pointer to an optional
-// where `pthread_t` is a pointer (Darwin, Musl, and the BSDs), and through a
-// pointer to the integer elsewhere (Glibc and Bionic).
-#if SYSTEM_PACKAGE_DARWIN || canImport(Musl) || os(FreeBSD) || os(OpenBSD)
+// where `pthread_t` is a pointer (Darwin, Musl, WASI, and the BSDs), and
+// through a pointer to the integer elsewhere (Glibc and Bionic).
+#if SYSTEM_PACKAGE_DARWIN || canImport(Musl) || os(WASI) || os(FreeBSD) || os(OpenBSD)
 internal typealias _PThreadCreateStorage = pthread_t?
 internal var _pthreadCreateZero: _PThreadCreateStorage { nil }
 internal func _pthreadCreated(_ storage: _PThreadCreateStorage) -> pthread_t { storage! }
@@ -143,9 +152,11 @@ internal func system_sched_yield() -> CInt {
   sched_yield()
 }
 
+#if !os(WASI)
 internal func system_pthread_exit() -> Never {
   pthread_exit(nil)
 }
+#endif
 
 #if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
 internal func system_pthread_main_np() -> CInt {
@@ -223,6 +234,7 @@ internal func system_pthread_attr_getstacksize(
   pthread_attr_getstacksize(attributes, size)
 }
 
+#if !os(WASI)
 internal func system_pthread_attr_setguardsize(
   _ attributes: UnsafeMutablePointer<_PThreadAttrStorage>, _ size: Int
 ) -> CInt {
@@ -247,6 +259,7 @@ internal func system_pthread_attr_setschedparam(
 ) -> CInt {
   pthread_attr_setschedparam(attributes, parameters)
 }
+#endif // !os(WASI)
 
 #if SYSTEM_PACKAGE_DARWIN
 internal func system_pthread_attr_set_qos_class_np(
@@ -259,6 +272,7 @@ internal func system_pthread_attr_set_qos_class_np(
 
 // MARK: - Scheduling
 
+#if !os(WASI)
 internal func system_pthread_getschedparam(
   _ thread: pthread_t,
   _ policy: UnsafeMutablePointer<CInt>,
@@ -295,6 +309,7 @@ internal func system_sched_get_priority_max(_ policy: CInt) -> CInt {
 #endif
   return sched_get_priority_max(policy)
 }
+#endif // !os(WASI)
 
 #if SYSTEM_PACKAGE_DARWIN
 internal func system_pthread_set_qos_class_self_np(
@@ -446,7 +461,7 @@ internal func system_pthread_mutex_consistent(
 }
 #endif
 
-#if !os(Android)
+#if !os(Android) && !os(WASI)
 internal func system_pthread_mutex_getprioceiling(
   _ mutex: UnsafeMutablePointer<_PThreadMutexStorage>,
   _ ceiling: UnsafeMutablePointer<CInt>
@@ -493,7 +508,7 @@ internal func system_pthread_mutexattr_setpshared(
   pthread_mutexattr_setpshared(attributes, shared)
 }
 
-#if !os(Android)
+#if !os(Android) && !os(WASI)
 internal func system_pthread_mutexattr_setprotocol(
   _ attributes: UnsafeMutablePointer<_PThreadMutexAttrStorage>, _ priorityProtocol: CInt
 ) -> CInt {
@@ -769,4 +784,4 @@ internal func system_pthread_setspecific(
   return pthread_setspecific(key, value)
 }
 
-#endif // !os(Windows) && !os(WASI)
+#endif // !os(Windows) && (!os(WASI) || _runtime(_multithreaded))

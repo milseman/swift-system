@@ -261,7 +261,7 @@ internal var _P_PIDFD: idtype_t { 3 }
 //
 // posix_spawn is wrapped where Syscalls+Processes.swift wraps it.
 
-#if !os(watchOS) && !os(tvOS) && !os(Android)
+#if !os(watchOS) && !os(tvOS)
 @_alwaysEmitIntoClient
 internal var _POSIX_SPAWN_RESETIDS: CShort { CShort(POSIX_SPAWN_RESETIDS) }
 
@@ -286,12 +286,12 @@ internal var _POSIX_SPAWN_START_SUSPENDED: CShort { CShort(POSIX_SPAWN_START_SUS
 
 @_alwaysEmitIntoClient
 internal var _POSIX_SPAWN_CLOEXEC_DEFAULT: CShort { CShort(POSIX_SPAWN_CLOEXEC_DEFAULT) }
-#elseif os(Linux)
-// glibc declares it only with _GNU_SOURCE.
+#elseif os(Linux) || os(Android)
+// glibc and Bionic declare it only with _GNU_SOURCE, as 0x80.
 @_alwaysEmitIntoClient
 internal var _POSIX_SPAWN_SETSID: CShort { 0x80 }
 #endif
-#endif // !os(watchOS) && !os(tvOS) && !os(Android)
+#endif // !os(watchOS) && !os(tvOS)
 
 // MARK: - Resource limits
 

@@ -7,7 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-#if !os(Windows) && !os(WASI)
+#if !os(Windows) && (!os(WASI) || _runtime(_multithreaded))
 
 #if SYSTEM_PACKAGE_DARWIN
 import Darwin
@@ -15,6 +15,9 @@ import Darwin
 import Glibc
 #elseif canImport(Musl)
 import Musl
+#elseif canImport(WASILibc)
+import WASILibc
+import wasi_pthread
 #elseif canImport(Android)
 import Android
 #else
@@ -52,10 +55,12 @@ extension PThread {
     /// The corresponding C function is `pthread_attr_setstacksize`.
     public var stackSize: Int?
 
+    #if !os(WASI)
     /// The size of the guard area past the end of the new thread's stack,
     /// in bytes, or `nil` for the system's default.
     ///
     /// The corresponding C function is `pthread_attr_setguardsize`.
+    /// - Note: Not available on WASI.
     public var guardSize: Int?
 
     /// The new thread's scheduling policy and priority,
@@ -68,7 +73,9 @@ extension PThread {
     /// The corresponding C functions are `pthread_attr_setinheritsched`,
     /// with `PTHREAD_EXPLICIT_SCHED`, `pthread_attr_setschedpolicy`,
     /// and `pthread_attr_setschedparam`.
+    /// - Note: Not available on WASI.
     public var scheduling: Scheduling?
+    #endif
 
     #if SYSTEM_PACKAGE_DARWIN
     /// The new thread's quality-of-service class,
@@ -155,6 +162,7 @@ extension PThread.Attributes {
         return error
       }
     }
+    #if !os(WASI)
     if let guardSize {
       if let error = _pthreadError(system_pthread_attr_setguardsize(attributes, guardSize)) {
         return error
@@ -177,6 +185,7 @@ extension PThread.Attributes {
         return error
       }
     }
+    #endif
     #if SYSTEM_PACKAGE_DARWIN
     if let qosClass {
       if let error = _pthreadError(
@@ -196,4 +205,4 @@ internal func _pthreadError(_ result: CInt) -> Errno? {
   result == 0 ? nil : Errno(rawValue: result)
 }
 
-#endif // !os(Windows) && !os(WASI)
+#endif // !os(Windows) && (!os(WASI) || _runtime(_multithreaded))

@@ -15,7 +15,7 @@
 // flags, and ProcessID.spawn(_:arguments:environment:cFileActions:
 // cAttributes:) spawns with them.
 
-#if !os(Windows) && !os(WASI) && !os(watchOS) && !os(tvOS) && !os(Android)
+#if !os(Windows) && !os(WASI) && !os(watchOS) && !os(tvOS)
 
 #if SYSTEM_PACKAGE_DARWIN
 import Darwin
@@ -23,23 +23,25 @@ import Darwin
 import Glibc
 #elseif canImport(Musl)
 import Musl
+#elseif canImport(Android)
+import Android
 #else
 #error("Unsupported Platform")
 #endif
 
 @available(System 199, *)
 extension CInterop {
-  #if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
+  #if SYSTEM_PACKAGE_DARWIN || os(Android) || os(FreeBSD) || os(OpenBSD)
   /// A spawn's C attributes: what `posix_spawn` takes a pointer to,
-  /// which on Darwin and the BSDs is itself a pointer to the attributes,
-  /// `nil` until `posix_spawnattr_init` sets it.
+  /// which on Darwin, Android, and the BSDs is itself a pointer to the
+  /// attributes, `nil` until `posix_spawnattr_init` sets it.
   ///
   /// The corresponding C type is `posix_spawnattr_t`.
   public typealias SpawnAttributes = posix_spawnattr_t?
 
   /// A spawn's C file actions: what `posix_spawn` takes a pointer to,
-  /// which on Darwin and the BSDs is itself a pointer to the actions,
-  /// `nil` until `posix_spawn_file_actions_init` sets it.
+  /// which on Darwin, Android, and the BSDs is itself a pointer to the
+  /// actions, `nil` until `posix_spawn_file_actions_init` sets it.
   ///
   /// The corresponding C type is `posix_spawn_file_actions_t`.
   public typealias SpawnFileActions = posix_spawn_file_actions_t?
@@ -358,4 +360,4 @@ extension ProcessID {
   }
 }
 
-#endif // !os(Windows) && !os(WASI) && !os(watchOS) && !os(tvOS) && !os(Android)
+#endif // !os(Windows) && !os(WASI) && !os(watchOS) && !os(tvOS)

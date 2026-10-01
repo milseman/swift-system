@@ -37,7 +37,7 @@ private struct MemoryTests {
   @available(System 199, *)
   @Test func zeroBytesAllocateABlockToFree() throws {
     let block = try Memory.allocate(byteCount: 0)
-    #if !os(OpenBSD) && !os(WASI)
+    #if !os(OpenBSD)
     #expect(Memory.usableSize(of: block) >= 1)
     #endif
     Memory.free(block)
@@ -48,12 +48,16 @@ private struct MemoryTests {
     Memory.free(nil)
   }
 
+  // On 32-bit platforms, Int.max bytes are half the address space, which
+  // WebAssembly's allocator can provide.
+  #if _pointerBitWidth(_64)
   @available(System 199, *)
   @Test func tooLargeARequestIsNoMemory() {
     #expect(throws: Errno.noMemory) { try Memory.allocate(byteCount: .max) }
     #expect(throws: Errno.noMemory) { try Memory.allocateZeroed(byteCount: .max) }
     #expect(throws: Errno.noMemory) { try Memory.allocate(byteCount: .max, alignment: 64) }
   }
+  #endif
 
   @available(System 199, *)
   @Test func allocateZeroedIsZeros() throws {
@@ -74,7 +78,10 @@ private struct MemoryTests {
   @Test func aTotalThatOverflowsIsNoMemory() {
     // count * stride would trap; calloc reports it.
     #expect(throws: Errno.noMemory) { try Memory.allocateZeroed(count: .max, stride: 2) }
-    #expect(throws: Errno.noMemory) { try Memory.allocateZeroed(count: 1 << 40, stride: 1 << 40) }
+    // A product past size_t's range on any platform: 1 << 40 is 0 in a
+    // 32-bit Int.
+    let half = 1 << (Int.bitWidth / 2 + 1)
+    #expect(throws: Errno.noMemory) { try Memory.allocateZeroed(count: half, stride: half) }
   }
 
   @available(System 199, *)
@@ -91,6 +98,7 @@ private struct MemoryTests {
     Memory.free(block)
   }
 
+  #if _pointerBitWidth(_64) // As for tooLargeARequestIsNoMemory()
   @available(System 199, *)
   @Test func aFailedReallocationLeavesTheBlock() throws {
     let block = try Memory.allocate(byteCount: 8)
@@ -99,6 +107,7 @@ private struct MemoryTests {
     #expect(throws: Errno.noMemory) { try Memory.reallocate(block, byteCount: .max) }
     #expect(block.load(as: UInt64.self) == 0x0123_4567_89AB_CDEF)
   }
+  #endif
 
   @available(System 199, *)
   @Test func alignedAllocationIsAligned() throws {
@@ -137,7 +146,7 @@ private struct MemoryTests {
   }
   #endif
 
-  #if !os(OpenBSD) && !os(WASI)
+  #if !os(OpenBSD)
   @available(System 199, *)
   @Test func usableSizeIsAtLeastTheRequest() throws {
     for byteCount in [1, 17, 100, 1000, 100_000] {

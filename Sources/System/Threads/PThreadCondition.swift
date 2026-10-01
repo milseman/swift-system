@@ -7,7 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-#if !os(Windows) && !os(WASI)
+#if !os(Windows) && (!os(WASI) || _runtime(_multithreaded))
 
 #if SYSTEM_PACKAGE_DARWIN
 import Darwin
@@ -15,6 +15,9 @@ import Darwin
 import Glibc
 #elseif canImport(Musl)
 import Musl
+#elseif canImport(WASILibc)
+import WASILibc
+import wasi_pthread
 #elseif canImport(Android)
 import Android
 #else
@@ -508,7 +511,7 @@ extension PThread.Condition {
   /// The corresponding C type is `clockid_t`.
   /// - Note: Not available on Darwin.
   @frozen
-  public struct Clock: RawRepresentable, Hashable, Sendable {
+  public struct Clock: RawRepresentable, Hashable {
     /// The raw C clock identifier.
     @_alwaysEmitIntoClient
     public var rawValue: clockid_t
@@ -531,6 +534,15 @@ extension PThread.Condition {
   }
   #endif // !SYSTEM_PACKAGE_DARWIN
 }
+
+// WASI's clockid_t is a pointer, which isn't Sendable, to a constant.
+#if os(WASI)
+@available(System 199, *)
+extension PThread.Condition.Clock: @unchecked Sendable {}
+#elseif !SYSTEM_PACKAGE_DARWIN
+@available(System 199, *)
+extension PThread.Condition.Clock: Sendable {}
+#endif
 
 @available(System 199, *)
 extension PThread.Condition.Attributes {
@@ -560,4 +572,4 @@ extension PThread.Condition.Attributes {
   }
 }
 
-#endif // !os(Windows) && !os(WASI)
+#endif // !os(Windows) && (!os(WASI) || _runtime(_multithreaded))

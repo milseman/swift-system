@@ -117,12 +117,12 @@ internal func system_malloc_size(_ pointer: UnsafeRawPointer) -> Int {
 internal func system_malloc_good_size(_ size: Int) -> Int {
   malloc_good_size(size)
 }
-#elseif os(Linux) || os(Android) || os(FreeBSD)
-// glibc declares malloc_usable_size in <malloc.h>, and FreeBSD in
-// <malloc_np.h>, which their Swift modules don't include; Musl's and
-// Bionic's modules include <malloc.h>.
+#elseif os(Linux) || os(Android) || os(FreeBSD) || os(WASI)
+// glibc and wasi-libc declare malloc_usable_size in <malloc.h>, and
+// FreeBSD in <malloc_np.h>, which their Swift modules don't include;
+// Musl's and Bionic's modules include <malloc.h>.
 internal func system_malloc_usable_size(_ pointer: UnsafeRawPointer) -> Int {
-#if (os(Linux) && canImport(Glibc)) || os(FreeBSD)
+#if (os(Linux) && canImport(Glibc)) || os(FreeBSD) || os(WASI)
   return csystem_malloc_usable_size(pointer)
 #elseif canImport(Musl)
   // Musl's takes a mutable pointer, which it doesn't write through.

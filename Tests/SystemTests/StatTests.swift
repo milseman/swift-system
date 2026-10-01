@@ -63,14 +63,18 @@ private struct StatTests {
       defer {
         try? fileFD.close()
       }
+      #if !os(WASI) // WASI's files have no permissions
       // The creation mask can clear some of those permissions, such as
       // with a umask of 077, so set them outright.
       try #require(fchmod(fileFD.rawValue, 0o644) == 0, "\(Errno.current)")
+      #endif
       try fileFD.writeAll("Hello, world!".utf8)
 
       let fileStatFromFD = try fileFD.stat()
       #expect(fileStatFromFD.type == .regular)
+      #if !os(WASI)
       #expect(fileStatFromFD.permissions == [.ownerReadWrite, .groupRead, .otherRead])
+      #endif
       #expect(fileStatFromFD.size == "Hello, world!".utf8.count)
 
       let fileStatFromFilePath = try tempFile.stat()
@@ -193,6 +197,7 @@ private struct StatTests {
     }
   }
 
+  #if !os(WASI) // WASI's files have no permissions: fchmod and chmod fail
   @available(System 1.7.0, *)
   @Test func permissions() async throws {
     try withTemporaryFilePath(basename: "Stat_permissions") { tempDir in
@@ -225,6 +230,7 @@ private struct StatTests {
       #expect(readOnlyStat.permissions == newMode.permissions)
     }
   }
+  #endif
 
   #if !os(WASI) // WASI's CLOCK_REALTIME is a macro Swift can't import
   @available(System 1.7.0, *)

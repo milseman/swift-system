@@ -7,7 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-#if !os(Windows) && !os(WASI)
+#if !os(Windows)
 
 import Testing
 
@@ -113,10 +113,12 @@ private struct DirectoryStreamTests {
       #expect(entries["e.txt"]?.type == .regular)
       // A link to a directory is a link.
       #expect(entries["link"]?.type == .symbolicLink)
+      #if !os(WASI) // Under WasmKit, readdir's d_ino isn't stat's st_ino.
       for (name, entry) in entries {
         let status = try root.appending(name).stat(followTargetSymlink: false)
         #expect(entry.inode == status.inode, "\(name)")
       }
+      #endif
     }
   }
 
@@ -189,10 +191,23 @@ private struct DirectoryStreamTests {
 
       // When the descriptor isn't a directory, the caller still owns it.
       let file = try FileDescriptor.open(root.appending("e.txt"), .readOnly)
+      #if os(WASI)
+      // wasi-libc's fdopendir reports fd_readdir's error, which is EBADF
+      // under WasmKit.
+      let error = #expect(throws: Errno.self) {
+        _ = try DirectoryStream(taking: file)
+      }
+      #expect(error == .notDirectory || error == .badFileDescriptor)
+      #else
       #expect(throws: Errno.notDirectory) {
         _ = try DirectoryStream(taking: file)
       }
+      #endif
+      #if os(WASI) // No descriptor flags: WASI has no exec
+      _ = try file.stat()
+      #else
       _ = try file.descriptorFlags()
+      #endif
       try file.close()
     }
   }
@@ -230,18 +245,26 @@ private struct DirectoryStreamTests {
       try DirectoryFixture.makeTree(in: root)
       var stream = try DirectoryStream.open(root)
       #expect(try Stat(stream.fileDescriptor).inode == root.stat().inode)
+      #if !os(WASI) // WASI has no exec
       #expect(try stream.fileDescriptor.descriptorFlags().contains(.closeOnExec))
+      #endif
 
       // Each entry's status, relative to the descriptor.
       while let entry = try stream.next() {
         let status = try FilePath(root: nil, components: entry.name)
           .stat(relativeTo: stream.fileDescriptor, flags: .symlinkNoFollow)
+        #if !os(WASI) // As in readsEachEntryOnce()
         #expect(status.inode == entry.inode)
+        #endif
         #expect(status.type == entry.type)
       }
 
       let relative = try DirectoryStream.open("a", relativeTo: stream.fileDescriptor)
+      #if !os(WASI)
       #expect(try relative.fileDescriptor.descriptorFlags().contains(.closeOnExec))
+      #else
+      _ = relative
+      #endif
     }
   }
 
@@ -296,4 +319,4 @@ private struct DirectoryStreamTests {
   }
 }
 
-#endif // !os(Windows) && !os(WASI)
+#endif // !os(Windows)

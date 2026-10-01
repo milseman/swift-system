@@ -33,6 +33,60 @@ internal func _getTemporaryDirectory() throws -> FilePath {
   return FilePath(SystemString(platformString: tmp))
 }
 
+#if os(WASI)
+/// Delete the entire contents of a directory, including its subdirectories.
+///
+/// - Parameters:
+///   - path: The directory to be deleted.
+///
+/// Removes a directory completely, including all of its contents.
+///
+/// On WASI, each directory is opened by its path, rather than as `.`
+/// relative to its descriptor: WasmKit, which runs the tests, backs a
+/// directory opened as `.` with its parent descriptor's host descriptor, so
+/// closing either closes both (WasmKit in Swift 6.2.4).
+internal func _recursiveRemove(
+  at path: FilePath
+) throws {
+  // The entries, read before any is removed, which could make the stream
+  // skip one.
+  var entries: [(name: FilePath.Component, isDirectory: Bool)] = []
+  let dirfd = try FileDescriptor.open(path, .readOnly, options: .directory)
+  guard let dir = system_fdopendir(dirfd.rawValue) else {
+    let error = Errno.current
+    try? dirfd.close()
+    throw error
+  }
+  while let dirent = system_readdir(dir) {
+    let name = withUnsafeBytes(of: dirent.pointee.d_name) {
+      String(platformString: $0.assumingMemoryBound(to: CInterop.PlatformChar.self).baseAddress!)
+    }
+    guard name != "." && name != "..", let component = FilePath.Component(name) else {
+      continue
+    }
+    entries.append((component, dirent.pointee.d_type == SYSTEM_DT_DIR))
+  }
+  _ = system_closedir(dir)
+
+  for entry in entries {
+    let child = path.appending(entry.name)
+    if entry.isDirectory {
+      try _recursiveRemove(at: child)
+    } else {
+      try child.withPlatformString {
+        if system_unlink($0) != 0 {
+          throw Errno.current
+        }
+      }
+    }
+  }
+  try path.withPlatformString {
+    if system_rmdir($0) != 0 {
+      throw Errno.current
+    }
+  }
+}
+#else
 /// Delete the entire contents of a directory, including its subdirectories.
 ///
 /// - Parameters:
@@ -165,5 +219,6 @@ fileprivate func removeContents(of dirfd: CInt) throws {
     }
   }
 }
+#endif // os(WASI)
 
 #endif // !os(Windows)

@@ -25,6 +25,11 @@ import CSystem
 import Musl
 #elseif canImport(WASILibc)
 import WASILibc
+#if _runtime(_multithreaded)
+// The mocking driver's thread-specific storage. WASILibc doesn't re-export
+// the module of <pthread.h>.
+import wasi_pthread
+#endif
 #elseif canImport(Android)
 import CSystem
 import Android
