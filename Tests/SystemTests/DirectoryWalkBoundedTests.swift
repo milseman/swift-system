@@ -7,7 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-#if !os(Windows) && !os(WASI)
+#if !os(Windows)
 
 import Testing
 
@@ -17,6 +17,8 @@ import Darwin
 import Glibc
 #elseif canImport(Musl)
 import Musl
+#elseif canImport(WASILibc)
+import WASILibc
 #elseif canImport(Android)
 import Android
 #else
@@ -81,6 +83,7 @@ private struct DirectoryWalkBoundedTests {
     }
   }
 
+  #if !os(WASI) // WASI's files have no permissions
   /// A directory the walk can't open gets the same visits.
   @available(System 199, *)
   @Test(.enabled(if: geteuid() != 0, "root can read any directory"))
@@ -102,7 +105,9 @@ private struct DirectoryWalkBoundedTests {
       }
     }
   }
+  #endif
 
+  #if !os(WASI) // WasmKit, which runs WASI's tests, can't rename (ENOTSUP)
   /// A directory that's moved, and replaced by another, while the walk is
   /// in one of its subdirectories isn't there when the walk comes back to it:
   /// the walk throws, leaves it, and goes on with the rest of the tree.
@@ -152,7 +157,9 @@ private struct DirectoryWalkBoundedTests {
       #expect(perLevel.visits.contains("a/b/") && perLevel.visits.contains("a/"))
     }
   }
+  #endif
 
+  #if !os(WASI) // WasmKit, which runs WASI's tests, can't rename (ENOTSUP)
   /// A directory replaced by a symbolic link while the walk is in one of
   /// its subdirectories: the walk reopens it by name, without following
   /// the link, and so doesn't go out of the tree.
@@ -196,6 +203,7 @@ private struct DirectoryWalkBoundedTests {
       #expect(try root.appending("outside/precious").stat().type == .regular)
     }
   }
+  #endif
 }
 
 @Suite("DirectoryWalk, bounded descriptors, limit")
@@ -258,4 +266,4 @@ private struct DirectoryWalkBoundedLimitTests {
   #endif
 }
 
-#endif // !os(Windows) && !os(WASI)
+#endif // !os(Windows)
