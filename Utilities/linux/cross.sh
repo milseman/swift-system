@@ -31,8 +31,9 @@
 # WASI has no sockets: SystemSockets, its tests and the samples don't build
 # for it, and SwiftPM builds the tests only with every target. So wasi's
 # build-tests and test run in a copy of the package whose manifest drops
-# those and the MemberImportVisibility canary, which depends on
-# SystemSockets elsewhere: .build/cross-<tag>-wasi-package, its Sources,
+# those, the MemberImportVisibility canary, which depends on SystemSockets
+# elsewhere, and _SystemPackageForPlugin, a second build of SystemPackage
+# that no test uses: .build/cross-<tag>-wasi-package, its Sources,
 # Tests and Package.swift copied again each run, with the scratch path
 # .build/cross-<tag>-wasi-tests. --whole builds the package itself.
 #
@@ -148,12 +149,14 @@ if [ -n "$copy" ]; then
   cp "$ROOT/Package.swift" "$ROOT/$copy/Package.swift"
   cat >> "$ROOT/$copy/Package.swift" <<'MANIFEST'
 
-// Added by Utilities/linux/cross.sh, for WASI, which has no sockets.
+// Added by Utilities/linux/cross.sh, for WASI, which has no sockets. The
+// plugins' second SystemPackage goes too: the tests don't use it.
 let crossDropped: Set<String> = [
   "SystemSockets", "SystemSocketsTests", "Samples", "MemberImportVisibility",
+  "_SystemPackageForPlugin",
 ]
 package.targets.removeAll { crossDropped.contains($0.name) }
-package.products.removeAll { $0.name == "SystemSockets" || $0.name == "system-samples" }
+package.products.removeAll { crossDropped.contains($0.name) || $0.name == "system-samples" }
 package.dependencies.removeAll()
 MANIFEST
   if [ "$threads" = 1 ]; then
