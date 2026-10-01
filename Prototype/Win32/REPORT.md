@@ -24,10 +24,11 @@ list is done.
   generating console events, and `SetStdHandle` (16); `AddDllDirectory` (18); a quoting helper for command lines
   (13); and packages-5's Windows gaps (`../adopters/PACKAGES-5-REPORT.md`, "Gaps, across platforms"):
   `ProcessID.ExitCode`'s `success` and `failure`, and `FileStream.setBuffering`.
-- **For other lanes**: P3 (section 22) must land with the next merge of this branch, or CI's CMake job fails on
-  system-next, which merged `b63bce9` without it; the windows-3 patches section has the list with this lane's files.
-  P4 there brings `FileDescriptor`'s Windows canonicalization to section 23's rule. The PlatformEnum samples'
-  Windows arms differ from `Win32.ProcessHandle` (section 21).
+- **For other lanes**: P3 (section 22) landed on system-next with coverage-4 (`8caa741`, merged here at
+  `bb225ab`). The CMake list still lacks this lane's files, so the Win32 block in the windows-3 patches section must
+  land with this branch's next merge, or CI's CMake job fails. P4 there brings `FileDescriptor`'s Windows
+  canonicalization to section 23's rule. The PlatformEnum samples' Windows arms differ from `Win32.ProcessHandle`
+  (section 21).
 - **Tests**: no Windows test has run; each section lists what a Windows run must check. At each commit, Darwin
   `swift build` and `swift test` pass, with the same tests skipped as before the lane (for counts, see
   `Prototype/Status/STATUS.md`), and `check-windows.sh` compiles the Win32 files and the Windows test files. No
@@ -1719,7 +1720,7 @@ buffers `char *`), and replaces what Winsock lacks or renames: `close` with `clo
 ## 31. windows-3: patches for files outside the lane
 
 **P3, continued: `Sources/System/CMakeLists.txt`.** The Win32 `target_sources` block as it should read with this
-lane's files, which coverage-4 applies with P3. It replaces the block whether or not P3 has landed. Kept current
+lane's files. P3 itself landed with coverage-4 (`8caa741`); this block replaces the one it left, and is kept current
 with each commit.
 
 ```cmake
