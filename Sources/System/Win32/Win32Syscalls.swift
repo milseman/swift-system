@@ -445,4 +445,63 @@ internal func system_Sleep(_ dwMilliseconds: DWORD) {
   Sleep(dwMilliseconds)
 }
 
+// MARK: - Locks and condition variables
+
+internal func system_InitializeSRWLock(_ SRWLock: UnsafeMutablePointer<SRWLOCK>) {
+  InitializeSRWLock(SRWLock)
+}
+
+internal func system_AcquireSRWLockExclusive(_ SRWLock: UnsafeMutablePointer<SRWLOCK>) {
+  AcquireSRWLockExclusive(SRWLock)
+}
+
+internal func system_AcquireSRWLockShared(_ SRWLock: UnsafeMutablePointer<SRWLOCK>) {
+  AcquireSRWLockShared(SRWLock)
+}
+
+internal func system_TryAcquireSRWLockExclusive(
+  _ SRWLock: UnsafeMutablePointer<SRWLOCK>
+) -> BOOLEAN {
+  TryAcquireSRWLockExclusive(SRWLock)
+}
+
+internal func system_TryAcquireSRWLockShared(_ SRWLock: UnsafeMutablePointer<SRWLOCK>) -> BOOLEAN {
+  TryAcquireSRWLockShared(SRWLock)
+}
+
+internal func system_ReleaseSRWLockExclusive(_ SRWLock: UnsafeMutablePointer<SRWLOCK>) {
+  ReleaseSRWLockExclusive(SRWLock)
+}
+
+internal func system_ReleaseSRWLockShared(_ SRWLock: UnsafeMutablePointer<SRWLOCK>) {
+  ReleaseSRWLockShared(SRWLock)
+}
+
+internal func system_InitializeConditionVariable(
+  _ ConditionVariable: UnsafeMutablePointer<CONDITION_VARIABLE>
+) {
+  InitializeConditionVariable(ConditionVariable)
+}
+
+internal func system_SleepConditionVariableSRW(
+  _ ConditionVariable: UnsafeMutablePointer<CONDITION_VARIABLE>,
+  _ SRWLock: UnsafeMutablePointer<SRWLOCK>,
+  _ dwMilliseconds: DWORD,
+  _ Flags: ULONG
+) -> Bool {
+  SleepConditionVariableSRW(ConditionVariable, SRWLock, dwMilliseconds, Flags)
+}
+
+internal func system_WakeConditionVariable(
+  _ ConditionVariable: UnsafeMutablePointer<CONDITION_VARIABLE>
+) {
+  WakeConditionVariable(ConditionVariable)
+}
+
+internal func system_WakeAllConditionVariable(
+  _ ConditionVariable: UnsafeMutablePointer<CONDITION_VARIABLE>
+) {
+  WakeAllConditionVariable(ConditionVariable)
+}
+
 #endif // os(Windows)

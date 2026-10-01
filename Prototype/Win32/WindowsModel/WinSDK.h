@@ -574,3 +574,31 @@ void QueryUnbiasedInterruptTimePrecise(PULONGLONG lpUnbiasedInterruptTimePrecise
 BOOL QueryPerformanceCounter(LARGE_INTEGER *lpPerformanceCount);
 BOOL QueryPerformanceFrequency(LARGE_INTEGER *lpFrequency);
 void Sleep(DWORD dwMilliseconds);
+
+// synchapi.h, winnt.h: SRW locks and condition variables
+
+typedef struct _RTL_SRWLOCK {
+  PVOID Ptr;
+} RTL_SRWLOCK, *PRTL_SRWLOCK;
+typedef RTL_SRWLOCK SRWLOCK, *PSRWLOCK;
+
+typedef struct _RTL_CONDITION_VARIABLE {
+  PVOID Ptr;
+} RTL_CONDITION_VARIABLE, *PRTL_CONDITION_VARIABLE;
+typedef RTL_CONDITION_VARIABLE CONDITION_VARIABLE, *PCONDITION_VARIABLE;
+
+#define CONDITION_VARIABLE_LOCKMODE_SHARED 0x1
+#define ERROR_TIMEOUT 1460
+
+void InitializeSRWLock(PSRWLOCK SRWLock);
+void AcquireSRWLockExclusive(PSRWLOCK SRWLock);
+void AcquireSRWLockShared(PSRWLOCK SRWLock);
+BOOLEAN TryAcquireSRWLockExclusive(PSRWLOCK SRWLock);
+BOOLEAN TryAcquireSRWLockShared(PSRWLOCK SRWLock);
+void ReleaseSRWLockExclusive(PSRWLOCK SRWLock);
+void ReleaseSRWLockShared(PSRWLOCK SRWLock);
+void InitializeConditionVariable(PCONDITION_VARIABLE ConditionVariable);
+BOOL SleepConditionVariableSRW(PCONDITION_VARIABLE ConditionVariable, PSRWLOCK SRWLock,
+                               DWORD dwMilliseconds, ULONG Flags);
+void WakeConditionVariable(PCONDITION_VARIABLE ConditionVariable);
+void WakeAllConditionVariable(PCONDITION_VARIABLE ConditionVariable);

@@ -14,9 +14,10 @@ The windows-2 lane (sections 11 on, base system-next at `4365f83`) applies patch
 adds API for the adopters' top Windows gaps of section 8, in its order, checked the same way.
 
 **Resume here:** windows-api's parts are done (sections 1 to 10). windows-2: P1 and P2 are applied (section 11);
-processes (sections 12 and 13) and clocks and sleeping (section 14) are done. Next: SRW locks and condition
-variables, the third gap, then the rest of section 8's gaps in order. Findings and patches for other lanes' files
-are the last two sections; patch P3 (the CMake source list) grows with each new file.
+processes (sections 12 and 13), clocks and sleeping (section 14), and SRW locks and condition variables (section 15)
+are done. Next: consoles and standard handles, the fourth gap, then the rest of section 8's gaps in order. Findings
+and patches for other lanes' files are the last two sections; patch P3 (the CMake source list) grows with each new
+file.
 
 ## How it was checked
 
@@ -807,7 +808,7 @@ A Windows run must check:
 - Not covered: consoles (`newConsole`, `detached`), breaking away from a job, a command line at the limit of
   32,767 characters, and callers whose standard handles are console handles.
 
-## 14. Clocks and sleeping: this commit
+## 14. Clocks and sleeping: `91b6894`
 
 The second gap of section 8. Most of its files call `Sleep`, many of them tests; next come the system time
 (`GetSystemTimePreciseAsFileTime`, `GetSystemTimeAsFileTime`) and `GetTickCount64`, then one file each for the
@@ -863,7 +864,55 @@ A Windows run must check:
   link through the WinSDK module, as swift-foundation's call to the unbiased one does.
 - `testSleepYieldsForNonpositiveDurations`.
 
-## 15. windows-2: findings
+## 15. SRW locks and condition variables: this commit
+
+The third gap of section 8. Every file in it takes an exclusive SRW lock (`InitializeSRWLock`,
+`AcquireSRWLockExclusive`, `ReleaseSRWLockExclusive`), as each package's own lock type; a third of them wait on a
+condition variable (`SleepConditionVariableSRW`, `WakeConditionVariable`); one takes the lock shared, one tries it,
+and one uses a critical section.
+
+What: `Win32Synchronization.swift`.
+- `Win32.SRWLock`: `init()` (`InitializeSRWLock`); `lock()`, `tryLock()`, `unlock()` and `withLock(_:)` exclusively
+  (`AcquireSRWLockExclusive`, `TryAcquireSRWLockExclusive`, `ReleaseSRWLockExclusive`); `lockShared()`,
+  `tryLockShared()`, `unlockShared()` and `withSharedLock(_:)` (the `Shared` functions); `unsafeAddress`.
+- `Win32.ConditionVariable`: `init()` (`InitializeConditionVariable`); `wait(on:shared:)` and
+  `wait(on:shared:timeout:) -> Bool` (`SleepConditionVariableSRW`, with `CONDITION_VARIABLE_LOCKMODE_SHARED` for
+  `shared`); `wake()` and `wakeAll()` (`WakeConditionVariable`, `WakeAllConditionVariable`); `unsafeAddress`.
+
+Which API: **Win32**, as the Windows side of `PThread.Mutex`, `PThread.ReadWriteLock` and `PThread.Condition`,
+which wrap pthreads, a library Windows doesn't have. `Synchronization.Mutex` already covers a plain lock on
+Windows (it's an SRW lock there), so these are for condition variables, shared holds, and C interop.
+
+Design calls, with the alternatives rejected:
+- **Heap storage**, as `PThread.Mutex` has: the C lock stays at one address while the owner moves, since Windows
+  doesn't let a lock or condition variable in use move. Neither needs destroying, so `deinit` only frees. Rejected:
+  inline storage with `@_rawLayout`, as `Synchronization.Mutex` has, which needs an experimental feature the package
+  doesn't enable.
+- **Nothing throws but the waits.** The lock functions and the wakes can't fail, so they return `Void` or `Bool`;
+  `withLock(_:)` and `withSharedLock(_:)` are generic over the body's error, `throws(E)`, where
+  `PThread.Mutex.withLock` throws untyped because locking can fail. The waits throw `Win32.Error` for a failure
+  other than the time-out, which Windows documents as possible.
+- **Exclusive and shared are separate methods**, as Win32 names them, rather than a mode parameter reusing
+  `Win32.LockMode`, whose documentation is about byte-range locks. The condition variable's `shared: Bool` mirrors
+  the C flag.
+- **Windows names**: `wake()` and `wakeAll()`, not POSIX's `signal()` and `broadcast()`; and `lockShared()`, not
+  `PThread.ReadWriteLock`'s `lockForReading()`.
+- **Relative time-outs**, as Windows takes them; POSIX's `wait(on:until:)` takes a deadline. A time-out longer
+  than `INFINITE - 1` milliseconds ends then and returns `true`, as a spurious wake-up, which the caller must
+  handle anyway.
+- `lock()`, `tryLock()` and `unlock()` and their shared forms are `noasync`, as `PThread.Mutex`'s are.
+- **Not wrapped**: `CRITICAL_SECTION` and `SleepConditionVariableCS` (one file, swift-subprocess); and adopting a
+  C-owned lock, as `PThread.Mutex.withUnsafeMutex(_:_:)` does.
+
+Tests: `Win32SynchronizationTests`, with other threads from Dispatch, as `FileLockTests` has them. The time-out
+tests retry until a wait times out, since a spurious wake-up returns `true`.
+
+A Windows run must check: `testInternalConstantsMatchTheSDK`; `testExclusiveLock` (another thread can't take it
+either way while it's held); `testSharedLock` (two shared holders; no exclusive one meanwhile);
+`testWithLockRethrowsAndReleases`; `testConditionVariableWakesAWaiter`; `testWaitTimesOut` and `testSharedWait`
+(the lock is held again, the same way, after a time-out); `testWakeAll` (three waiters).
+
+## 16. windows-2: findings
 
 - **The PlatformEnum samples' Windows arms now reach System's `Win32.ProcessHandle`** (the stand-ins compile only
   with `SIMULATE_PLATFORMS`), and differ from it: `Platform.Process` reads `processID` as a property, where
@@ -880,7 +929,7 @@ A Windows run must check:
   available for a noncopyable wrapped type in Swift 6.2, and a closure that captures a partially consumed struct
   is "used after consume" even when it touches only a field that wasn't consumed.
 
-## 16. windows-2: patches for files outside the lane
+## 17. windows-2: patches for files outside the lane
 
 **P3, `Sources/System/CMakeLists.txt`: list the lane's new sources.** CI's CMake job fails when a SwiftPM source is
 missing from the list. Kept current with each commit; it applies to this branch with `git apply`.
@@ -894,12 +943,13 @@ missing from the list. Kept current with each commit; it applies to this branch 
 +  Win32/ProcessIDWindows.swift
    Win32/Win32.swift
    Win32/Win32Constants.swift
-@@ -366,7 +367,12 @@
+@@ -366,7 +367,13 @@
    Win32/Win32Locking.swift
    Win32/Win32Open.swift
 +  Win32/Win32Process.swift
 +  Win32/Win32ProcessCreation.swift
    Win32/Win32SecurityDescriptor.swift
++  Win32/Win32Synchronization.swift
    Win32/Win32Syscalls.swift
 -  Win32/Win32VolumeInformation.swift)
 +  Win32/Win32Thread.swift
