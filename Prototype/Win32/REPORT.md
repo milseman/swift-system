@@ -1141,7 +1141,9 @@ runtime's, which relies on `_wputenv_s` removing a variable it's given an empty 
 ## 21. windows-2: patches for files outside the lane
 
 **P3, `Sources/System/CMakeLists.txt`: list the lane's new sources.** CI's CMake job fails when a SwiftPM source is
-missing from the list. Kept current with each commit; it applies to this branch with `git apply`.
+missing from the list. Kept current with each commit; it applies to this branch with `git apply`. system-next at
+`70e1766` merged this branch at `b63bce9` without it, so system-next's list lacks the files through `b63bce9`; apply
+P3 with the next merge of this branch, which brings the rest.
 
 ```diff
 --- a/Sources/System/CMakeLists.txt
