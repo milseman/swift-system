@@ -14,15 +14,25 @@ Darwin; grouped here into clusters and ranked by packages, then call sites. `eco
 toolchain's packages, and `ecosystem.sh --popular report` for popular.tsv's (section 37). Counts are in the runs'
 reports and in STATUS.md, not here.
 
-**Resume here** (coverage-3 stopped 2026-09-30, done; STATUS.md regenerated at the stop). Section 40's rows are all
-closed (sections 41 to 43), both queues are empty and popular.tsv needs no fourth batch (section 44), the
-`_version: 346` gates stay (section 45), `Utilities/linux/build.sh --quiet` exists (section 46), and STATUS.md's
-section 4 tracks the platform imports (section 47). Nothing is uncommitted. Open, for a next lane:
+**Resume here** (coverage-4, worktree `../coverage-4`, from system-next `bb950db` on 2026-10-01; in progress). Its
+brief, rows C1 to C4:
+
+| # | Item | State |
+|---|---|---|
+| C1 | STATUS.md section 4 per platform, each adopter at its newest migration branch | in progress |
+| C2 | Section 1: the symbols the built SystemPackage exports, and the added declarations that export one only to forward a C value | open |
+| C3 | windows-2's patch P3, the Win32 sources in `Sources/System/CMakeLists.txt` | done (section 48) |
+| C4 | A `_SystemPackageForPlugin` product (O2 below) | open |
+
+coverage-3 stopped 2026-09-30, done: section 40's rows are all closed (sections 41 to 43), both queues are empty and
+popular.tsv needs no fourth batch (section 44), the `_version: 346` gates stay (section 45),
+`Utilities/linux/build.sh --quiet` exists (section 46), and STATUS.md's section 4 tracks the platform imports
+(section 47). Open from it:
 
 | # | Item | State |
 |---|---|---|
 | O1 | Linux, Windows and WASI builds of sections 42 and 43's API: `CInterop.Offset` everywhere, PIPE_BUF and cancellation off Darwin | unbuilt; `Utilities/linux/build.sh --quiet test` when the container service runs |
-| O2 | A `_SystemPackageForPlugin` product for sourcekit-lsp's plugins (the packages-5 lane's ask) | Package.swift, outside this lane's files |
+| O2 | A `_SystemPackageForPlugin` product for sourcekit-lsp's plugins (the packages-5 lane's ask) | coverage-4's C4 |
 | O3 | A join that tells a cancelled thread from one that returned (section 43) | open |
 | O4 | Why Foundation's build ignores `_version` (section 45) | open, Foundation's |
 | O5 | A fourth popular batch | not needed now (section 44); the alternative is there |
@@ -1236,3 +1246,20 @@ per kind, and a module-by-kind table the totals. The counts are there, not here.
   evaluation, which answers what one platform's build compiles, not whether any does.
 - `--branch-for` (`STATUS_BRANCHES`) sets a package's migration branch for the adoption and gaps sections too, whose
   header names it when it isn't the default; `STATUS_ECOSYSTEM` points at the clones.
+
+## 48. coverage-4: windows-2's P3, the Win32 sources in CMake: this commit
+
+The coverage-4 lane (worktree `../coverage-4`, from system-next `bb950db`, after the 2026-10-01 convergence merge) took
+four rows: STATUS.md's section 4 per platform, ABI symbols in section 1, windows-2's CMake patch, and the plugin
+product (the Resume-here table's C1 to C4).
+
+`Sources/System/CMakeLists.txt` now lists the twelve Win32 sources that windows-2 added after `b63bce9`: its patch P3
+(Prototype/Win32/REPORT.md section 22), applied with `git apply` as it stands. They are DynamicLibraryWindows,
+PathsWindows, ProcessEnvironmentWindows, ProcessIDWindows, Win32Console, Win32FileInformation, Win32Process,
+Win32ProcessCreation, Win32Synchronization, Win32Thread, Win32Time and Win32Wait. The block stays in byte order, as
+the others are (Win32FileIO before Win32FileInformation).
+
+Check: CI's comparison (`.github/workflows/pull_request.yml`, CMake Validation), redone here with `swift package
+describe` and the file's `add_library` and `target_sources` lists. Before, the twelve were SwiftPM's only sources
+missing from CMake; after, none is, and CMake's only extras are the Linux-only IORing files in its conditional block.
+Nothing builds CMake here.
