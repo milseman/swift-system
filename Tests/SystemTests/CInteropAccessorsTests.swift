@@ -174,8 +174,13 @@ private struct CInteropAccessorsTests {
     // so compare fields.
     let zero = CInterop.Stat()
     #expect(zero.st_ino == 0 && zero.st_size == 0 && zero.st_mode == 0 && zero.st_nlink == 0)
-    // A real file's status reads the same through both.
+    // A real file's status reads the same through both. (WASI's tests see
+    // only the directories the runner preopens, such as /tmp.)
+    #if os(WASI)
+    let real = try FilePath("/tmp").stat().rawValue
+    #else
     let real = try FilePath("/").stat().rawValue
+    #endif
     #expect(real.inode == Stat(rawValue: real).inode)
     #expect(real.accessTime.seconds == Stat(rawValue: real).st_atim.tv_sec)
   }

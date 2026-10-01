@@ -11,6 +11,7 @@
 #   Utilities/linux/cross.sh --triple x86_64-swift-linux-musl musl
 #   Utilities/linux/cross.sh wasi build-tests
 #   Utilities/linux/cross.sh wasi test                # runs the tests under WasmKit
+#   Utilities/linux/cross.sh wasi test -- --skip StatFS  # arguments for swift test
 #   Utilities/linux/cross.sh android install          # only installs the SDK
 #
 # Platforms, and their default triples:
@@ -26,6 +27,14 @@
 # list (the cache's SDKs). The arguments after `--` go to the swift
 # command, after its --scratch-path.
 #
+# WASI has no sockets: SystemSockets, its tests and the samples don't build
+# for it, and SwiftPM builds the tests only with every target. So wasi's
+# build-tests and test run in a copy of the package whose manifest drops
+# those and the MemberImportVisibility canary, which depends on
+# SystemSockets elsewhere: .build/cross-<tag>-wasi-package, its Sources,
+# Tests and Package.swift copied again each run, with the scratch path
+# .build/cross-<tag>-wasi-tests. --whole builds the package itself.
+#
 # Options:
 #   --swift <version>  the Swift version of the image swift:<version>-noble
 #                      (default 6.2, or 6.3 for android)
@@ -38,6 +47,8 @@
 #   --log <path>       the log (default .build/cross-<tag>-<platform>-<action>.log)
 #   --memory <size>    the container's memory (default 8G)
 #   --cpus <count>     the container's CPUs (default: the tool's)
+#   --whole            for wasi's build-tests and test, the package itself,
+#                      not the copy without sockets
 #
 # <tag> is the image's, as in build.sh. The cache has bundles/ (downloaded
 # on the host, from download.swift.org, with their signatures), sdks/<swift
@@ -63,6 +74,7 @@ memory=8G
 cpus=""
 platform=""
 action=build
+whole=0
 extra=()
 
 while [ $# -gt 0 ]; do
@@ -75,6 +87,7 @@ while [ $# -gt 0 ]; do
     --log) log="$2"; shift 2 ;;
     --memory) memory="$2"; shift 2 ;;
     --cpus) cpus="$2"; shift 2 ;;
+    --whole) whole=1; shift ;;
     -h|--help) usage; exit 0 ;;
     musl|wasi|android) platform="$1"; shift ;;
     build|build-tests|test|install|list) action="$1"; shift ;;
@@ -97,8 +110,32 @@ triple="${triple:-$default_triple}"
 image="${image:-swift:$swift-noble}"
 tag="${image#swift:}"
 tag="$(printf '%s' "$tag" | sed 's|[/:]|-|g')"
-scratch="${scratch:-.build/cross-$tag-$platform}"
 log="${log:-.build/cross-$tag-$platform-$action.log}"
+
+# The package to build, as the container sees it: this one, or for wasi's
+# tests the copy without sockets (see above). The scratch path is relative
+# to this package's directory either way.
+package=/code
+copy=""
+if [ "$platform" = wasi ] && [ "$whole" = 0 ] && { [ "$action" = build-tests ] || [ "$action" = test ]; }; then
+  copy=".build/cross-$tag-wasi-package"
+  scratch="${scratch:-.build/cross-$tag-wasi-tests}"
+  mkdir -p "$ROOT/$copy"
+  rsync -a --delete "$ROOT/Sources" "$ROOT/Tests" "$ROOT/$copy/"
+  cp "$ROOT/Package.swift" "$ROOT/$copy/Package.swift"
+  cat >> "$ROOT/$copy/Package.swift" <<'MANIFEST'
+
+// Added by Utilities/linux/cross.sh, for WASI, which has no sockets.
+let crossDropped: Set<String> = [
+  "SystemSockets", "SystemSocketsTests", "Samples", "MemberImportVisibility",
+]
+package.targets.removeAll { crossDropped.contains($0.name) }
+package.products.removeAll { $0.name == "SystemSockets" || $0.name == "system-samples" }
+package.dependencies.removeAll()
+MANIFEST
+  package="/code/$copy"
+fi
+scratch="${scratch:-.build/cross-$tag-$platform}"
 if [ -z "$cache" ]; then
   mkdir -p "$ROOT/../linux-logs/cross"
   cache="$ROOT/../linux-logs/cross"
@@ -149,7 +186,7 @@ fi
 [ -n "$bundle" ] || {
   echo "cross.sh: download.swift.org has no $kind SDK for $version" >&2; exit 1; }
 
-run=(container run --rm -m "$memory" -v "$ROOT:/code" -v "$cache:/cache" -w /code)
+run=(container run --rm -m "$memory" -v "$ROOT:/code" -v "$cache:/cache" -w "$package")
 [ -n "$cpus" ] && run+=(--cpus "$cpus")
 
 case "$action" in
@@ -161,7 +198,7 @@ esac
 # picks its SDK by name.
 selector="$triple"
 [ "$platform" = wasi ] && selector="$bundle"
-command+=(--swift-sdks-path "/cache/sdks/$version" --swift-sdk "$selector" --scratch-path "$scratch")
+command+=(--swift-sdks-path "/cache/sdks/$version" --swift-sdk "$selector" --scratch-path "/code/$scratch")
 [ "$action" = test ] && command+=(--toolset /cache/sdks/wasmkit-toolset.json)
 command+=(${extra[@]+"${extra[@]}"})
 
@@ -222,10 +259,12 @@ totals() {
 
 # build.sh's --quiet summary: the distinct error lines, not the `| `- error:`
 # annotations of source excerpts, and for a test run its totals and the
-# failing tests' lines, with the mounts' /code/ taken out of paths.
+# failing tests' lines, with the mounts' /code/, and the copy's directory,
+# taken out of paths.
 summarize() {
   local file="$1" action="$2" errors failing count
-  errors="$(grep -a 'error:' "$file" | grep -a -v -E '^[[:space:]]*\|' | sed 's|/code/||g' \
+  local strip="s|/code/${copy:+$copy/}||g; s|/code/||g"
+  errors="$(grep -a 'error:' "$file" | grep -a -v -E '^[[:space:]]*\|' | sed "$strip" \
     | awk '!seen[$0]++' || true)"
   count=0
   [ -n "$errors" ] && count="$(printf '%s\n' "$errors" | wc -l | tr -d ' ')"
@@ -237,8 +276,8 @@ summarize() {
   esac
   [ "$action" = test ] || return 0
   totals "$file"
-  failing="$(grep -a -E '✘|^/code/Tests/[^:]*:[0-9]+: error:' "$file" | grep -a -v '✘ Test run with' \
-    | sed 's|/code/||g' | awk '!seen[$0]++' || true)"
+  failing="$(grep -a -E '✘|^/code/(\.build/[^/]*/)?Tests/[^:]*:[0-9]+: error:' "$file" \
+    | grep -a -v '✘ Test run with' | sed "$strip" | awk '!seen[$0]++' || true)"
   count=0
   [ -n "$failing" ] && count="$(printf '%s\n' "$failing" | wc -l | tr -d ' ')"
   echo "== $count failing-test lines"
@@ -248,6 +287,7 @@ summarize() {
 
 mkdir -p "$ROOT/$(dirname "$log")"
 echo "== $image, $bundle ($triple): ${command[*]}"
+[ -n "$copy" ] && echo "== in $copy, the package without sockets"
 echo "== log: $log"
 set +e
 {
