@@ -13,6 +13,14 @@ extern int csystem_posix_pipe2(int fildes[2], int flag);
 
 extern int csystem_posix_dup3(int fildes, int fildes2, int flag);
 
+#if defined(__FreeBSD__) || defined(__OpenBSD__)
+// Terminal ioctl shims, as CSystemLinux.h and CSystemDarwin.h declare them.
+// `ws` points to a struct winsize, untyped so that this header needn't
+// include <sys/ioctl.h>, as CSystemLinux.h explains.
+extern int _system_ioctl_TIOCGWINSZ(int fd, void *ws);
+extern int _system_ioctl_TIOCSWINSZ(int fd, const void *ws);
+#endif
+
 #if !defined(_WIN32) && !defined(__wasi__) && !defined(__ANDROID__)
 // shm_open, which is variadic, so Swift can't import it.
 extern int csystem_shm_open(const char *name, int oflag, unsigned int mode);

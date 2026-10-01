@@ -1430,10 +1430,12 @@ internal var _PARMRK: tcflag_t { tcflag_t(PARMRK) }
 @_alwaysEmitIntoClient
 internal var _IMAXBEL: tcflag_t { tcflag_t(IMAXBEL) }
 
+#if !os(OpenBSD)
 @_alwaysEmitIntoClient
 internal var _IUTF8: tcflag_t { tcflag_t(IUTF8) }
+#endif
 
-#if os(Linux)
+#if os(Linux) || os(Android)
 @_alwaysEmitIntoClient
 internal var _IUCLC: tcflag_t { tcflag_t(IUCLC) }
 #endif
@@ -1454,6 +1456,8 @@ internal var _ONOCR: tcflag_t { tcflag_t(ONOCR) }
 @_alwaysEmitIntoClient
 internal var _ONLRET: tcflag_t { tcflag_t(ONLRET) }
 
+// FreeBSD and OpenBSD have no fill characters or delays but the tab's.
+#if !os(FreeBSD) && !os(OpenBSD)
 @_alwaysEmitIntoClient
 internal var _OFILL: tcflag_t { tcflag_t(OFILL) }
 
@@ -1483,6 +1487,7 @@ internal var _CR2: tcflag_t { tcflag_t(CR2) }
 
 @_alwaysEmitIntoClient
 internal var _CR3: tcflag_t { tcflag_t(CR3) }
+#endif
 
 @_alwaysEmitIntoClient
 internal var _TABDLY: tcflag_t { tcflag_t(TABDLY) }
@@ -1490,20 +1495,23 @@ internal var _TABDLY: tcflag_t { tcflag_t(TABDLY) }
 @_alwaysEmitIntoClient
 internal var _TAB0: tcflag_t { tcflag_t(TAB0) }
 
+#if !os(FreeBSD) && !os(OpenBSD)
 @_alwaysEmitIntoClient
 internal var _TAB1: tcflag_t { tcflag_t(TAB1) }
 
 @_alwaysEmitIntoClient
 internal var _TAB2: tcflag_t { tcflag_t(TAB2) }
+#endif
 
-#if SYSTEM_PACKAGE_DARWIN
+#if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
 @_alwaysEmitIntoClient
 internal var _TAB3: tcflag_t { tcflag_t(TAB3) }
-#elseif os(Linux)
+#elseif os(Linux) || os(Android)
 @_alwaysEmitIntoClient
 internal var _XTABS: tcflag_t { tcflag_t(XTABS) }
 #endif
 
+#if !os(FreeBSD) && !os(OpenBSD)
 @_alwaysEmitIntoClient
 internal var _BSDLY: tcflag_t { tcflag_t(BSDLY) }
 
@@ -1530,8 +1538,9 @@ internal var _FF0: tcflag_t { tcflag_t(FF0) }
 
 @_alwaysEmitIntoClient
 internal var _FF1: tcflag_t { tcflag_t(FF1) }
+#endif
 
-#if canImport(Darwin)
+#if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
 @_alwaysEmitIntoClient
 internal var _OXTABS: tcflag_t { tcflag_t(OXTABS) }
 
@@ -1539,7 +1548,7 @@ internal var _OXTABS: tcflag_t { tcflag_t(OXTABS) }
 internal var _ONOEOT: tcflag_t { tcflag_t(ONOEOT) }
 #endif
 
-#if os(Linux)
+#if os(Linux) || os(Android)
 @_alwaysEmitIntoClient
 internal var _OLCUC: tcflag_t { tcflag_t(OLCUC) }
 #endif
@@ -1578,13 +1587,15 @@ internal var _CS7: tcflag_t { tcflag_t(CS7) }
 @_alwaysEmitIntoClient
 internal var _CS8: tcflag_t { tcflag_t(CS8) }
 
-#if canImport(Darwin)
+#if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
 @_alwaysEmitIntoClient
 internal var _CCTS_OFLOW: tcflag_t { tcflag_t(CCTS_OFLOW) }
 
 @_alwaysEmitIntoClient
 internal var _CRTS_IFLOW: tcflag_t { tcflag_t(CRTS_IFLOW) }
 
+// OpenBSD has no DTR, DSR or carrier flow control flags.
+#if !os(OpenBSD)
 @_alwaysEmitIntoClient
 internal var _CDTR_IFLOW: tcflag_t { tcflag_t(CDTR_IFLOW) }
 
@@ -1593,12 +1604,13 @@ internal var _CDSR_OFLOW: tcflag_t { tcflag_t(CDSR_OFLOW) }
 
 @_alwaysEmitIntoClient
 internal var _CCAR_OFLOW: tcflag_t { tcflag_t(CCAR_OFLOW) }
+#endif
 
 @_alwaysEmitIntoClient
 internal var _CRTSCTS: tcflag_t { tcflag_t(CRTSCTS) }
 #endif
 
-#if os(Linux)
+#if os(Linux) || os(Android)
 @_alwaysEmitIntoClient
 internal var _CRTSCTS: tcflag_t { tcflag_t(CRTSCTS) }
 
@@ -1649,7 +1661,7 @@ internal var _FLUSHO: tcflag_t { tcflag_t(FLUSHO) }
 @_alwaysEmitIntoClient
 internal var _PENDIN: tcflag_t { tcflag_t(PENDIN) }
 
-#if canImport(Darwin)
+#if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
 @_alwaysEmitIntoClient
 internal var _ALTWERASE: tcflag_t { tcflag_t(ALTWERASE) }
 
@@ -1660,7 +1672,7 @@ internal var _EXTPROC: tcflag_t { tcflag_t(EXTPROC) }
 internal var _NOKERNINFO: tcflag_t { tcflag_t(NOKERNINFO) }
 #endif
 
-#if os(Linux)
+#if os(Linux) || os(Android)
 @_alwaysEmitIntoClient
 internal var _EXTPROC: tcflag_t { tcflag_t(EXTPROC) }
 #endif
@@ -1714,7 +1726,7 @@ internal var _VDISCARD: CInt { CInt(VDISCARD) }
 @_alwaysEmitIntoClient
 internal var _VLNEXT: CInt { CInt(VLNEXT) }
 
-#if canImport(Darwin)
+#if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
 @_alwaysEmitIntoClient
 internal var _VSTATUS: CInt { CInt(VSTATUS) }
 
@@ -1722,7 +1734,7 @@ internal var _VSTATUS: CInt { CInt(VSTATUS) }
 internal var _VDSUSP: CInt { CInt(VDSUSP) }
 #endif
 
-#if os(Linux)
+#if os(Linux) || os(Android)
 @_alwaysEmitIntoClient
 internal var _VSWTC: CInt { CInt(VSWTC) }
 #endif
@@ -1785,7 +1797,7 @@ internal var _B115200: speed_t { speed_t(B115200) }
 @_alwaysEmitIntoClient
 internal var _B230400: speed_t { speed_t(B230400) }
 
-#if canImport(Darwin)
+#if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
 @_alwaysEmitIntoClient
 internal var _B7200: speed_t { speed_t(B7200) }
 
@@ -1799,7 +1811,7 @@ internal var _B28800: speed_t { speed_t(B28800) }
 internal var _B76800: speed_t { speed_t(B76800) }
 #endif
 
-#if os(Linux)
+#if os(Linux) || os(Android)
 @_alwaysEmitIntoClient
 internal var _B460800: speed_t { speed_t(B460800) }
 
@@ -1847,7 +1859,7 @@ internal var _TCSADRAIN: CInt { CInt(TCSADRAIN) }
 @_alwaysEmitIntoClient
 internal var _TCSAFLUSH: CInt { CInt(TCSAFLUSH) }
 
-#if canImport(Darwin)
+#if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
 @_alwaysEmitIntoClient
 internal var _TCSASOFT: CInt { CInt(TCSASOFT) }
 #endif

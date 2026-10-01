@@ -256,7 +256,7 @@ extension TerminalAttributes {
     @_alwaysEmitIntoClient
     public static var afterFlush: Self { Self(rawValue: _TCSAFLUSH) }
 
-    #if canImport(Darwin)
+    #if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
     /// Apply changes immediately,
     /// except to the hardware settings: the control flags and the speeds.
     ///

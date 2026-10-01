@@ -128,6 +128,14 @@ final class TerminalTests: XCTestCase {
     }
   }
 
+  func testControlCharactersMatchTheCArray() {
+    // TerminalAttributes rebinds termios's c_cc to ControlCharacters, whose
+    // storage is a tuple written out for each platform.
+    XCTAssertEqual(
+      MemoryLayout<ControlCharacters>.size, MemoryLayout.size(ofValue: termios().c_cc))
+    XCTAssertEqual(MemoryLayout<ControlCharacters>.size, ControlCharacters.count)
+  }
+
   func testTerminalAttributesEqualityIgnoresPadding() throws {
     // termios pads the end of c_cc to align the speed that follows it.
     let ccEnd = MemoryLayout<termios>.offset(of: \termios.c_cc)! + ControlCharacters.count
