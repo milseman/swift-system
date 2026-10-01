@@ -304,10 +304,13 @@ final class ProvisionalStdioTest: XCTestCase {
     try withTemporaryFilePath(basename: "testLocking") { dir in
       let stream = try FileStream.open(dir.appending("file"), mode: "w")
       defer { try? stream.close() }
-      XCTAssertEqual(try stream.withLock { () throws(Errno) -> Int in
+      // Bound first: the main-branch compiler (6.5-dev) fails SIL
+      // verification for this typed-throws closure inside the autoclosure.
+      let result = try stream.withLock { () throws(Errno) -> Int in
         try stream.write("locked")
         return 42
-      }, 42)
+      }
+      XCTAssertEqual(result, 42)
       // The lock is recursive, and other threads can't take it.
       stream.lock()
       XCTAssertTrue(stream.tryLock())
