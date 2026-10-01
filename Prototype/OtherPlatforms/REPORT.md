@@ -206,9 +206,9 @@ By sites on WASI lines (the inventory's (W: b)): sockets 86, the allocator
 ### 3.2 Left
 
 - **WASI, buildable here**: `DirectoryStreamTests` and
-  `DirectoryEntryTypeTests` still skip WASI (their fixture makes symbolic
-  links and reads `CInterop.DirectoryEntry`, which stays off WASI: its
-  `d_name` is a flexible array).
+  `DirectoryEntryTypeTests` still skip WASI, not yet widened;
+  `DirectoryEntryTypeTests` also reads `CInterop.DirectoryEntry`, which stays
+  off WASI (its `d_name` is a flexible array).
 - **WASI, not System's to fix here**: pthreads (none: wasm32-wasip1's
   `libpthread.a` is empty, and `libc.a` has no `pthread_` symbol, so
   `PThread`, `sched_yield`'s `PThread.yield()`, NIOLock's and WasmKit's
