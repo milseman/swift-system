@@ -16,9 +16,8 @@ adds API for the adopters' top Windows gaps of section 8, in its order, checked 
 
 **Resume here:** windows-api's parts are done (sections 1 to 10), and so are windows-2's (11 to 22: P1 and P2,
 then section 8's gaps from processes to file information). windows-3, in progress: long paths (section 23,
-`315f25b`), threads (24, `054e9e2`), and `HRESULT` (25, the last commit).
-- **Next**: the rest of section 8's list, in order: path operations (create, remove, rename, copy, link, and the
-  POSIX-semantics delete and rename dispositions); overlapped I/O; system information; Winsock, last (design only
+`315f25b`), threads (24, `054e9e2`), `HRESULT` (25, `b89b78c`), and path operations (26, the last commit).
+- **Next**: the rest of section 8's list, in order: overlapped I/O; system information; Winsock, last (design only
   if time runs short, since the decisions triage gives Winsock a Windows-only module of its own).
 - **Then, left within done gaps**: a Windows `BrokenDownTime` over the UCRT's time functions (14); a Windows
   `ProcessID.exit(_:)` and `exitImmediately(_:)` (12); `CRITICAL_SECTION` (15); attaching, freeing and
@@ -1391,7 +1390,7 @@ A Windows run must check:
   another thread that's still running.
 - Not covered: running out of FLS indexes, fibers, and a thread that ends through `ExitThread`.
 
-## 25. windows-3: HRESULT: this commit
+## 25. windows-3: HRESULT: `b89b78c`
 
 The next gap of section 8, and SYS-0010's future direction. swift-foundation, swift-build and swift-subprocess
 each define `SUCCEEDED`, `HRESULT_CODE`, `HRESULT_FACILITY` and `WIN32_FROM_HRESULT` for themselves, Foundation's
@@ -1442,7 +1441,79 @@ their values, and `E_OUTOFMEMORY`'s Win32 code against `ERROR_OUTOFMEMORY`); `te
 `FormatMessageW` resolving an `HRESULT` in `FACILITY_WIN32`, and a customer code (bit 29) has none;
 `testTypedThrows`; and `testWin32ErrorsFromHRESULTs`.
 
-## 26. windows-3: findings
+## 26. windows-3: path operations: this commit
+
+The next gap of section 8. swift-foundation's `FileManager` creates and removes directories (`CreateDirectoryW`,
+`RemoveDirectoryW`), deletes, moves and copies files (`DeleteFileW`, `MoveFileExW`, `CopyFile2`, `CopyFileW`), makes
+symbolic links (`CreateSymbolicLinkW`, with `SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE`), and replaces a file
+atomically with `SetFileInformationByHandle(FileRenameInfoEx)` and POSIX semantics; NIO deletes a Unix domain
+socket's file with `FileDispositionInfoEx` and POSIX semantics, and other files with `DeleteFileW`; NIO's and
+WasmKit's tests make directories with `CreateDirectoryW` and the C runtime's `_mkdir`.
+
+What: `Win32PathOperations.swift`.
+- By path: `Win32.createDirectory(_:securityDescriptor:)` (`CreateDirectoryW`), `removeDirectory(_:)`
+  (`RemoveDirectoryW`), `deleteFile(_:)` (`DeleteFileW`), `moveFile(_:to:flags:)` (`MoveFileExW`, with
+  `Win32.MoveFileFlags`), `copyFile(_:to:flags:)` (`CopyFile2`, with `Win32.CopyFileFlags`),
+  `createSymbolicLink(_:to:flags:)` (`CreateSymbolicLinkW`, with `Win32.SymbolicLinkFlags`), and
+  `createHardLink(_:to:)` (`CreateHardLinkW`).
+- By handle, on `FileHandle` and `DirectoryHandle`: `setDisposition(_:)` (`FileDispositionInfoEx`, with
+  `Win32.DispositionFlags`) and `rename(to:flags:)` (`FileRenameInfoEx`, with `Win32.RenameFlags`).
+- `Win32.Error` gains three of section 1's candidates, which these functions document: `notSameDevice` (17),
+  `directoryNotEmpty` (145) and `privilegeNotHeld` (1314).
+
+Which API: **Win32.** `FilePathOperations.swift` is POSIX-only, and its signatures carry POSIX's parameters
+(`permissions:`, a `relativeTo:` descriptor, `ResolutionFlags`) and `Errno`; Windows' operations take security
+descriptors and flags of their own, and fail in ways `Errno` can't tell apart, such as sharing violations and
+files pending deletion. So they're Win32 functions, with Win32's verbs.
+
+Design calls, with the alternatives rejected:
+- **Win32 functions rather than `FilePath`'s POSIX names.** Open: the shared part, `removeDirectory()`,
+  `unlink()`, `rename(to:)` and `makeHardLink(to:)`, under POSIX's names on Windows too, as the working directory
+  shares them (section 17), with approximated errors.
+- **The defaults are the C functions'**, no flags: `moveFile` and `rename(to:)` don't replace a destination, and
+  `copyFile` does, as `MoveFileExW`, `FileRenameInfoEx` and `CopyFile2` behave without flags; each doc says so.
+  Rejected: safer defaults, such as `failIfExists` for a copy or `allowUnprivilegedCreate` for a link, which an
+  option set drops as soon as a caller passes another flag.
+- **`CopyFile2`**, rather than `CopyFileW` or `CopyFileExW`: it takes every `COPY_FILE_*` flag, and Foundation
+  calls it. Its `HRESULT` becomes a `Win32.Error` as section 25 describes. Not wrapped: its progress callback and
+  cancellation.
+- **A symbolic link's target isn't canonicalized**, as Foundation's `withNTPathRepresentation(relative: true)`
+  leaves it, since the link stores the target as it's given and a relative one must stay relative. `FilePath` turns
+  forward slashes into backslashes, which Windows' links need.
+- **Deleting and renaming by handle** take the `SetFileInformationByHandle` classes that section 20 left for this
+  gap. POSIX semantics are a flag, not a default, since FAT volumes and early Windows 10 releases don't support
+  them. Rejected: an `unlink()`-like method that falls back to `FileDispositionInfo` where the `Ex` class fails,
+  as Rust's `remove_dir_all` does, which hides which semantics applied.
+- **The rename's destination is a canonical full path**, with the prefix when it's long, as Rust's `rename`
+  passes one, and `RootDirectory` is NULL. Rejected: a `relativeTo:` directory handle, which `RootDirectory`
+  allows and no adopter uses.
+- **Not wrapped**: `CreateDirectoryExW` (template directories), `ReplaceFileW`, `MoveFileWithProgressW`, deleting
+  at the next start (`MoveFileExW` with no new name), `FileDispositionInfo` and `FileRenameInfo`, and the C
+  runtime's `_mkdir`, `_mktemp_s` and `_commit`.
+
+Tests: `Win32PathOperationsTests`. The symbolic link test skips without developer mode or elevation.
+
+A Windows run must check:
+- `testConstantsMatchTheSDK` (`COPY_FILE_*` aren't in Rust's bindings, so the SDK is the only check of their
+  values), and the three new codes in `Win32ErrorTests.testCodesMatchTheSDK`.
+- `testDirectories` (`alreadyExists`, `pathNotFound`, `directoryNotEmpty`, `fileNotFound`) and
+  `testCreatingADirectoryWithASecurityDescriptor`.
+- `testDeletingFiles`: a read-only file and a directory give `accessDenied`, and an open without delete sharing
+  `sharingViolation`.
+- `testMovingFiles` (`alreadyExists` without `replaceExisting`; a directory moves) and `testCopyingFiles` (a copy
+  replaces by default, `failIfExists` gives `fileExists` through `CopyFile2`'s `HRESULT`, the read-only attribute
+  comes along).
+- `testSymbolicLinks` (a relative file link and a directory link resolve; deleting a link leaves its target),
+  where links can be made; `testHardLinks` (a link count of 2; a directory gives `accessDenied`).
+- `testPOSIXDeletion` (the name goes when the deleting handle closes, a new file can take it, and another handle
+  still reads the old one), `testDeletionOnLastClose` (`isDeletePending`, and opening the pending name gives
+  `accessDenied`), `testClearingTheDisposition`.
+- `testRenamingByHandle` (the handle's final path follows; `alreadyExists`; POSIX semantics replace an open
+  destination, whose handle reads the old file), and `testDirectoryHandles`.
+- Not covered: moves and hard links across volumes (`notSameDevice`), FAT volumes, `delayUntilReboot`,
+  `ignoreReadOnlyAttribute`, and paths past `MAX_PATH`, beyond the canonicalization section 23 checks.
+
+## 27. windows-3: findings
 
 - **`FileDescriptor`'s Windows canonicalization doesn't cover `CreateDirectoryW`'s limit** (P4).
   `withCanonicalPathRepresentation` passes `PATHCCH_ALLOW_LONG_PATHS`, so the `mkdir` adapter, which
@@ -1459,7 +1530,7 @@ their values, and `E_OUTOFMEMORY`'s Win32 code against `ERROR_OUTOFMEMORY`); `te
 - **macOS's CoreFoundation declares `S_OK` and `S_FALSE` too**, so the harness's tests spell `WinSDK.S_OK`; on
   Windows, where XCTest's Foundation is swift-corelibs-foundation, the bare names would do.
 
-## 27. windows-3: patches for files outside the lane
+## 28. windows-3: patches for files outside the lane
 
 **P3, continued: `Sources/System/CMakeLists.txt`.** The Win32 `target_sources` block as it should read with this
 lane's files, which coverage-4 applies with P3. It replaces the block whether or not P3 has landed. Kept current
@@ -1488,6 +1559,7 @@ target_sources(SystemPackage PRIVATE
   Win32/Win32Locking.swift
   Win32/Win32LongPaths.swift
   Win32/Win32Open.swift
+  Win32/Win32PathOperations.swift
   Win32/Win32Process.swift
   Win32/Win32ProcessCreation.swift
   Win32/Win32SecurityDescriptor.swift

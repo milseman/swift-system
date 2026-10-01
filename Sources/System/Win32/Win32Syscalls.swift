@@ -712,4 +712,53 @@ internal func system_SetFileAttributesW(
   SetFileAttributesW(lpFileName, dwFileAttributes)
 }
 
+// MARK: - Path operations
+
+internal func system_CreateDirectoryW(
+  _ lpPathName: UnsafePointer<WCHAR>,
+  _ lpSecurityAttributes: UnsafeMutablePointer<SECURITY_ATTRIBUTES>?
+) -> Bool {
+  CreateDirectoryW(lpPathName, lpSecurityAttributes)
+}
+
+internal func system_RemoveDirectoryW(_ lpPathName: UnsafePointer<WCHAR>) -> Bool {
+  RemoveDirectoryW(lpPathName)
+}
+
+internal func system_DeleteFileW(_ lpFileName: UnsafePointer<WCHAR>) -> Bool {
+  DeleteFileW(lpFileName)
+}
+
+internal func system_MoveFileExW(
+  _ lpExistingFileName: UnsafePointer<WCHAR>,
+  _ lpNewFileName: UnsafePointer<WCHAR>?,
+  _ dwFlags: DWORD
+) -> Bool {
+  MoveFileExW(lpExistingFileName, lpNewFileName, dwFlags)
+}
+
+internal func system_CopyFile2(
+  _ pwszExistingFileName: UnsafePointer<WCHAR>,
+  _ pwszNewFileName: UnsafePointer<WCHAR>,
+  _ pExtendedParameters: UnsafeMutablePointer<COPYFILE2_EXTENDED_PARAMETERS>?
+) -> HRESULT {
+  CopyFile2(pwszExistingFileName, pwszNewFileName, pExtendedParameters)
+}
+
+internal func system_CreateSymbolicLinkW(
+  _ lpSymlinkFileName: UnsafePointer<WCHAR>,
+  _ lpTargetFileName: UnsafePointer<WCHAR>,
+  _ dwFlags: DWORD
+) -> BOOLEAN {
+  CreateSymbolicLinkW(lpSymlinkFileName, lpTargetFileName, dwFlags)
+}
+
+// The security attributes parameter is reserved, and always NULL.
+internal func system_CreateHardLinkW(
+  _ lpFileName: UnsafePointer<WCHAR>,
+  _ lpExistingFileName: UnsafePointer<WCHAR>
+) -> Bool {
+  CreateHardLinkW(lpFileName, lpExistingFileName, nil)
+}
+
 #endif // os(Windows)
