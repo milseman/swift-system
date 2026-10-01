@@ -37,7 +37,7 @@ private struct MemoryTests {
   @available(System 199, *)
   @Test func zeroBytesAllocateABlockToFree() throws {
     let block = try Memory.allocate(byteCount: 0)
-    #if !os(OpenBSD) && !os(WASI)
+    #if !os(OpenBSD)
     #expect(Memory.usableSize(of: block) >= 1)
     #endif
     Memory.free(block)
@@ -146,7 +146,7 @@ private struct MemoryTests {
   }
   #endif
 
-  #if !os(OpenBSD) && !os(WASI)
+  #if !os(OpenBSD)
   @available(System 199, *)
   @Test func usableSizeIsAtLeastTheRequest() throws {
     for byteCount in [1, 17, 100, 1000, 100_000] {

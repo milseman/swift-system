@@ -754,6 +754,14 @@ extern size_t csystem_malloc_usable_size(const void *pointer) {
 }
 #endif // defined(__FreeBSD__)
 
+#if defined(__wasi__)
+#include <malloc.h>
+
+extern size_t csystem_malloc_usable_size(const void *pointer) {
+  return malloc_usable_size((void *)pointer);
+}
+#endif // defined(__wasi__)
+
 #ifdef __ANDROID__
 #include <string.h>
 
