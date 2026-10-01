@@ -40,9 +40,10 @@
 # --assume-threads typechecks the code for it with the wasip1 SDK, whose
 # headers are the same: the build is of a copy of the package in which
 # `_runtime(_multithreaded)` is `true`, .build/cross-<tag>-wasi-threads-package
-# (scratch path .build/cross-<tag>-wasi-threads). wasip1's C library
-# defines no pthread function, so build a library target only: an
-# executable wouldn't link.
+# (scratch path .build/cross-<tag>-wasi-threads), with -Xcc -D_REENTRANT,
+# which a threads SDK's -pthread defines, and which wasi-libc's <stdio.h>
+# declares the stream locks under. wasip1's C library defines no pthread
+# function, so build a library target only: an executable wouldn't link.
 #
 # Options:
 #   --swift <version>  the Swift version of the image swift:<version>-noble
@@ -226,6 +227,7 @@ selector="$triple"
 [ "$platform" = wasi ] && selector="$bundle"
 command+=(--swift-sdks-path "/cache/sdks/$version" --swift-sdk "$selector" --scratch-path "/code/$scratch")
 [ "$action" = test ] && command+=(--toolset /cache/sdks/wasmkit-toolset.json)
+[ "$threads" = 1 ] && command+=(-Xcc -D_REENTRANT)
 command+=(${extra[@]+"${extra[@]}"})
 
 # What runs in the container: install the SDK if the cache lacks it (and,

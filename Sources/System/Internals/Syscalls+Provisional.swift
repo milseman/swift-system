@@ -275,7 +275,8 @@ internal func system_clearerr(_ stream: _CFilePointer) {
   clearerr(stream)
 }
 
-#if !os(WASI)
+// wasi-libc defines the stream locks only with threads.
+#if !os(WASI) || _runtime(_multithreaded)
 // flockfile
 internal func system_flockfile(_ stream: _CFilePointer) {
   flockfile(stream)
@@ -290,6 +291,6 @@ internal func system_funlockfile(_ stream: _CFilePointer) {
 internal func system_ftrylockfile(_ stream: _CFilePointer) -> CInt {
   ftrylockfile(stream)
 }
-#endif // !os(WASI)
+#endif // !os(WASI) || _runtime(_multithreaded)
 
 #endif // !os(Windows)
