@@ -7,7 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-#if !os(Windows) && !os(WASI)
+#if !os(Windows)
 
 // The C library's calls on memory that can't fail, and that Swift code
 // otherwise imports the C library for. memcpy and memset aren't here: the
@@ -141,4 +141,4 @@ extension Memory {
   }
 }
 
-#endif // !os(Windows) && !os(WASI)
+#endif // !os(Windows)

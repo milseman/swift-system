@@ -151,8 +151,8 @@ private struct DirectoryWalkRootAndStatusTests {
   /// status (fts's FTS_NS): the error is permissionDenied, and the type is
   /// the one the directory records.
   @available(System 199, *)
-  @Test func entriesWhoseStatusCantBeRead() throws {
-    try #require(getuid() != 0, "root can search any directory")
+  @Test(.enabled(if: geteuid() != 0, "root can search any directory"))
+  func entriesWhoseStatusCantBeRead() throws {
     try DirectoryFixture.withTemporaryDirectory("DirectoryWalk_noStatus") { root in
       let listed = root.appending("listed")
       try DirectoryFixture.directory(listed)

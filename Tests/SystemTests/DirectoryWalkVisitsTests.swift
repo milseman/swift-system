@@ -82,8 +82,8 @@ private struct DirectoryWalkVisitsTests {
 
   /// A directory the walk can't open is visited once, with its error.
   @available(System 199, *)
-  @Test func anUnreadableDirectoryOnce() throws {
-    try #require(getuid() != 0, "root can read any directory")
+  @Test(.enabled(if: geteuid() != 0, "root can read any directory"))
+  func anUnreadableDirectoryOnce() throws {
     try DirectoryFixture.withTemporaryDirectory("DirectoryWalk_bothUnreadable") { root in
       try DirectoryFixture.makeTree(in: root)
       let locked = root.appending("a/b")
@@ -145,8 +145,8 @@ private struct DirectoryWalkVisitsTests {
   /// in place of its contents (fts's FTS_D and FTS_DNR). Skipping its
   /// contents after the first visit keeps the walk from opening it.
   @available(System 199, *)
-  @Test func anUnreadableDirectoryWhenEntered() throws {
-    try #require(getuid() != 0, "root can read any directory")
+  @Test(.enabled(if: geteuid() != 0, "root can read any directory"))
+  func anUnreadableDirectoryWhenEntered() throws {
     try DirectoryFixture.withTemporaryDirectory("DirectoryWalk_whenEnteredUnreadable") { root in
       try DirectoryFixture.makeTree(in: root)
       let locked = root.appending("a/b")

@@ -77,7 +77,7 @@ extension TerminalAttributes {
     @_alwaysEmitIntoClient
     public static var odd: Parity { Parity(rawValue: _PARENB | _PARODD) }
 
-    #if os(Linux)
+    #if os(Linux) || os(Android)
     /// A parity bit that's always 1.
     ///
     /// The corresponding C constants are `PARENB`, `PARODD`, and `CMSPAR`.
@@ -131,7 +131,7 @@ extension TerminalAttributes {
   @_alwaysEmitIntoClient
   public var parity: Parity {
     get {
-      #if os(Linux)
+      #if os(Linux) || os(Android)
       let parityBits = controlFlags.rawValue & (_PARENB | _PARODD | _CMSPAR)
       #else
       let parityBits = controlFlags.rawValue & (_PARENB | _PARODD)
@@ -139,7 +139,7 @@ extension TerminalAttributes {
       return Parity(rawValue: parityBits)
     }
     set {
-      #if os(Linux)
+      #if os(Linux) || os(Android)
       let mask: CInterop.TerminalFlags = _PARENB | _PARODD | _CMSPAR
       #else
       let mask: CInterop.TerminalFlags = _PARENB | _PARODD

@@ -160,7 +160,7 @@ public struct ControlCharacter: RawRepresentable, Hashable, Sendable {
   @_alwaysEmitIntoClient
   public static var literalNext: Self { Self(rawValue: _VLNEXT) }
 
-  #if canImport(Darwin)
+  #if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
   /// The status character, Control-T by default,
   /// which sends `SIGINFO` to the terminal's foreground process group,
   /// and prints a line of status
@@ -181,7 +181,7 @@ public struct ControlCharacter: RawRepresentable, Hashable, Sendable {
   public static var delayedSuspend: Self { Self(rawValue: _VDSUSP) }
   #endif
 
-  #if os(Linux)
+  #if os(Linux) || os(Android)
   /// The switch character, which Linux doesn't use.
   ///
   /// The corresponding C constant is `VSWTC`.
@@ -198,24 +198,32 @@ public struct ControlCharacter: RawRepresentable, Hashable, Sendable {
 @frozen
 @available(System 199, *)
 public struct ControlCharacters: Sendable {
-  #if SYSTEM_PACKAGE_DARWIN
+  // termios's c_cc, whose NCCS elements the accessors in
+  // TerminalAttributes.swift rebind this storage to: 32 in glibc's and
+  // Musl's termios, and 19 in the Linux kernel's, which Bionic's is.
+  #if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
   @usableFromInline
   internal var storage: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8)
   #elseif os(Linux)
   @usableFromInline
   internal var storage: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8)
+  #elseif os(Android)
+  @usableFromInline
+  internal var storage: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8)
   #endif
 
   /// Creates control characters with every element zero.
   ///
   /// Zero isn't ``disabled`` on every platform:
-  /// on Darwin, it makes byte 0 every control character.
+  /// on Darwin, FreeBSD, and OpenBSD, it makes byte 0 every control character.
   @_alwaysEmitIntoClient
   public init() {
-    #if SYSTEM_PACKAGE_DARWIN
+    #if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
     self.storage = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
     #elseif os(Linux)
     self.storage = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+    #elseif os(Android)
+    self.storage = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
     #endif
   }
 
@@ -229,7 +237,8 @@ public struct ControlCharacters: Sendable {
   ///
   /// Setting a control character to this value turns off its function,
   /// so no input byte performs it.
-  /// The value is 0xFF on Darwin and 0 on Linux,
+  /// The value is 0xFF on Darwin, FreeBSD, and OpenBSD,
+  /// and 0 on Linux and Android,
   /// where each is otherwise a rarely typed byte.
   ///
   /// The corresponding C constant is `_POSIX_VDISABLE`.

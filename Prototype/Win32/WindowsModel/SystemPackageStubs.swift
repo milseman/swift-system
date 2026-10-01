@@ -22,6 +22,10 @@ public typealias CModeT = CInt // mirrors: Sources/System/Internals/CInterop.swi
 public struct FilePath: Hashable, Sendable {
   internal var _storage: [CInterop.PlatformChar]
 
+  public init() { // mirrors: Sources/System/FilePath/FilePath.swift
+    _storage = [0]
+  }
+
   public init(_ string: String) {
     _storage = Array(string.utf16) + [0]
   }
@@ -42,6 +46,12 @@ public struct FilePath: Hashable, Sendable {
   public var string: String {
     String(decoding: _storage.dropLast(), as: UTF16.self)
   }
+
+  public var isAbsolute: Bool { // mirrors: Sources/System/FilePath/FilePathSyntax.swift
+    _storage.count > 3
+  }
+
+  public var isEmpty: Bool { _storage.count == 1 } // mirrors: Sources/System/FilePath/FilePathSyntax.swift
 
   public __consuming func appending(_ other: __owned String) -> FilePath { // mirrors: Sources/System/FilePath/FilePathSyntax.swift
     FilePath(string + "\\" + other)
@@ -106,6 +116,8 @@ public struct Errno: RawRepresentable, Error, Hashable, Codable { // mirrors: So
   @_alwaysEmitIntoClient
   public static var brokenPipe: Errno { .init(rawValue: 32) }
   @_alwaysEmitIntoClient
+  public static var outOfRange: Errno { .init(rawValue: 34) }
+  @_alwaysEmitIntoClient
   public static var noData: Errno { .init(rawValue: 120) }
   @_alwaysEmitIntoClient
   public static var notSupported: Errno { .init(rawValue: 129) }
@@ -118,8 +130,8 @@ public struct Errno: RawRepresentable, Error, Hashable, Codable { // mirrors: So
 }
 
 extension Errno {
-  // As shipped: not @_disfavoredOverload.
   @_alwaysEmitIntoClient
+  @_disfavoredOverload
   public static func ~=(_ lhs: Errno, _ rhs: Error) -> Bool { // mirrors: Sources/System/Errno.swift
     guard let value = rhs as? Errno else { return false }
     return lhs == value
@@ -215,6 +227,12 @@ public struct FilePermissions: OptionSet, Sendable, Hashable, Codable { // mirro
 internal func _mapWindowsErrorToErrno(_ errorCode: DWORD) -> CInt { 22 } // mirrors: Sources/System/Internals/WindowsSyscallAdapters.swift
 
 internal func system_close(_ fd: Int32) -> Int32 { 0 } // mirrors: Sources/System/Internals/Syscalls.swift
+
+internal func nothingOrErrno<I: FixedWidthInteger>( // mirrors: Sources/System/Util.swift
+  retryOnInterrupt: Bool, _ f: () -> I
+) -> Result<(), Errno> {
+  .success(())
+}
 
 internal var mockingEnabled: Bool { false } // mirrors: Sources/System/Internals/Mocking.swift
 

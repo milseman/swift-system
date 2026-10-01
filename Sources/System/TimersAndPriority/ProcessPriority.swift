@@ -33,6 +33,13 @@ import Android
 ///     try ProcessPriority.setCurrent(10, for: .process(.current))
 ///
 /// A child process inherits its parent's nice value.
+///
+/// On Linux, a nice value belongs to a thread, not a process:
+/// ``adjust(by:)`` changes the calling thread's,
+/// and a ``Target/process(_:)`` target is one thread,
+/// the main thread for the process's own ID
+/// and the calling thread for `ProcessID(rawValue: 0)`.
+/// A new thread starts with its creator's nice value.
 @available(System 199, *)
 public enum ProcessPriority {}
 
@@ -126,7 +133,8 @@ extension ProcessPriority {
     }
   }
 
-  /// Adds to the calling process's nice value.
+  /// Adds to the calling process's nice value,
+  /// or on Linux the calling thread's.
   ///
   /// - Parameter increment: The amount to add,
   ///   which is negative to lower the nice value and favor the process more.
