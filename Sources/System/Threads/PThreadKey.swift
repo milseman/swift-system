@@ -7,7 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-#if !os(Windows) && !os(WASI)
+#if !os(Windows) && (!os(WASI) || _runtime(_multithreaded))
 
 @available(System 199, *)
 extension PThread {
@@ -139,4 +139,4 @@ internal func _pthreadKeyDestructor(_ value: UnsafeMutableRawPointer?) {
   Unmanaged<_PThreadKeyBoxBase>.fromOpaque(value!).release()
 }
 
-#endif // !os(Windows) && !os(WASI)
+#endif // !os(Windows) && (!os(WASI) || _runtime(_multithreaded))

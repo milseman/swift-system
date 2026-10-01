@@ -11,7 +11,8 @@
 #   Utilities/linux/cross.sh --triple x86_64-swift-linux-musl musl
 #   Utilities/linux/cross.sh wasi build-tests
 #   Utilities/linux/cross.sh wasi test                # runs the tests under WasmKit
-#   Utilities/linux/cross.sh wasi test -- --skip StatFS  # arguments for swift test
+#   Utilities/linux/cross.sh wasi test -- --disable-xctest --filter StatFS
+#   Utilities/linux/cross.sh wasi --assume-threads build -- --target SystemPackage
 #   Utilities/linux/cross.sh android install          # only installs the SDK
 #
 # Platforms, and their default triples:
@@ -35,6 +36,14 @@
 # Tests and Package.swift copied again each run, with the scratch path
 # .build/cross-<tag>-wasi-tests. --whole builds the package itself.
 #
+# swift.org has no SDK for wasm32-wasip1-threads, where WASI has pthreads.
+# --assume-threads typechecks the code for it with the wasip1 SDK, whose
+# headers are the same: the build is of a copy of the package in which
+# `_runtime(_multithreaded)` is `true`, .build/cross-<tag>-wasi-threads-package
+# (scratch path .build/cross-<tag>-wasi-threads). wasip1's C library
+# defines no pthread function, so build a library target only: an
+# executable wouldn't link.
+#
 # Options:
 #   --swift <version>  the Swift version of the image swift:<version>-noble
 #                      (default 6.2, or 6.3 for android)
@@ -49,6 +58,8 @@
 #   --cpus <count>     the container's CPUs (default: the tool's)
 #   --whole            for wasi's build-tests and test, the package itself,
 #                      not the copy without sockets
+#   --assume-threads   for wasi, build as if for wasm32-wasip1-threads
+#                      (above)
 #
 # <tag> is the image's, as in build.sh. The cache has bundles/ (downloaded
 # on the host, from download.swift.org, with their signatures), sdks/<swift
@@ -75,6 +86,7 @@ cpus=""
 platform=""
 action=build
 whole=0
+threads=0
 extra=()
 
 while [ $# -gt 0 ]; do
@@ -88,6 +100,7 @@ while [ $# -gt 0 ]; do
     --memory) memory="$2"; shift 2 ;;
     --cpus) cpus="$2"; shift 2 ;;
     --whole) whole=1; shift ;;
+    --assume-threads) threads=1; shift ;;
     -h|--help) usage; exit 0 ;;
     musl|wasi|android) platform="$1"; shift ;;
     build|build-tests|test|install|list) action="$1"; shift ;;
@@ -99,6 +112,10 @@ done
 [ -n "$platform" ] || { echo "cross.sh: name a platform: musl, wasi, or android" >&2; exit 64; }
 [ "$action" = test ] && [ "$platform" != wasi ] && {
   echo "cross.sh: only wasi's tests run here" >&2; exit 64; }
+[ "$threads" = 1 ] && [ "$platform" != wasi ] && {
+  echo "cross.sh: --assume-threads is for wasi" >&2; exit 64; }
+[ "$threads" = 1 ] && [ "$action" = test ] && {
+  echo "cross.sh: --assume-threads builds can't run: wasip1 has no pthreads to link" >&2; exit 64; }
 
 case "$platform" in
   musl) kind=static; default_triple=aarch64-swift-linux-musl ;;
@@ -113,13 +130,18 @@ tag="$(printf '%s' "$tag" | sed 's|[/:]|-|g')"
 log="${log:-.build/cross-$tag-$platform-$action.log}"
 
 # The package to build, as the container sees it: this one, or for wasi's
-# tests the copy without sockets (see above). The scratch path is relative
-# to this package's directory either way.
+# tests and --assume-threads a copy (see above). The scratch path is
+# relative to this package's directory either way.
 package=/code
 copy=""
-if [ "$platform" = wasi ] && [ "$whole" = 0 ] && { [ "$action" = build-tests ] || [ "$action" = test ]; }; then
+if [ "$threads" = 1 ]; then
+  copy=".build/cross-$tag-wasi-threads-package"
+  scratch="${scratch:-.build/cross-$tag-wasi-threads}"
+elif [ "$platform" = wasi ] && [ "$whole" = 0 ] && { [ "$action" = build-tests ] || [ "$action" = test ]; }; then
   copy=".build/cross-$tag-wasi-package"
   scratch="${scratch:-.build/cross-$tag-wasi-tests}"
+fi
+if [ -n "$copy" ]; then
   mkdir -p "$ROOT/$copy"
   rsync -a --delete "$ROOT/Sources" "$ROOT/Tests" "$ROOT/$copy/"
   cp "$ROOT/Package.swift" "$ROOT/$copy/Package.swift"
@@ -133,6 +155,10 @@ package.targets.removeAll { crossDropped.contains($0.name) }
 package.products.removeAll { $0.name == "SystemSockets" || $0.name == "system-samples" }
 package.dependencies.removeAll()
 MANIFEST
+  if [ "$threads" = 1 ]; then
+    grep -rl --include='*.swift' '_runtime(_multithreaded)' "$ROOT/$copy/Sources" "$ROOT/$copy/Tests" \
+      | xargs perl -pi -e 's/_runtime\(_multithreaded\)/true/g'
+  fi
   package="/code/$copy"
 fi
 scratch="${scratch:-.build/cross-$tag-$platform}"
@@ -287,7 +313,11 @@ summarize() {
 
 mkdir -p "$ROOT/$(dirname "$log")"
 echo "== $image, $bundle ($triple): ${command[*]}"
-[ -n "$copy" ] && echo "== in $copy, the package without sockets"
+if [ "$threads" = 1 ]; then
+  echo "== in $copy, with _runtime(_multithreaded) as true"
+elif [ -n "$copy" ]; then
+  echo "== in $copy, the package without sockets"
+fi
 echo "== log: $log"
 set +e
 {

@@ -13,7 +13,7 @@
 // enums, which Swift imports as `Int`, and FreeBSD and OpenBSD declare the
 // mutex types in a named enum, which Swift imports as a structure.
 
-#if !os(Windows) && !os(WASI)
+#if !os(Windows) && (!os(WASI) || _runtime(_multithreaded))
 
 import CSystem
 #if SYSTEM_PACKAGE_DARWIN
@@ -22,6 +22,9 @@ import Darwin
 import Glibc
 #elseif canImport(Musl)
 import Musl
+#elseif canImport(WASILibc)
+import WASILibc
+import wasi_pthread
 #elseif canImport(Android)
 import Android
 #else
@@ -66,7 +69,7 @@ internal var _PTHREAD_PROCESS_SHARED: CInt { CInt(PTHREAD_PROCESS_SHARED) }
 
 // MARK: - Mutex priority protocols
 
-#if !os(Android)
+#if !os(Android) && !os(WASI)
 @_alwaysEmitIntoClient
 internal var _PTHREAD_PRIO_NONE: CInt { CInt(PTHREAD_PRIO_NONE) }
 
@@ -89,6 +92,9 @@ internal var _PTHREAD_MUTEX_ROBUST: CInt { CInt(PTHREAD_MUTEX_ROBUST) }
 
 // MARK: - Scheduling
 
+// WASI has no scheduling (its <sched.h> declares the policies only for
+// unmodified upstream musl).
+#if !os(WASI)
 @_alwaysEmitIntoClient
 internal var _PTHREAD_INHERIT_SCHED: CInt { CInt(PTHREAD_INHERIT_SCHED) }
 
@@ -103,10 +109,12 @@ internal var _SCHED_FIFO: CInt { CInt(SCHED_FIFO) }
 
 @_alwaysEmitIntoClient
 internal var _SCHED_RR: CInt { CInt(SCHED_RR) }
+#endif
 
 // MARK: - Clocks for condition variables and interval timers
 
-#if !SYSTEM_PACKAGE_DARWIN
+// Darwin's and WASI's are in Constants+Time.swift.
+#if !SYSTEM_PACKAGE_DARWIN && !os(WASI)
 @_alwaysEmitIntoClient
 internal var _CLOCK_REALTIME: clockid_t { clockid_t(CLOCK_REALTIME) }
 
@@ -136,4 +144,4 @@ internal var _QOS_CLASS_BACKGROUND: qos_class_t { QOS_CLASS_BACKGROUND }
 internal var _QOS_CLASS_UNSPECIFIED: qos_class_t { QOS_CLASS_UNSPECIFIED }
 #endif
 
-#endif // !os(Windows) && !os(WASI)
+#endif // !os(Windows) && (!os(WASI) || _runtime(_multithreaded))

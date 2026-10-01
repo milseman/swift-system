@@ -7,7 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-#if !os(Windows) && !os(WASI)
+#if !os(Windows) && (!os(WASI) || _runtime(_multithreaded))
 
 #if SYSTEM_PACKAGE_DARWIN
 import Darwin
@@ -15,6 +15,9 @@ import Darwin
 import Glibc
 #elseif canImport(Musl)
 import Musl
+#elseif canImport(WASILibc)
+import WASILibc
+import wasi_pthread
 #elseif canImport(Android)
 import Android
 #else
@@ -272,12 +275,12 @@ extension PThread.Mutex {
   }
   #endif // os(Linux) || os(FreeBSD)
 
-  #if !os(Android)
+  #if !os(Android) && !os(WASI)
   /// The priority ceiling of a mutex
   /// with the ``PriorityProtocol-swift.struct/protect`` protocol.
   ///
   /// The corresponding C function is `pthread_mutex_getprioceiling`.
-  /// - Note: Not available on Android.
+  /// - Note: Not available on Android or WASI.
   @_alwaysEmitIntoClient
   public func priorityCeiling() throws(Errno) -> CInt {
     try _priorityCeiling().get()
@@ -299,7 +302,7 @@ extension PThread.Mutex {
   /// - Returns: The previous priority ceiling.
   ///
   /// The corresponding C function is `pthread_mutex_setprioceiling`.
-  /// - Note: Not available on Android.
+  /// - Note: Not available on Android or WASI.
   @_alwaysEmitIntoClient
   @discardableResult
   @available(*, noasync, message: "Changing the priority ceiling locks the mutex")
@@ -314,7 +317,7 @@ extension PThread.Mutex {
       system_pthread_mutex_setprioceiling(_address, ceiling, &oldCeiling)
     }.map { oldCeiling }
   }
-  #endif // !os(Android)
+  #endif // !os(Android) && !os(WASI)
 }
 
 // MARK: - C interoperation
@@ -425,11 +428,11 @@ extension PThread.Mutex {
     /// with `PTHREAD_PROCESS_SHARED` or `PTHREAD_PROCESS_PRIVATE`.
     public var isProcessShared: Bool
 
-    #if !os(Android)
+    #if !os(Android) && !os(WASI)
     /// How holding the mutex affects the priority of the thread that holds it.
     ///
     /// The corresponding C function is `pthread_mutexattr_setprotocol`.
-    /// - Note: Not available on Android.
+    /// - Note: Not available on Android or WASI.
     public var priorityProtocol: PriorityProtocol
 
     /// The priority that a thread holding the mutex runs at,
@@ -443,7 +446,7 @@ extension PThread.Mutex {
     /// with ``Errno/notSupported``.
     ///
     /// The corresponding C function is `pthread_mutexattr_setprioceiling`.
-    /// - Note: Not available on Android.
+    /// - Note: Not available on Android or WASI.
     public var priorityCeiling: CInt?
     #endif
 
@@ -466,7 +469,7 @@ extension PThread.Mutex {
     public init(kind: Kind = .default, isProcessShared: Bool = false) {
       self.kind = kind
       self.isProcessShared = isProcessShared
-      #if !os(Android)
+      #if !os(Android) && !os(WASI)
       self.priorityProtocol = .none
       self.priorityCeiling = nil
       #endif
@@ -523,7 +526,7 @@ extension PThread.Mutex {
     public static var `default`: Self { Self(rawValue: _PTHREAD_MUTEX_DEFAULT) }
   }
 
-  #if !os(Android)
+  #if !os(Android) && !os(WASI)
   /// How holding a mutex affects the priority of the thread that holds it.
   @frozen
   public struct PriorityProtocol: RawRepresentable, Hashable, Sendable {
@@ -554,7 +557,7 @@ extension PThread.Mutex {
     @_alwaysEmitIntoClient
     public static var protect: Self { Self(rawValue: _PTHREAD_PRIO_PROTECT) }
   }
-  #endif // !os(Android)
+  #endif // !os(Android) && !os(WASI)
 }
 
 @available(System 199, *)
@@ -586,7 +589,7 @@ extension PThread.Mutex.Attributes {
     if let error = _pthreadError(system_pthread_mutexattr_setpshared(attributes, shared)) {
       return error
     }
-    #if !os(Android)
+    #if !os(Android) && !os(WASI)
     if priorityProtocol != .none {
       if let error = _pthreadError(
         system_pthread_mutexattr_setprotocol(attributes, priorityProtocol.rawValue)
@@ -615,4 +618,4 @@ extension PThread.Mutex.Attributes {
   }
 }
 
-#endif // !os(Windows) && !os(WASI)
+#endif // !os(Windows) && (!os(WASI) || _runtime(_multithreaded))
