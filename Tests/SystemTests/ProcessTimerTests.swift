@@ -59,8 +59,15 @@ final class ProcessTimerTests: XCTestCase {
         Schedule(nextExpiration: expiration, interval: .seconds(1)))
       XCTAssertEqual(previous, .disarmed)
 
+      // Linux adds a scheduler tick, 1 to 10 ms, to a processor-time
+      // timer's expiration, so that it can't expire early.
+      #if os(Linux) || os(Android)
+      let most = timer == .real ? expiration : expiration + .milliseconds(10)
+      #else
+      let most = expiration
+      #endif
       let schedule = try timer.schedule()
-      XCTAssertLessThanOrEqual(schedule.nextExpiration, expiration)
+      XCTAssertLessThanOrEqual(schedule.nextExpiration, most)
       XCTAssertGreaterThan(schedule.nextExpiration, least)
       XCTAssertEqual(schedule.interval, .seconds(1))
 

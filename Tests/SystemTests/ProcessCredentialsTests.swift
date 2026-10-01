@@ -62,11 +62,17 @@ private struct ProcessCredentialsTests {
     #expect(result != -1)
     #expect(groups.map(\.rawValue) == Array(buffer[..<Int(count)]))
 
-    // Another group to include comes first, and adds one.
+    // Another group to include comes first, and adds one. Darwin's list
+    // keeps the user's primary group; glibc's has it only if the group
+    // database lists the user in it, as it doesn't list root in group 0.
     let unusual = GroupID(rawValue: 4242)
     let more = try GroupID.supplementary(forUser: me.name, including: unusual)
     #expect(more.first == unusual)
+    #if SYSTEM_PACKAGE_DARWIN
     #expect(Set(more) == Set(groups).union([unusual]))
+    #else
+    #expect(Set(more).union([me.groupID]) == Set(groups).union([unusual]))
+    #endif
   }
 
   @available(System 199, *)

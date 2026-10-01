@@ -8,7 +8,9 @@
 */
 
 import XCTest
+#if canImport(Dispatch)
 import Dispatch
+#endif
 
 #if SYSTEM_PACKAGE
 @testable import SystemPackage

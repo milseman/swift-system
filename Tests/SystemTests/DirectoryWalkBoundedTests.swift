@@ -83,8 +83,8 @@ private struct DirectoryWalkBoundedTests {
 
   /// A directory the walk can't open gets the same visits.
   @available(System 199, *)
-  @Test func anUnreadableDirectory() throws {
-    try #require(getuid() != 0, "root can read any directory")
+  @Test(.enabled(if: geteuid() != 0, "root can read any directory"))
+  func anUnreadableDirectory() throws {
     try DirectoryFixture.withTemporaryDirectory("DirectoryWalk_boundedUnreadable") { root in
       try DirectoryFixture.makeTree(in: root)
       let locked = root.appending("a/b")

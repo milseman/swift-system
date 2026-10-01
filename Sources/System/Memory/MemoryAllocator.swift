@@ -7,7 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-#if !os(Windows) && !os(WASI)
+#if !os(Windows)
 
 #if os(Linux) && canImport(Glibc)
 import CSystem
@@ -322,4 +322,4 @@ extension Memory {
 }
 #endif // os(Linux) && canImport(Glibc)
 
-#endif // !os(Windows) && !os(WASI)
+#endif // !os(Windows)

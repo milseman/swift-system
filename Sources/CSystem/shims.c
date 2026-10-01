@@ -115,6 +115,22 @@ char *csystem_mktemp(char *path) {
 
 #endif
 
+#if defined(__FreeBSD__) || defined(__OpenBSD__)
+
+#include <CSystemShared.h>
+#include <sys/ioctl.h>
+
+// Terminal ioctl shims for FreeBSD and OpenBSD
+int _system_ioctl_TIOCGWINSZ(int fd, void *ws) {
+  return ioctl(fd, TIOCGWINSZ, ws);
+}
+
+int _system_ioctl_TIOCSWINSZ(int fd, const void *ws) {
+  return ioctl(fd, TIOCSWINSZ, ws);
+}
+
+#endif
+
 #if defined(_WIN32)
 #include <CSystemWindows.h>
 #endif

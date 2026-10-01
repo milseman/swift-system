@@ -158,6 +158,7 @@ final class ProvisionalStdioTest: XCTestCase {
     }
   }
 
+  #if !os(WASI) // WASI has no pipe
   func testAStreamOnADescriptor() throws {
     let (reader, writer) = try FileDescriptor.pipe()
     defer { try? reader.close() }
@@ -181,7 +182,9 @@ final class ProvisionalStdioTest: XCTestCase {
     try reader.setStatusFlags(.nonBlocking)
     let stream = try FileStream.open(writer, mode: "w")
     defer { try? stream.close() }
-    let storage = UnsafeMutableRawBufferPointer.allocate(byteCount: 64, alignment: 1)
+    // glibc writes a stream's first write straight to its descriptor
+    // when the buffer is smaller than 128 bytes.
+    let storage = UnsafeMutableRawBufferPointer.allocate(byteCount: 256, alignment: 1)
     defer { storage.deallocate() }
     try stream.setBuffering(.line, buffer: storage)
     let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 16, alignment: 1)
@@ -196,6 +199,8 @@ final class ProvisionalStdioTest: XCTestCase {
     XCTAssertEqual(String(decoding: buffer[..<count], as: UTF8.self), "part line\n")
     XCTAssertEqual(FileStream.Buffering.line.description, "line")
   }
+
+  #endif // !os(WASI)
 
   func testErrors() throws {
     try withTemporaryFilePath(basename: "testErrors") { dir in

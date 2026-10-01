@@ -106,13 +106,15 @@ public struct InputFlags: OptionSet, Hashable, Sendable {
   @_alwaysEmitIntoClient
   public static var ringBellOnFull: Self { Self(rawValue: _IMAXBEL) }
 
+  #if !os(OpenBSD)
   /// Assume input is UTF-8 encoded for correct VERASE handling.
   ///
   /// The corresponding C constant is `IUTF8`.
   @_alwaysEmitIntoClient
   public static var utf8Input: Self { Self(rawValue: _IUTF8) }
+  #endif
 
-  #if os(Linux)
+  #if os(Linux) || os(Android)
   /// Map uppercase characters to lowercase on input.
   ///
   /// The corresponding C constant is `IUCLC`.
@@ -169,6 +171,8 @@ public struct OutputFlags: OptionSet, Hashable, Sendable {
   @_alwaysEmitIntoClient
   public static var nlPerformsCR: Self { Self(rawValue: _ONLRET) }
 
+  // FreeBSD and OpenBSD have no fill characters or delays but the tab's.
+  #if !os(FreeBSD) && !os(OpenBSD)
   /// Use fill characters for delay.
   ///
   /// The corresponding C constant is `OFILL`.
@@ -228,6 +232,7 @@ public struct OutputFlags: OptionSet, Hashable, Sendable {
   /// The corresponding C constant is `CR3`.
   @_alwaysEmitIntoClient
   public static var crDelay3: Self { Self(rawValue: _CR3) }
+  #endif
 
   /// Horizontal tab delay mask.
   ///
@@ -241,6 +246,7 @@ public struct OutputFlags: OptionSet, Hashable, Sendable {
   @_alwaysEmitIntoClient
   public static var tabDelay0: Self { Self(rawValue: _TAB0) }
 
+  #if !os(FreeBSD) && !os(OpenBSD)
   /// Horizontal tab delay type 1.
   ///
   /// The corresponding C constant is `TAB1`.
@@ -252,14 +258,15 @@ public struct OutputFlags: OptionSet, Hashable, Sendable {
   /// The corresponding C constant is `TAB2`.
   @_alwaysEmitIntoClient
   public static var tabDelay2: Self { Self(rawValue: _TAB2) }
+  #endif
 
-  #if SYSTEM_PACKAGE_DARWIN
+  #if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
   /// Expand tabs to spaces.
   ///
   /// The corresponding C constant is `TAB3`.
   @_alwaysEmitIntoClient
   public static var expandTabs: Self { Self(rawValue: _TAB3) }
-  #elseif os(Linux)
+  #elseif os(Linux) || os(Android)
   /// Expand tabs to spaces.
   ///
   /// The corresponding C constant is `XTABS`.
@@ -267,6 +274,7 @@ public struct OutputFlags: OptionSet, Hashable, Sendable {
   public static var expandTabs: Self { Self(rawValue: _XTABS) }
   #endif
 
+  #if !os(FreeBSD) && !os(OpenBSD)
   /// Backspace delay mask.
   ///
   /// The corresponding C constant is `BSDLY`.
@@ -320,11 +328,12 @@ public struct OutputFlags: OptionSet, Hashable, Sendable {
   /// The corresponding C constant is `FF1`.
   @_alwaysEmitIntoClient
   public static var formFeedDelay1: Self { Self(rawValue: _FF1) }
+  #endif
 
-  #if canImport(Darwin)
+  #if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
   /// Expand tabs to spaces.
   ///
-  /// On Darwin, `OXTABS` and `TAB3` have the same value,
+  /// On Darwin, FreeBSD, and OpenBSD, `OXTABS` and `TAB3` have the same value,
   /// so this is the same flag as ``expandTabs``,
   /// which Linux has too.
   ///
@@ -340,7 +349,7 @@ public struct OutputFlags: OptionSet, Hashable, Sendable {
   public static var discardEOT: Self { Self(rawValue: _ONOEOT) }
   #endif
 
-  #if os(Linux)
+  #if os(Linux) || os(Android)
   /// Map lowercase characters to uppercase on output.
   ///
   /// The corresponding C constant is `OLCUC`.
@@ -433,7 +442,7 @@ public struct ControlFlags: OptionSet, Hashable, Sendable {
   @_alwaysEmitIntoClient
   public static var characterSize8: Self { Self(rawValue: _CS8) }
 
-  #if canImport(Darwin)
+  #if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
   /// CTS flow control of output.
   ///
   /// The corresponding C constant is `CCTS_OFLOW`.
@@ -446,6 +455,7 @@ public struct ControlFlags: OptionSet, Hashable, Sendable {
   @_alwaysEmitIntoClient
   public static var rtsInputFlowControl: Self { Self(rawValue: _CRTS_IFLOW) }
 
+  #if !os(OpenBSD)
   /// DTR flow control of input.
   ///
   /// The corresponding C constant is `CDTR_IFLOW`.
@@ -463,6 +473,7 @@ public struct ControlFlags: OptionSet, Hashable, Sendable {
   /// The corresponding C constant is `CCAR_OFLOW`.
   @_alwaysEmitIntoClient
   public static var carrierFlowControl: Self { Self(rawValue: _CCAR_OFLOW) }
+  #endif
 
   /// Enable RTS/CTS (hardware) full-duplex flow control.
   ///
@@ -471,7 +482,7 @@ public struct ControlFlags: OptionSet, Hashable, Sendable {
   public static var hardwareFlowControl: Self { Self(rawValue: _CRTSCTS) }
   #endif
 
-  #if os(Linux)
+  #if os(Linux) || os(Android)
   /// Enable RTS/CTS (hardware) flow control.
   ///
   /// The corresponding C constant is `CRTSCTS`.
@@ -588,7 +599,7 @@ public struct LocalFlags: OptionSet, Hashable, Sendable {
   @_alwaysEmitIntoClient
   public static var retypePending: Self { Self(rawValue: _PENDIN) }
 
-  #if canImport(Darwin)
+  #if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
   /// Use alternate word erase algorithm.
   ///
   /// The corresponding C constant is `ALTWERASE`.
@@ -608,7 +619,7 @@ public struct LocalFlags: OptionSet, Hashable, Sendable {
   public static var noKernelInfo: Self { Self(rawValue: _NOKERNINFO) }
   #endif
 
-  #if os(Linux)
+  #if os(Linux) || os(Android)
   /// External processing (for pseudo-terminals).
   ///
   /// The corresponding C constant is `EXTPROC`.

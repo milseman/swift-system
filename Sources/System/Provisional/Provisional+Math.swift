@@ -52,6 +52,8 @@ import ucrt
 ///
 /// These functions return NaN for a value outside their domain,
 /// as C's do, rather than trap; C also sets `errno`, which they don't read.
+/// Their results are the C library's, whose last bits can differ
+/// between platforms: glibc's `cbrt(-27.0)` isn't exactly `-3`.
 ///
 /// - Note: Provisional: math functions may move to the Swift standard library.
 @available(System 199, *)
