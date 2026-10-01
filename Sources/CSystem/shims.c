@@ -52,10 +52,11 @@ uint64_t _system_get_ST_APPEND(void) { return ST_APPEND; }
 uint64_t _system_get_ST_IMMUTABLE(void) { return ST_IMMUTABLE; }
 #endif
 
-// O_TMPFILE and AT_EMPTY_PATH, which <fcntl.h> declares only with
-// _GNU_SOURCE in glibc and Musl.
+// O_PATH, O_TMPFILE and AT_EMPTY_PATH, which <fcntl.h> declares only with
+// _GNU_SOURCE in glibc, as Musl's does the last two.
 #include <fcntl.h>
 int _system_get_AT_EMPTY_PATH(void) { return AT_EMPTY_PATH; }
+int _system_get_O_PATH(void) { return O_PATH; }
 int _system_get_O_TMPFILE(void) { return O_TMPFILE; }
 
 // MAXSYMLINKS, and XATTR_NAME_MAX, which Musl's <limits.h> doesn't define:
