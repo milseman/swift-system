@@ -13,11 +13,27 @@ passing. After each commit: the same, since every new file compiles to nothing o
 The windows-2 lane (sections 11 on, base system-next at `4365f83`) applies patches P1 and P2 of section 10, then
 adds API for the adopters' top Windows gaps of section 8, in its order, checked the same way.
 
-**Resume here:** windows-api's parts are done (sections 1 to 10). windows-2: P1 and P2 are applied (section 11);
-processes (sections 12 and 13), clocks and sleeping (14), SRW locks and condition variables (15), consoles and
-standard handles (16), well-known directories (17), dynamic loading (18), and environment variables (19) are
-done. Next: file information, the eighth gap, then the rest of section 8's gaps in order. Findings and patches for
-other lanes' files are the last two sections; patch P3 (the CMake source list) grows with each new file.
+**Resume here:** windows-api's parts are done (sections 1 to 10). windows-2 stopped at convergence, 2026-10-01,
+with nothing in progress. Done, one section and commit each: P1 and P2 (section 11, `037de61`, `5d843d5`),
+processes (12, `92a1dbd`), process creation and thread handles (13, `e84b953`), clocks and sleeping (14,
+`91b6894`), SRW locks and condition variables (15, `a3eb00c`), consoles and standard handles (16, `649fcd9`),
+well-known directories (17, `b63bce9`), dynamic loading (18, `257fb78`), environment variables (19, `0ed04ff`),
+and file information (20, the last commit); system-next was merged at `ed762e3`.
+- **Next**: the rest of section 8's list, in order: long paths (a public form of `_withCanonicalPath`, or
+  wrapping the calls that need it); threads (creating them, and fiber-local storage, on `Win32.ThreadHandle`);
+  `Win32.HResult`; path operations (create, remove, rename, copy, link, and the POSIX-semantics delete and rename
+  dispositions); overlapped I/O; system information; Winsock.
+- **Left within done gaps**: a Windows `BrokenDownTime` over the UCRT's time functions (14); a Windows
+  `ProcessID.exit(_:)` and `exitImmediately(_:)` (12); `CRITICAL_SECTION` (15); attaching, freeing and
+  generating console events, and `SetStdHandle` (16); `AddDllDirectory` (18); a quoting helper for command lines
+  (13).
+- **For other lanes**: P3 (section 22) must land with the next merge of this branch, or CI's CMake job fails on
+  system-next, which merged `b63bce9` without it. The PlatformEnum samples' Windows arms differ from
+  `Win32.ProcessHandle` (section 21).
+- **Tests**: no Windows test has run; each section lists what a Windows run must check. At the last commit:
+  Darwin `swift build` and `swift test`, XCTest 572 tests (5 skipped) and swift-testing 502 tests in 82 suites,
+  all passing; `check-windows.sh` compiles the Win32 files and the 19 Windows test files. No Linux build was run in
+  this lane.
 
 ## How it was checked
 
@@ -1071,7 +1087,7 @@ A Windows run must check: `testConstantsMatchTheSDK`, and the two new codes in `
 `testLoadOptionsAndTheCStringOverload`; `testMissingLibraries` (`moduleNotFound` both ways); `testAlreadyLoaded`;
 `testMainProgram` (the handle is `GetModuleHandleW(NULL)`'s); `testTakingAndRelinquishing`.
 
-## 19. Environment variables: this commit
+## 19. Environment variables: `0ed04ff`
 
 The seventh gap of section 8. Its files read a variable (`GetEnvironmentVariableW`), set or remove one
 (`SetEnvironmentVariableW`, and the C runtime's `_putenv`, `_putenv_s` and `_wputenv_s`), and copy the whole
@@ -1117,7 +1133,55 @@ runtime's, which relies on `_wputenv_s` removing a variable it's given an empty 
 `testLongValues` (past the first buffer); `testInvalidNamesAndValues`; `testEntriesAndTheBlock`;
 `testChildrenInherit` (a child created afterward sees the variable).
 
-## 20. windows-2: findings
+## 20. File information: this commit
+
+The eighth gap of section 8, and the first two stages SYS-0010's roadmap leaves to future proposals. Its files test
+attributes (`FILE_ATTRIBUTE_DIRECTORY`, `FILE_ATTRIBUTE_REPARSE_POINT`, `FILE_ATTRIBUTE_READONLY`), read
+`BY_HANDLE_FILE_INFORMATION` (`GetFileInformationByHandle`) and `WIN32_FILE_ATTRIBUTE_DATA`
+(`GetFileAttributesExW`), get and set attributes by path, set times (`SetFileTime`), and, in swift-foundation, read
+`FileIdInfo`, `FileBasicInfo` and `FileAttributeTagInfo`.
+
+What: `Win32FileInformation.swift`.
+- `Win32.FileAttributes` gains the attributes that describe an existing file (`directory`, `reparsePoint`,
+  `sparseFile`, `compressed`, and eight more); its doc says which ones creation applies.
+- `Win32.FileInformation` (`BY_HANDLE_FILE_INFORMATION`): attributes, the three times as `Win32.FileTime`,
+  volume serial number, size, link count, and file index. `Win32.FileBasicInformation` (`FILE_BASIC_INFO`),
+  `Win32.FileStandardInformation` (`FILE_STANDARD_INFO`), `Win32.FileID` (`FILE_ID_INFO`, the 128-bit ID as a
+  `UInt128`), `Win32.ReparseTag` (symbolic link, mount point, app execution alias, Unix domain socket, and the
+  Microsoft and name-surrogate bits), and `Win32.FileAttributeTagInformation`.
+- On both handle types: `information()`, `basicInformation()`, `fileID()`, `attributeTagInformation()`,
+  `setTimes(creation:lastAccess:lastWrite:change:)` and `setAttributes(_:)`; on `FileHandle`,
+  `standardInformation()` too.
+- By path: `Win32.fileAttributes(of:)`, `Win32.fileAttributeData(of:)` and `Win32.setFileAttributes(_:of:)`
+  (`GetFileAttributesW`, `GetFileAttributesExW`, `SetFileAttributesW`), with `open`'s path canonicalization.
+
+Which API: **Win32.** SYS-0006 keeps `Stat` POSIX-only and calls for Windows types instead, and SYS-0010's roadmap
+puts them in the namespace. A cross-platform `FileInfo` over both stays SYS-0006's future direction.
+
+Design calls, with the alternatives rejected:
+- **Information types wrap their C structs** with read-only properties, as `ConsoleScreenBufferInfo` and System's
+  other C-struct wrappers do; `FileID` is a plain value instead, since an identity needs `Hashable`.
+- **Times are `Win32.FileTime`**, section 14's type, from both `FILETIME` and `FILE_BASIC_INFO`'s
+  `LARGE_INTEGER`s.
+- **Setting goes through `FILE_BASIC_INFO`** with optional times, nil for "leave it", as POSIX's `setTimes` takes
+  `nil` for `UTIME_OMIT`; `SetFileTime` would need a separate path for the change time. A zero time means "leave
+  it" there, so the start of 1601 can't be set, which the doc says. Empty attributes become
+  `FILE_ATTRIBUTE_NORMAL`, since zero means "leave them".
+- **The path queries are namespace functions** taking a `FilePath`, as the drafts' API takes paths; they don't
+  open the file, and report a reparse point's own attributes.
+- **Not done**: the other information classes (names, streams, compression, alignment, remote protocol,
+  directory enumeration), and setting the delete and rename dispositions with POSIX semantics
+  (`FileDispositionInfoEx`, `FileRenameInfoEx`), which belong with the path operations gap.
+
+Tests: `Win32FileInformationTests`.
+
+A Windows run must check: `testConstantsMatchTheSDK` (the attributes and the four reparse tags);
+`testFileInformation` (size, links, times, the three information classes agreeing, the same `FileID` for two
+opens and a different one for another file); `testDirectoryInformation`; `testSettingTimesAndAttributes` (a
+time set and the others left, attributes set and cleared); `testQueriesByPath` (`fileNotFound` and
+`pathNotFound`); `testFileIDBytes` (the little-endian reading). `fileID()` on FAT, which throws, isn't covered.
+
+## 21. windows-2: findings
 
 - **The PlatformEnum samples' Windows arms now reach System's `Win32.ProcessHandle`** (the stand-ins compile only
   with `SIMULATE_PLATFORMS`), and differ from it: `Platform.Process` reads `processID` as a property, where
@@ -1138,7 +1202,7 @@ runtime's, which relies on `_wputenv_s` removing a variable it's given an empty 
   a warning that the constant has type `()`. Callers of the C-string overloads that make owners have to get the
   pointer some other way; `Win32DynamicLibraryTests` allocates it.
 
-## 21. windows-2: patches for files outside the lane
+## 22. windows-2: patches for files outside the lane
 
 **P3, `Sources/System/CMakeLists.txt`: list the lane's new sources.** CI's CMake job fails when a SwiftPM source is
 missing from the list. Kept current with each commit; it applies to this branch with `git apply`. system-next at
@@ -1159,7 +1223,13 @@ P3 with the next merge of this branch, which brings the rest.
 +  Win32/Win32Console.swift
    Win32/Win32Constants.swift
    Win32/Win32Error.swift
-@@ -366,7 +371,13 @@
+@@ -361,4 +366,5 @@
+   Win32/Win32FileHandle.swift
+   Win32/Win32FileIO.swift
++  Win32/Win32FileInformation.swift
+   Win32/Win32FileType.swift
+   Win32/Win32FinalPath.swift
+@@ -366,7 +372,13 @@
    Win32/Win32Locking.swift
    Win32/Win32Open.swift
 +  Win32/Win32Process.swift

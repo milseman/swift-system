@@ -628,4 +628,30 @@ internal func system__wputenv_s(
   return _wputenv_s(varname, value_string)
 }
 
+// MARK: - File information
+
+internal func system_GetFileInformationByHandle(
+  _ hFile: HANDLE, _ lpFileInformation: UnsafeMutablePointer<BY_HANDLE_FILE_INFORMATION>
+) -> Bool {
+  GetFileInformationByHandle(hFile, lpFileInformation)
+}
+
+internal func system_GetFileAttributesW(_ lpFileName: UnsafePointer<WCHAR>) -> DWORD {
+  GetFileAttributesW(lpFileName)
+}
+
+internal func system_GetFileAttributesExW(
+  _ lpFileName: UnsafePointer<WCHAR>,
+  _ fInfoLevelId: GET_FILEEX_INFO_LEVELS,
+  _ lpFileInformation: UnsafeMutablePointer<WIN32_FILE_ATTRIBUTE_DATA>
+) -> Bool {
+  GetFileAttributesExW(lpFileName, fInfoLevelId, lpFileInformation)
+}
+
+internal func system_SetFileAttributesW(
+  _ lpFileName: UnsafePointer<WCHAR>, _ dwFileAttributes: DWORD
+) -> Bool {
+  SetFileAttributesW(lpFileName, dwFileAttributes)
+}
+
 #endif // os(Windows)
