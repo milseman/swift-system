@@ -14,11 +14,17 @@
 // they're CSystem shims. On Android, Bionic's strtod_l, strtof_l and
 // strncasecmp_l, which it declares only from API levels 26, 26 and 23, are
 // strtod, strtof and strncasecmp, ignoring the locale, so these call those.
+// FreeBSD's locale calls are Darwin's (its xlocale is the same code), but
+// its <stdlib.h> and <strings.h> declare the *_l calls only after
+// <xlocale.h>, so these are CSystem shims there. OpenBSD has no strtod_l or
+// strtof_l, and its LC_NUMERIC is always the POSIX locale's, so these call
+// strtod and strtof there; its strncasecmp_l ignores the locale, so this
+// calls strncasecmp, as on Android.
 //
 // In a mock test, a locale that newlocale "created" is a placeholder
 // address, so freelocale is mocked too, and neither touches it.
 
-#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
+#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD)
 import CSystem
 #if SYSTEM_PACKAGE_DARWIN
 import Darwin
@@ -94,7 +100,9 @@ internal func system_strtod_l(
 ) -> Double {
 #if SYSTEM_PACKAGE_DARWIN
   strtod_l(string, end, locale)
-#elseif os(Android)
+#elseif os(FreeBSD)
+  csystem_strtod_l(string, end, UnsafeMutableRawPointer(locale))
+#elseif os(Android) || os(OpenBSD)
   strtod(string, end)
 #else
   if _isGlobalLocale(locale) { return strtod(string, end) }
@@ -110,7 +118,9 @@ internal func system_strtof_l(
 ) -> Float {
 #if SYSTEM_PACKAGE_DARWIN
   strtof_l(string, end, locale)
-#elseif os(Android)
+#elseif os(FreeBSD)
+  csystem_strtof_l(string, end, UnsafeMutableRawPointer(locale))
+#elseif os(Android) || os(OpenBSD)
   strtof(string, end)
 #else
   if _isGlobalLocale(locale) { return strtof(string, end) }
@@ -124,7 +134,9 @@ internal func system_strncasecmp_l(
 ) -> CInt {
 #if SYSTEM_PACKAGE_DARWIN
   strncasecmp_l(a, b, count, locale)
-#elseif os(Android)
+#elseif os(FreeBSD)
+  csystem_strncasecmp_l(a, b, count, UnsafeMutableRawPointer(locale))
+#elseif os(Android) || os(OpenBSD)
   strncasecmp(a, b, count)
 #else
   if _isGlobalLocale(locale) { return strncasecmp(a, b, count) }
@@ -132,4 +144,4 @@ internal func system_strncasecmp_l(
 #endif
 }
 
-#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
+#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD)

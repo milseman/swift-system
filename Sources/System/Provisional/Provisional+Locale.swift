@@ -17,12 +17,13 @@
 // number parsing does, or that sets the process's C locale, as its tests
 // do, can do so without importing the C library.
 //
-// On Darwin, Linux (glibc and Musl) and Android, which have these calls,
-// though Linux declares strtod_l and strtof_l only with _GNU_SOURCE, and has
-// no LC_C_LOCALE, and Bionic's *_l calls ignore the locale (see
+// On Darwin, Linux (glibc and Musl), Android, FreeBSD and OpenBSD, which
+// have these calls, though Linux declares strtod_l and strtof_l only with
+// _GNU_SOURCE, and has no LC_C_LOCALE, Bionic's *_l calls ignore the locale,
+// and OpenBSD has no strtod_l or strtof_l (see
 // Syscalls+ProvisionalLocale.swift).
 
-#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
+#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD)
 import CSystem
 #if SYSTEM_PACKAGE_DARWIN
 import Darwin
@@ -41,7 +42,7 @@ extension CInterop {
   /// The corresponding C type is `locale_t`.
   ///
   /// - Note: Provisional: C locales may move to the Swift standard library.
-  /// - Note: Only available on Darwin, Linux and Android.
+  /// - Note: Only available on Darwin, Linux, Android, FreeBSD and OpenBSD.
   public typealias Locale = locale_t
 }
 
@@ -66,9 +67,11 @@ extension CInterop {
 /// and `"C.UTF-8"` and `"en_US.UTF-8"` the same with UTF-8 characters,
 /// which ``globalName(for:)`` names `"C.UTF-8"`;
 /// and its calls that take a locale ignore it.
+/// OpenBSD's locales differ only in their character types,
+/// so its numbers and case are the POSIX locale's in every locale.
 ///
 /// - Note: Provisional: C locales may move to the Swift standard library.
-/// - Note: Only available on Darwin, Linux and Android.
+/// - Note: Only available on Darwin, Linux, Android, FreeBSD and OpenBSD.
 @frozen
 @available(System 199, *)
 public struct CLocale: RawRepresentable, Hashable, @unchecked Sendable {
@@ -187,7 +190,8 @@ extension CLocale {
     /// The corresponding C constant is `LC_ALL_MASK`.
     @_alwaysEmitIntoClient
     public static var all: Categories {
-      #if SYSTEM_PACKAGE_DARWIN
+      // FreeBSD's LC_ALL_MASK is Darwin's, and OpenBSD's the same six.
+      #if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
       [.collation, .characterTypes, .messages, .monetary, .numeric, .time]
       #else
       Categories(rawValue: _LC_ALL_MASK)
@@ -404,4 +408,4 @@ extension CLocale {
   }
 }
 
-#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
+#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD)
