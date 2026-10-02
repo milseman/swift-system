@@ -643,6 +643,44 @@ internal func system_WakeAllConditionVariable(
   WakeAllConditionVariable(ConditionVariable)
 }
 
+internal func system_InitializeCriticalSection(
+  _ lpCriticalSection: UnsafeMutablePointer<CRITICAL_SECTION>
+) {
+  InitializeCriticalSection(lpCriticalSection)
+}
+
+internal func system_EnterCriticalSection(
+  _ lpCriticalSection: UnsafeMutablePointer<CRITICAL_SECTION>
+) {
+  EnterCriticalSection(lpCriticalSection)
+}
+
+internal func system_TryEnterCriticalSection(
+  _ lpCriticalSection: UnsafeMutablePointer<CRITICAL_SECTION>
+) -> Bool {
+  TryEnterCriticalSection(lpCriticalSection)
+}
+
+internal func system_LeaveCriticalSection(
+  _ lpCriticalSection: UnsafeMutablePointer<CRITICAL_SECTION>
+) {
+  LeaveCriticalSection(lpCriticalSection)
+}
+
+internal func system_DeleteCriticalSection(
+  _ lpCriticalSection: UnsafeMutablePointer<CRITICAL_SECTION>
+) {
+  DeleteCriticalSection(lpCriticalSection)
+}
+
+internal func system_SleepConditionVariableCS(
+  _ ConditionVariable: UnsafeMutablePointer<CONDITION_VARIABLE>,
+  _ CriticalSection: UnsafeMutablePointer<CRITICAL_SECTION>,
+  _ dwMilliseconds: DWORD
+) -> Bool {
+  SleepConditionVariableCS(ConditionVariable, CriticalSection, dwMilliseconds)
+}
+
 // MARK: - Consoles
 
 internal func system_GetConsoleMode(

@@ -30,6 +30,15 @@ private final class Shared: @unchecked Sendable {
   var woken = 0
 }
 
+/// A critical section, a condition variable, and the state they protect,
+/// shared with other threads.
+@available(System 199, *)
+private final class SharedCriticalSection: @unchecked Sendable {
+  let criticalSection = Win32.CriticalSection()
+  let condition = Win32.ConditionVariable()
+  var ready = false
+}
+
 /// A result handed from another thread.
 private final class Handoff<Value>: @unchecked Sendable {
   var value: Value?
@@ -47,8 +56,8 @@ private func onAnotherThread<Value>(_ body: @escaping @Sendable () -> Value) -> 
   return handoff.value!
 }
 
-// Win32.SRWLock and Win32.ConditionVariable. Other threads come from
-// Dispatch, as in FileLockTests.
+// Win32.SRWLock, Win32.CriticalSection and Win32.ConditionVariable. Other
+// threads come from Dispatch, as in FileLockTests.
 @available(System 199, *)
 final class Win32SynchronizationTests: XCTestCase {
   func testInternalConstantsMatchTheSDK() {
@@ -173,6 +182,60 @@ final class Win32SynchronizationTests: XCTestCase {
     }
     let woken = shared.lock.withLock { shared.woken }
     XCTAssertEqual(woken, waiters)
+  }
+
+  // MARK: - Critical sections
+
+  func testCriticalSection() {
+    let shared = SharedCriticalSection()
+    XCTAssertTrue(shared.criticalSection.tryLock())
+    // Recursive: the holder can take it again, and holds it until it
+    // releases it as many times.
+    shared.criticalSection.lock()
+    XCTAssertTrue(shared.criticalSection.tryLock())
+    XCTAssertFalse(onAnotherThread { shared.criticalSection.tryLock() })
+    shared.criticalSection.unlock()
+    shared.criticalSection.unlock()
+    XCTAssertFalse(onAnotherThread { shared.criticalSection.tryLock() })
+    shared.criticalSection.unlock()
+    XCTAssertTrue(onAnotherThread { () -> Bool in
+      guard shared.criticalSection.tryLock() else { return false }
+      shared.criticalSection.unlock()
+      return true
+    })
+    let value = shared.criticalSection.withLock { shared.criticalSection.withLock { 42 } }
+    XCTAssertEqual(value, 42)
+  }
+
+  func testConditionVariableWithACriticalSection() throws {
+    let shared = SharedCriticalSection()
+    DispatchQueue.global().async {
+      shared.criticalSection.withLock { shared.ready = true }
+      shared.condition.wake()
+    }
+    try shared.criticalSection.withLock { () throws(Win32.Error) in
+      while !shared.ready {
+        try shared.condition.wait(on: shared.criticalSection)
+      }
+    }
+    let ready = shared.criticalSection.withLock { shared.ready }
+    XCTAssertTrue(ready)
+  }
+
+  func testCriticalSectionWaitTimesOut() throws {
+    let shared = SharedCriticalSection()
+    var timedOut = false
+    for _ in 0..<100 where !timedOut {
+      timedOut = try shared.criticalSection.withLock { () throws(Win32.Error) -> Bool in
+        try !shared.condition.wait(on: shared.criticalSection, timeout: .milliseconds(5))
+      }
+    }
+    XCTAssertTrue(timedOut)
+    XCTAssertTrue(onAnotherThread { () -> Bool in
+      guard shared.criticalSection.tryLock() else { return false }
+      shared.criticalSection.unlock()
+      return true
+    })
   }
 }
 

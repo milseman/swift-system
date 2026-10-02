@@ -18,9 +18,9 @@ adds API for the adopters' top Windows gaps of section 8, in its order, checked 
 then section 8's gaps from processes to file information). windows-3, in progress: long paths (section 23,
 `315f25b`), threads (24, `054e9e2`), `HRESULT` (25, `b89b78c`), path operations (26, `8326373`), overlapped I/O (27,
 `d479525`), system information (28, `c04d6b1`), and Winsock, as a design (29, `052ae8a`), which finishes section
-8's list; then `BrokenDownTime` on Windows (30, `ada7eea`), and ending the process and exit codes (31, the last
-commit).
-- **Next, left within done gaps**: `CRITICAL_SECTION` (15); attaching, freeing and
+8's list; then `BrokenDownTime` on Windows (30, `ada7eea`), ending the process and exit codes (31, `a7d4db9`), and critical
+sections (32, the last commit).
+- **Next, left within done gaps**: attaching, freeing and
   generating console events, and `SetStdHandle` (16); `AddDllDirectory` (18); a quoting helper for command lines
   (13); and packages-5's other Windows gap (`../adopters/PACKAGES-5-REPORT.md`, "Gaps, across platforms"):
   `FileStream.setBuffering`.
@@ -1765,7 +1765,7 @@ A Windows run must check:
 - Not covered: zones without daylight saving time, zones east of UTC, a non-English system zone name (decoded as
   UTF-8 from the C runtime's code page), and `setlocale`.
 
-## 31. windows-3: ending the process, and exit codes: this commit
+## 31. windows-3: ending the process, and exit codes: `a7d4db9`
 
 Left within section 12, with the first of packages-5's Windows gaps. Adopters end their process on Windows with the
 UCRT's `exit` and `_exit`, or with `TerminateProcess(GetCurrentProcess(), code)`, which section 12's
@@ -1807,7 +1807,34 @@ reading the whole code on Windows; `exitRunsTheHandlersInReverseOrder`; `exitFlu
 pipe, where `print` writes; and `exitWithACode`. Not covered: handlers that a DLL registers, and other threads
 while the process exits.
 
-## 32. windows-3: findings
+## 32. windows-3: critical sections: this commit
+
+Left within section 15. swift-subprocess's work queue is a `CRITICAL_SECTION` (`InitializeCriticalSection`,
+`EnterCriticalSection`, `LeaveCriticalSection`, `DeleteCriticalSection`) with a condition variable it waits on with
+`SleepConditionVariableCS`, where its other platforms use `PThread.Mutex` and `PThread.Condition`.
+
+What, in `Win32Synchronization.swift`: `Win32.CriticalSection`, with `init()` (`InitializeCriticalSection`), `lock()`,
+`tryLock()`, `unlock()` and `withLock(_:)` (`EnterCriticalSection`, `TryEnterCriticalSection`, `LeaveCriticalSection`),
+`unsafeAddress`, and a deinit that deletes it (`DeleteCriticalSection`); and `Win32.ConditionVariable`'s
+`wait(on:)` and `wait(on:timeout:)` for one (`SleepConditionVariableCS`).
+
+Which API: **Win32**, beside section 15's `SRWLock`, as the Windows side of a recursive `PThread.Mutex`.
+
+Design calls, with the alternatives rejected:
+- **Section 15's shape**: heap storage at a fixed address, nothing that throws but the waits, `withLock(_:)`
+  generic over the body's error, `noasync` on the bare calls. What differs is documented: it's recursive, and it
+  needs deleting, which the deinit does.
+- **The waits take it as `on:`**, overloading the SRW lock's, since the condition variable is the same type; the
+  doc says the critical section must be held once, as `SleepConditionVariableCS` requires.
+- **No spin count.** `InitializeCriticalSectionAndSpinCount` and `SetCriticalSectionSpinCount` tune the wait, and no
+  adopter calls them. Not wrapped: `InitializeCriticalSectionEx`'s flags.
+
+Tests, in `Win32SynchronizationTests`: `testCriticalSection` (recursion, held until released as many times, another
+thread can't take it), `testConditionVariableWithACriticalSection`, `testCriticalSectionWaitTimesOut`.
+
+A Windows run must check those three; that `TryEnterCriticalSection` succeeds for the holder, as Windows documents.
+
+## 33. windows-3: findings
 
 - **`FileDescriptor`'s Windows canonicalization doesn't cover `CreateDirectoryW`'s limit** (P4).
   `withCanonicalPathRepresentation` passes `PATHCCH_ALLOW_LONG_PATHS`, so the `mkdir` adapter, which
@@ -1834,7 +1861,7 @@ while the process exits.
 - **macOS's CoreFoundation declares `S_OK` and `S_FALSE` too**, so the harness's tests spell `WinSDK.S_OK`; on
   Windows, where XCTest's Foundation is swift-corelibs-foundation, the bare names would do.
 
-## 33. windows-3: patches for files outside the lane
+## 34. windows-3: patches for files outside the lane
 
 **P3, continued: `Sources/System/CMakeLists.txt`.** The Win32 `target_sources` block as it should read with this
 lane's files. P3 itself landed with coverage-4 (`8caa741`); this block replaces the one it left, and is kept current

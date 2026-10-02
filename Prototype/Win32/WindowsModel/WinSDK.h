@@ -656,6 +656,27 @@ BOOL SleepConditionVariableSRW(PCONDITION_VARIABLE ConditionVariable, PSRWLOCK S
 void WakeConditionVariable(PCONDITION_VARIABLE ConditionVariable);
 void WakeAllConditionVariable(PCONDITION_VARIABLE ConditionVariable);
 
+// minwinbase.h, synchapi.h, winnt.h: critical sections
+
+struct _RTL_CRITICAL_SECTION_DEBUG;
+typedef struct _RTL_CRITICAL_SECTION {
+  struct _RTL_CRITICAL_SECTION_DEBUG *DebugInfo;
+  LONG LockCount;
+  LONG RecursionCount;
+  HANDLE OwningThread;
+  HANDLE LockSemaphore;
+  ULONG_PTR SpinCount;
+} RTL_CRITICAL_SECTION, *PRTL_CRITICAL_SECTION;
+typedef RTL_CRITICAL_SECTION CRITICAL_SECTION, *PCRITICAL_SECTION, *LPCRITICAL_SECTION;
+
+void InitializeCriticalSection(LPCRITICAL_SECTION lpCriticalSection);
+void EnterCriticalSection(LPCRITICAL_SECTION lpCriticalSection);
+BOOL TryEnterCriticalSection(LPCRITICAL_SECTION lpCriticalSection);
+void LeaveCriticalSection(LPCRITICAL_SECTION lpCriticalSection);
+void DeleteCriticalSection(LPCRITICAL_SECTION lpCriticalSection);
+BOOL SleepConditionVariableCS(PCONDITION_VARIABLE ConditionVariable,
+                              PCRITICAL_SECTION CriticalSection, DWORD dwMilliseconds);
+
 // consoleapi.h, consoleapi2.h, wincon.h: consoles
 
 typedef short SHORT;
