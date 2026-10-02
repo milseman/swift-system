@@ -95,3 +95,10 @@ size_t strftime(char *_Buffer, size_t _SizeInBytes, const char *_Format, const t
 #define EINVAL 22
 #define ERANGE 34
 #define EOVERFLOW 132
+
+// stdlib.h and process.h: ending the process. _exit and exit don't return.
+#define EXIT_SUCCESS 0
+#define EXIT_FAILURE 1
+__attribute__((noreturn)) void exit(int _Code);
+__attribute__((noreturn)) void _exit(int _Code);
+int atexit(void (*_Function)(void));

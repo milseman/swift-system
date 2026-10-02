@@ -18,11 +18,12 @@ adds API for the adopters' top Windows gaps of section 8, in its order, checked 
 then section 8's gaps from processes to file information). windows-3, in progress: long paths (section 23,
 `315f25b`), threads (24, `054e9e2`), `HRESULT` (25, `b89b78c`), path operations (26, `8326373`), overlapped I/O (27,
 `d479525`), system information (28, `c04d6b1`), and Winsock, as a design (29, `052ae8a`), which finishes section
-8's list; then `BrokenDownTime` on Windows (30, the last commit).
-- **Next, left within done gaps**: a Windows `ProcessID.exit(_:)` and `exitImmediately(_:)` (12); `CRITICAL_SECTION` (15); attaching, freeing and
+8's list; then `BrokenDownTime` on Windows (30, `ada7eea`), and ending the process and exit codes (31, the last
+commit).
+- **Next, left within done gaps**: `CRITICAL_SECTION` (15); attaching, freeing and
   generating console events, and `SetStdHandle` (16); `AddDllDirectory` (18); a quoting helper for command lines
-  (13); and packages-5's Windows gaps (`../adopters/PACKAGES-5-REPORT.md`, "Gaps, across platforms"):
-  `ProcessID.ExitCode`'s `success` and `failure`, and `FileStream.setBuffering`.
+  (13); and packages-5's other Windows gap (`../adopters/PACKAGES-5-REPORT.md`, "Gaps, across platforms"):
+  `FileStream.setBuffering`.
 - **For other lanes**: P3 (section 22) landed on system-next with coverage-4 (`8caa741`, merged here at
   `bb225ab`). The CMake list still lacks this lane's files, so the Win32 block in the windows-3 patches section must
   land with this branch's next merge, or CI's CMake job fails. P4 there brings `FileDescriptor`'s Windows
@@ -1700,7 +1701,7 @@ buffers `char *`), and replaces what Winsock lacks or renames: `close` with `clo
 **Outside this lane's files**: a target in `Package.swift` that links `ws2_32`, its CMake list, and SystemSockets'
 `#error` for other platforms (`Sources/SystemSockets`), which a Windows port replaces.
 
-## 30. windows-3: BrokenDownTime on Windows: this commit
+## 30. windows-3: BrokenDownTime on Windows: `ada7eea`
 
 Left within section 14, which named broken-down time the cross-platform candidate. swift-log's
 `StreamLogHandler.timestamp()` formats the local time with `_time64`, `_localtime64_s` and `strftime` on Windows,
@@ -1764,7 +1765,49 @@ A Windows run must check:
 - Not covered: zones without daylight saving time, zones east of UTC, a non-English system zone name (decoded as
   UTF-8 from the C runtime's code page), and `setlocale`.
 
-## 31. windows-3: findings
+## 31. windows-3: ending the process, and exit codes: this commit
+
+Left within section 12, with the first of packages-5's Windows gaps. Adopters end their process on Windows with the
+UCRT's `exit` and `_exit`, or with `TerminateProcess(GetCurrentProcess(), code)`, which section 12's
+`current.terminate` covers but returns `Void`; sourcekit-lsp ends it with `ProcessID.exitImmediately` on Darwin.
+swift-argument-parser defines `exitCodeSuccess` and `exitCodeFailure` from `EXIT_SUCCESS` and `EXIT_FAILURE` on
+Windows, where its other platforms use `ProcessID.ExitCode` (`../adopters/PACKAGES-5-REPORT.md`).
+
+What: `ProcessExitWindows.swift`: `ProcessID.exit(_:)` (`exit`), `exitImmediately(_:)` (`TerminateProcess`),
+`addExitHandler(_:)` (`atexit`), `ProcessID.ExitCode` with `success`, `failure` and a `description`, and the
+`ExitCode` overloads of `exit` and `exitImmediately`.
+
+Which API: **System's `ProcessID`.** Ending the calling process, its exit handlers, and the C standard's two codes
+are the same concepts on Windows, where the UCRT has `exit` and `atexit` under POSIX's names, so the signatures
+carry over.
+
+Design calls, with the alternatives rejected:
+- **`exitImmediately` is `TerminateProcess` on the calling process**, as section 12 proposed. POSIX's `_exit` runs
+  no code in the process; the UCRT's `_exit` ends it with `ExitProcess`, which notifies each loaded DLL, and so
+  runs their detach code and the exit handlers that DLLs registered. Rejected: `_exit`, the same name. It follows
+  `TerminateProcess`, unreached, for the `Never`.
+- **`ExitCode` has the C standard's two codes, and none of `<sysexits.h>`'s**, which Windows doesn't have, as WASI
+  doesn't. Its description adds the bits of a code whose high bit is set, as a crash's `NTSTATUS` is.
+- **The raw value stays `CInt`**, the UCRT's `exit` parameter, though Windows' exit codes are `DWORD`s: the bits
+  pass unchanged, and a parent gets all 32, which the doc says. Still open, from section 12: `ProcessHandle`'s
+  `exitCode()` returns a `DWORD`, not an `ExitCode`.
+- **`addExitHandler`'s doc says where Windows differs**: the UCRT keeps a table of handlers for each DLL, so when
+  System is a DLL of its own, the handlers it registers run when it's unloaded, after the program's own handlers
+  and the flush of the C streams.
+- **The constants are values**, in `Win32Constants.swift`, since `Constants+ExitCodes.swift` is POSIX-only.
+
+Tests: `Win32ProcessExitTests`, swift-testing exit tests like POSIX's `ProcessExitTests` and `ExitCodeTests`, since
+an exit test's body ends a process of its own. The harness now passes swift-testing's macro plugin to the test
+compile, so a Windows test file can use swift-testing.
+
+A Windows run must check: `theConstantsAreTheCRuntimes`; `descriptions`; `exitEndsTheProcessWithTheStatus`;
+`theParentGetsTheWholeStatus` (0x105, and `0xC000013A` through `exitImmediately`), which relies on swift-testing
+reading the whole code on Windows; `exitRunsTheHandlersInReverseOrder`; `exitFlushesBufferedOutput` and
+`exitImmediatelySkipsTheHandlersAndBufferedOutput`, which rely on the UCRT buffering a standard output that's a
+pipe, where `print` writes; and `exitWithACode`. Not covered: handlers that a DLL registers, and other threads
+while the process exits.
+
+## 32. windows-3: findings
 
 - **`FileDescriptor`'s Windows canonicalization doesn't cover `CreateDirectoryW`'s limit** (P4).
   `withCanonicalPathRepresentation` passes `PATHCCH_ALLOW_LONG_PATHS`, so the `mkdir` adapter, which
@@ -1791,7 +1834,7 @@ A Windows run must check:
 - **macOS's CoreFoundation declares `S_OK` and `S_FALSE` too**, so the harness's tests spell `WinSDK.S_OK`; on
   Windows, where XCTest's Foundation is swift-corelibs-foundation, the bare names would do.
 
-## 32. windows-3: patches for files outside the lane
+## 33. windows-3: patches for files outside the lane
 
 **P3, continued: `Sources/System/CMakeLists.txt`.** The Win32 `target_sources` block as it should read with this
 lane's files. P3 itself landed with coverage-4 (`8caa741`); this block replaces the one it left, and is kept current
@@ -1804,6 +1847,7 @@ target_sources(SystemPackage PRIVATE
   Win32/FilePathResolutionWindows.swift
   Win32/PathsWindows.swift
   Win32/ProcessEnvironmentWindows.swift
+  Win32/ProcessExitWindows.swift
   Win32/ProcessIDWindows.swift
   Win32/Win32.swift
   Win32/Win32Console.swift

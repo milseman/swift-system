@@ -371,6 +371,28 @@ internal func system_WaitForSingleObject(_ hHandle: HANDLE, _ dwMilliseconds: DW
   WaitForSingleObject(hHandle, dwMilliseconds)
 }
 
+// MARK: - Ending the process
+
+// exit and _exit never return, so they have no mock hook. macOS's C library
+// declares all three too, which the qualified names keep the harness from
+// calling.
+
+internal func system_exit(_ status: CInt) -> Never {
+  ucrt.exit(status)
+}
+
+internal func system__exit(_ status: CInt) -> Never {
+  ucrt._exit(status)
+}
+
+// atexit returns a nonzero value, not necessarily -1, when it fails.
+internal func system_atexit(_ function: @convention(c) () -> Void) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock() }
+#endif
+  return ucrt.atexit(function)
+}
+
 // MARK: - Threads
 
 internal func system_GetCurrentThread() -> HANDLE {

@@ -112,6 +112,8 @@ public struct Errno: RawRepresentable, Error, Hashable, Codable { // mirrors: So
   @_alwaysEmitIntoClient
   public static var badFileDescriptor: Errno { .init(rawValue: 9) }
   @_alwaysEmitIntoClient
+  public static var noMemory: Errno { .init(rawValue: 12) }
+  @_alwaysEmitIntoClient
   public static var permissionDenied: Errno { .init(rawValue: 13) }
   @_alwaysEmitIntoClient
   public static var fileExists: Errno { .init(rawValue: 17) }

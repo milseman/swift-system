@@ -126,6 +126,16 @@ internal var _WAIT_OBJECT_0: DWORD { 0x0 }
 @_alwaysEmitIntoClient
 internal var _WAIT_TIMEOUT: DWORD { 0x102 }
 
+// MARK: - Ending the process
+
+// stdlib.h's, which Constants+ExitCodes.swift spells for the other
+// platforms.
+@_alwaysEmitIntoClient
+internal var _EXIT_SUCCESS: CInt { 0 }
+
+@_alwaysEmitIntoClient
+internal var _EXIT_FAILURE: CInt { 1 }
+
 // MARK: - Creating threads
 
 @_alwaysEmitIntoClient

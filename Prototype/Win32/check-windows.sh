@@ -69,6 +69,8 @@ for version in 0.0.1 0.0.2 0.0.3 1.1.0 1.1.1 1.2.0 1.2.1 1.3.0 1.3.1 1.3.2 1.4.0
     "AvailabilityMacro=System $version:macOS 10.10, iOS 8.0, watchOS 2.0, tvOS 9.0, visionOS 1.0")
 done
 platform="$(xcode-select -p)/Platforms/MacOSX.platform/Developer"
+# swift-testing's macros, for the test files that use it.
+testing_macros="$(xcode-select -p)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing"
 
 report() {
   grep -E "(error|warning):" | grep -v "^ *|" \
@@ -108,7 +110,7 @@ tests=()
 while IFS= read -r file; do tests+=("$file"); done < <(find "$work/tests" -name '*.swift' | sort)
 if [ $module_status -eq 0 ] && [ ${#tests[@]} -gt 0 ]; then
   test_output=$(swiftc -c -wmo -module-name SystemTests -D SYSTEM_PACKAGE -D ENABLE_MOCKING \
-    -F "$platform/Library/Frameworks" -I "$platform/usr/lib" \
+    -F "$platform/Library/Frameworks" -I "$platform/usr/lib" -plugin-path "$testing_macros" \
     -o "$work/SystemTests.o" "${common[@]}" "${tests[@]}" 2>&1)
   if [ $? -eq 0 ]; then
     echo "== the Windows tests compile (${#tests[@]} files)"
