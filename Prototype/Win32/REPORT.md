@@ -19,10 +19,9 @@ then section 8's gaps from processes to file information). windows-3, in progres
 `315f25b`), threads (24, `054e9e2`), `HRESULT` (25, `b89b78c`), path operations (26, `8326373`), overlapped I/O (27,
 `d479525`), system information (28, `c04d6b1`), and Winsock, as a design (29, `052ae8a`), which finishes section
 8's list; then `BrokenDownTime` on Windows (30, `ada7eea`), ending the process and exit codes (31, `a7d4db9`), critical
-sections (32, `c353713`), console events and `SetStdHandle` (33, `3b9327e`), and library
-search directories (34, the last commit).
-- **Next, left within done gaps**: a quoting helper for command lines
-  (13); and packages-5's other Windows gap (`../adopters/PACKAGES-5-REPORT.md`, "Gaps, across platforms"):
+sections (32, `c353713`), console events and `SetStdHandle` (33, `3b9327e`), library
+search directories (34, `c5efe5d`), and quoting a command line (35, the last commit).
+- **Next**: packages-5's other Windows gap (`../adopters/PACKAGES-5-REPORT.md`, "Gaps, across platforms"):
   `FileStream.setBuffering`.
 - **For other lanes**: P3 (section 22) landed on system-next with coverage-4 (`8caa741`, merged here at
   `bb225ab`). The CMake list still lacks this lane's files, so the Win32 block in the windows-3 patches section must
@@ -1870,11 +1869,11 @@ A Windows run must check those three, in a console and without one (as CI runs t
 `GenerateConsoleCtrlEvent` checks the event before the console, for `.close`; and that `sort.exe` has no Ctrl+Break
 handler of its own.
 
-## 34. windows-3: library search directories: this commit
+## 34. windows-3: library search directories: `c5efe5d`
 
 Left within section 18, whose `LoadOptions.searchUserDirectories` searches directories that nothing could add. No
-adopter calls `AddDllDirectory` yet; a program that loads plug-ins from its own directories, as SwiftPM's and
-sourcekit-lsp's do through `PATH`, would, with the `search` options that leave the current directory and `PATH` out.
+adopter calls `AddDllDirectory` yet; a program that loads libraries from directories of its own would, with the
+`search` options that leave the current directory and `PATH` out.
 
 What, in `DynamicLibraryWindows.swift`: `DynamicLibrary.SearchDirectory` (`DLL_DIRECTORY_COOKIE`),
 `addSearchDirectory(_:)` (`AddDllDirectory`), `removeSearchDirectory(_:)` (`RemoveDllDirectory`), and
@@ -1898,7 +1897,44 @@ found once it's removed. `setDefaultSearch(_:)` isn't tested: it would change ev
 A Windows run must check `testSearchDirectories`, which relies on the loader not finding a library by a name that's
 loaded already once its last reference is freed.
 
-## 35. windows-3: findings
+## 35. windows-3: quoting a command line: this commit
+
+Left within section 13, whose `ProcessHandle.create` takes one command line, unquoted, as `CreateProcessW` does.
+swift-subprocess (`quoteWindowsCommandLine`, "taken from SCF", swift-corelibs-foundation's `Process`) and
+swift-tools-support-core (`quote`) each carry the same quoting, from Daniel Colascione's "Everyone quotes command line
+arguments the wrong way", and both drop an empty argument, which they leave unquoted, and so as nothing. swift-subprocess adds cmd.exe's own
+escaping for batch files, after CVE-2024-24576's class of bugs.
+
+What: `Win32CommandLine.swift`: `Win32.commandLine(program:arguments:)`, which quotes the program name always, without
+escaping, and each argument that's empty or holds a space, a tab, a line feed, a vertical tab or a quotation mark,
+with the backslash rules the C runtime reads.
+
+Which API: **Win32**: the C runtime's rules for splitting a command line are Windows', which no other platform
+has, since a POSIX program receives its arguments split.
+
+Design calls, with the alternatives rejected:
+- **A function that returns the line**, for `create(commandLine:)` and any other `CreateProcessW` caller, rather than
+  an overload of `create` that takes arguments, which would tie the rules to System's one way of creating
+  processes. The program and the arguments are separate parameters, since the C runtime reads the program name by a
+  rule of its own: to the next quotation mark, with backslashes literal. That's Rust's `make_command_line`.
+- **The program name is always quoted**: `CreateProcessW` reads the program from an unquoted command line by trying
+  each prefix that ends at a space, so `C:\Program Files\tool.exe` would run `C:\Program.exe` if there were one.
+- **No cmd.exe quoting.** Escaping for cmd.exe, which batch files run in, is a different and harder set of rules,
+  for which Rust refuses some arguments; the doc says not to pass arguments someone else chose to a batch file.
+  Rejected for now: swift-subprocess's batch-file escaping, a candidate once its rules are reviewed.
+- **Not wrapped**: `CommandLineToArgvW`, the other direction, in shell32, which the tests use.
+
+Tests: `Win32CommandLineTests`: fixed quotings; a split back through `CommandLineToArgvW` for empty arguments,
+blanks, quotation marks with and without backslashes, trailing backslashes, and non-ASCII text; and a child created
+from a quoted program name. The quoting also ran on macOS, copied into a scratch program, against an implementation
+of the UCRT's `parse_command_line` rules (argv[0] to the next quotation mark; 2n and 2n + 1 backslashes; a doubled
+quotation mark inside quotes): 300,000 random command lines of up to four arguments from an alphabet of blanks,
+backslashes, quotation marks and letters split back to what was quoted.
+
+A Windows run must check `testQuoting`, `testCommandLineToArgvWSplitsItBack` (which relies on shell32 following the
+C runtime's rules for what this quoting produces), and `testAChildReceivesTheArguments`.
+
+## 36. windows-3: findings
 
 - **`FileDescriptor`'s Windows canonicalization doesn't cover `CreateDirectoryW`'s limit** (P4).
   `withCanonicalPathRepresentation` passes `PATHCCH_ALLOW_LONG_PATHS`, so the `mkdir` adapter, which
@@ -1925,7 +1961,7 @@ loaded already once its last reference is freed.
 - **macOS's CoreFoundation declares `S_OK` and `S_FALSE` too**, so the harness's tests spell `WinSDK.S_OK`; on
   Windows, where XCTest's Foundation is swift-corelibs-foundation, the bare names would do.
 
-## 36. windows-3: patches for files outside the lane
+## 37. windows-3: patches for files outside the lane
 
 **P3, continued: `Sources/System/CMakeLists.txt`.** The Win32 `target_sources` block as it should read with this
 lane's files. P3 itself landed with coverage-4 (`8caa741`); this block replaces the one it left, and is kept current
@@ -1941,6 +1977,7 @@ target_sources(SystemPackage PRIVATE
   Win32/ProcessExitWindows.swift
   Win32/ProcessIDWindows.swift
   Win32/Win32.swift
+  Win32/Win32CommandLine.swift
   Win32/Win32Console.swift
   Win32/Win32Constants.swift
   Win32/Win32Error.swift

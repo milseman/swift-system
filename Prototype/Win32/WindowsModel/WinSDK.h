@@ -1041,3 +1041,6 @@ BOOL GetLogicalProcessorInformation(PSYSTEM_LOGICAL_PROCESSOR_INFORMATION Buffer
                                     PDWORD ReturnedLength);
 BOOL GetPhysicallyInstalledSystemMemory(PULONGLONG TotalMemoryInKilobytes);
 BOOL GetComputerNameExW(COMPUTER_NAME_FORMAT NameType, LPWSTR lpBuffer, LPDWORD nSize);
+
+// shellapi.h: splitting a command line, as the C runtime does.
+LPWSTR *CommandLineToArgvW(LPCWSTR lpCmdLine, int *pNumArgs);
