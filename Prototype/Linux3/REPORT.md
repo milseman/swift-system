@@ -12,40 +12,55 @@ through the GitHub API (`aosp-mirror/platform_bionic`, `freebsd/freebsd-src`, `o
 
 ## Resume here
 
-- **Done** (step 1, every gap):
-  - `ef379e6`, `7670d0c` `PThread.Condition.wait(on:timeout:)` off Darwin (section 1).
-  - `42616ac` the time zone paths on Android (3); `9d00c35` `UserEntry.realName` on 32-bit Android (4);
-    `83e956c` `CLocale` on Android (5).
-  - `c72fe57` `OpenOptions.pathOnly` (`O_PATH`, 6.3); `948f91e` `readSymbolicLinkPlatformString` (6.4);
-    `a6478fb` `FileStream.seek(offset:from:)` and `offset()` (6.5).
-  - SystemSockets isn't this lane's: `TCPOption.info` on FreeBSD (2), vsock (6.1) and UDP offload (6.2) are
-    patches, Appendix A and B, tested in a scratch copy on Linux and Darwin.
-- **In progress**: step 2, swift-foundation's `migrate-unix` on Linux (section 7).
-- **Next**: section 7's runs; then "For unix-adopt-2" from what fails.
-- **Latest tests**, at `a6478fb`: Darwin, XCTest 575 tests, 5 skipped, 0 failures; swift-testing 503 tests in 82
-  suites passed. Linux as root (`linux-3-a6478fb-root.log`), XCTest 486 tests, 6 skipped, 0 failures;
-  swift-testing 473 tests in 79 suites passed; as 1000:1000 (`linux-3-a6478fb-user.log`), 486 tests, 4 skipped,
-  0 failures, and 473 tests in 79 suites passed.
-- **Scratch**: `.build/linux-3-patches` (the patches), `.build/linux-3-sockets` and `.build/linux-3-base` (the
-  patched and unpatched copies), `.build/linux-3-sockets-darwin`; delete them once the patches are taken.
+- **Done**:
+  - Step 1, every gap: `ef379e6`, `7670d0c` `PThread.Condition.wait(on:timeout:)` off Darwin (section 1);
+    `42616ac` the time zone paths on Android (3); `9d00c35` `UserEntry.realName` on 32-bit Android (4);
+    `83e956c` `CLocale` on Android (5); `c72fe57` `OpenOptions.pathOnly` (`O_PATH`, 6.3); `948f91e`
+    `readSymbolicLinkPlatformString` (6.4); `a6478fb` `FileStream.seek(offset:from:)` and `offset()` (6.5).
+    SystemSockets isn't this lane's: `TCPOption.info` on FreeBSD (2), vsock (6.1) and UDP offload (6.2) are
+    patches, Appendices A and B, tested in a scratch copy on Linux and Darwin.
+  - Step 2: swift-foundation's `migrate-unix` `83bde529` builds and passes on Linux with the main-branch nightly,
+    as root and as 1000:1000; with the collapses this lane's API allows (Appendix C), too (section 7).
+  - The nightly on System (section 8): `16ed3b6` (the versioned `canImport` warnings), `5c4ec41` and `a181aff`
+    (a test the nightly's SIL verifier rejected).
+  - system-next `87c3fc6` merged (a fast-forward: it had merged this lane at `a181aff`).
+  - swift-nio's `ConditionLock` on System's relative wait, in a scratch copy on Linux: 2007 tests passed, then
+    the run hung after the `ConditionLock` tests, in tests that don't use it (section 7.2).
+- **In progress**: nothing; nothing is uncommitted.
+- **Open for Michael**: the hung container `2fc42ef1-1c99-4da8-8669-1d516076796b` (section 7.2), which the
+  classifier wouldn't let this lane stop: `container stop 2fc42ef1-1c99-4da8-8669-1d516076796b`.
+- **Next**: nothing else assigned; the patches (Appendices A, B) wait for SystemSockets' owner, and C for
+  unix-adopt-2, whose `842e8037` already has section 7.2's change.
+- **Latest tests**, at `87c3fc6`: Darwin, XCTest 575 tests, 5 skipped, 0 failures; swift-testing 504 tests in 82
+  suites passed. Linux as root (`linux-3-87c3fc6-root.log`), XCTest 486 tests, 6 skipped, 0 failures;
+  swift-testing 474 tests in 79 suites passed; as 1000:1000 (`linux-3-87c3fc6-user.log`), 486 tests, 4 skipped,
+  0 failures, and 474 tests in 79 suites passed.
+- **Scratch** (all this lane's, in `.build`): `linux-3-patches` (the patches), `linux-3-sockets` and
+  `linux-3-base` (the patched and unpatched copies), `linux-3-sockets-darwin`, `foundation-scratch` and
+  `foundation-pristine`, `nio-scratch` and `nio-pristine`. Delete them once the patches are taken.
 - **How to run**: `container system start >/dev/null 2>&1; Utilities/linux/build.sh --quiet --log
   ../linux-logs/linux-3-$(git rev-parse --short HEAD)-<what>.log test`, with `--user 1000:1000` and `--
   --filter <Suite>`; commit first. A patched copy: `--root .build/linux-3-sockets` and an absolute `--log`.
+  An adopter: `--root .build/<pkg>-scratch --dir adopters-unix/<pkg> --mount .:swift-system`, and
+  `--image swiftlang/swift:nightly-main-noble` for Foundation.
 
 ## For unix-adopt-2
 
-What each gap's API lets collapse, per package and file (the sites are UNIX-REPORT's). None of these was built
-here: they're the edits the new API allows.
+What each gap's API lets collapse, per package and file (the sites are UNIX-REPORT's). The Linux ones marked
+*tested* were made in a scratch copy and built and tested on Linux (section 7, Appendix C); the others are the
+edits the API allows, checked against headers only (Android, the BSDs) or waiting for a patch.
 
 **swift-nio**
 
 - `Sources/NIOConcurrencyHelpers/lock.swift`, `ConditionLock` (6 sites: the condition's storage, init, wait,
   timed wait, broadcast and destroy): the `canImport(Darwin)` branches, over `PThread.Condition` and
-  `wait(on:timeout:)`, widen to `os(Linux) || os(Android)`, where `NIOLock`'s mutex is System's already; the C
-  branches stay for Windows and WASI. FreeBSD and OpenBSD have System's condition too (from headers), but
-  `NIOLock`'s mutex there is C, so they widen only with it. On Linux the relative wait is measured on the
-  condition's clock, realtime by default, as NIO's C wait (a `gettimeofday` deadline) is today; for Darwin's
-  behavior, create the condition with `attributes.clock = .monotonic` off Darwin (section 1).
+  `wait(on:timeout:)`, widen to `os(Linux) || os(Android)`, where `NIOLock`'s mutex is System's already, and
+  the file then imports no C module there; the C branches stay for Windows, the BSDs and WASI. FreeBSD and
+  OpenBSD have System's condition too (from headers), but `NIOLock`'s mutex there is C, so they widen only with
+  it. On Linux the relative wait is measured on the condition's clock, realtime by default, as NIO's C wait
+  (a realtime deadline) is today; for Darwin's behavior, create the condition with
+  `attributes.clock = .monotonic` off Darwin (section 1). Done in unix-adopt-2's `842e8037`; section 7.2 ran
+  the same change on Linux.
 - After Appendix A: `NIOBSDSocket.Option.tcp_info` is `SocketDescriptor.TCPOption.info.rawValue`, and
   `getTCPInfo()` and `_getTCPInfo()` return `CInterop.TCPInfo`, on Linux, Android and FreeBSD (3 sites); the
   `import Glibc` kept for `tcp_info` goes.
@@ -64,17 +79,27 @@ here: they're the edits the new API allows.
 - `Platform.swift`, `cLocale`, `strncasecmp_clocale`, `strtod_clocale`, `strtof_clocale`, and
   `JSONEncoderTests.swift`'s `localeDecimalPolicyIndependence`: the `canImport(Darwin) || os(Linux)` branches
   widen to Android (section 5).
-- `Data/Data+Writing.swift`, `minimalOpenFlagsForDirectories`: the `#else` branch (Linux, Android, FreeBSD) is
-  `FileDescriptor.OpenOptions([.directory, .pathOnly]).rawValue`, its last C names on Linux.
-- `FileManager/FileOperations.swift`, the Linux copy of a symbolic link (`FTS_SL`, `FTS_SLNONE`): `readlink` and
-  `symlink` become `FilePath.readSymbolicLinkPlatformString(fts_path)` and `FilePath.makeSymbolicLink(_:to:)`
-  with its result, which keeps the target's redundant and trailing separators (section 6.4).
+- *Tested*: `Data/Data+Writing.swift`, `minimalOpenFlagsForDirectories`: the `#else` branch (Linux, Android,
+  FreeBSD) is `FileDescriptor.OpenOptions([.directory, .pathOnly]).rawValue`, its last C names on Linux, so the
+  file imports no C module on Linux.
+- *Tested*: `FileManager/FileOperations.swift`, the Linux copy of a symbolic link (`FTS_SL`, `FTS_SLNONE`):
+  `readlink` and `symlink` become `FilePath.readSymbolicLinkPlatformString(fts_path)` and
+  `FilePath.makeSymbolicLink(_:to:)` with its result, which keeps the target's redundant and trailing
+  separators (section 6.4).
+- *Tested*: `TimeZone/TimeZone.swift`, `dataFromTZFile`: the `canImport(Darwin)` branch over
+  `FilePath.timeZoneDirectory`, and its `import SystemPackage`, widen to Linux and Android (not in UNIX-REPORT's
+  list: the Darwin round's, never widened); the BSDs keep `TZDIR`.
+- *Tested*: `Error/ErrorCodes+POSIX.swift:546`, `#if canImport(Darwin, _version: 346)`: the main-branch compiler
+  warns that it can't find Darwin on Linux; `canImport(Darwin) && canImport(Darwin, _version: 346)` doesn't
+  (section 8).
 
 **WasmKit**
 
 - `Platform/AtomicParkingLot.swift`, `BlockingSlot`: the `canImport(Darwin)` slot, over `PThread.Mutex`,
   `PThread.Condition` and `wait(on:timeout:)`, widens to Linux, Musl and Android; to keep the C branch's
-  monotonic clock, `attributes.clock = .monotonic` off Darwin. WASI's stays C (System has no `PThread` there).
+  monotonic clock, `attributes.clock = .monotonic` off Darwin. System's `PThread` is on WASI with threads too
+  since platforms-2's `92984f5`, relative wait included, so WASI's slot could follow there (platforms-2's to
+  check); without threads it stays C.
 - `CLICommands/Platform.swift`, the non-Darwin `CLIFile`: `seekToStart`'s `fseek` is
   `FileStream.seek(offset: 0, from: .start)`, and its other stdio calls are `FileStream`'s; or the Darwin
   `CLIFile`, over `FileDescriptor`, widens to Linux, Musl and Android.
@@ -292,12 +317,83 @@ stream's buffer: after unflushed writes, before what was read ahead.
   `ProvisionalStdioTest` tests passed; Linux: the full runs at `a6478fb`.
 - Unblocks: WasmKit `CLICommands/Platform.swift`.
 
-## 7. swift-foundation's `migrate-unix` on Linux
+## 7. The adopters on Linux
 
-In progress.
+### 7.1 swift-foundation's `migrate-unix`
+
+`83bde529` (the branch's head; the worktree was clean), as linux-2's section 4.2 planned: a `git archive` of it in
+`.build/foundation-scratch/adopters-unix/swift-foundation`, built from `--root .build/foundation-scratch` with
+`--mount .:swift-system` (so its `../../swift-system` is this worktree) and the main-branch nightly
+(`swiftlang/swift:nightly-main-noble`, Swift 6.5-dev, SwiftPM's Swift Build backend), whose standard library
+has what 6.3's lacked. `swift test` runs three test products, each with its own swift-testing total.
+
+| Run | Log (`../linux-logs/linux-3-…`) | Result |
+|---|---|---|
+| `83bde529`, root, first | `55bc248-foundation-83bde529-test.log` | every module and test target compiled; the build failed copying `FoundationInternationalizationTests_test_runner.swiftmodule` ("The file doesn't exist"), a Swift Build step |
+| the same, again | `55bc248-foundation-83bde529-test-2.log` | swift-testing 45 tests in 5 suites, 442 tests in 63 suites, and 1212 tests in 60 suites passed (38 skipped by their own conditions); XCTest 0 |
+| the same, 1000:1000 | `55bc248-foundation-83bde529-test-user.log` | the same three totals passed |
+| with Appendix C's collapses | `55bc248-foundation-collapses-test.log` | the same three totals passed |
+| Appendix C with `ErrorCodes+POSIX.swift`'s fix, System `a181aff` | `a181aff-foundation-collapses-test.log` | the same three totals passed; no `canImport` warnings |
+
+- So nothing fails: unix-adopt's 30 files build on Linux against System, and the suites its section 2.2 names
+  (FileManager, Data I/O, ProcessInfo, TimeZone, JSONEncoder with `localeDecimalPolicyIndependence`, String,
+  Decimal, DateComponents) pass, as do the rest. Darwin's count, 1703 in 128 suites, has 4 Darwin-only tests.
+- The first failure went away on a rerun with no change, so it's the build system's, not the sources'.
+- Appendix C is the Linux-testable collapses from "For unix-adopt-2": `Data+Writing.swift` (`pathOnly`, and no C
+  import on Linux), `FileOperations.swift` (the byte-exact link copy, which `copyFileAtPathToPath`'s link cases
+  exercise), `TimeZone.swift` (`dataFromTZFile`), `ErrorCodes+POSIX.swift` (the warning). The Android ones
+  can't build here.
+
+### 7.2 swift-nio's `ConditionLock`
+
+`871c3a2c` (the branch's head when copied; the worktree had another lane's uncommitted changes, which a `git
+archive` leaves out) in `.build/nio-scratch`, with `lock.swift`'s six `canImport(Darwin)` branches in
+`ConditionLock` widened to `os(Linux) || os(Android)` and its C import left to the other platforms, on
+swift:6.2-noble, as root (`linux-3-87c3fc6-nio-871c3a2c-conditionlock-test.log`):
+
+- Everything built (`Build complete!`, 228 s); `lock.swift` needs no C module on Linux.
+- XCTest ran 2007 tests in 116 suites before stopping: all passed but the one that fails upstream in the
+  container too (`BootstrapTest.testClientBindWorksOnSocketsBoundToEitherIPv4OrIPv6Only`, `ip6-localhost`),
+  including the heaviest users of the timed wait (`SALChannelTest`, `SALEventLoopTests`, `SocketChannelTest`)
+  and `NIOConcurrencyHelpersTests`' four `ConditionLock` tests.
+- Then it hung: the log stops in the middle of `testDeprecatedLockMutualExclusion`'s line, with nothing after
+  13:31:58 (container time) for 15 minutes. stdout to a pipe is block-buffered, so the hung test is one of the next ones,
+  likely still in `NIOConcurrencyHelpersTests` (the atomics, `NIOLock` and `Lock` tests, which don't use
+  `ConditionLock`), which linux-2's run passed in 1.6 s at `cc819b01`. Not diagnosed: the auto mode classifier
+  refused `container stop` for the container (`2fc42ef1-1c99-4da8-8669-1d516076796b`, whose `container
+  inspect` shows this scratch copy at `/code` and this worktree at `/code/swift-system`), so it's still
+  running, and another run on the same scratch path would wait for its lock.
+- Meanwhile unix-adopt-2's `842e8037` (2026-10-02) made the same `ConditionLock` change on every platform with
+  threads, with the same default clock and the same rejected alternative, so this scratch patch isn't needed;
+  the hang is worth a Linux run of that commit's `NIOConcurrencyHelpersTests`.
+
+## 8. The main-branch nightly on System
+
+Foundation's nightly build compiled System too, and a run of System's own tests on the nightly
+(`linux-3-<commit>-nightly-root.log`) found two things, both fixed:
+
+- **`canImport(Darwin, _version: 346)` warns off Darwin**: "cannot find module 'Darwin' for canImport check;
+  the directive will evaluate to false", from five conditions, `canImport(Darwin, _version: 346) ||
+  os(FreeBSD)` (`ENOTCAPABLE` and `AT_RESOLVE_BENEATH` in `Errno.swift`, `Constants.swift` twice, `Stat.swift`,
+  `FilePathOperations.swift`), and two tests' copies, in every Linux build of System and its clients.
+  `16ed3b6` makes them `SYSTEM_PACKAGE_DARWIN && canImport(...) || os(FreeBSD)`: the same on every platform,
+  and the nightly then warns only for Samples' `Beneath.swift` (the demos lane's). The versioned checks inside
+  Darwin-only blocks don't warn. Swift 6.2 warns for none.
+- **The nightly's SIL verifier rejects a test**: "throw operand type does not match error result type of
+  function" in `ProvisionalStdioTest.testLocking`, for a `throws(Errno)` closure passed to
+  `FileStream.withLock`, whose parameter throws untyped (`rethrows`). Binding the result first (`5c4ec41`)
+  didn't help; an untyped closure (`a181aff`) does. A compiler bug, not System's; the test now passes on both
+  compilers.
+- With both, System's tests on the nightly (`linux-3-a181aff-nightly-root.log`): XCTest 486 tests, 6 skipped, 0
+  failures; swift-testing 333 tests in 57 suites and 140 tests in 22 suites passed, 473 in 79 as on 6.2 at that
+  commit. `--quiet`'s summary shows only the last test product's totals (below).
 
 ## Findings
 
+- **Foundation's Unix rewrite builds and passes on Linux** against system-next (section 7.1): what unix-adopt
+  couldn't check without a Linux build or a new enough toolchain.
+- **Newer compilers warn for a versioned `canImport` of a missing module** (section 8), in System and in
+  Foundation; a `&&` with the platform's define or an unversioned `canImport` first avoids it.
 - **A `FilePath` symbolic link target is normalized too**: `makeSymbolicLink(to: FilePath("a//b/"))` stores `a/b`,
   so neither the read nor the write side of a `FilePath` copy of a link is byte-exact; the C-string forms are
   (section 6.4).
@@ -313,9 +409,17 @@ In progress.
   patch rather than committed alone.
 - Tests/MemberImportVisibility: a probe for `CInterop.SockAddrVM` on Linux, once Appendix B lands (linux-api's
   note); none of this lane's API vends a new C type's members.
-- Utilities/linux: nothing needed. A Musl build of SystemPackage (`Utilities/linux/cross.sh musl build --
-  --target SystemPackage`) would check sections 1, 5, 6.3 and 6.5 on Musl; it isn't this lane's Linux command,
-  so they're checked against the static SDK's headers.
+- Utilities/linux (`build.sh`): with SwiftPM's Swift Build backend (the main-branch nightly), `swift test`
+  runs each test product separately, so a log has several XCTest and swift-testing totals, and `--quiet`'s
+  summary shows only the last (for System, 0 tests, after SystemTests' 486 and 333 and SystemSocketsTests' 140;
+  for Foundation, 1212 of 1699). It should list each run's totals, or sum them.
+- Utilities/linux: a Musl build of SystemPackage (`Utilities/linux/cross.sh musl build -- --target
+  SystemPackage`) would check sections 1, 5, 6.3 and 6.5 on Musl; it isn't this lane's Linux command, so they're
+  checked against the static SDK's headers.
+- Sources/Samples (demos): `Beneath.swift:17` and its `#endif` comment have `canImport(Darwin, _version: 346) ||
+  os(FreeBSD)`, which the main-branch compiler warns about on Linux; `SYSTEM_PACKAGE_DARWIN && ...`, as
+  `16ed3b6` does, silences it.
+- unix-adopt-2 (`../adopters-unix`): Appendix C, "For unix-adopt-2", and section 7.2's hang.
 
 ## Appendix A: `TCPOption.info` and `CInterop.TCPInfo` on FreeBSD, the patch
 
@@ -1105,6 +1209,96 @@ Against `a6478fb`; apply with `git apply`.
  
 -#endif // SYSTEM_PACKAGE_DARWIN
 +#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
+```
+
+</details>
+
+## Appendix C: swift-foundation's Linux collapses, the patch
+
+Against `migrate-unix` `83bde529`; apply with `git apply` in `../adopters-unix/swift-foundation` (checked with
+`git apply --check` only).
+
+<details>
+<summary>FoundationEssentials (12 lines added)</summary>
+
+```diff
+--- a/Sources/FoundationEssentials/Data/Data+Writing.swift
++++ b/Sources/FoundationEssentials/Data/Data+Writing.swift
+@@ -23,7 +23,7 @@
+ // mktemp with the exclusive open of the temporary file (FilePath.makeUniqueFile).
+ internal import SystemPackage
+ 
+-#if canImport(Darwin)
++#if canImport(Darwin) || os(Linux)
+ #elseif canImport(Android)
+ @preconcurrency import Android
+ import unistd
+@@ -79,7 +79,7 @@
+ #elseif os(WASI) || os(Emscripten) || os(OpenBSD)
+     O_DIRECTORY | O_RDONLY
+ #else
+-    O_DIRECTORY | O_PATH
++    FileDescriptor.OpenOptions([.directory, .pathOnly]).rawValue
+ #endif
+ }
+ #endif
+--- a/Sources/FoundationEssentials/Error/ErrorCodes+POSIX.swift
++++ b/Sources/FoundationEssentials/Error/ErrorCodes+POSIX.swift
+@@ -543,7 +543,7 @@
+ 
+     // MIGRATE-DARWIN: new, as the overlay's ENOTCAPABLE, which had no static property; with System's gate for
+     // Errno.notCapable, since the SDKs before the macOS 26 generation don't define ENOTCAPABLE.
+-    #if canImport(Darwin, _version: 346)
++    #if canImport(Darwin) && canImport(Darwin, _version: 346)
+     /// Capabilities insufficient.
+     @available(*, deprecated, message: "Use SystemPackage's Errno.notCapable")
+     public static var ENOTCAPABLE: Code { Code(.notCapable)! }
+--- a/Sources/FoundationEssentials/FileManager/FileOperations.swift
++++ b/Sources/FoundationEssentials/FileManager/FileOperations.swift
+@@ -1209,16 +1209,13 @@
+                     case FTS_SL: fallthrough    // Symlink.
+                     case FTS_SLNONE:            // Symlink with no target.
+                         // Do what the documentation says (and what linkPath:toPath:handler: does) - copy the symlink, instead of creating a hard link.
+-                        // readlink and symlink, not SystemPackage's readSymbolicLink, whose FilePath would collapse
+-                        // the target's redundant separators and drop a trailing one.
+-                        try withUnsafeTemporaryAllocation(of: CChar.self, capacity: FileManager.MAX_PATH_SIZE) { tempBuff in
+-                            tempBuff.initialize(repeating: 0)
+-                            defer { tempBuff.deinitialize() }
+-                            let len = readlink(fts_path, tempBuff.baseAddress!, FileManager.MAX_PATH_SIZE - 1)
+-                            if len >= 0, symlink(tempBuff.baseAddress!, buffer.baseAddress!) != -1 {
+-                                return
+-                            }
+-                            try delegate.throwIfNecessary(errno, String(cString: fts_path), String(cString: buffer.baseAddress!))
++                        // The link's contents byte for byte, which a FilePath target would lose its redundant
++                        // separators and a trailing one in.
++                        do throws(Errno) {
++                            let target = try FilePath.readSymbolicLinkPlatformString(fts_path, retryOnInterrupt: false)
++                            try FilePath.makeSymbolicLink(buffer.baseAddress!, to: target, retryOnInterrupt: false)
++                        } catch {
++                            try delegate.throwIfNecessary(error.rawValue, String(cString: fts_path), String(cString: buffer.baseAddress!))
+                         }
+                         
+                     case FTS_DEFAULT: fallthrough   // Something not defined anywhere else.
+--- a/Sources/FoundationEssentials/TimeZone/TimeZone.swift
++++ b/Sources/FoundationEssentials/TimeZone/TimeZone.swift
+@@ -11,7 +11,7 @@
+ //===----------------------------------------------------------------------===//
+ 
+ internal import _FoundationCShims
+-#if canImport(Darwin)
++#if canImport(Darwin) || os(Linux) || os(Android)
+ // MIGRATE-DARWIN: tzfile.h's TZDIR, through _FoundationCShims, is SystemPackage's FilePath.timeZoneDirectory.
+ internal import SystemPackage
+ #endif
+@@ -406,7 +406,7 @@
+ #if NO_TZFILE || os(Windows) || os(WASI) || os(Emscripten)
+         return Data()
+ #else
+-        #if canImport(Darwin)
++        #if canImport(Darwin) || os(Linux) || os(Android)
+         let path = FilePath.timeZoneDirectory.string + "/" + name
+         #else
+         let path = TZDIR + "/" + name
 ```
 
 </details>
