@@ -171,6 +171,7 @@ Each is listed with the alternative it rejected.
 
 ### Limitations
 
+- **An enum case compiled only off Darwin isn't counted**, because api-delta doesn't list it: its symbol graphs are macOS's, and its scanner records no cases. At `71211bc` that's five Windows cases, in `Win32.LockMode` and `Win32.ExtendedLengthPrefix`. The history scan drops such cases too, so the days agree with the head.
 - **Days other than the head's** come from a lexical scan, so each can be short of api-delta by:
   - an implicit member (an enum's `init(rawValue:)`);
   - a declaration main has on another platform that the commit adds on Darwin;
