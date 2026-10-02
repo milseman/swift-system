@@ -784,6 +784,18 @@ internal func system_FreeLibrary(_ hLibModule: HMODULE) -> Bool {
   FreeLibrary(hLibModule)
 }
 
+internal func system_AddDllDirectory(_ NewDirectory: UnsafePointer<WCHAR>) -> DLL_DIRECTORY_COOKIE? {
+  AddDllDirectory(NewDirectory)
+}
+
+internal func system_RemoveDllDirectory(_ Cookie: DLL_DIRECTORY_COOKIE) -> Bool {
+  RemoveDllDirectory(Cookie)
+}
+
+internal func system_SetDefaultDllDirectories(_ DirectoryFlags: DWORD) -> Bool {
+  SetDefaultDllDirectories(DirectoryFlags)
+}
+
 internal func system_GetModuleHandleExW(
   _ dwFlags: DWORD,
   _ lpModuleName: UnsafePointer<WCHAR>?,

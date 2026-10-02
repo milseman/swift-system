@@ -760,6 +760,11 @@ HMODULE LoadLibraryExW(LPCWSTR lpLibFileName, HANDLE hFile, DWORD dwFlags);
 BOOL FreeLibrary(HMODULE hLibModule);
 BOOL GetModuleHandleExW(DWORD dwFlags, LPCWSTR lpModuleName, HMODULE *phModule);
 
+typedef PVOID DLL_DIRECTORY_COOKIE, *PDLL_DIRECTORY_COOKIE;
+DLL_DIRECTORY_COOKIE AddDllDirectory(PCWSTR NewDirectory);
+BOOL RemoveDllDirectory(DLL_DIRECTORY_COOKIE Cookie);
+BOOL SetDefaultDllDirectories(DWORD DirectoryFlags);
+
 #define ERROR_ENVVAR_NOT_FOUND 203
 
 typedef WCHAR *LPWCH;

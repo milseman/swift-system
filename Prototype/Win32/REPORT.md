@@ -19,8 +19,9 @@ then section 8's gaps from processes to file information). windows-3, in progres
 `315f25b`), threads (24, `054e9e2`), `HRESULT` (25, `b89b78c`), path operations (26, `8326373`), overlapped I/O (27,
 `d479525`), system information (28, `c04d6b1`), and Winsock, as a design (29, `052ae8a`), which finishes section
 8's list; then `BrokenDownTime` on Windows (30, `ada7eea`), ending the process and exit codes (31, `a7d4db9`), critical
-sections (32, `c353713`), and console events and `SetStdHandle` (33, the last commit).
-- **Next, left within done gaps**: `AddDllDirectory` (18); a quoting helper for command lines
+sections (32, `c353713`), console events and `SetStdHandle` (33, `3b9327e`), and library
+search directories (34, the last commit).
+- **Next, left within done gaps**: a quoting helper for command lines
   (13); and packages-5's other Windows gap (`../adopters/PACKAGES-5-REPORT.md`, "Gaps, across platforms"):
   `FileStream.setBuffering`.
 - **For other lanes**: P3 (section 22) landed on system-next with coverage-4 (`8caa741`, merged here at
@@ -1833,7 +1834,7 @@ thread can't take it), `testConditionVariableWithACriticalSection`, `testCritica
 
 A Windows run must check those three; that `TryEnterCriticalSection` succeeds for the holder, as Windows documents.
 
-## 33. windows-3: console events, and setting a standard handle: this commit
+## 33. windows-3: console events, and setting a standard handle: `3b9327e`
 
 Left within section 16. swift-subprocess ends a child gently by attaching to its console (`AttachConsole`), ignoring
 Ctrl+C itself while it generates one (`GenerateConsoleCtrlEvent(CTRL_C_EVENT, 0)`), freeing the console
@@ -1869,7 +1870,35 @@ A Windows run must check those three, in a console and without one (as CI runs t
 `GenerateConsoleCtrlEvent` checks the event before the console, for `.close`; and that `sort.exe` has no Ctrl+Break
 handler of its own.
 
-## 34. windows-3: findings
+## 34. windows-3: library search directories: this commit
+
+Left within section 18, whose `LoadOptions.searchUserDirectories` searches directories that nothing could add. No
+adopter calls `AddDllDirectory` yet; a program that loads plug-ins from its own directories, as SwiftPM's and
+sourcekit-lsp's do through `PATH`, would, with the `search` options that leave the current directory and `PATH` out.
+
+What, in `DynamicLibraryWindows.swift`: `DynamicLibrary.SearchDirectory` (`DLL_DIRECTORY_COOKIE`),
+`addSearchDirectory(_:)` (`AddDllDirectory`), `removeSearchDirectory(_:)` (`RemoveDllDirectory`), and
+`setDefaultSearch(_:)` (`SetDefaultDllDirectories`).
+
+Design calls, with the alternatives rejected:
+- **On `DynamicLibrary`**, beside its Windows `LoadOptions`, since they're the loader's search; Windows-only, as those
+  options are.
+- **The registration is a copyable value**, as the C cookie is, not an owner whose deinit removes the directory: a
+  directory added for the program's life, the usual case, would otherwise need its owner kept in a global.
+- **A relative path is resolved** against the current directory, without the `\\?\` prefix, since
+  `AddDllDirectory` takes only an absolute path and doesn't document taking the prefix.
+- **`setDefaultSearch(_:)` takes `LoadOptions`**, whose doc says only the `search` options apply, and that the change
+  lasts for the process's life.
+- **Not wrapped**: `SetDllDirectoryW`, the older single directory, which Microsoft's guidance replaces with these.
+
+Tests, in `Win32DynamicLibraryTests`: `testSearchDirectories`, with a copy of the system's `version.dll` under a name
+of its own in a temporary directory: not found before the directory is added, loaded and looked up after, and not
+found once it's removed. `setDefaultSearch(_:)` isn't tested: it would change every later load in the test process.
+
+A Windows run must check `testSearchDirectories`, which relies on the loader not finding a library by a name that's
+loaded already once its last reference is freed.
+
+## 35. windows-3: findings
 
 - **`FileDescriptor`'s Windows canonicalization doesn't cover `CreateDirectoryW`'s limit** (P4).
   `withCanonicalPathRepresentation` passes `PATHCCH_ALLOW_LONG_PATHS`, so the `mkdir` adapter, which
@@ -1896,7 +1925,7 @@ handler of its own.
 - **macOS's CoreFoundation declares `S_OK` and `S_FALSE` too**, so the harness's tests spell `WinSDK.S_OK`; on
   Windows, where XCTest's Foundation is swift-corelibs-foundation, the bare names would do.
 
-## 35. windows-3: patches for files outside the lane
+## 36. windows-3: patches for files outside the lane
 
 **P3, continued: `Sources/System/CMakeLists.txt`.** The Win32 `target_sources` block as it should read with this
 lane's files. P3 itself landed with coverage-4 (`8caa741`); this block replaces the one it left, and is kept current
