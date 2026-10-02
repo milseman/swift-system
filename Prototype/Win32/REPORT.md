@@ -15,18 +15,22 @@ adds API for the adopters' top Windows gaps of section 8, in its order, checked 
 (sections 23 on, base system-next at `bb950db`) continues that list, then the gaps the earlier sections left.
 
 **Resume here:** windows-api's parts are done (sections 1 to 10), and so are windows-2's (11 to 22: P1 and P2,
-then section 8's gaps from processes to file information). windows-3, in progress: long paths (section 23,
-`315f25b`), threads (24, `054e9e2`), `HRESULT` (25, `b89b78c`), path operations (26, `8326373`), overlapped I/O (27,
-`d479525`), system information (28, `c04d6b1`), and Winsock, as a design (29, `052ae8a`), which finishes section
-8's list; then `BrokenDownTime` on Windows (30, `ada7eea`), ending the process and exit codes (31, `a7d4db9`), critical
-sections (32, `c353713`), console events and `SetStdHandle` (33, `3b9327e`), library
-search directories (34, `c5efe5d`), and quoting a command line (35, the last commit).
-- **Next**: packages-5's other Windows gap (`../adopters/PACKAGES-5-REPORT.md`, "Gaps, across platforms"):
-  `FileStream.setBuffering`.
+then section 8's gaps from processes to file information). windows-3 stopped 2026-10-02, at quota, with nothing in
+progress. Done, one section and commit each: long paths (23, `315f25b`), threads (24, `054e9e2`), `HRESULT` (25,
+`b89b78c`), path operations (26, `8326373`), overlapped I/O (27, `d479525`), system information (28, `c04d6b1`), and
+Winsock as a design (29, `052ae8a`), which finish section 8's list; then the gaps left within done ones:
+`BrokenDownTime` on Windows (30, `ada7eea`), ending the process and exit codes (31, `a7d4db9`), critical sections
+(32, `c353713`), console events and `SetStdHandle` (33, `3b9327e`), library search directories (34, `c5efe5d`),
+quoting a command line (35, `c536687`), and packages-5's `FileStream` (36, the last commit). system-next was merged
+at `bb225ab`.
+- **Next**, none of it started: Winsock's implementation, once the decisions triage's item 74 settles its module
+  (section 29); mock hooks for the Windows `FileStream` (36); one declaration each for `BrokenDownTime` and
+  `FileStream` across platforms (30, 36); and from the sections' "Not wrapped" lists, the pipes, job objects,
+  reparse points, events, directory enumeration and notification, and memory-mapping gaps of section 8's ranking.
 - **For other lanes**: P3 (section 22) landed on system-next with coverage-4 (`8caa741`, merged here at
   `bb225ab`). The CMake list still lacks this lane's files, so the Win32 block in the windows-3 patches section must
   land with this branch's next merge, or CI's CMake job fails. P4 there brings `FileDescriptor`'s Windows
-  canonicalization to section 23's rule. The PlatformEnum samples' Windows arms differ from `Win32.ProcessHandle`
+  canonicalization to section 23's rule, and P5 names `EOVERFLOW` on Windows (section 30). The PlatformEnum samples' Windows arms differ from `Win32.ProcessHandle`
   (section 21).
 - **Tests**: no Windows test has run; each section lists what a Windows run must check. At each commit, Darwin
   `swift build` and `swift test` pass, with the same tests skipped as before the lane (for counts, see
@@ -1897,7 +1901,7 @@ found once it's removed. `setDefaultSearch(_:)` isn't tested: it would change ev
 A Windows run must check `testSearchDirectories`, which relies on the loader not finding a library by a name that's
 loaded already once its last reference is freed.
 
-## 35. windows-3: quoting a command line: this commit
+## 35. windows-3: quoting a command line: `c536687`
 
 Left within section 13, whose `ProcessHandle.create` takes one command line, unquoted, as `CreateProcessW` does.
 swift-subprocess (`quoteWindowsCommandLine`, "taken from SCF", swift-corelibs-foundation's `Process`) and
@@ -1934,7 +1938,42 @@ backslashes, quotation marks and letters split back to what was quoted.
 A Windows run must check `testQuoting`, `testCommandLineToArgvWSplitsItBack` (which relies on shell32 following the
 C runtime's rules for what this quoting produces), and `testAChildReceivesTheArguments`.
 
-## 36. windows-3: findings
+## 36. windows-3: FileStream on Windows: this commit
+
+packages-5's other Windows gap. swift-log's stream test buffers a stream with `setvbuf(_IOFBF)` on Windows, over
+`_fdopen`, `_lock_file`, `fwrite` and `fflush`, where its other platforms use System's provisional `FileStream`
+(`open(_:mode:)` on a descriptor, `setBuffering`, and the lock and writes), as swift-log's `StreamLogHandler` does.
+
+What: `FileStreamWindows.swift`: the provisional `FileStream`, with `CInterop.File`, on Windows, with
+`Provisional+Stdio.swift`'s API: the standard streams (`__acrt_iob_func`), `open` for a path (`_wfopen`), a wide C
+string, and a descriptor (`_fdopen`), `close()`, `fileDescriptor()` (`_fileno`), the four writes (`fwrite`, `fputs`,
+`fputc`), `read(into:)` (`fread`), `readLine(strippingNewline:)` (`fgetc`), `flush()` and `flushAll()`, `hasError`,
+`isAtEnd` and `clearError()`, `Buffering` and `setBuffering(_:buffer:)` (`setvbuf`), and `lock()`, `unlock()` and
+`withLock(_:)` (`_lock_file`, `_unlock_file`).
+
+Design calls, with the alternatives rejected:
+- **A second declaration**, as for `BrokenDownTime` (section 30): the POSIX file is `#if !os(Windows)` and another
+  lane's. Proposed for later: one declaration over a per-platform syscall layer, since the UCRT names nearly every
+  call as POSIX does.
+- **Every call runs with an invalid parameter handler that returns** (`_withReturningInvalidParameterHandler`, in
+  `Win32Syscalls.swift`): the UCRT reports an invalid mode, a bad descriptor, or a stream whose descriptor closed
+  to the handler, whose default ends the process, so the calls throw `invalidArgument` and `badFileDescriptor`
+  instead, as POSIX's doc promises. `setBuffering` checks the mode and the size first, and passes 4 KiB for a `nil`
+  buffer, which the UCRT, unlike POSIX's C libraries, would otherwise reject.
+- **What Windows lacks isn't faked**: no `tryLock()` (the UCRT has no `ftrylockfile`); `readLine` reads a byte at a
+  time with the stream locked, since the UCRT has no `getline`; and the docs say that `.line` buffers fully, that a
+  stream translates newlines unless its mode adds `"b"`, and that `"N"` is POSIX's `"e"`.
+- **Paths are wide**, as the other Windows path API's are: `_wfopen`, and a C string of `CInterop.PlatformChar`.
+- **No mock hooks yet**, unlike POSIX's, which mock every call that takes a stream with a placeholder one; for later.
+
+Tests: `Win32FileStreamTests`: writing each way and reading lines back; text mode's `\r\n`; a full buffer that holds
+a write until `flush()`; rejected arguments (mode `"z"`, descriptor -1, an unknown mode, a 1-byte buffer) that throw
+rather than end the process; and the standard error's descriptor and a recursive lock.
+
+A Windows run must check those, and in particular that the UCRT reports `_fdopen(-1)` as `EBADF` and mode `"z"` as
+`EINVAL` through the returning handler, and that a stream of a process without a console reports descriptor -2.
+
+## 37. windows-3: findings
 
 - **`FileDescriptor`'s Windows canonicalization doesn't cover `CreateDirectoryW`'s limit** (P4).
   `withCanonicalPathRepresentation` passes `PATHCCH_ALLOW_LONG_PATHS`, so the `mkdir` adapter, which
@@ -1961,7 +2000,7 @@ C runtime's rules for what this quoting produces), and `testAChildReceivesTheArg
 - **macOS's CoreFoundation declares `S_OK` and `S_FALSE` too**, so the harness's tests spell `WinSDK.S_OK`; on
   Windows, where XCTest's Foundation is swift-corelibs-foundation, the bare names would do.
 
-## 37. windows-3: patches for files outside the lane
+## 38. windows-3: patches for files outside the lane
 
 **P3, continued: `Sources/System/CMakeLists.txt`.** The Win32 `target_sources` block as it should read with this
 lane's files. P3 itself landed with coverage-4 (`8caa741`); this block replaces the one it left, and is kept current
@@ -1972,6 +2011,7 @@ target_sources(SystemPackage PRIVATE
   Win32/BrokenDownTimeWindows.swift
   Win32/DynamicLibraryWindows.swift
   Win32/FilePathResolutionWindows.swift
+  Win32/FileStreamWindows.swift
   Win32/PathsWindows.swift
   Win32/ProcessEnvironmentWindows.swift
   Win32/ProcessExitWindows.swift

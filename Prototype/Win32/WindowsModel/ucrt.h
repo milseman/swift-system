@@ -102,3 +102,29 @@ size_t strftime(char *_Buffer, size_t _SizeInBytes, const char *_Format, const t
 __attribute__((noreturn)) void exit(int _Code);
 __attribute__((noreturn)) void _exit(int _Code);
 int atexit(void (*_Function)(void));
+
+// stdio.h. As for tm, the tag isn't macOS's, whose FILE the files that
+// import WinSDK see too; Swift code spells the UCRT's names as `ucrt.FILE`
+// and the like.
+typedef struct _ucrt_model_iobuf { void *_Placeholder; } FILE;
+#define _IOFBF 0x0000
+#define _IOLBF 0x0040
+#define _IONBF 0x0004
+#define EOF (-1)
+FILE *__acrt_iob_func(unsigned _Ix);
+FILE *_wfopen(const unsigned short *_FileName, const unsigned short *_Mode);
+FILE *_fdopen(int _FileHandle, const char *_Mode);
+int fclose(FILE *_Stream);
+int fflush(FILE *_Stream);
+size_t fwrite(const void *_Buffer, size_t _ElementSize, size_t _ElementCount, FILE *_Stream);
+size_t fread(void *_Buffer, size_t _ElementSize, size_t _ElementCount, FILE *_Stream);
+int fputs(const char *_Buffer, FILE *_Stream);
+int fputc(int _Character, FILE *_Stream);
+int fgetc(FILE *_Stream);
+int _fileno(FILE *_Stream);
+int setvbuf(FILE *_Stream, char *_Buffer, int _Mode, size_t _Size);
+int ferror(FILE *_Stream);
+int feof(FILE *_Stream);
+void clearerr(FILE *_Stream);
+void _lock_file(FILE *_Stream);
+void _unlock_file(FILE *_Stream);

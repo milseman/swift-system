@@ -839,6 +839,106 @@ internal func system__wputenv_s(
   return _wputenv_s(varname, value_string)
 }
 
+// MARK: - C standard I/O
+
+/// Calls `body` with a thread-local invalid parameter handler that returns,
+/// so that a C runtime call that rejects an argument fails with EINVAL or
+/// EBADF, rather than ending the process, as the default handler does.
+internal func _withReturningInvalidParameterHandler<R>(_ body: () -> R) -> R {
+  let previous = _set_thread_local_invalid_parameter_handler { _, _, _, _, _ in }
+  defer { _ = _set_thread_local_invalid_parameter_handler(previous) }
+  return body()
+}
+
+// The streams' calls. macOS's C library declares most of them too, which
+// the qualified names keep the harness from calling. The C runtime calls
+// have no mock hooks yet, unlike POSIX's: see Prototype/Win32/REPORT.md.
+
+internal func system___acrt_iob_func(_ index: UInt32) -> UnsafeMutablePointer<ucrt.FILE> {
+  __acrt_iob_func(index)
+}
+
+internal func system__wfopen(
+  _ path: UnsafePointer<WCHAR>, _ mode: UnsafePointer<WCHAR>
+) -> UnsafeMutablePointer<ucrt.FILE>? {
+  _withReturningInvalidParameterHandler { _wfopen(path, mode) }
+}
+
+internal func system__fdopen(
+  _ fd: CInt, _ mode: UnsafePointer<CChar>
+) -> UnsafeMutablePointer<ucrt.FILE>? {
+  _withReturningInvalidParameterHandler { _fdopen(fd, mode) }
+}
+
+internal func system_fclose(_ stream: UnsafeMutablePointer<ucrt.FILE>) -> CInt {
+  _withReturningInvalidParameterHandler { ucrt.fclose(stream) }
+}
+
+internal func system_fflush(_ stream: UnsafeMutablePointer<ucrt.FILE>?) -> CInt {
+  _withReturningInvalidParameterHandler { ucrt.fflush(stream) }
+}
+
+// The count of bytes written, which is short only after an error.
+internal func system_fwrite(
+  _ bytes: UnsafeRawPointer?, _ count: Int, _ stream: UnsafeMutablePointer<ucrt.FILE>
+) -> Int {
+  _withReturningInvalidParameterHandler { ucrt.fwrite(bytes, 1, count, stream) }
+}
+
+internal func system_fputs(
+  _ string: UnsafePointer<CChar>, _ stream: UnsafeMutablePointer<ucrt.FILE>
+) -> CInt {
+  _withReturningInvalidParameterHandler { ucrt.fputs(string, stream) }
+}
+
+internal func system_fputc(_ byte: CInt, _ stream: UnsafeMutablePointer<ucrt.FILE>) -> CInt {
+  _withReturningInvalidParameterHandler { ucrt.fputc(byte, stream) }
+}
+
+// The count of bytes read, which is short at the end or after an error.
+internal func system_fread(
+  _ bytes: UnsafeMutableRawPointer?, _ count: Int, _ stream: UnsafeMutablePointer<ucrt.FILE>
+) -> Int {
+  _withReturningInvalidParameterHandler { ucrt.fread(bytes, 1, count, stream) }
+}
+
+internal func system_fgetc(_ stream: UnsafeMutablePointer<ucrt.FILE>) -> CInt {
+  _withReturningInvalidParameterHandler { ucrt.fgetc(stream) }
+}
+
+internal func system__fileno(_ stream: UnsafeMutablePointer<ucrt.FILE>) -> CInt {
+  _withReturningInvalidParameterHandler { _fileno(stream) }
+}
+
+internal func system_setvbuf(
+  _ stream: UnsafeMutablePointer<ucrt.FILE>,
+  _ buffer: UnsafeMutablePointer<CChar>?,
+  _ mode: CInt,
+  _ size: Int
+) -> CInt {
+  _withReturningInvalidParameterHandler { ucrt.setvbuf(stream, buffer, mode, size) }
+}
+
+internal func system_ferror(_ stream: UnsafeMutablePointer<ucrt.FILE>) -> CInt {
+  ucrt.ferror(stream)
+}
+
+internal func system_feof(_ stream: UnsafeMutablePointer<ucrt.FILE>) -> CInt {
+  ucrt.feof(stream)
+}
+
+internal func system_clearerr(_ stream: UnsafeMutablePointer<ucrt.FILE>) {
+  ucrt.clearerr(stream)
+}
+
+internal func system__lock_file(_ stream: UnsafeMutablePointer<ucrt.FILE>) {
+  _lock_file(stream)
+}
+
+internal func system__unlock_file(_ stream: UnsafeMutablePointer<ucrt.FILE>) {
+  _unlock_file(stream)
+}
+
 // MARK: - Broken-down time
 
 // The C runtime's 64-bit time functions, which report errors as their

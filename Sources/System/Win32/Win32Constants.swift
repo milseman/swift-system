@@ -126,6 +126,11 @@ internal var _WAIT_OBJECT_0: DWORD { 0x0 }
 @_alwaysEmitIntoClient
 internal var _WAIT_TIMEOUT: DWORD { 0x102 }
 
+// MARK: - C standard I/O
+
+@_alwaysEmitIntoClient
+internal var _EOF: CInt { -1 }
+
 // MARK: - Ending the process
 
 // stdlib.h's, which Constants+ExitCodes.swift spells for the other
