@@ -15,10 +15,12 @@
 // values match the SDK headers (checked against the Windows metadata that
 // Rust's standard library bindings are generated from).
 
+// Only the compiler's own headers: the macOS SDK's would bring its C
+// library's declarations, such as gmtime_r, into every file that imports
+// this module.
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stddef.h>
-#include <stdint.h>
 
 typedef bool BOOL;
 typedef unsigned char BYTE;

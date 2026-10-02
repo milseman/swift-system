@@ -3,11 +3,18 @@
 // WinSDK.h. The declarations follow the UCRT's <io.h>, <fcntl.h>, and
 // <stdlib.h>.
 
-#include <stdint.h>
-#include <wchar.h>
+// Only the compiler's own headers, as in WinSDK.h: the macOS SDK's
+// <stdint.h> and <wchar.h> would bring its C library's declarations, such
+// as gmtime_r and a struct tm with tm_gmtoff, into every file that imports
+// this module. wchar_t is 16 bits on Windows, so it's spelled as one here.
+#include <stddef.h>
 
-typedef void (*_invalid_parameter_handler)(const wchar_t *, const wchar_t *,
-                                           const wchar_t *, unsigned int,
+typedef __INTPTR_TYPE__ intptr_t;
+typedef __UINTPTR_TYPE__ uintptr_t;
+
+typedef void (*_invalid_parameter_handler)(const unsigned short *,
+                                           const unsigned short *,
+                                           const unsigned short *, unsigned int,
                                            uintptr_t);
 _invalid_parameter_handler
 _set_thread_local_invalid_parameter_handler(_invalid_parameter_handler _Handler);
@@ -55,3 +62,36 @@ typedef unsigned (*_beginthreadex_proc_type)(void *);
 uintptr_t _beginthreadex(void *_Security, unsigned _StackSize,
                          _beginthreadex_proc_type _StartAddress, void *_ArgList,
                          unsigned _InitFlag, unsigned *_ThrdAddr);
+
+// time.h, as the UCRT declares its 64-bit functions. Its struct tm has no
+// tm_gmtoff or tm_zone, and long is 32 bits on Windows, so it's int here.
+// The tag isn't tm, which the macOS SDK's struct tm has, with the members
+// Windows lacks: the files that import WinSDK see it too, through the
+// ObjectiveC module that WindowsBool needs, and Clang rejects two
+// definitions of one tag. So Swift code spells the UCRT's as `ucrt.tm`.
+typedef struct _ucrt_model_tm {
+  int tm_sec;
+  int tm_min;
+  int tm_hour;
+  int tm_mday;
+  int tm_mon;
+  int tm_year;
+  int tm_wday;
+  int tm_yday;
+  int tm_isdst;
+} tm;
+
+errno_t _gmtime64_s(tm *_Tm, const __time64_t *_Time);
+errno_t _localtime64_s(tm *_Tm, const __time64_t *_Time);
+__time64_t _mkgmtime64(tm *_Tm);
+__time64_t _mktime64(tm *_Tm);
+void _tzset(void);
+errno_t _get_timezone(int *_TimeZone);
+errno_t _get_dstbias(int *_DaylightSavingsBias);
+errno_t _get_tzname(size_t *_ReturnValue, char *_Buffer, size_t _SizeInBytes, int _Index);
+size_t strftime(char *_Buffer, size_t _SizeInBytes, const char *_Format, const tm *_Tm);
+
+// errno.h
+#define EINVAL 22
+#define ERANGE 34
+#define EOVERFLOW 132

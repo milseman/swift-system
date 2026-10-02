@@ -745,6 +745,89 @@ internal func system__wputenv_s(
   return _wputenv_s(varname, value_string)
 }
 
+// MARK: - Broken-down time
+
+// The C runtime's 64-bit time functions, which report errors as their
+// result or as -1, without setting errno. The time is recorded by value, and
+// the fields that _mkgmtime64 and _mktime64 read; a mocked success leaves
+// the result as it was.
+
+internal func system__gmtime64_s(
+  _ result: UnsafeMutablePointer<ucrt.tm>, _ time: UnsafePointer<__time64_t>
+) -> errno_t {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mockReturningErrno(Int(time.pointee)) }
+#endif
+  return _gmtime64_s(result, time)
+}
+
+internal func system__localtime64_s(
+  _ result: UnsafeMutablePointer<ucrt.tm>, _ time: UnsafePointer<__time64_t>
+) -> errno_t {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mockReturningErrno(Int(time.pointee)) }
+#endif
+  return _localtime64_s(result, time)
+}
+
+#if ENABLE_MOCKING
+private func _mockTimeFields(
+  name: String = #function, _ time: UnsafeMutablePointer<ucrt.tm>
+) -> __time64_t {
+  let t = time.pointee
+  return __time64_t(_mock(
+    name: name, t.tm_year, t.tm_mon, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec,
+    t.tm_isdst))
+}
+#endif
+
+internal func system__mkgmtime64(_ time: UnsafeMutablePointer<ucrt.tm>) -> __time64_t {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mockTimeFields(time) }
+#endif
+  return _mkgmtime64(time)
+}
+
+internal func system__mktime64(_ time: UnsafeMutablePointer<ucrt.tm>) -> __time64_t {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mockTimeFields(time) }
+#endif
+  return _mktime64(time)
+}
+
+// The zone's queries and tzset can't fail on valid arguments, and strftime
+// reports only a result that doesn't fit, or fields it rejects, so they have
+// no mock hook, as on the other platforms.
+
+internal func system__tzset() {
+  _tzset()
+}
+
+// Windows' long is 32 bits.
+internal func system__get_timezone(_ seconds: UnsafeMutablePointer<Int32>) -> errno_t {
+  _get_timezone(seconds)
+}
+
+internal func system__get_dstbias(_ seconds: UnsafeMutablePointer<Int32>) -> errno_t {
+  _get_dstbias(seconds)
+}
+
+internal func system__get_tzname(
+  _ returnValue: UnsafeMutablePointer<Int>,
+  _ buffer: UnsafeMutablePointer<CChar>?,
+  _ sizeInBytes: Int,
+  _ index: CInt
+) -> errno_t {
+  _get_tzname(returnValue, buffer, sizeInBytes, index)
+}
+
+internal func system_strftime(
+  _ buffer: UnsafeMutablePointer<CChar>, _ capacity: Int,
+  _ format: UnsafePointer<CChar>, _ time: UnsafePointer<ucrt.tm>
+) -> Int {
+  ucrt.strftime(buffer, capacity, format, time)
+}
+
 // MARK: - File information
 
 internal func system_GetFileInformationByHandle(

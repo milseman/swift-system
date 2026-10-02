@@ -17,10 +17,9 @@ adds API for the adopters' top Windows gaps of section 8, in its order, checked 
 **Resume here:** windows-api's parts are done (sections 1 to 10), and so are windows-2's (11 to 22: P1 and P2,
 then section 8's gaps from processes to file information). windows-3, in progress: long paths (section 23,
 `315f25b`), threads (24, `054e9e2`), `HRESULT` (25, `b89b78c`), path operations (26, `8326373`), overlapped I/O (27,
-`d479525`), system information (28, `c04d6b1`), and Winsock, as a design (29, the last commit). Section 8's
-list is done.
-- **Next, left within done gaps**: a Windows `BrokenDownTime` over the UCRT's time functions (14); a Windows
-  `ProcessID.exit(_:)` and `exitImmediately(_:)` (12); `CRITICAL_SECTION` (15); attaching, freeing and
+`d479525`), system information (28, `c04d6b1`), and Winsock, as a design (29, `052ae8a`), which finishes section
+8's list; then `BrokenDownTime` on Windows (30, the last commit).
+- **Next, left within done gaps**: a Windows `ProcessID.exit(_:)` and `exitImmediately(_:)` (12); `CRITICAL_SECTION` (15); attaching, freeing and
   generating console events, and `SetStdHandle` (16); `AddDllDirectory` (18); a quoting helper for command lines
   (13); and packages-5's Windows gaps (`../adopters/PACKAGES-5-REPORT.md`, "Gaps, across platforms"):
   `ProcessID.ExitCode`'s `success` and `failure`, and `FileStream.setBuffering`.
@@ -48,8 +47,9 @@ list is done.
 
   It catches Swift errors: types, optionality, ownership, typed throws, `@_alwaysEmitIntoClient` visibility,
   MemberImportVisibility. It can't catch where the model differs from the SDK (a macro that doesn't import, a
-  pointer the SDK annotates), runtime behavior, or a name that collides with a Windows-only internal in a file it
-  doesn't compile; the new internal names were checked against all of `Sources/` and `Tests/` by grep. A
+  pointer the SDK annotates), runtime behavior, a name that collides with a Windows-only internal in a file it
+  doesn't compile, or, in a file that imports `WinSDK`, a use of macOS's C library, which the `ObjectiveC` module
+  behind `WindowsBool`'s stand-in brings in (a file that imports only `ucrt` doesn't see it; section 31); the new internal names were checked against all of `Sources/` and `Tests/` by grep. A
   deliberate use after `close()` and a type error in a test file both fail it. It takes a few seconds.
 - **The constants** are spelled as values. Each one was checked against Rust's standard library bindings
   (`library/std/src/sys/pal/windows/c/windows_sys.rs`, generated from Microsoft's Windows metadata) where they
@@ -1637,7 +1637,7 @@ mask's bits equal to the count, the architecture matching the build's, the nativ
 with the host name); and `testOSVersion` (10.0, from build 10240). Not covered: more than one processor group,
 emulated processes, and clusters' virtual servers.
 
-## 29. windows-3: Winsock, a design: this commit
+## 29. windows-3: Winsock, a design: `052ae8a`
 
 The last gap of section 8: two packages, but 23 files, nearly all NIO's. Not implemented: its natural shape needs
 files outside this lane, and its module structure waits on a decision (`../Claude outputs/decisions-triage.md`, item
@@ -1700,7 +1700,71 @@ buffers `char *`), and replaces what Winsock lacks or renames: `close` with `clo
 **Outside this lane's files**: a target in `Package.swift` that links `ws2_32`, its CMake list, and SystemSockets'
 `#error` for other platforms (`Sources/SystemSockets`), which a Windows port replaces.
 
-## 30. windows-3: findings
+## 30. windows-3: BrokenDownTime on Windows: this commit
+
+Left within section 14, which named broken-down time the cross-platform candidate. swift-log's
+`StreamLogHandler.timestamp()` formats the local time with `_time64`, `_localtime64_s` and `strftime` on Windows,
+where its other platforms use System's `BrokenDownTime`, and Foundation's `Date.description` formats UTC with
+`_gmtime64_s` and `strftime`.
+
+What: `BrokenDownTimeWindows.swift`: `BrokenDownTime` on Windows, with the POSIX declaration's public API: the
+fields and their initializer, `Weekday`, `weekday`, `dayOfYear`, `Zone`, `init(secondsSinceEpoch:in:)`
+(`_gmtime64_s`, and `_localtime64_s` after `_tzset`), `secondsSinceEpoch(in:)` and `normalized(in:)`
+(`_mkgmtime64`, `_mktime64`), and `formatted(_:)` (`strftime`). The four conversions have mock hooks, as their
+POSIX counterparts do.
+
+Which API: **System's `BrokenDownTime`.** The UCRT's time functions are POSIX's under other names (`_gmtime64_s`
+for `gmtime_r`, `_mkgmtime64` for `timegm`), so the concept and its signatures carry over.
+
+Design calls, with the alternatives rejected:
+- **A second declaration of the type.** `BrokenDownTime.swift` is `#if !os(Windows)`, and isn't this lane's, so the
+  Windows file declares the type again, with the same public API, and copies the arithmetic, `formatted`'s
+  replacement of the zone conversions, and the docs, adapted. Proposed for later, without a patch, since it
+  reshapes another lane's file: a shared file for the platform-neutral half (the type, `Weekday`, `Zone`, the
+  arithmetic, the replacement), leaving each platform its conversions.
+- **The zone's fields come from the C runtime's globals**, since Windows' `struct tm` has no `tm_gmtoff` or
+  `tm_zone`: `utcOffset` from `_get_timezone`, and `_get_dstbias` in daylight saving time, and
+  `timeZoneAbbreviation` from `_get_tzname`, which is `TZ`'s abbreviation, or the system zone's name, such as
+  "Pacific Standard Time". UTC's is "UTC", as Darwin's is.
+- **UTC has POSIX's range.** The C runtime converts 1970 through 3000 only, and reports other times as `EINVAL`;
+  for UTC, System computes their fields with the arithmetic the type already uses for the weekday (Howard Hinnant's
+  algorithms), as the POSIX file does on Darwin before 1900. Local times outside the range throw `EOVERFLOW`.
+  Rejected: computing every UTC time in Swift, which would leave the C function unused, and throwing outside the
+  range for UTC too, which would make Windows' range a hazard for cross-platform code.
+- **`EOVERFLOW` has no name on Windows.** `Errno.overflow` is `#if !os(Windows)`, since the initial Windows port,
+  though the UCRT defines `EOVERFLOW` (132), so the file throws `Errno(rawValue: EOVERFLOW)`. Patch P5 gives Windows
+  the name.
+- **`formatted(_:)` can't end the process.** The UCRT's `strftime` reports a conversion it doesn't know, and a field
+  outside its range, to the invalid parameter handler, whose default ends the process. So System prints a
+  conversion the UCRT doesn't support (`%k`, `%-d`) as it's written, installs a handler that returns during the
+  call, and for fields outside their ranges formats the time they carry to, as UTC; a year before 0 or after
+  9999, which the UCRT can't print, gives an empty string. The doc says each. Rejected: formatting fields outside
+  their ranges in Swift, as POSIX prints them, which means writing strftime's numeric conversions again; and
+  trapping.
+- **`%z`, `%Z` and `%s` are the time's own**, as on POSIX; with a flag or a modifier, the UCRT's.
+
+Tests: `Win32BrokenDownTimeTests`, which set `TZ` to `PST8PDT` and restore it. The arithmetic and the format scanner
+also ran on macOS, copied into a scratch program: the UTC fields agree with Darwin's `gmtime_r` for 200,000 random
+times within 3,000 years of 1970 and the edge cases (−1, the years 1 and 3001, 9999-12-31, a leap day), and
+convert back to the same seconds.
+
+A Windows run must check:
+- `testInternalConstantsMatchTheSDK` (`EOVERFLOW`).
+- `testUTC`, `testUTCOutsideTheCRuntimesRange` (−1, 3001, the year 1, and `EOVERFLOW` for `Int.max`), and
+  `testNormalizing` (inside and outside the range).
+- `testLocalTimes`: `PDT` and `PST`, their offsets and abbreviations, the fields against the UTC fields of the
+  shifted time, the conversion back, and a week's arithmetic with `isDaylightSavingTime` `nil`. This relies on the
+  UCRT reading `TZ` from the environment that `ProcessEnvironment.set` changes, and applying US rules to `PST8PDT`.
+- `testLocalTimesOutsideTheCRuntimesRange`: `EOVERFLOW` both ways.
+- `testFormatting`: the conversions, the `#` flag and the `E` and `O` modifiers, unsupported conversions printed as
+  written, and a `%` in the abbreviation; `testFormattingFieldsOutsideTheirRanges`: the 32nd of January as
+  `2026-02-01`, an empty string for the year 12000, and that a conversion that doesn't read the year still works,
+  which assumes the UCRT validates fields per conversion.
+- `testTheCRuntimeCalls` (mock).
+- Not covered: zones without daylight saving time, zones east of UTC, a non-English system zone name (decoded as
+  UTF-8 from the C runtime's code page), and `setlocale`.
+
+## 31. windows-3: findings
 
 - **`FileDescriptor`'s Windows canonicalization doesn't cover `CreateDirectoryW`'s limit** (P4).
   `withCanonicalPathRepresentation` passes `PATHCCH_ALLOW_LONG_PATHS`, so the `mkdir` adapter, which
@@ -1710,6 +1774,16 @@ buffers `char *`), and replaces what Winsock lacks or renames: `close` with `clo
 - **Windows doesn't support the `\\?\` prefix for a current directory**, which Rust's `Command::current_dir` and
   Foundation's `FileManager` both work around: `ProcessHandle.create` gave one to a current directory past
   `MAX_PATH`, and no longer does (section 23).
+- **macOS's C library leaked into the harness's Windows modules.** The model's headers included the macOS SDK's
+  `<stdint.h>` and `<wchar.h>`, which belong to its Darwin modules, so every file that imported the model saw
+  Darwin's C library: a call to `gmtime_r`, or a read of `tm_gmtoff`, compiled as if Windows had them. The model now
+  includes only the compiler's own headers, so a file that imports only `ucrt` sees none of it; a file that
+  imports `WinSDK` still does, through the `ObjectiveC` module that `WindowsBool`'s stand-in needs, so for a name
+  both have, such as `tm` and `strftime`, the code spells `ucrt.tm`, which Windows accepts too.
+- **The UCRT's `strftime` ends the process for a field outside its range**, or a conversion it doesn't know: it
+  reports them to the invalid parameter handler, whose default terminates. Code that passes it a `struct tm` it
+  didn't get from the C runtime, as cross-platform code does, should install a handler that returns (section 30).
+- **`Errno.overflow` is missing on Windows** (P5), though the UCRT defines `EOVERFLOW`.
 - **Swift can't spell `winerror.h`'s failures.** `E_FAIL` and the rest come through `_HRESULT_TYPEDEF_`, a
   function-like macro, so they don't import, and a negative `HRESULT` cast directly, `((HRESULT)0x80004005)`,
   imports as an overflowing literal, an error at each use; only `S_OK` and `S_FALSE` work. That's why no adopter
@@ -1717,7 +1791,7 @@ buffers `char *`), and replaces what Winsock lacks or renames: `close` with `clo
 - **macOS's CoreFoundation declares `S_OK` and `S_FALSE` too**, so the harness's tests spell `WinSDK.S_OK`; on
   Windows, where XCTest's Foundation is swift-corelibs-foundation, the bare names would do.
 
-## 31. windows-3: patches for files outside the lane
+## 32. windows-3: patches for files outside the lane
 
 **P3, continued: `Sources/System/CMakeLists.txt`.** The Win32 `target_sources` block as it should read with this
 lane's files. P3 itself landed with coverage-4 (`8caa741`); this block replaces the one it left, and is kept current
@@ -1725,6 +1799,7 @@ with each commit.
 
 ```cmake
 target_sources(SystemPackage PRIVATE
+  Win32/BrokenDownTimeWindows.swift
   Win32/DynamicLibraryWindows.swift
   Win32/FilePathResolutionWindows.swift
   Win32/PathsWindows.swift
@@ -1790,3 +1865,43 @@ and the overlay's `ERROR_SUCCESS`. It applies to this branch with `git apply`.
 
 A Windows run with P4 must check that `FileDescriptor.open` and `withTemporaryFilePath` work for paths of 248 to
 259 characters, and that `Win32OverlongPathTests` still throws.
+
+**P5, `Sources/System/Errno.swift` and `Sources/System/Internals/Constants.swift`: name `EOVERFLOW` on Windows.**
+The UCRT defines it, 132, and `BrokenDownTime` throws it there (section 30), where cross-platform code catches
+`Errno.overflow`. Not compiled here (the files are outside the harness); it removes two `#if !os(Windows)`. It applies
+to this branch with `git apply`. With it, `BrokenDownTime._overflow` in `BrokenDownTimeWindows.swift` can become
+`.overflow`.
+
+```diff
+--- a/Sources/System/Errno.swift
++++ b/Sources/System/Errno.swift
+@@ -1134,7 +1134,6 @@
+   public static var EDEVERR: Errno { deviceError }
+ #endif
+ 
+-#if !os(Windows)
+   /// Value too large to be stored in data type.
+   ///
+   /// A numerical result of the function
+@@ -1147,7 +1146,6 @@
+   @_alwaysEmitIntoClient
+   @available(*, unavailable, renamed: "overflow")
+   public static var EOVERFLOW: Errno { overflow }
+-#endif
+ 
+ #if SYSTEM_PACKAGE_DARWIN
+   /// Bad executable or shared library.
+--- a/Sources/System/Internals/Constants.swift
++++ b/Sources/System/Internals/Constants.swift
+@@ -376,10 +376,8 @@
+ internal var _EDEVERR: CInt { EDEVERR }
+ #endif
+ 
+-#if !os(Windows)
+ @_alwaysEmitIntoClient
+ internal var _EOVERFLOW: CInt { EOVERFLOW }
+-#endif
+ 
+ #if SYSTEM_PACKAGE_DARWIN
+ @_alwaysEmitIntoClient
+```
