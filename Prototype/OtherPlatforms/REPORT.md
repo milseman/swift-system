@@ -10,8 +10,8 @@ other lanes'.
 
 ## Resume here
 
-platforms-2, 2026-10-01: steps 1 (WASI) and 3 (the BSDs) done but what
-waits on linux-3; step 2 (Android) done from headers, its build still blocked.
+platforms-2, 2026-10-02: steps 1 (WASI) and 3 (the BSDs) done; step 2
+(Android) done from headers, its build still blocked (no NDK).
 
 - **Done** (platforms-2 commits): `99eea7f` WASI's swift-testing suites run
   (6.11); `92984f5` the PThread family on WASI with threads (6.1); `66a4862`
@@ -20,29 +20,30 @@ waits on linux-3; step 2 (Android) done from headers, its build still blocked.
   `7bcde7e` the directory tests on WASI (6.11); `75cf417` `Spawn`, `RawSpawn`
   and `ChildProcess.spawn` on Android (7.2); `a70ce05` `maxSymbolicLinks` on
   FreeBSD and OpenBSD, and the pseudoterminal API on FreeBSD (8.2); `fee12f0`
-  cross.sh after coverage-4's plugin product. system-next `d53a655` merged.
+  cross.sh after coverage-4's plugin product; after system-next `87c3fc6`
+  (linux-3 and windows-3) merged: `e1b44a1` a second Win32 test's Dispatch
+  import (section 5), `2e0aedb` `CLocale` and `f0111f9` the time zone paths
+  on FreeBSD and OpenBSD (8.3), `adb9599` `CInterop.POSIXErrorCode` on
+  FreeBSD, OpenBSD and WASI (8.3, 6.10).
 - **In progress**: nothing uncommitted.
 - **Next**:
-  1. When system-next has linux-3 (its `ef379e6`, `42616ac`, `9d00c35` and
-     `83e956c` widen `PThread.Condition.wait(on:timeout:)` beyond Darwin, and
-     the time zone paths, `UserEntry.realName` and `CLocale` to Android): merge
-     (`git merge-tree` finds no conflict with linux-3 at `a181aff`), rerun
-     `cross.sh wasi --assume-threads build -- --target SystemPackage` (its
-     relative wait stores a `clockid_t`, a pointer on WASI), then widen
-     `CLocale` to FreeBSD and OpenBSD and the time zone paths to both (8.3).
-  2. Android's build, once an NDK is in `../linux-logs/cross/ndk/` (1.3):
+  1. Android's build, once an NDK is in `../linux-logs/cross/ndk/` (1.3):
      `Utilities/linux/cross.sh android install`, then `cross.sh android`;
      then the spawn tests with `/system/bin/sh` (7.2).
-  3. `MemoryMapping` on WASI, after Package.swift's define (6.4, section 5).
+  2. `MemoryMapping` on WASI, after Package.swift's define (6.4, section 5).
+  3. What's left on the BSDs has another interface there (8.4); and
+     section 6.10's open question, `yield()` and `sleep(for:)` without
+     threads on WASI.
 - **For other lanes**: section 5; for the adopter lanes, sections 9 and 10.
-- **Latest tests** (at `fee12f0`): Darwin `swift build --build-tests && swift
-  test --skip-build`: XCTest 572 tests, 5 skipped, 0 failures; swift-testing
-  503 tests passed. WASI, `cross.sh wasi test -- --disable-xctest`: 93 tests in
-  20 suites passed (XCTest doesn't start there: 4). Builds with 0 errors:
+- **Latest tests** (at `adb9599`): Darwin `swift build --build-tests && swift
+  test --skip-build`: XCTest 575 tests, 5 skipped, 0 failures; swift-testing
+  504 tests passed. WASI, `cross.sh wasi test -- --disable-xctest`: 95 tests in
+  21 suites passed (XCTest doesn't start there: 4). Builds with 0 errors:
   `Utilities/linux/build.sh --quiet` (the whole package), `cross.sh musl build
   -- --target SystemPackage`, `cross.sh wasi --assume-threads build --
-  --target SystemPackage`. Before platforms-2's changes (at `bb950db`): the
-  same Darwin totals but 502; WASI's tests didn't build (6.11).
+  --target SystemPackage`. Before platforms-2's changes (at `bb950db`):
+  XCTest 572, 5 skipped, 0 failures, and swift-testing 502; WASI's tests
+  didn't build (6.11).
 - **Checks**: the commands above; `Prototype/OtherPlatforms/bsd-arms.py` for
   the API the adopters' widened branches leave on C on the BSDs (8.1).
 
@@ -319,13 +320,12 @@ platforms-2's WASI work is section 6.
 - **`BrokenDownTime`'s and `CInterop.TimeSpec`'s owner**: whether their
   seconds should be `Int64` or `time_t`, for 32-bit platforms (4).
 - **`Utilities/linux/README.md`** (linux-2's): a line pointing to `cross.sh`.
-- **For windows-3**: `99eea7f` moved `Tests/SystemTests/Win32SynchronizationTests.swift`'s
-  `import Dispatch` into its `#if os(Windows)` block: imported everywhere, it
-  stopped SystemTests from building for WASI, which has no Dispatch. No other
-  change to the file.
-- **For linux-3 and the integrator**: platforms-2 holds the BSD widenings of
-  `CLocale` and `TimeZoneFiles` (8.3) until linux-3's Android widenings of the
-  same gate lines are in system-next, to keep the merges apart.
+- **For windows-3**: `99eea7f` and `e1b44a1` moved
+  `Win32SynchronizationTests.swift`'s and `Win32ThreadCreationTests.swift`'s
+  `import Dispatch` into their `#if os(Windows)` blocks: imported everywhere,
+  it stopped SystemTests from building for WASI, which has no Dispatch. No
+  other change to the files. A new Windows-only test file needs its imports
+  inside its `#if os(Windows)` too.
 
 ## 6. platforms-2: WASI
 
@@ -447,7 +447,9 @@ On WASI since `fb0fecb` (3.1), every name.
 
 ### 6.10 What else WASI's adopters call
 
-Sockets (section 5) and, without threads, the thread API. `sched_yield`
+`CInterop.POSIXErrorCode` (`adb9599`), the WASILibc overlay's enum, which
+Foundation's `POSIXError.Code` is there (8.3); its suite runs on WASI. Left:
+sockets (section 5) and, without threads, the thread API. `sched_yield`
 (NIO's `atomics.swift`) is `PThread.yield()`, on WASI only with threads,
 though wasi-libc's wasip1 defines `sched_yield`; and `PThread.sleep(for:)`,
 over `nanosleep`, which WASI has, stays off WASI with Sleep.swift. Both could
@@ -537,11 +539,11 @@ ones, with the BSD headers' verdict:
 |---|---|---|
 | `SystemConfig.maxSymbolicLinks` | Foundation `String+Path.swift:669` (F, O) | yes, `MAXSYMLINKS` 32 on both: widened (8.2) |
 | `TerminalDescriptor.openPseudoterminal`, `pseudoterminalPath()` | Subprocess `UnixTests.swift:1510` (F, O) | FreeBSD yes: widened (8.2); OpenBSD has no `ptsname_r` |
-| `CLocale` and its members | Foundation `Platform.swift:449`, `:472`, `:486`, `:501`; `JSONEncoderTests.swift:1507` (F, O) | FreeBSD yes (xlocale, as Darwin's); OpenBSD has no `strtod_l`, `strtof_l`: pending (8.3) |
-| `FilePath.timeZoneDirectory`, `defaultTimeZoneFile` | Foundation `TimeZone_Cache.swift:160`, `:177` (F, O) | yes, tzcode's paths: pending (8.3) |
+| `CLocale` and its members | Foundation `Platform.swift:449`, `:472`, `:486`, `:501`; `JSONEncoderTests.swift:1507` (F, O) | FreeBSD yes (xlocale, as Darwin's); OpenBSD but `strtod_l` and `strtof_l`: widened (8.3) |
+| `FilePath.timeZoneDirectory`, `defaultTimeZoneFile` | Foundation `TimeZone_Cache.swift:160`, `:177` (F, O) | yes, tzcode's paths: widened (8.3) |
 | `FileDescriptor.sendFile` | NIO `System.swift:1117` (F, O) | no (8.4) |
 | `extendedAttribute` and the other xattr API | Foundation `FileManager+Files.swift:495`, `:537`, `FileManager+Utilities.swift:184` (F; O 1) | no (8.4) |
-| `CInterop.POSIXErrorCode` | Foundation `ErrorCodes+POSIX.swift:79`, `:99` (F, O) | each system's own errno set (8.4) |
+| `CInterop.POSIXErrorCode` | Foundation `ErrorCodes+POSIX.swift:79`, `:99` (F, O) | yes, the overlay's own enum: widened (8.3) |
 | `PThread.setCurrentName` | NIO `ThreadPosix.swift:17` (O) | no (8.4) |
 | `SocketOption.reusePort` | NIO `BSDSocketAPI.swift:699` (O) | yes, but SystemSockets' (section 5) |
 
@@ -557,23 +559,43 @@ ones, with the BSD headers' verdict:
   Darwin's does (`lib/libc/stdlib/ptsname.c`), so Darwin's conversion serves
   it. Its tests aren't widened: nothing here runs them.
 
-### 8.3 Pending linux-3
+### 8.3 Widened after linux-3 (`2e0aedb`, `f0111f9`, `adb9599`)
 
-Both edit the gate lines that linux-3's Android commits change, so they wait
-for those in system-next (section 5):
+These edit the gate lines that linux-3's Android commits changed, so they
+waited for those in system-next (`87c3fc6`):
 
-- **`CLocale`** on FreeBSD: `newlocale`, `freelocale`, `uselocale` and the
-  `LC_*_MASK`s (`xlocale/_locale.h`, `LC_ALL_MASK` an OR of six), `strtod_l`
-  and `strtof_l` (`xlocale/_stdlib.h`), `strncasecmp_l`
-  (`xlocale/_strings.h`): Darwin's interface, from the same code. On OpenBSD,
-  `newlocale`, `freelocale`, `uselocale`, the masks (`LC_ALL_MASK` is `(1 <<
-  _LC_LAST) - 2`) and `strncasecmp_l`, but no `strtod_l` or `strtof_l`;
-  OpenBSD's `LC_NUMERIC` is always C's, so `strtod` and `strtof` would stand
-  in, as linux-3 does on Android.
+- **`CLocale`** on FreeBSD: `<locale.h>` declares `newlocale`, `freelocale`,
+  `uselocale`, the `LC_*_MASK`s (`LC_ALL_MASK` an OR of the six) and
+  `LC_GLOBAL_LOCALE` by default (POSIX 2008, `xlocale/_locale.h`), but
+  `<stdlib.h>` and `<strings.h>` declare `strtod_l`, `strtof_l` and
+  `strncasecmp_l` only after `<xlocale.h>`, so those three are CSystem
+  shims (CSystemFreeBSD.h, shims.c). FreeBSD's xlocale is Darwin's code: a
+  null locale is C's and `LC_GLOBAL_LOCALE` the global one, so the calls
+  pass `CLocale`'s raw value as Darwin's do. Rejected: including
+  `<xlocale.h>` in CSystemFreeBSD.h, whose effect through the module that
+  declares `<stdlib.h>` can't be checked here.
+- **`CLocale`** on OpenBSD: `newlocale`, `freelocale`, `uselocale`, the masks
+  (`LC_ALL_MASK` is `(1 << _LC_LAST) - 2`, the same six) and
+  `strncasecmp_l`, but no `strtod_l` or `strtof_l`. Its locales differ only
+  in their character types (`lib/libc/locale/newlocale.c`) and its
+  `strncasecmp_l` ignores the locale (`lib/libc/string/strcasecmp_l.c`), so
+  `parseDouble`, `parseFloat` and `compareIgnoringCase` call `strtod`,
+  `strtof` and `strncasecmp`, as on Android. `Categories.all` is Darwin's
+  literal set on both.
 - **`FilePath.timeZoneDirectory` and `defaultTimeZoneFile`**:
   `/usr/share/zoneinfo` and `/etc/localtime` on both, tzcode's `TZDIR` and
-  `TZDEFAULT` (FreeBSD's `contrib/tzcode/tzfile.h` no longer defines them;
-  check the build's `-D`s, or spell the paths, as linux-3 does for Android).
+  `TZDEFAULT`. Neither system installs a `<tzfile.h>` (OpenBSD's is
+  libc-private, `lib/libc/time/tzfile.h`; FreeBSD's `contrib/tzcode/tzfile.h`
+  no longer defines them), so they're literals there, as on Android.
+- **`CInterop.POSIXErrorCode`**: Swift's `POSIXError.swift` (release/6.2)
+  declares the overlay's enum for FreeBSD and OpenBSD, whose overlays are
+  named Glibc, and for WASI, so System aliases it there too. The cases those
+  systems lack (FreeBSD's and OpenBSD's STREAMS ones, `ENODATA`, `ENOSR`,
+  `ENOSTR`, `ETIME`; OpenBSD's `EMULTIHOP` and `ENOLINK`) stay Foundation's
+  conditionals. On WASI its tests run: the overlay's values are wasi-libc's.
+
+All from headers and sources: neither BSD builds here. Darwin, Linux and
+Musl build as before.
 
 ### 8.4 Not the same interface
 
@@ -582,11 +604,8 @@ for those in system-next (section 5):
   Darwin's `SocketDescriptor` one; OpenBSD has none.
 - **Extended attributes**: FreeBSD's are `extattr_get_fd` and the like, with
   namespaces; OpenBSD has none.
-- **`POSIXErrorCode`**: an enum of each C library's errno names; FreeBSD and
-  OpenBSD lack the STREAMS ones (`ENODATA`, `ENOSR`, `ENOSTR`, `ETIME`) that
-  Foundation's widened branch names, and OpenBSD `EMULTIHOP` and `ENOLINK`.
-  Two more enums from their `<errno.h>`s, and Foundation's own conditionals
-  for the missing names. Open.
+- **The pseudoterminal API on OpenBSD**: no `ptsname_r`, only `ptsname`,
+  whose static buffer another thread's call can overwrite.
 - **`PThread.setCurrentName` on OpenBSD**: `pthread_set_name_np`, which
   returns nothing; FreeBSD has `pthread_setname_np` (on already).
 
@@ -612,9 +631,18 @@ every platform the site compiles for).
 - **Android**: `ProcessID.spawn`, `ChildProcess.spawn` and `RawSpawn` (7.2):
   TSC `Process.swift`'s Android branch. From API level 28; below it they throw
   `noFunction`, where the C branch didn't compile.
-- **FreeBSD and OpenBSD**: `SystemConfig.maxSymbolicLinks` (both);
-  `openPseudoterminal` and `pseudoterminalPath()` (FreeBSD): Subprocess's
-  `UnixTests.swift:1510`. Neither builds here; from headers.
+- **WASI**, also: `CInterop.POSIXErrorCode` (6.10): Foundation's
+  `ErrorCodes+POSIX.swift` WASI arm.
+- **FreeBSD and OpenBSD** (8.2, 8.3; neither builds here, so from headers):
+  `SystemConfig.maxSymbolicLinks` (both): Foundation `String+Path.swift:669`;
+  `openPseudoterminal` and `pseudoterminalPath()` (FreeBSD): Subprocess
+  `UnixTests.swift:1510`; `CLocale` (both): Foundation `Platform.swift:449`,
+  `:472`, `:486`, `:501` and `JSONEncoderTests.swift:1507`;
+  `FilePath.timeZoneDirectory` and `defaultTimeZoneFile` (both): Foundation
+  `TimeZone_Cache.swift:160`, `:177`; `CInterop.POSIXErrorCode` (both):
+  Foundation `ErrorCodes+POSIX.swift:79`, `:99`, keeping its conditionals for
+  the cases the BSDs lack. So the widened branches whose arms serve FreeBSD
+  or OpenBSD can widen to them too, but where 8.4 says otherwise.
 - **Unchanged**: the UNIX gap list's rank 2 (`wait(on:timeout:)`) is
   linux-3's (`ef379e6`, for L, M, A, F, O).
 
