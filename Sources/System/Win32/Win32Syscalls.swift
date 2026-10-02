@@ -704,6 +704,28 @@ internal func system_SetConsoleCtrlHandler(_ HandlerRoutine: PHANDLER_ROUTINE?, 
   SetConsoleCtrlHandler(HandlerRoutine, Add)
 }
 
+internal func system_SetStdHandle(_ nStdHandle: DWORD, _ hHandle: HANDLE) -> Bool {
+  SetStdHandle(nStdHandle, hHandle)
+}
+
+internal func system_AttachConsole(_ dwProcessId: DWORD) -> Bool {
+  AttachConsole(dwProcessId)
+}
+
+internal func system_FreeConsole() -> Bool {
+  FreeConsole()
+}
+
+internal func system_AllocConsole() -> Bool {
+  AllocConsole()
+}
+
+internal func system_GenerateConsoleCtrlEvent(
+  _ dwCtrlEvent: DWORD, _ dwProcessGroupId: DWORD
+) -> Bool {
+  GenerateConsoleCtrlEvent(dwCtrlEvent, dwProcessGroupId)
+}
+
 // MARK: - Directories and paths
 
 internal func system__wgetcwd(

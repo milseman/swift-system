@@ -18,10 +18,9 @@ adds API for the adopters' top Windows gaps of section 8, in its order, checked 
 then section 8's gaps from processes to file information). windows-3, in progress: long paths (section 23,
 `315f25b`), threads (24, `054e9e2`), `HRESULT` (25, `b89b78c`), path operations (26, `8326373`), overlapped I/O (27,
 `d479525`), system information (28, `c04d6b1`), and Winsock, as a design (29, `052ae8a`), which finishes section
-8's list; then `BrokenDownTime` on Windows (30, `ada7eea`), ending the process and exit codes (31, `a7d4db9`), and critical
-sections (32, the last commit).
-- **Next, left within done gaps**: attaching, freeing and
-  generating console events, and `SetStdHandle` (16); `AddDllDirectory` (18); a quoting helper for command lines
+8's list; then `BrokenDownTime` on Windows (30, `ada7eea`), ending the process and exit codes (31, `a7d4db9`), critical
+sections (32, `c353713`), and console events and `SetStdHandle` (33, the last commit).
+- **Next, left within done gaps**: `AddDllDirectory` (18); a quoting helper for command lines
   (13); and packages-5's other Windows gap (`../adopters/PACKAGES-5-REPORT.md`, "Gaps, across platforms"):
   `FileStream.setBuffering`.
 - **For other lanes**: P3 (section 22) landed on system-next with coverage-4 (`8caa741`, merged here at
@@ -1807,7 +1806,7 @@ reading the whole code on Windows; `exitRunsTheHandlersInReverseOrder`; `exitFlu
 pipe, where `print` writes; and `exitWithACode`. Not covered: handlers that a DLL registers, and other threads
 while the process exits.
 
-## 32. windows-3: critical sections: this commit
+## 32. windows-3: critical sections: `c353713`
 
 Left within section 15. swift-subprocess's work queue is a `CRITICAL_SECTION` (`InitializeCriticalSection`,
 `EnterCriticalSection`, `LeaveCriticalSection`, `DeleteCriticalSection`) with a condition variable it waits on with
@@ -1834,7 +1833,43 @@ thread can't take it), `testConditionVariableWithACriticalSection`, `testCritica
 
 A Windows run must check those three; that `TryEnterCriticalSection` succeeds for the holder, as Windows documents.
 
-## 33. windows-3: findings
+## 33. windows-3: console events, and setting a standard handle: this commit
+
+Left within section 16. swift-subprocess ends a child gently by attaching to its console (`AttachConsole`), ignoring
+Ctrl+C itself while it generates one (`GenerateConsoleCtrlEvent(CTRL_C_EVENT, 0)`), freeing the console
+(`FreeConsole`), and then sending Ctrl+Break to the child's process group; section 16's tests and swift-subprocess's
+point a standard handle at a pipe with `SetStdHandle`.
+
+What, in `Win32Console.swift`: `Win32.attachConsole(of:)` and `attachParentConsole()` (`AttachConsole`, the second
+with `ATTACH_PARENT_PROCESS`), `freeConsole()` (`FreeConsole`), `allocateConsole()` (`AllocConsole`),
+`generateConsoleControlEvent(_:toProcessGroup:)` (`GenerateConsoleCtrlEvent`), and
+`Win32.FileHandle.setStandardHandle(_:to:)` (`SetStdHandle`).
+
+Design calls, with the alternatives rejected:
+- **`setStandardHandle` consumes the handle**, which the process keeps from then on, and doesn't close the one it
+  replaces, which something else can own: the C runtime's descriptor 0, 1 or 2, or the console. That settles section
+  16's open question of ownership. The doc says the C runtime's descriptors keep their handles, so `print` doesn't
+  follow. If the call throws, the handle is closed. Rejected: borrowing the handle, which leaves the process holding
+  one its owner will close; and returning the previous handle as an owner, which could close a descriptor's handle.
+- **Two attach functions**, for a process and for the parent, rather than an optional process ID whose `nil` would
+  mean the parent.
+- **`generateConsoleControlEvent` takes a `ConsoleControlEvent`**, section 16's type, and documents that only Ctrl+C
+  and Ctrl+Break can be generated, and that Ctrl+C doesn't reach a process group; the group is the ID of its first
+  process, a `ProcessID`, and `nil` means every process on the console.
+- **Not wrapped**: `GetConsoleWindow` (swift-subprocess's tests compare windows; it returns a user32 `HWND`),
+  `ReadConsoleW` and `WriteConsoleW`, and the console's buffers and fonts.
+
+Tests, in `Win32ConsoleTests`: `testSettingAStandardHandle`; `testAllocatingAndAttachingConsoles`, which with a console
+checks `accessDenied` for a second one and `invalidParameter` for generating `.close`, and without one allocates a
+console, opens `CONOUT$`, frees it, and puts the standard handles back; `testCtrlBreakEndsAProcessGroup`, with
+`sort.exe` waiting on console input in a new process group, skipped when standard input isn't a console.
+
+A Windows run must check those three, in a console and without one (as CI runs them), and in particular: that
+`attachParentConsole()` gives `accessDenied` for a process that has a console, as documented; that
+`GenerateConsoleCtrlEvent` checks the event before the console, for `.close`; and that `sort.exe` has no Ctrl+Break
+handler of its own.
+
+## 34. windows-3: findings
 
 - **`FileDescriptor`'s Windows canonicalization doesn't cover `CreateDirectoryW`'s limit** (P4).
   `withCanonicalPathRepresentation` passes `PATHCCH_ALLOW_LONG_PATHS`, so the `mkdir` adapter, which
@@ -1861,7 +1896,7 @@ A Windows run must check those three; that `TryEnterCriticalSection` succeeds fo
 - **macOS's CoreFoundation declares `S_OK` and `S_FALSE` too**, so the harness's tests spell `WinSDK.S_OK`; on
   Windows, where XCTest's Foundation is swift-corelibs-foundation, the bare names would do.
 
-## 34. windows-3: patches for files outside the lane
+## 35. windows-3: patches for files outside the lane
 
 **P3, continued: `Sources/System/CMakeLists.txt`.** The Win32 `target_sources` block as it should read with this
 lane's files. P3 itself landed with coverage-4 (`8caa741`); this block replaces the one it left, and is kept current

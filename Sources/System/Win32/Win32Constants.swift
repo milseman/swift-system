@@ -184,6 +184,11 @@ internal var _STD_INPUT_HANDLE: DWORD { DWORD(bitPattern: -10) }
 @_alwaysEmitIntoClient
 internal var _STD_OUTPUT_HANDLE: DWORD { DWORD(bitPattern: -11) }
 
+// MARK: - Consoles
+
+@_alwaysEmitIntoClient
+internal var _ATTACH_PARENT_PROCESS: DWORD { DWORD(bitPattern: -1) }
+
 // MARK: - Condition variables
 
 @_alwaysEmitIntoClient
