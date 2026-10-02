@@ -546,7 +546,8 @@
     }
     const head = el("tr", null, ...["State", "Declaration", "Kind", "C name", "Header", "Pitch"].map((h) => el("th", { text: h })),
       el("th", { class: "n", text: "Packages" }));
-    box.appendChild(el("table", { class: "data" }, el("thead", null, head), el("tbody", null, rows)));
+    box.appendChild(el("div", { class: "list-wrap" },
+      el("table", { class: "data" }, el("thead", null, head), el("tbody", null, rows))));
     if (list.length > listLimit) {
       box.appendChild(el("button", { type: "button", class: "more",
         onclick: () => { listLimit += 200; renderList(); },

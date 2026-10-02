@@ -196,7 +196,9 @@ table.data .muted { color: var(--text-muted); }
 .list-row { cursor: pointer; }
 .list-row:hover td { background: var(--wash); }
 .state-cell { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
-td.decl-cell { min-width: 330px; }
+td.decl-cell { min-width: 300px; }
+table.data td.mono { overflow-wrap: anywhere; }
+.list-wrap { overflow-x: auto; }
 .path { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12.5px; word-break: break-word; }
 .flagtag { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 999px; border: 1px solid var(--border);
   color: var(--text-secondary); font-size: 11.5px; font-family: system-ui, -apple-system, sans-serif; }
