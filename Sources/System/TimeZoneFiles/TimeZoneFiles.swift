@@ -16,8 +16,10 @@
 // conventional paths, which it doesn't read: its time zones are in one file
 // (tzdata), and the device's is a system property. So on Android these are
 // those paths, which code that reads them on Linux finds missing there.
+// FreeBSD and OpenBSD don't install a <tzfile.h> either, and their tzcode
+// reads the conventional paths, so these are those there too.
 
-#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
+#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD)
 import CSystem
 
 @available(System 199, *)
@@ -31,10 +33,11 @@ extension FilePath {
   /// as in a container without time zone data.
   /// On Android it's `/usr/share/zoneinfo`, which Android doesn't have:
   /// its C library keeps the time zones in one file, `tzdata`.
+  /// On FreeBSD and OpenBSD it's `/usr/share/zoneinfo`.
   ///
   /// The corresponding C constant is `TZDIR`.
   ///
-  /// - Note: Only available on Darwin, Linux and Android.
+  /// - Note: Only available on Darwin, Linux, Android, FreeBSD and OpenBSD.
   @_alwaysEmitIntoClient
   public static var timeZoneDirectory: FilePath { FilePath(_TZDIR) }
 
@@ -49,10 +52,11 @@ extension FilePath {
   /// On Android it's `/etc/localtime`, which is always missing:
   /// the system's time zone is the `persist.sys.timezone` property,
   /// which the C library reads unless `TZ` names another.
+  /// On FreeBSD and OpenBSD it's `/etc/localtime`.
   ///
   /// The corresponding C constant is `TZDEFAULT`.
   ///
-  /// - Note: Only available on Darwin, Linux and Android.
+  /// - Note: Only available on Darwin, Linux, Android, FreeBSD and OpenBSD.
   @_alwaysEmitIntoClient
   public static var defaultTimeZoneFile: FilePath { FilePath(_TZDEFAULT) }
 }
@@ -63,8 +67,9 @@ internal var _TZDIR: String { TZDIR }
 
 @_alwaysEmitIntoClient
 internal var _TZDEFAULT: String { TZDEFAULT }
-#elseif os(Android)
-// The values in Bionic's tzcode's private <tzfile.h>.
+#elseif os(Android) || os(FreeBSD) || os(OpenBSD)
+// The values in tzcode's <tzfile.h>, which Bionic and OpenBSD keep private
+// (OpenBSD's lib/libc/time/tzfile.h), and which FreeBSD's tzcode reads.
 @_alwaysEmitIntoClient
 internal var _TZDIR: String { "/usr/share/zoneinfo" }
 
@@ -78,4 +83,4 @@ internal var _TZDIR: String { String(cString: _system_get_TZDIR()) }
 internal var _TZDEFAULT: String { String(cString: _system_get_TZDEFAULT()) }
 #endif
 
-#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
+#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD)

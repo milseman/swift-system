@@ -21,4 +21,12 @@
 // Swift module doesn't include; see shims.c.
 extern size_t csystem_malloc_usable_size(const void *pointer);
 
+// The locale calls that System wraps provisionally whose declarations
+// FreeBSD's <stdlib.h> and <strings.h> make only after <xlocale.h>, as
+// Darwin's do; see shims.c. `locale` is a locale_t: NULL is the POSIX
+// locale, and LC_GLOBAL_LOCALE the global one.
+extern double csystem_strtod_l(const char *string, char **end, void *locale);
+extern float csystem_strtof_l(const char *string, char **end, void *locale);
+extern int csystem_strncasecmp_l(const char *a, const char *b, size_t count, void *locale);
+
 #endif // defined(__FreeBSD__)

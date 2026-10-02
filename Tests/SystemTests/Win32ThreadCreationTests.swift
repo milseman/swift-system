@@ -8,9 +8,10 @@
 */
 
 import XCTest
-import Dispatch
 
 #if os(Windows)
+
+import Dispatch
 
 #if SYSTEM_PACKAGE
 @testable import SystemPackage

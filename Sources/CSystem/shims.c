@@ -832,6 +832,22 @@ extern void csystem_get_mallinfo2(struct csystem_mallinfo2 *info) {
 extern size_t csystem_malloc_usable_size(const void *pointer) {
   return malloc_usable_size(pointer);
 }
+
+#include <stdlib.h>
+#include <strings.h>
+#include <xlocale.h>
+
+extern double csystem_strtod_l(const char *string, char **end, void *locale) {
+  return strtod_l(string, end, (locale_t)locale);
+}
+
+extern float csystem_strtof_l(const char *string, char **end, void *locale) {
+  return strtof_l(string, end, (locale_t)locale);
+}
+
+extern int csystem_strncasecmp_l(const char *a, const char *b, size_t count, void *locale) {
+  return strncasecmp_l(a, b, count, (locale_t)locale);
+}
 #endif // defined(__FreeBSD__)
 
 #if defined(__wasi__)
