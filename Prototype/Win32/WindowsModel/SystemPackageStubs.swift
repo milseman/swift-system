@@ -53,6 +53,8 @@ public struct FilePath: Hashable, Sendable {
 
   public var isEmpty: Bool { _storage.count == 1 } // mirrors: Sources/System/FilePath/FilePathSyntax.swift
 
+  public var length: Int { _storage.count - 1 } // mirrors: Sources/System/FilePath/FilePath.swift
+
   public __consuming func appending(_ other: __owned String) -> FilePath { // mirrors: Sources/System/FilePath/FilePathSyntax.swift
     FilePath(string + "\\" + other)
   }

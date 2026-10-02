@@ -30,6 +30,8 @@ final class Win32ErrorTests: XCTestCase {
       (.pathNotFound, DWORD(WinSDK.ERROR_PATH_NOT_FOUND)),
       (.accessDenied, DWORD(WinSDK.ERROR_ACCESS_DENIED)),
       (.invalidHandle, DWORD(WinSDK.ERROR_INVALID_HANDLE)),
+      (.notEnoughMemory, DWORD(WinSDK.ERROR_NOT_ENOUGH_MEMORY)),
+      (.notSameDevice, DWORD(WinSDK.ERROR_NOT_SAME_DEVICE)),
       (.deviceNotReady, DWORD(WinSDK.ERROR_NOT_READY)),
       (.cyclicRedundancyCheck, DWORD(WinSDK.ERROR_CRC)),
       (.writeFault, DWORD(WinSDK.ERROR_WRITE_FAULT)),
@@ -46,6 +48,7 @@ final class Win32ErrorTests: XCTestCase {
       (.invalidName, DWORD(WinSDK.ERROR_INVALID_NAME)),
       (.moduleNotFound, DWORD(WinSDK.ERROR_MOD_NOT_FOUND)),
       (.procedureNotFound, DWORD(WinSDK.ERROR_PROC_NOT_FOUND)),
+      (.directoryNotEmpty, DWORD(WinSDK.ERROR_DIR_NOT_EMPTY)),
       (.badPathName, DWORD(WinSDK.ERROR_BAD_PATHNAME)),
       (.alreadyExists, DWORD(WinSDK.ERROR_ALREADY_EXISTS)),
       (.fileTooLarge, DWORD(WinSDK.ERROR_FILE_TOO_LARGE)),
@@ -58,6 +61,7 @@ final class Win32ErrorTests: XCTestCase {
       (.operationAborted, DWORD(WinSDK.ERROR_OPERATION_ABORTED)),
       (.ioPending, DWORD(WinSDK.ERROR_IO_PENDING)),
       (.userMappedFile, DWORD(WinSDK.ERROR_USER_MAPPED_FILE)),
+      (.privilegeNotHeld, DWORD(WinSDK.ERROR_PRIVILEGE_NOT_HELD)),
       (.cannotResolveFileName, DWORD(WinSDK.ERROR_CANT_RESOLVE_FILENAME)),
     ]
     for (error, code) in codes {

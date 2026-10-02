@@ -32,6 +32,7 @@ typedef unsigned long long ULONGLONG;
 typedef long long INT_PTR;
 typedef unsigned long long ULONG_PTR;
 typedef ULONG_PTR DWORD_PTR;
+typedef ULONG_PTR *PULONG_PTR;
 typedef unsigned int UINT;
 typedef unsigned short WCHAR;
 typedef char CHAR;
@@ -159,6 +160,10 @@ typedef union _LARGE_INTEGER {
 #define ERROR_PATH_NOT_FOUND 3
 #define ERROR_ACCESS_DENIED 5
 #define ERROR_INVALID_HANDLE 6
+#define ERROR_NOT_ENOUGH_MEMORY 8
+#define ERROR_NOT_SAME_DEVICE 17
+#define ERROR_DIR_NOT_EMPTY 145
+#define ERROR_PRIVILEGE_NOT_HELD 1314
 #define ERROR_NOT_READY 21
 #define ERROR_CRC 23
 #define ERROR_WRITE_FAULT 29
@@ -383,9 +388,36 @@ FARPROC GetProcAddress(HMODULE hModule, LPCSTR lpProcName);
 typedef enum PATHCCH_OPTIONS : int {
   PATHCCH_NONE = 0x0,
   PATHCCH_ALLOW_LONG_PATHS = 0x01,
+  PATHCCH_FORCE_ENABLE_LONG_NAME_PROCESS = 0x02,
+  PATHCCH_FORCE_DISABLE_LONG_NAME_PROCESS = 0x04,
+  PATHCCH_DO_NOT_NORMALIZE_SEGMENTS = 0x08,
+  PATHCCH_ENSURE_IS_EXTENDED_LENGTH_PATH = 0x10,
+  PATHCCH_ENSURE_TRAILING_SLASH = 0x20,
 } PATHCCH_OPTIONS;
 
+#define PATHCCH_MAX_CCH 0x8000
+
 HRESULT PathAllocCanonicalize(PCWSTR pszPathIn, ULONG dwFlags, PWSTR *ppszPathOut);
+HRESULT PathCchStripPrefix(PWSTR pszPath, size_t cchPath);
+
+// winerror.h, as the SDK spells them, less the L suffixes. Swift imports
+// S_OK and S_FALSE, and none of the failures: the function-like macro is
+// unsupported, and a negative HRESULT's literal overflows.
+#define _HRESULT_TYPEDEF_(_sc) ((HRESULT)_sc)
+#define S_OK ((HRESULT)0)
+#define S_FALSE ((HRESULT)1)
+#define E_NOTIMPL _HRESULT_TYPEDEF_(0x80004001)
+#define E_NOINTERFACE _HRESULT_TYPEDEF_(0x80004002)
+#define E_POINTER _HRESULT_TYPEDEF_(0x80004003)
+#define E_ABORT _HRESULT_TYPEDEF_(0x80004004)
+#define E_FAIL _HRESULT_TYPEDEF_(0x80004005)
+#define E_UNEXPECTED _HRESULT_TYPEDEF_(0x8000FFFF)
+#define E_ACCESSDENIED _HRESULT_TYPEDEF_(0x80070005)
+#define E_HANDLE _HRESULT_TYPEDEF_(0x80070006)
+#define E_OUTOFMEMORY _HRESULT_TYPEDEF_(0x8007000E)
+#define E_INVALIDARG _HRESULT_TYPEDEF_(0x80070057)
+#define FACILITY_NULL 0
+#define ERROR_OUTOFMEMORY 14
 
 // sddl.h
 
@@ -548,6 +580,23 @@ int CompareStringOrdinal(LPCWCH lpString1, int cchCount1, LPCWCH lpString2,
 
 HANDLE GetCurrentThread(void);
 DWORD GetCurrentThreadId(void);
+BOOL SwitchToThread(void);
+HRESULT SetThreadDescription(HANDLE hThread, PCWSTR lpThreadDescription);
+HRESULT GetThreadDescription(HANDLE hThread, PWSTR *ppszThreadDescription);
+void GetCurrentThreadStackLimits(PULONG_PTR LowLimit, PULONG_PTR HighLimit);
+
+#define STACK_SIZE_PARAM_IS_A_RESERVATION 0x00010000
+
+// fibersapi.h, winbase.h, winnt.h: fiber-local storage
+
+typedef void (*PFLS_CALLBACK_FUNCTION)(PVOID lpFlsData);
+
+#define FLS_OUT_OF_INDEXES ((DWORD)0xFFFFFFFF)
+
+DWORD FlsAlloc(PFLS_CALLBACK_FUNCTION lpCallback);
+BOOL FlsFree(DWORD dwFlsIndex);
+PVOID FlsGetValue(DWORD dwFlsIndex);
+BOOL FlsSetValue(DWORD dwFlsIndex, PVOID lpFlsData);
 HANDLE OpenThread(DWORD dwDesiredAccess, BOOL bInheritHandle, DWORD dwThreadId);
 DWORD GetThreadId(HANDLE Thread);
 BOOL GetExitCodeThread(HANDLE hThread, LPDWORD lpExitCode);
@@ -762,3 +811,198 @@ BOOL GetFileInformationByHandle(HANDLE hFile,
 BOOL GetFileAttributesExW(LPCWSTR lpFileName, GET_FILEEX_INFO_LEVELS fInfoLevelId,
                           LPVOID lpFileInformation);
 BOOL SetFileAttributesW(LPCWSTR lpFileName, DWORD dwFileAttributes);
+
+// fileapi.h, winbase.h, minwinbase.h, winnt.h: path operations
+
+#define MOVEFILE_COPY_ALLOWED 0x00000002
+#define MOVEFILE_DELAY_UNTIL_REBOOT 0x00000004
+#define MOVEFILE_WRITE_THROUGH 0x00000008
+#define MOVEFILE_CREATE_HARDLINK 0x00000010
+#define MOVEFILE_FAIL_IF_NOT_TRACKABLE 0x00000020
+
+#define COPY_FILE_FAIL_IF_EXISTS 0x00000001
+#define COPY_FILE_RESTARTABLE 0x00000002
+#define COPY_FILE_OPEN_SOURCE_FOR_WRITE 0x00000004
+#define COPY_FILE_ALLOW_DECRYPTED_DESTINATION 0x00000008
+#define COPY_FILE_DIRECTORY 0x00000080
+#define COPY_FILE_COPY_SYMLINK 0x00000800
+#define COPY_FILE_NO_BUFFERING 0x00001000
+#define COPY_FILE_NO_OFFLOAD 0x00040000
+#define COPY_FILE_OPEN_AND_COPY_REPARSE_POINT 0x00200000
+
+#define SYMBOLIC_LINK_FLAG_DIRECTORY 0x1
+#define SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE 0x2
+
+#define FILE_DISPOSITION_FLAG_DO_NOT_DELETE 0x00000000
+#define FILE_DISPOSITION_FLAG_DELETE 0x00000001
+#define FILE_DISPOSITION_FLAG_POSIX_SEMANTICS 0x00000002
+#define FILE_DISPOSITION_FLAG_FORCE_IMAGE_SECTION_CHECK 0x00000004
+#define FILE_DISPOSITION_FLAG_ON_CLOSE 0x00000008
+#define FILE_DISPOSITION_FLAG_IGNORE_READONLY_ATTRIBUTE 0x00000010
+
+#define FILE_RENAME_FLAG_REPLACE_IF_EXISTS 0x00000001
+#define FILE_RENAME_FLAG_POSIX_SEMANTICS 0x00000002
+#define FILE_RENAME_FLAG_SUPPRESS_PIN_STATE_INHERITANCE 0x00000004
+#define FILE_RENAME_FLAG_IGNORE_READONLY_ATTRIBUTE 0x00000040
+
+typedef struct _FILE_DISPOSITION_INFO_EX {
+  DWORD Flags;
+} FILE_DISPOSITION_INFO_EX, *PFILE_DISPOSITION_INFO_EX;
+
+// The union is anonymous, as DUMMYUNIONNAME leaves it by default.
+typedef struct _FILE_RENAME_INFO {
+  union {
+    BOOLEAN ReplaceIfExists;
+    DWORD Flags;
+  };
+  HANDLE RootDirectory;
+  DWORD FileNameLength;
+  WCHAR FileName[1];
+} FILE_RENAME_INFO, *PFILE_RENAME_INFO;
+
+// The progress routine's message is a union of structs, which nothing here
+// reads.
+typedef int (*PCOPYFILE2_PROGRESS_ROUTINE)(const void *pMessage, PVOID pvCallbackContext);
+
+typedef struct COPYFILE2_EXTENDED_PARAMETERS {
+  DWORD dwSize;
+  DWORD dwCopyFlags;
+  BOOL *pfCancel;
+  PCOPYFILE2_PROGRESS_ROUTINE pProgressRoutine;
+  PVOID pvCallbackContext;
+} COPYFILE2_EXTENDED_PARAMETERS;
+
+HRESULT CopyFile2(PCWSTR pwszExistingFileName, PCWSTR pwszNewFileName,
+                  COPYFILE2_EXTENDED_PARAMETERS *pExtendedParameters);
+BOOLEAN CreateSymbolicLinkW(LPCWSTR lpSymlinkFileName, LPCWSTR lpTargetFileName,
+                            DWORD dwFlags);
+BOOL CreateHardLinkW(LPCWSTR lpFileName, LPCWSTR lpExistingFileName,
+                     LPSECURITY_ATTRIBUTES lpSecurityAttributes);
+
+// ioapiset.h, minwinbase.h, winerror.h: overlapped I/O and completion ports
+
+#define ERROR_IO_INCOMPLETE 996
+#define ERROR_NOT_FOUND 1168
+#define ERROR_ABANDONED_WAIT_0 735
+
+BOOL GetOverlappedResult(HANDLE hFile, LPOVERLAPPED lpOverlapped,
+                         LPDWORD lpNumberOfBytesTransferred, BOOL bWait);
+BOOL GetOverlappedResultEx(HANDLE hFile, LPOVERLAPPED lpOverlapped,
+                           LPDWORD lpNumberOfBytesTransferred, DWORD dwMilliseconds,
+                           BOOL bAlertable);
+BOOL CancelIoEx(HANDLE hFile, LPOVERLAPPED lpOverlapped);
+HANDLE CreateIoCompletionPort(HANDLE FileHandle, HANDLE ExistingCompletionPort,
+                              ULONG_PTR CompletionKey, DWORD NumberOfConcurrentThreads);
+BOOL PostQueuedCompletionStatus(HANDLE CompletionPort, DWORD dwNumberOfBytesTransferred,
+                                ULONG_PTR dwCompletionKey, LPOVERLAPPED lpOverlapped);
+BOOL GetQueuedCompletionStatus(HANDLE CompletionPort, LPDWORD lpNumberOfBytesTransferred,
+                               PULONG_PTR lpCompletionKey, LPOVERLAPPED *lpOverlapped,
+                               DWORD dwMilliseconds);
+
+// sysinfoapi.h, winnt.h, winbase.h: system information
+
+typedef unsigned short USHORT;
+
+typedef struct _SYSTEM_INFO {
+  union {
+    DWORD dwOemId;
+    struct {
+      WORD wProcessorArchitecture;
+      WORD wReserved;
+    };
+  };
+  DWORD dwPageSize;
+  LPVOID lpMinimumApplicationAddress;
+  LPVOID lpMaximumApplicationAddress;
+  DWORD_PTR dwActiveProcessorMask;
+  DWORD dwNumberOfProcessors;
+  DWORD dwProcessorType;
+  DWORD dwAllocationGranularity;
+  WORD wProcessorLevel;
+  WORD wProcessorRevision;
+} SYSTEM_INFO, *LPSYSTEM_INFO;
+
+#define PROCESSOR_ARCHITECTURE_INTEL 0
+#define PROCESSOR_ARCHITECTURE_ARM 5
+#define PROCESSOR_ARCHITECTURE_IA64 6
+#define PROCESSOR_ARCHITECTURE_AMD64 9
+#define PROCESSOR_ARCHITECTURE_ARM64 12
+#define PROCESSOR_ARCHITECTURE_UNKNOWN 0xFFFF
+#define ALL_PROCESSOR_GROUPS 0xffff
+
+typedef enum _LOGICAL_PROCESSOR_RELATIONSHIP : int {
+  RelationProcessorCore,
+  RelationNumaNode,
+  RelationCache,
+  RelationProcessorPackage,
+  RelationGroup,
+  RelationAll = 0xffff
+} LOGICAL_PROCESSOR_RELATIONSHIP;
+
+typedef enum _PROCESSOR_CACHE_TYPE : int {
+  CacheUnified,
+  CacheInstruction,
+  CacheData,
+  CacheTrace
+} PROCESSOR_CACHE_TYPE;
+
+typedef struct _CACHE_DESCRIPTOR {
+  BYTE Level;
+  BYTE Associativity;
+  WORD LineSize;
+  DWORD Size;
+  PROCESSOR_CACHE_TYPE Type;
+} CACHE_DESCRIPTOR, *PCACHE_DESCRIPTOR;
+
+typedef struct _SYSTEM_LOGICAL_PROCESSOR_INFORMATION {
+  ULONG_PTR ProcessorMask;
+  LOGICAL_PROCESSOR_RELATIONSHIP Relationship;
+  union {
+    struct {
+      BYTE Flags;
+    } ProcessorCore;
+    struct {
+      DWORD NodeNumber;
+    } NumaNode;
+    CACHE_DESCRIPTOR Cache;
+    ULONGLONG Reserved[2];
+  };
+} SYSTEM_LOGICAL_PROCESSOR_INFORMATION, *PSYSTEM_LOGICAL_PROCESSOR_INFORMATION;
+
+typedef enum _COMPUTER_NAME_FORMAT : int {
+  ComputerNameNetBIOS,
+  ComputerNameDnsHostname,
+  ComputerNameDnsDomain,
+  ComputerNameDnsFullyQualified,
+  ComputerNamePhysicalNetBIOS,
+  ComputerNamePhysicalDnsHostname,
+  ComputerNamePhysicalDnsDomain,
+  ComputerNamePhysicalDnsFullyQualified,
+  ComputerNameMax
+} COMPUTER_NAME_FORMAT;
+
+typedef struct _OSVERSIONINFOEXW {
+  DWORD dwOSVersionInfoSize;
+  DWORD dwMajorVersion;
+  DWORD dwMinorVersion;
+  DWORD dwBuildNumber;
+  DWORD dwPlatformId;
+  WCHAR szCSDVersion[128];
+  WORD wServicePackMajor;
+  WORD wServicePackMinor;
+  WORD wSuiteMask;
+  BYTE wProductType;
+  BYTE wReserved;
+} OSVERSIONINFOEXW, *POSVERSIONINFOEXW, RTL_OSVERSIONINFOEXW, *PRTL_OSVERSIONINFOEXW;
+
+#define VER_NT_WORKSTATION 0x0000001
+#define VER_NT_DOMAIN_CONTROLLER 0x0000002
+#define VER_NT_SERVER 0x0000003
+
+void GetSystemInfo(LPSYSTEM_INFO lpSystemInfo);
+void GetNativeSystemInfo(LPSYSTEM_INFO lpSystemInfo);
+DWORD GetActiveProcessorCount(WORD GroupNumber);
+BOOL GetLogicalProcessorInformation(PSYSTEM_LOGICAL_PROCESSOR_INFORMATION Buffer,
+                                    PDWORD ReturnedLength);
+BOOL GetPhysicallyInstalledSystemMemory(PULONGLONG TotalMemoryInKilobytes);
+BOOL GetComputerNameExW(COMPUTER_NAME_FORMAT NameType, LPWSTR lpBuffer, LPDWORD nSize);

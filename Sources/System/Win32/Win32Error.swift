@@ -89,6 +89,20 @@ extension Win32.Error {
   @_alwaysEmitIntoClient
   public static var invalidHandle: Win32.Error { Win32.Error(rawValue: 6) }
 
+  /// There isn't enough memory to process the command.
+  ///
+  /// The corresponding C constant is `ERROR_NOT_ENOUGH_MEMORY`.
+  @_alwaysEmitIntoClient
+  public static var notEnoughMemory: Win32.Error { Win32.Error(rawValue: 8) }
+
+  /// The system can't move the file to a different disk drive.
+  ///
+  /// A rename or a hard link crosses volumes.
+  ///
+  /// The corresponding C constant is `ERROR_NOT_SAME_DEVICE`.
+  @_alwaysEmitIntoClient
+  public static var notSameDevice: Win32.Error { Win32.Error(rawValue: 17) }
+
   /// The device isn't ready.
   ///
   /// The corresponding C constant is `ERROR_NOT_READY`.
@@ -199,6 +213,12 @@ extension Win32.Error {
   @_alwaysEmitIntoClient
   public static var procedureNotFound: Win32.Error { Win32.Error(rawValue: 127) }
 
+  /// The directory isn't empty.
+  ///
+  /// The corresponding C constant is `ERROR_DIR_NOT_EMPTY`.
+  @_alwaysEmitIntoClient
+  public static var directoryNotEmpty: Win32.Error { Win32.Error(rawValue: 145) }
+
   /// The specified path is invalid.
   ///
   /// The corresponding C constant is `ERROR_BAD_PATHNAME`.
@@ -277,6 +297,13 @@ extension Win32.Error {
   /// The corresponding C constant is `ERROR_USER_MAPPED_FILE`.
   @_alwaysEmitIntoClient
   public static var userMappedFile: Win32.Error { Win32.Error(rawValue: 1224) }
+
+  /// The caller doesn't hold a privilege the operation needs, such as
+  /// `SeCreateSymbolicLinkPrivilege`.
+  ///
+  /// The corresponding C constant is `ERROR_PRIVILEGE_NOT_HELD`.
+  @_alwaysEmitIntoClient
+  public static var privilegeNotHeld: Win32.Error { Win32.Error(rawValue: 1314) }
 
   /// The system can't resolve the name of the file.
   ///
@@ -386,6 +413,8 @@ extension Win32.Error {
     case 3: return "ERROR_PATH_NOT_FOUND"
     case 5: return "ERROR_ACCESS_DENIED"
     case 6: return "ERROR_INVALID_HANDLE"
+    case 8: return "ERROR_NOT_ENOUGH_MEMORY"
+    case 17: return "ERROR_NOT_SAME_DEVICE"
     case 21: return "ERROR_NOT_READY"
     case 23: return "ERROR_CRC"
     case 29: return "ERROR_WRITE_FAULT"
@@ -402,6 +431,7 @@ extension Win32.Error {
     case 126: return "ERROR_MOD_NOT_FOUND"
     case 127: return "ERROR_PROC_NOT_FOUND"
     case 131: return "ERROR_NEGATIVE_SEEK"
+    case 145: return "ERROR_DIR_NOT_EMPTY"
     case 158: return "ERROR_NOT_LOCKED"
     case 161: return "ERROR_BAD_PATHNAME"
     case 183: return "ERROR_ALREADY_EXISTS"
@@ -414,6 +444,7 @@ extension Win32.Error {
     case 995: return "ERROR_OPERATION_ABORTED"
     case 997: return "ERROR_IO_PENDING"
     case 1224: return "ERROR_USER_MAPPED_FILE"
+    case 1314: return "ERROR_PRIVILEGE_NOT_HELD"
     case 1921: return "ERROR_CANT_RESOLVE_FILENAME"
     // System's own code has no C name.
     case Win32.Error.incompleteTransfer.rawValue: return "incompleteTransfer"

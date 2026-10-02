@@ -7,7 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-#if os(Linux)
+#if os(Linux) || os(Android)
 
 import Testing
 
@@ -21,7 +21,8 @@ import System
 @Suite("Time zone files on Linux")
 private struct TimeZoneFilesLinuxTests {
   /// The conventional paths. A container can have neither: the plain
-  /// Ubuntu images have no time zone data.
+  /// Ubuntu images have no time zone data. Android has neither: its time
+  /// zones are in one file.
   @available(System 199, *)
   @Test func theDirectoryAndTheDefault() throws {
     #expect(FilePath.timeZoneDirectory == "/usr/share/zoneinfo")
@@ -35,4 +36,4 @@ private struct TimeZoneFilesLinuxTests {
   }
 }
 
-#endif // os(Linux)
+#endif // os(Linux) || os(Android)

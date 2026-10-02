@@ -52,10 +52,11 @@ uint64_t _system_get_ST_APPEND(void) { return ST_APPEND; }
 uint64_t _system_get_ST_IMMUTABLE(void) { return ST_IMMUTABLE; }
 #endif
 
-// O_TMPFILE and AT_EMPTY_PATH, which <fcntl.h> declares only with
-// _GNU_SOURCE in glibc and Musl.
+// O_PATH, O_TMPFILE and AT_EMPTY_PATH, which <fcntl.h> declares only with
+// _GNU_SOURCE in glibc, as Musl's does the last two.
 #include <fcntl.h>
 int _system_get_AT_EMPTY_PATH(void) { return AT_EMPTY_PATH; }
+int _system_get_O_PATH(void) { return O_PATH; }
 int _system_get_O_TMPFILE(void) { return O_TMPFILE; }
 
 // MAXSYMLINKS, and XATTR_NAME_MAX, which Musl's <limits.h> doesn't define:
@@ -728,8 +729,13 @@ extern int csystem_recvmmsg(int fd, void *msgvec, unsigned int vlen, int flags, 
 
 // MARK: - Locales
 
-#if defined(__linux__) && !defined(__ANDROID__)
+#ifdef __linux__
 #include <locale.h>
+
+int _system_get_LC_ALL_MASK(void) { return LC_ALL_MASK; }
+#endif // __linux__
+
+#if defined(__linux__) && !defined(__ANDROID__)
 #include <stdlib.h>
 
 // With _GNU_SOURCE, which this file defines on Linux, <stdlib.h> declares
@@ -741,8 +747,6 @@ extern double csystem_strtod_l(const char *string, char **end, void *locale) {
 extern float csystem_strtof_l(const char *string, char **end, void *locale) {
   return strtof_l(string, end, (locale_t)locale);
 }
-
-int _system_get_LC_ALL_MASK(void) { return LC_ALL_MASK; }
 
 // MARK: - Time zone files
 

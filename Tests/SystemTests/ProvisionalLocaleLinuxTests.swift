@@ -7,7 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-#if os(Linux)
+#if os(Linux) || os(Android)
 
 import XCTest
 
@@ -15,6 +15,8 @@ import XCTest
 import Glibc
 #elseif canImport(Musl)
 import Musl
+#elseif canImport(Android)
+import Android
 #endif
 
 #if SYSTEM_PACKAGE
@@ -23,18 +25,20 @@ import Musl
 @testable import System
 #endif
 
-// The provisional C locales on Linux, where the categories' values differ
-// from Darwin's, the POSIX and global locales are passed differently (see
-// Syscalls+ProvisionalLocale.swift), and a container may have no locales
-// but C, POSIX and C.UTF-8. XCTest, since setting the global locale changes
-// the whole process. ProvisionalLocaleTest has Darwin's.
+// The provisional C locales on Linux and Android, where the categories'
+// values differ from Darwin's, the POSIX and global locales are passed
+// differently (see Syscalls+ProvisionalLocale.swift), and a container may
+// have no locales but C, POSIX and C.UTF-8, which with en_US.UTF-8 are
+// Android's only ones. XCTest, since setting the global locale changes the
+// whole process. ProvisionalLocaleTest has Darwin's.
 @available(System 199, *)
 final class ProvisionalLocaleLinuxTest: XCTestCase {
   #if ENABLE_MOCKING
   func testSyscalls() {
     let locale = CLocale(rawValue: _mockLocale)
-    #if canImport(Glibc)
-    // glibc's twelve categories: bits 0 through 12, but for LC_ALL's, 6.
+    #if canImport(Glibc) || canImport(Android)
+    // glibc's and Bionic's twelve categories: bits 0 through 12, but for
+    // LC_ALL's, 6.
     let all: CInt = 0x1FBF
     #else
     let all: CInt = 0x7FFF_FFFF
@@ -54,7 +58,7 @@ final class ProvisionalLocaleLinuxTest: XCTestCase {
   }
   #endif
 
-  /// glibc's and Musl's values, which aren't Darwin's.
+  /// glibc's, Musl's and Bionic's values, which aren't Darwin's.
   func testTheCategories() {
     XCTAssertEqual(CLocale.Category.characterTypes.rawValue, 0)
     XCTAssertEqual(CLocale.Category.numeric.rawValue, 1)
@@ -91,14 +95,15 @@ final class ProvisionalLocaleLinuxTest: XCTestCase {
     XCTAssertEqual(CLocale.global.compareIgnoringCase("HELLO", "hello", maxByteCount: 5), 0)
   }
 
-  /// C.UTF-8 is built into glibc from 2.35, and into Musl. French, whose
-  /// decimal separator is a comma, is checked where it's installed, and
-  /// only in glibc: Musl's numbers don't follow the locale.
+  /// C.UTF-8 is built into glibc from 2.35, and into Musl and Bionic.
+  /// French, whose decimal separator is a comma, is checked where it's
+  /// installed, and only in glibc: Musl's numbers don't follow the locale,
+  /// and Bionic has no French.
   func testANamedLocale() throws {
     let utf8 = try CLocale.named("C.UTF-8")
     defer { utf8.free() }
     XCTAssertTrue("3.25".withCString { utf8.parseDouble($0) } == (3.25, 4))
-    #if canImport(Glibc)
+    #if canImport(Glibc) || canImport(Android)
     // Musl accepts any name, keeping it for messages.
     XCTAssertThrowsError(try CLocale.named("no_SUCH.locale")) {
       XCTAssertEqual($0 as? Errno, .noSuchFileOrDirectory)
@@ -120,7 +125,7 @@ final class ProvisionalLocaleLinuxTest: XCTestCase {
     let original = CLocale.globalName(for: .numeric)
     defer { CLocale.setGlobal(original, for: .numeric) }
     XCTAssertTrue("3.25".withCString { CLocale.global.parseDouble($0) } == (3.25, 4))
-    #if canImport(Glibc)
+    #if canImport(Glibc) || canImport(Android)
     // Musl accepts any name, keeping it for messages.
     XCTAssertNil(CLocale.setGlobal("no_SUCH.locale", for: .numeric))
     guard CLocale.setGlobal("fr_FR.UTF-8", for: .numeric) != nil else {
@@ -134,4 +139,4 @@ final class ProvisionalLocaleLinuxTest: XCTestCase {
   }
 }
 
-#endif // os(Linux)
+#endif // os(Linux) || os(Android)

@@ -220,6 +220,7 @@ target_sources(SystemPackage PRIVATE
   Passphrase/ReadPassphrase.swift)
 target_sources(SystemPackage PRIVATE
   PathsAndFiles/FilePath+Resolution.swift
+  PathsAndFiles/PathOnlyDescriptors.swift
   PathsAndFiles/ProcessDefaults.swift
   PathsAndFiles/UniqueFiles.swift)
 target_sources(SystemPackage PRIVATE

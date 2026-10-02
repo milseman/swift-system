@@ -17,12 +17,12 @@
 // number parsing does, or that sets the process's C locale, as its tests
 // do, can do so without importing the C library.
 //
-// On Darwin and Linux (glibc and Musl), which have these calls, though
-// Linux declares strtod_l and strtof_l only with _GNU_SOURCE, and has no
-// LC_C_LOCALE (see Syscalls+ProvisionalLocale.swift). Not on Android:
-// Bionic has strtod_l and strtof_l only from API level 26.
+// On Darwin, Linux (glibc and Musl) and Android, which have these calls,
+// though Linux declares strtod_l and strtof_l only with _GNU_SOURCE, and has
+// no LC_C_LOCALE, and Bionic's *_l calls ignore the locale (see
+// Syscalls+ProvisionalLocale.swift).
 
-#if SYSTEM_PACKAGE_DARWIN || os(Linux)
+#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
 import CSystem
 #if SYSTEM_PACKAGE_DARWIN
 import Darwin
@@ -30,6 +30,8 @@ import Darwin
 import Glibc
 #elseif canImport(Musl)
 import Musl
+#elseif canImport(Android)
+import Android
 #endif
 
 @available(System 199, *)
@@ -39,7 +41,7 @@ extension CInterop {
   /// The corresponding C type is `locale_t`.
   ///
   /// - Note: Provisional: C locales may move to the Swift standard library.
-  /// - Note: Only available on Darwin and Linux.
+  /// - Note: Only available on Darwin, Linux and Android.
   public typealias Locale = locale_t
 }
 
@@ -59,8 +61,14 @@ extension CInterop {
 /// and ``free()`` frees it for every copy.
 /// The ``posix`` and ``global`` locales aren't created, and aren't freed.
 ///
+/// Android's C library has only the POSIX locale's rules.
+/// Of the names it accepts, `"C"` and `"POSIX"` are the POSIX locale,
+/// and `"C.UTF-8"` and `"en_US.UTF-8"` the same with UTF-8 characters,
+/// which ``globalName(for:)`` names `"C.UTF-8"`;
+/// and its calls that take a locale ignore it.
+///
 /// - Note: Provisional: C locales may move to the Swift standard library.
-/// - Note: Only available on Darwin and Linux.
+/// - Note: Only available on Darwin, Linux and Android.
 @frozen
 @available(System 199, *)
 public struct CLocale: RawRepresentable, Hashable, @unchecked Sendable {
@@ -227,6 +235,7 @@ extension CLocale {
   ///     which the new locale replaces:
   ///     don't use or free it afterward, unless it's ``posix``.
   ///     The default is ``posix``.
+  ///     On Android, which ignores it, it isn't freed either.
   /// - Returns: The new locale, which ``free()`` frees.
   ///
   /// A name that has no locale throws ``Errno/noSuchFileOrDirectory``.
@@ -395,4 +404,4 @@ extension CLocale {
   }
 }
 
-#endif // SYSTEM_PACKAGE_DARWIN || os(Linux)
+#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
