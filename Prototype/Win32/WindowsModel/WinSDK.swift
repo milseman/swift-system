@@ -13,6 +13,14 @@ public var HANDLE_FLAG_INHERIT: DWORD {
   0x00000001
 }
 
+// WinIoCtl.h. The SDK computes it with CTL_CODE, a function-like macro,
+// which doesn't import, and the adopters' uses of it mean the overlay
+// declares it.
+@inlinable
+public var FSCTL_GET_REPARSE_POINT: DWORD {
+  0x000900A8
+}
+
 // WinBase.h
 @inlinable
 public var INFINITE: DWORD {

@@ -24,12 +24,11 @@ console events and `SetStdHandle` (33, `3b9327e`), library search directories (3
 line (35, `c536687`), and packages-5's `FileStream` (36, `3b9ace4`). The second session (2026-10-03) merged
 system-next at `ffaa7e4`, and did `FileStream`'s position and mock hooks (37, `6c34274`), with patch P6; then
 section 8's gaps after its top ten, in its order: users, access tokens and security identifiers (38, `32161bb`),
-pipes (39, `1bfd761`), and job objects (40, the last commit).
-- **Next**, none of it started: the rest of section 8's ranking, in its order: reparse points; events; network
-  interfaces; memory-mapped files; directory enumeration; directory change notification; free space and volume
-  paths. Then Winsock's implementation, once the decisions triage's item 74 is applied (section 29), and one
-  declaration each for `BrokenDownTime` and `FileStream` across platforms (sections 30 and 36), which reshapes other
-  lanes' files.
+pipes (39, `1bfd761`), job objects (40, `6d2ca5b`), and reparse points (41, the last commit).
+- **Next**, none of it started: the rest of section 8's ranking, in its order: events; network interfaces;
+  memory-mapped files; directory enumeration; directory change notification; free space and volume paths. Then
+  Winsock's implementation, once the decisions triage's item 74 is applied (section 29), and one declaration each
+  for `BrokenDownTime` and `FileStream` across platforms (sections 30 and 36), which reshapes other lanes' files.
 - **For other lanes**, in the windows-3 patches section (the last): system-next merged this branch at `87c3fc6`
   without its CMake list, so system-next's `Sources/System/CMakeLists.txt` lacks eight Win32 files, which CI's CMake
   job's list check would fail on; the Win32 block there (P3, continued) must land with this branch's next merge. P4
@@ -2157,7 +2156,7 @@ first instance and `ERROR_PIPE_BUSY` past the limit; that a nonblocking read of 
 too; that a read of a message pipe into a short buffer gives `ERROR_MORE_DATA`, a short read; and what a disk file
 and a name outside `\\.\pipe\` give.
 
-## 40. windows-3: job objects: this commit
+## 40. windows-3: job objects: `6d2ca5b`
 
 The next gap of section 8: 2 packages, 3 files. swift-subprocess puts each child in a job of its own
 (`CreateJobObjectW`), created suspended and assigned before it runs (`AssignProcessToJobObject`), so that
@@ -2214,7 +2213,56 @@ the tests' jobs nest; that `JOB_OBJECT_MSG_ACTIVE_PROCESS_ZERO` arrives after th
 console host the child starts joins the job too; and that `AssignProcessToJobObject` reports a handle without the
 rights as `ERROR_ACCESS_DENIED`.
 
-## 41. windows-3: findings
+## 41. windows-3: reparse points: this commit
+
+The next gap of section 8: 2 packages, 3 files, and SYS-0016's one future direction. swift-foundation's
+`destinationOfSymbolicLink(atPath:)` reads a symbolic link's or a junction's target with `DeviceIoControl` and
+`FSCTL_GET_REPARSE_POINT`, through C shims for `REPARSE_DATA_BUFFER`'s offsets, since that structure is the
+Driver Kit's, not the SDK's; its `attributesOfItem(atPath:)` tells a symbolic link by `FileAttributeTagInfo`. NIO
+checks that a path it's about to delete is a Unix domain socket's, by the `IO_REPARSE_TAG_AF_UNIX` tag of its
+reparse point, through a `REPARSE_DATA_BUFFER` of its own. Section 20 has the tag (`attributeTagInformation()`,
+`Win32.ReparseTag`); this is the data.
+
+What, in `Win32ReparsePoints.swift`: `Win32.ReparsePoint`, with the `tag`, the tag's `data`, and, for a symbolic
+link or a mount point, the `substituteName`, the `printName`, `isRelative` and the `target`; and `reparsePoint()`
+on `FileHandle` and `DirectoryHandle` (`DeviceIoControl` with `FSCTL_GET_REPARSE_POINT`). `Win32.Error` gains
+`notAReparsePoint` and `invalidReparseData`.
+
+Which API: **Win32**, as SYS-0016 proposed: a typed wrapper over one control code, not a general `DeviceIoControl`.
+Open, with section 26's shared names: `FilePath.readSymbolicLink()` on Windows, over this, with `target`'s rule.
+
+Design calls, with the alternatives rejected:
+- **The data is parsed in Swift**, from the documented layout, since the SDK doesn't declare `REPARSE_DATA_BUFFER`:
+  every offset and length is checked against what the call returned, and a name outside it throws
+  `invalidReparseData`. swift-foundation's check counts a name's end from the path buffer but compares it with the
+  bytes from the structure's start, so it can read past them (see the windows-3 findings). The parsing also ran on
+  macOS, copied into a scratch program, for links, junctions, a third party's tag with its GUID, and malformed data.
+- **`target` follows Rust's `read_link`**: a relative target as it's stored; an absolute one's `\??\` as `\\?\`,
+  removed from a drive's path, or a UNC path's `\\?\UNC\`, when the path is shorter than `MAX_PATH` and
+  `GetFullPathNameW` leaves it as it is, so a target with a trailing dot or a reserved name keeps its prefix.
+  Rejected: dropping `\??\`, as swift-foundation does, which turns a UNC target into a relative path
+  (`UNC\server\share`); and the substitute name alone, an NT path that Win32's functions don't take.
+- **Both names are kept, as strings**, and `target` as a path built from the code units, so an unpaired surrogate,
+  which NTFS allows, survives in the path though not in the names. The print name can be empty: some programs that
+  make junctions leave it so.
+- **The query needs no access rights**, which the doc says, with Rust's example of the junction
+  `C:\Documents and Settings`, whose security descriptor denies listing it.
+- **A third party's tag's data follows its GUID**, which `ReparsePoint` leaves out.
+- **Not wrapped**: setting and deleting reparse points (`FSCTL_SET_REPARSE_POINT`, `FSCTL_DELETE_REPARSE_POINT`),
+  so making a junction, which `mklink /J` does in the tests; the app execution alias's data; and the other
+  `FSCTL` codes SYS-0016 lists.
+
+Tests: `Win32ReparsePointsTests`: the constants; a junction made by `mklink /J`, read with no access rights, its
+print name and target the full path; symbolic links, relative, absolute, UNC, past `MAX_PATH`, with a trailing dot,
+and a directory's, where links can be made; files and directories that aren't reparse points; the parsing of
+synthetic data; and `target`'s rule, with a stand-in for `GetFullPathNameW` and the real one.
+
+A Windows run must check those, and in particular: that `CreateSymbolicLinkW` stores an absolute target as
+`\??\…` and a UNC one as `\??\UNC\…`, and keeps a verbatim target's trailing dot; whether `mklink /J` ends the
+substitute name with a backslash, which `FilePath` drops either way; and that `FSCTL_GET_REPARSE_POINT` works on a
+handle with no access rights.
+
+## 42. windows-3: findings
 
 - **`FileDescriptor`'s Windows canonicalization doesn't cover `CreateDirectoryW`'s limit** (P4).
   `withCanonicalPathRepresentation` passes `PATHCCH_ALLOW_LONG_PATHS`, so the `mkdir` adapter, which
@@ -2262,10 +2310,24 @@ rights as `ERROR_ACCESS_DENIED`.
   (`ReadFile`'s documentation); it works while one operation at a time uses the handle. Rust's standard library
   opens the child's end synchronously (`FILE_SYNCHRONOUS_IO_NONALERT`, in `anon_pipe`), and only its own end
   overlapped (section 39).
+- **swift-foundation's `destinationOfSymbolicLink(atPath:)` can read past a reparse point's data, and makes a UNC
+  target relative.** It checks `SubstituteNameOffset + SubstituteNameLength <= dwBytesWritten`, but the offset
+  counts from the path buffer, 20 bytes into a symbolic link's structure and 16 into a mount point's, while the
+  bytes written count from the start, so a name that ends within those last bytes is read past them, and past the
+  16 KiB buffer when the data fills it. It drops a target's `\??\`, which leaves `UNC\server\share\…` for a
+  link to a share (section 41).
+- **swift-foundation's `attributesOfItem(atPath:)` loses a file index's high half**: `UInt64(info.nFileIndexHigh
+  << 32)` shifts the 32-bit `DWORD` by 32, which Swift's smart shift makes 0, so `systemFileNumber` is the low 32
+  bits; `UInt64(info.nFileIndexHigh) << 32` was meant.
+- **NIO's `cleanupUnixDomainSocket(atPath:)` goes on only if `GetFileType` doesn't report `FILE_TYPE_DISK`** for the
+  socket's file, which it opens as itself with `FILE_FLAG_OPEN_REPARSE_POINT`. Windows reports `FILE_TYPE_DISK` for
+  a file on a disk's volume; if it does for a socket's file too, the cleanup always throws. A Windows run can tell,
+  by `fileType()` and `reparsePoint()` of a bound socket's path. Its `guard let` on `CreateFileW`'s result can't see
+  a failure, which is `INVALID_HANDLE_VALUE`, not `NULL`.
 - **macOS's CoreFoundation declares `S_OK` and `S_FALSE` too**, so the harness's tests spell `WinSDK.S_OK`; on
   Windows, where XCTest's Foundation is swift-corelibs-foundation, the bare names would do.
 
-## 42. windows-3: patches for files outside the lane
+## 43. windows-3: patches for files outside the lane
 
 **P3, continued: `Sources/System/CMakeLists.txt`.** The Win32 `target_sources` block as it should read with this
 lane's files. P3 itself landed with coverage-4 (`8caa741`); this block replaces the one it left, and is kept current
@@ -2305,6 +2367,7 @@ target_sources(SystemPackage PRIVATE
   Win32/Win32Pipes.swift
   Win32/Win32Process.swift
   Win32/Win32ProcessCreation.swift
+  Win32/Win32ReparsePoints.swift
   Win32/Win32SecurityDescriptor.swift
   Win32/Win32SecurityIdentifier.swift
   Win32/Win32Synchronization.swift

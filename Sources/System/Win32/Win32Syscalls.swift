@@ -1200,6 +1200,23 @@ internal func system_CreateHardLinkW(
   CreateHardLinkW(lpFileName, lpExistingFileName, nil)
 }
 
+// MARK: - Reparse points
+
+// The synchronous form: lpOverlapped is NULL.
+internal func system_DeviceIoControl(
+  _ hDevice: HANDLE,
+  _ dwIoControlCode: DWORD,
+  _ lpInBuffer: UnsafeMutableRawPointer?,
+  _ nInBufferSize: DWORD,
+  _ lpOutBuffer: UnsafeMutableRawPointer?,
+  _ nOutBufferSize: DWORD,
+  _ lpBytesReturned: UnsafeMutablePointer<DWORD>
+) -> Bool {
+  DeviceIoControl(
+    hDevice, dwIoControlCode, lpInBuffer, nInBufferSize, lpOutBuffer, nOutBufferSize,
+    lpBytesReturned, nil)
+}
+
 // MARK: - Pipes
 
 internal func system_CreatePipe(

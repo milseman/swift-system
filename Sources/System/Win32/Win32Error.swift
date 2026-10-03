@@ -331,6 +331,18 @@ extension Win32.Error {
   @_alwaysEmitIntoClient
   public static var cannotResolveFileName: Win32.Error { Win32.Error(rawValue: 1921) }
 
+  /// The file or directory isn't a reparse point.
+  ///
+  /// The corresponding C constant is `ERROR_NOT_A_REPARSE_POINT`.
+  @_alwaysEmitIntoClient
+  public static var notAReparsePoint: Win32.Error { Win32.Error(rawValue: 4390) }
+
+  /// The reparse point's data isn't valid.
+  ///
+  /// The corresponding C constant is `ERROR_INVALID_REPARSE_DATA`.
+  @_alwaysEmitIntoClient
+  public static var invalidReparseData: Win32.Error { Win32.Error(rawValue: 4392) }
+
   /// A transfer succeeded without moving all of its bytes.
   ///
   /// System synthesizes this code, and Windows never reports it. A write

@@ -1266,3 +1266,16 @@ BOOL QueryInformationJobObject(HANDLE hJob, JOBOBJECTINFOCLASS JobObjectInformat
                                LPVOID lpJobObjectInformation, DWORD cbJobObjectInformationLength,
                                LPDWORD lpReturnLength);
 BOOL IsProcessInJob(HANDLE ProcessHandle, HANDLE JobHandle, PBOOL Result);
+
+// winioctl.h, winnt.h and ntifs.h: reparse points. FSCTL_GET_REPARSE_POINT
+// is CTL_CODE(FILE_DEVICE_FILE_SYSTEM, 42, METHOD_BUFFERED, FILE_ANY_ACCESS),
+// which doesn't import; WinSDK.swift declares it, as Swift's overlay does.
+// REPARSE_DATA_BUFFER is the Driver Kit's, in ntifs.h, not the SDK's.
+#define MAXIMUM_REPARSE_DATA_BUFFER_SIZE (16 * 1024)
+#define SYMLINK_FLAG_RELATIVE 0x00000001
+#define ERROR_NOT_A_REPARSE_POINT 4390
+#define ERROR_INVALID_REPARSE_DATA 4392
+
+BOOL DeviceIoControl(HANDLE hDevice, DWORD dwIoControlCode, LPVOID lpInBuffer,
+                     DWORD nInBufferSize, LPVOID lpOutBuffer, DWORD nOutBufferSize,
+                     LPDWORD lpBytesReturned, LPOVERLAPPED lpOverlapped);

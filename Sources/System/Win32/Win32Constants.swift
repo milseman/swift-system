@@ -207,6 +207,19 @@ internal var _ERROR_TIMEOUT: DWORD { 1460 }
 @_alwaysEmitIntoClient
 internal var _ERROR_ENVVAR_NOT_FOUND: DWORD { 203 }
 
+// MARK: - Reparse points
+
+// winioctl.h computes it with CTL_CODE, a function-like macro, which
+// doesn't import; Swift's WinSDK overlay declares it.
+@_alwaysEmitIntoClient
+internal var _FSCTL_GET_REPARSE_POINT: DWORD { 0x0009_00A8 }
+
+@_alwaysEmitIntoClient
+internal var _MAXIMUM_REPARSE_DATA_BUFFER_SIZE: Int { 16 * 1024 }
+
+@_alwaysEmitIntoClient
+internal var _SYMLINK_FLAG_RELATIVE: DWORD { 0x0000_0001 }
+
 // MARK: - Pipes
 
 @_alwaysEmitIntoClient
