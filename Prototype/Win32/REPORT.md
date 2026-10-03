@@ -22,18 +22,19 @@ and commit each: long paths (23, `315f25b`), threads (24, `054e9e2`), `HRESULT` 
 Windows (30, `ada7eea`), ending the process and exit codes (31, `a7d4db9`), critical sections (32, `c353713`),
 console events and `SetStdHandle` (33, `3b9327e`), library search directories (34, `c5efe5d`), quoting a command
 line (35, `c536687`), and packages-5's `FileStream` (36, `3b9ace4`). The second session (2026-10-03) merged
-system-next at `ffaa7e4` and did `FileStream`'s position and mock hooks (37, the last commit), with patch P6.
-- **Next**, none of it started: the rest of section 8's ranking, in its order: users, tokens and security
-  identifiers; pipes; job objects; reparse points; events; network interfaces; memory-mapped files; directory
-  enumeration; directory change notification; free space and volume paths. Then Winsock's implementation, once
-  the decisions triage's item 74 is applied (section 29), and one declaration each for `BrokenDownTime` and
-  `FileStream` across platforms (sections 30 and 36), which reshapes other lanes' files.
+system-next at `ffaa7e4`, and did `FileStream`'s position and mock hooks (37, `6c34274`), with patch P6, and users,
+access tokens and security identifiers (38, the last commit), the first of section 8's gaps after its top ten.
+- **Next**, none of it started: the rest of section 8's ranking, in its order: pipes; job objects; reparse points;
+  events; network interfaces; memory-mapped files; directory enumeration; directory change notification; free space
+  and volume paths. Then Winsock's implementation, once the decisions triage's item 74 is applied (section 29), and
+  one declaration each for `BrokenDownTime` and `FileStream` across platforms (sections 30 and 36), which reshapes
+  other lanes' files.
 - **For other lanes**, in the windows-3 patches section (the last): system-next merged this branch at `87c3fc6`
   without its CMake list, so system-next's `Sources/System/CMakeLists.txt` lacks eight Win32 files, which CI's CMake
-  job's list check would fail on; the Win32 block there (P3, continued) must land with this branch's next merge. P4 brings
-  `FileDescriptor`'s Windows canonicalization to section 23's rule, P5 names `EOVERFLOW` on Windows (section 30), and
-  P6 gives `FileDescriptor` 64-bit offsets on Windows, where they're 32 bits (section 38). The PlatformEnum samples'
-  Windows arms differ from `Win32.ProcessHandle` (section 21).
+  job's list check would fail on; the Win32 block there (P3, continued) must land with this branch's next merge. P4
+  brings `FileDescriptor`'s Windows canonicalization to section 23's rule, P5 names `EOVERFLOW` on Windows (section
+  30), and P6 gives `FileDescriptor` 64-bit offsets on Windows, where they're 32 bits (section 39). The PlatformEnum
+  samples' Windows arms differ from `Win32.ProcessHandle` (section 21).
 - **Tests**: no Windows test has run; each section lists what a Windows run must check. At each commit, Darwin
   `swift build` and `swift test` pass, with the same tests skipped as at the last merge of system-next (at
   `ffaa7e4`: XCTest 575 tests, 5 skipped; swift-testing 504 tests in 82 suites), and `check-windows.sh` compiles the
@@ -1976,7 +1977,7 @@ rather than end the process; and the standard error's descriptor and a recursive
 A Windows run must check those, and in particular that the UCRT reports `_fdopen(-1)` as `EBADF` and mode `"z"` as
 `EINVAL` through the returning handler, and that a stream of a process without a console reports descriptor -2.
 
-## 37. windows-3: FileStream's position, and its mock hooks: this commit
+## 37. windows-3: FileStream's position, and its mock hooks: `6c34274`
 
 system-next gave the POSIX `FileStream` `seek(offset:from:)` and `offset()` (`fseeko`, `ftello`; `a6478fb`, merged
 here at `ffaa7e4`). Section 36's Windows declaration has the POSIX file's API, so it gets them too, and the mock hooks
@@ -2017,7 +2018,82 @@ errno of `ERROR_NEGATIVE_SEEK`); that `_ftelli64` counts a text stream's buffere
 read-ahead back to the next character's byte; that `NUL` is `FILE_TYPE_CHAR`; and that a seek past 4 GiB in the
 temporary directory succeeds without growing the file.
 
-## 38. windows-3: findings
+## 38. windows-3: users, access tokens and security identifiers: this commit
+
+The first of section 8's gaps after its top ten: 3 packages in its ranking, but 2 in fact, since SwiftPM's file
+counts only for `PLACEHOLDER_TOKEN_USER`, a string constant of its own that the survey took for an SDK name (the
+script now classes it with the packages' own names). swift-foundation reads the process's user name (`GetUserNameW`)
+and display name (`GetUserNameExW` with `NameDisplay`), its home directory (`OpenProcessToken`,
+`GetUserProfileDirectoryW`), and whether its token is elevated (`GetTokenInformation` with `TokenElevation`, for
+`getEnvSecure`, its `secure_getenv`), and finds another user's home directory through the account's security
+identifier (`LookupAccountNameW`, `ConvertSidToStringSidW`, then the registry's `ProfileList`). swift-subprocess's
+tests read the user's name and check for the Administrators group (`AllocateAndInitializeSid`,
+`CheckTokenMembership`), and swift-build reads the user's name through SWBLibc, which the survey doesn't follow.
+
+What:
+- `Win32SecurityIdentifier.swift`: `Win32.SecurityIdentifier`, a value, with `init(authority:subauthorities:)`,
+  `authority`, `subauthorities`, its string form as `description`, `init(_:)` for a string
+  (`ConvertStringSidToSidW`), `init(_:domain:)` for a well-known one (`CreateWellKnownSid`) and `WellKnown`'s 18
+  names, `init?(accountName:)` (`LookupAccountNameW`), `init?(unsafeCopying:)` and `withUnsafeBytes(_:)`; and
+  `Win32.Account`, with `name`, `domain`, `kind` (`Kind`, `SID_NAME_USE`) and `init?(_:)` (`LookupAccountSidW`).
+- `Win32AccessToken.swift`: `Win32.TokenAccess`; `Win32.TokenHandle`, an owner, with `open(process:access:)`
+  (`OpenProcessToken`), `user()` (`TokenUser`), `isElevated()` (`TokenElevation`) and `profileDirectory()`
+  (`GetUserProfileDirectoryW`); `Win32.userName()` (`GetUserNameW`) and `userName(format:)`, with `UserNameFormat`
+  (`GetUserNameExW`); and `Win32.callingThreadIsMember(of:)` (`CheckTokenMembership`).
+- `Win32.Error.noneMapped`, `invalidSecurityIdentifier` and `noSuchDomain`.
+
+Which API: **Win32.** Windows names users and groups by security identifier, not by POSIX's numeric IDs, and a
+process's identity is its token, so `UserID`, `GroupID` and `UserEntry` don't carry over. What's shared is the
+questions (whose process this is, their name, their home directory), which the docs answer in Windows' terms.
+
+Design calls, with the alternatives rejected:
+- **A security identifier is a copyable value** that holds its bytes and compares and hashes by them, as an address
+  does: it's data, of at most 68 bytes, and every call that returns one fills a caller's buffer or allocates a copy.
+  Rejected: an owner of a `LocalAlloc`'d `PSID`, as `SecurityDescriptor` is, which would make comparing, hashing
+  and keeping identifiers awkward, for no resource.
+- **Its parts and string form are computed in Swift**: the binary form and the string form are documented
+  (MS-DTYP 2.4.2), so `init(authority:subauthorities:)`, `authority`, `subauthorities` and `description` call
+  nothing, and `description` can't fail. The test holds `description` to `ConvertSidToStringSidW`, including an
+  authority past 32 bits, which the string form writes as 12 hexadecimal digits. The encoding and the string form
+  also ran on macOS, copied into a scratch program: the Administrators group's bytes are the documented ones, and
+  200,000 random identifiers round-trip through their bytes and their string form. Parsing goes through
+  `ConvertStringSidToSidW`, which also reads SDDL's abbreviations (`BA`, `SY`).
+- **A lookup returns `nil` for no account** (`ERROR_NONE_MAPPED`) and throws for a failure, as `UserEntry(name:)`
+  does. A name or a string with a null character is rejected first: the C string would end early, at what might be
+  another account's name.
+- **Name to identifier, and identifier to account**: `SecurityIdentifier(accountName:)` and `Account(_:)` each wrap
+  one lookup, and `Account(SecurityIdentifier(accountName:))` gives an account by name, with its canonical names.
+  Rejected: an `Account(name:)`, which would need both lookups or give back the name as typed. Only the local
+  computer looks names up: `lpSystemName` is `NULL`.
+- **The token is an owner**, as `ProcessHandle` is, opened from a process handle; `Win32.ProcessHandle.current` is
+  the calling process's. Rejected for now: `GetCurrentProcessToken`'s pseudo handle, which Rust uses, but which
+  isn't a handle to close, so `TokenHandle` couldn't own it; and `OpenThreadToken`, which no adopter calls.
+- **Membership is the calling thread's**: `callingThreadIsMember(of:)` is `CheckTokenMembership` with a `NULL`
+  token, which checks the thread's impersonation token, or else its process's. On a `TokenHandle` it would need an
+  impersonation token, which a process's isn't. `AllocateAndInitializeSid` and `FreeSid`, which swift-subprocess
+  calls to make the group's identifier, aren't needed: `init(_:domain:)` or `init(authority:subauthorities:)` makes
+  it.
+- **`userName(format:)`'s formats but `samCompatible` need a domain**, which its doc says, with the errors.
+- **The libraries**: `GetUserNameExW` is secur32's and `GetUserProfileDirectoryW` userenv's. swift-foundation calls
+  both with `import WinSDK` alone, as System does, which the WinSDK module's link directives must cover.
+
+Tests: `Win32SecurityIdentifierTests`: the constants; parts and bytes; string forms against
+`ConvertSidToStringSidW`; parsing and what it rejects; the well-known identifiers' string forms, and a
+domain-relative one; built-in accounts, looked up both ways; the current user's account; unknown names and
+identifiers; copying a C identifier. `Win32AccessTokenTests`: the constants; the process's user and elevation
+against raw calls; `accessDenied` without `query`; the profile directory against `USERPROFILE`; user names against
+`USERNAME` and the account's SAM-compatible name; membership of `Everyone`, `ANONYMOUS LOGON` and the user, and of
+the Administrators group only when the token is elevated.
+
+A Windows run must check those, and in particular: that `ConvertSidToStringSidW` writes an authority past 32 bits
+as `0x` and 12 lowercase digits; that `LookupAccountSidW` gives `Everyone` an empty domain, and `SYSTEM` and
+`Everyone` `SidTypeWellKnownGroup`; that looking up an unknown domain's identifier gives `ERROR_NONE_MAPPED` without
+a long wait; that `GetUserNameExW` with `NameDisplay` fails with `ERROR_NONE_MAPPED` or `ERROR_NO_SUCH_DOMAIN` for a
+local account, such as CI's; that `CreateWellKnownSid` fails for `WinAccountAdministratorSid` without a domain; and
+that SystemPackage links secur32 and userenv. Not covered: domain accounts, Microsoft and Entra ID accounts (whose
+name from `GetUserNameW` may not be the account's), impersonation, and the names on a Windows not in English.
+
+## 39. windows-3: findings
 
 - **`FileDescriptor`'s Windows canonicalization doesn't cover `CreateDirectoryW`'s limit** (P4).
   `withCanonicalPathRepresentation` passes `PATHCCH_ALLOW_LONG_PATHS`, so the `mkdir` adapter, which
@@ -2050,10 +2126,19 @@ temporary directory succeeds without growing the file.
   came with `036f567` (#105, 2022).
 - **The C runtime's seeks are undefined on a pipe or a console**, as Microsoft documents them (section 37).
   `FileDescriptor.seek` reaches them too, through `_lseek`; P6 leaves that alone.
+- **swift-foundation's `ProcessInfo.fullUserName` is empty on Windows whenever it works**:
+  `guard GetUserNameExW(NameDisplay, …) == 0 else { return "" }` returns `""` when the call succeeds, which is when
+  it returns nonzero, and otherwise returns the buffer it didn't fill. For a local account the call fails anyway,
+  since only a domain's accounts have a display name (section 38).
+- **swift-foundation's `homeDirectoryPath(forUser:)` leaks** the string `ConvertSidToStringSidW` allocates, which
+  needs `LocalFree`, and calls `fatalError` if the conversion fails.
+- **The survey counted SwiftPM for users and tokens** by its own `PLACEHOLDER_TOKEN_USER`; the script now classes
+  the name with the packages' own, so a new run gives the concept 2 packages and 5 files (4 in sources). Section 8's
+  table is as surveyed.
 - **macOS's CoreFoundation declares `S_OK` and `S_FALSE` too**, so the harness's tests spell `WinSDK.S_OK`; on
   Windows, where XCTest's Foundation is swift-corelibs-foundation, the bare names would do.
 
-## 39. windows-3: patches for files outside the lane
+## 40. windows-3: patches for files outside the lane
 
 **P3, continued: `Sources/System/CMakeLists.txt`.** The Win32 `target_sources` block as it should read with this
 lane's files. P3 itself landed with coverage-4 (`8caa741`); this block replaces the one it left, and is kept current
@@ -2070,6 +2155,7 @@ target_sources(SystemPackage PRIVATE
   Win32/ProcessExitWindows.swift
   Win32/ProcessIDWindows.swift
   Win32/Win32.swift
+  Win32/Win32AccessToken.swift
   Win32/Win32CommandLine.swift
   Win32/Win32Console.swift
   Win32/Win32Constants.swift
@@ -2091,6 +2177,7 @@ target_sources(SystemPackage PRIVATE
   Win32/Win32Process.swift
   Win32/Win32ProcessCreation.swift
   Win32/Win32SecurityDescriptor.swift
+  Win32/Win32SecurityIdentifier.swift
   Win32/Win32Synchronization.swift
   Win32/Win32Syscalls.swift
   Win32/Win32SystemInformation.swift

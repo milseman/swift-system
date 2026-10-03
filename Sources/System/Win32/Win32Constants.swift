@@ -207,4 +207,21 @@ internal var _ERROR_TIMEOUT: DWORD { 1460 }
 @_alwaysEmitIntoClient
 internal var _ERROR_ENVVAR_NOT_FOUND: DWORD { 203 }
 
+// MARK: - Security identifiers and accounts
+
+@_alwaysEmitIntoClient
+internal var _SID_REVISION: UInt8 { 1 }
+
+@_alwaysEmitIntoClient
+internal var _SID_MAX_SUB_AUTHORITIES: Int { 15 }
+
+// winnt.h computes it, with sizeof, so it doesn't import: the 8 bytes of a
+// SID's header, and 15 subauthorities of 4.
+@_alwaysEmitIntoClient
+internal var _SECURITY_MAX_SID_SIZE: Int { 68 }
+
+// The longest user name, in characters, without the terminator.
+@_alwaysEmitIntoClient
+internal var _UNLEN: Int { 256 }
+
 #endif // os(Windows)

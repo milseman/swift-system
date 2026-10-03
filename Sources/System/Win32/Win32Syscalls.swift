@@ -1200,4 +1200,89 @@ internal func system_CreateHardLinkW(
   CreateHardLinkW(lpFileName, lpExistingFileName, nil)
 }
 
+// MARK: - Access tokens, security identifiers and accounts
+
+internal func system_OpenProcessToken(
+  _ ProcessHandle: HANDLE, _ DesiredAccess: DWORD, _ TokenHandle: UnsafeMutablePointer<HANDLE?>
+) -> Bool {
+  OpenProcessToken(ProcessHandle, DesiredAccess, TokenHandle)
+}
+
+internal func system_GetTokenInformation(
+  _ TokenHandle: HANDLE,
+  _ TokenInformationClass: TOKEN_INFORMATION_CLASS,
+  _ TokenInformation: UnsafeMutableRawPointer?,
+  _ TokenInformationLength: DWORD,
+  _ ReturnLength: UnsafeMutablePointer<DWORD>
+) -> Bool {
+  GetTokenInformation(
+    TokenHandle, TokenInformationClass, TokenInformation, TokenInformationLength, ReturnLength)
+}
+
+internal func system_CheckTokenMembership(
+  _ TokenHandle: HANDLE?, _ SidToCheck: PSID, _ IsMember: UnsafeMutablePointer<WindowsBool>
+) -> Bool {
+  CheckTokenMembership(TokenHandle, SidToCheck, IsMember)
+}
+
+internal func system_GetUserNameW(
+  _ lpBuffer: UnsafeMutablePointer<WCHAR>?, _ pcbBuffer: UnsafeMutablePointer<DWORD>
+) -> Bool {
+  GetUserNameW(lpBuffer, pcbBuffer)
+}
+
+// In secur32.dll. Its BOOLEAN is nonzero on success.
+internal func system_GetUserNameExW(
+  _ NameFormat: CInt,
+  _ lpNameBuffer: UnsafeMutablePointer<WCHAR>?,
+  _ nSize: UnsafeMutablePointer<ULONG>
+) -> Bool {
+  GetUserNameExW(EXTENDED_NAME_FORMAT(rawValue: NameFormat), lpNameBuffer, nSize) != 0
+}
+
+// In userenv.dll.
+internal func system_GetUserProfileDirectoryW(
+  _ hToken: HANDLE,
+  _ lpProfileDir: UnsafeMutablePointer<WCHAR>?,
+  _ lpcchSize: UnsafeMutablePointer<DWORD>
+) -> Bool {
+  GetUserProfileDirectoryW(hToken, lpProfileDir, lpcchSize)
+}
+
+// The lookups on the local computer: lpSystemName is always NULL.
+internal func system_LookupAccountNameW(
+  _ lpAccountName: UnsafePointer<WCHAR>,
+  _ Sid: PSID?,
+  _ cbSid: UnsafeMutablePointer<DWORD>,
+  _ ReferencedDomainName: UnsafeMutablePointer<WCHAR>?,
+  _ cchReferencedDomainName: UnsafeMutablePointer<DWORD>,
+  _ peUse: UnsafeMutablePointer<SID_NAME_USE>
+) -> Bool {
+  LookupAccountNameW(
+    nil, lpAccountName, Sid, cbSid, ReferencedDomainName, cchReferencedDomainName, peUse)
+}
+
+internal func system_LookupAccountSidW(
+  _ Sid: PSID,
+  _ Name: UnsafeMutablePointer<WCHAR>?,
+  _ cchName: UnsafeMutablePointer<DWORD>,
+  _ ReferencedDomainName: UnsafeMutablePointer<WCHAR>?,
+  _ cchReferencedDomainName: UnsafeMutablePointer<DWORD>,
+  _ peUse: UnsafeMutablePointer<SID_NAME_USE>
+) -> Bool {
+  LookupAccountSidW(nil, Sid, Name, cchName, ReferencedDomainName, cchReferencedDomainName, peUse)
+}
+
+internal func system_ConvertStringSidToSidW(
+  _ StringSid: UnsafePointer<WCHAR>, _ Sid: UnsafeMutablePointer<PSID?>
+) -> Bool {
+  ConvertStringSidToSidW(StringSid, Sid)
+}
+
+internal func system_CreateWellKnownSid(
+  _ WellKnownSidType: CInt, _ DomainSid: PSID?, _ pSid: PSID?, _ cbSid: UnsafeMutablePointer<DWORD>
+) -> Bool {
+  CreateWellKnownSid(WELL_KNOWN_SID_TYPE(rawValue: WellKnownSidType), DomainSid, pSid, cbSid)
+}
+
 #endif // os(Windows)

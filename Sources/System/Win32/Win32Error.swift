@@ -305,6 +305,26 @@ extension Win32.Error {
   @_alwaysEmitIntoClient
   public static var privilegeNotHeld: Win32.Error { Win32.Error(rawValue: 1314) }
 
+  /// No mapping between account names and security identifiers was done:
+  /// no account has the name or the identifier, or the name isn't
+  /// available in the format asked for.
+  ///
+  /// The corresponding C constant is `ERROR_NONE_MAPPED`.
+  @_alwaysEmitIntoClient
+  public static var noneMapped: Win32.Error { Win32.Error(rawValue: 1332) }
+
+  /// The security identifier isn't valid.
+  ///
+  /// The corresponding C constant is `ERROR_INVALID_SID`.
+  @_alwaysEmitIntoClient
+  public static var invalidSecurityIdentifier: Win32.Error { Win32.Error(rawValue: 1337) }
+
+  /// The domain doesn't exist, or its domain controller can't be reached.
+  ///
+  /// The corresponding C constant is `ERROR_NO_SUCH_DOMAIN`.
+  @_alwaysEmitIntoClient
+  public static var noSuchDomain: Win32.Error { Win32.Error(rawValue: 1355) }
+
   /// The system can't resolve the name of the file.
   ///
   /// The corresponding C constant is `ERROR_CANT_RESOLVE_FILENAME`.

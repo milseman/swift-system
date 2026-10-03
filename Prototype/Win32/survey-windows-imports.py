@@ -441,7 +441,7 @@ CONCEPTS = [
       "GetTokenInformation", "TOKEN_QUERY", "TokenElevation", "TOKEN_ELEVATION", "CheckTokenMembership",
       "AllocateAndInitializeSid", "FreeSid", "ConvertSidToStringSidW", "LookupAccountNameW",
       "SID_IDENTIFIER_AUTHORITY", "SID_NAME_USE", "SidTypeUnknown", "PSID", "DOMAIN_ALIAS_RID_ADMINS",
-      "SECURITY_BUILTIN_DOMAIN_RID", "PLACEHOLDER_TOKEN_USER"]),
+      "SECURITY_BUILTIN_DOMAIN_RID"]),
     ("gap", "Memory-mapped files", "MemoryMapping is POSIX-only",
      ["CreateFileMappingW", "MapViewOfFile", "UnmapViewOfFile", "FILE_MAP_READ", "PAGE_READONLY"]),
     ("gap", "Free space and volume paths", "SYS-0015's future directions",
@@ -501,8 +501,8 @@ CONCEPTS = [
       "ChannelInitializerResult", "CommandResult", "CommandStatusKind", "ConditionTrait", "ConvertibleFromBytes",
       "CycleAction", "DateFormatter", "Deque", "DestinationType", "DiscoveredDependencyKind", "HTTPURLResponse",
       "In", "InputElement", "InputString", "re:^LanguageServerProtocol[A-Za-z]*$", "ManagedAtomic", "ObjCBool",
-      "Out", "RuleRunReason", "SIG_FIG", "SymbolGraph", "TX", "TargetEncoding", "TargetStream", "URLResponse",
-      "UnsafeAtomic", "ToolsProtocolsSwiftExtensions", "SKLogging"]),
+      "Out", "PLACEHOLDER_TOKEN_USER", "RuleRunReason", "SIG_FIG", "SymbolGraph", "TX", "TargetEncoding",
+      "TargetStream", "URLResponse", "UnsafeAtomic", "ToolsProtocolsSwiftExtensions", "SKLogging"]),
 ]
 
 
