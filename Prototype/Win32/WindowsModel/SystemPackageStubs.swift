@@ -110,6 +110,8 @@ public struct Errno: RawRepresentable, Error, Hashable, Codable { // mirrors: So
   @_alwaysEmitIntoClient
   public static var noSuchFileOrDirectory: Errno { .init(rawValue: 2) }
   @_alwaysEmitIntoClient
+  public static var ioError: Errno { .init(rawValue: 5) }
+  @_alwaysEmitIntoClient
   public static var badFileDescriptor: Errno { .init(rawValue: 9) }
   @_alwaysEmitIntoClient
   public static var noMemory: Errno { .init(rawValue: 12) }
@@ -123,6 +125,8 @@ public struct Errno: RawRepresentable, Error, Hashable, Codable { // mirrors: So
   public static var fileTooLarge: Errno { .init(rawValue: 27) }
   @_alwaysEmitIntoClient
   public static var noSpace: Errno { .init(rawValue: 28) }
+  @_alwaysEmitIntoClient
+  public static var illegalSeek: Errno { .init(rawValue: 29) }
   @_alwaysEmitIntoClient
   public static var brokenPipe: Errno { .init(rawValue: 32) }
   @_alwaysEmitIntoClient
@@ -185,8 +189,17 @@ public struct FileDescriptor: RawRepresentable, Hashable, Codable { // mirrors: 
   }
 
   @frozen
-  public enum SeekOrigin: Sendable {
-    case start, current, end
+  public struct SeekOrigin: RawRepresentable, Sendable, Hashable, Codable { // mirrors: Sources/System/FileDescriptor.swift
+    @_alwaysEmitIntoClient
+    public var rawValue: CInt
+    @_alwaysEmitIntoClient
+    public init(rawValue: CInt) { self.rawValue = rawValue }
+    @_alwaysEmitIntoClient
+    public static var start: SeekOrigin { SeekOrigin(rawValue: 0) }
+    @_alwaysEmitIntoClient
+    public static var current: SeekOrigin { SeekOrigin(rawValue: 1) }
+    @_alwaysEmitIntoClient
+    public static var end: SeekOrigin { SeekOrigin(rawValue: 2) }
   }
 
   @_alwaysEmitIntoClient
@@ -202,6 +215,12 @@ public struct FileDescriptor: RawRepresentable, Hashable, Codable { // mirrors: 
 
   @_alwaysEmitIntoClient
   public func close() throws {} // mirrors: Sources/System/FileOperations.swift
+
+  @_alwaysEmitIntoClient
+  public static func pipe( // mirrors: Sources/System/FileOperations.swift
+  ) throws -> (readEnd: FileDescriptor, writeEnd: FileDescriptor) {
+    (FileDescriptor(rawValue: 3), FileDescriptor(rawValue: 4))
+  }
 
   @_alwaysEmitIntoClient
   public func read( // mirrors: Sources/System/FileOperations.swift
@@ -238,6 +257,12 @@ internal func _mapWindowsErrorToErrno(_ errorCode: DWORD) -> CInt { 22 } // mirr
 
 internal func system_close(_ fd: Int32) -> Int32 { 0 } // mirrors: Sources/System/Internals/Syscalls.swift
 
+internal func valueOrErrno<I: FixedWidthInteger>( // mirrors: Sources/System/Util.swift
+  retryOnInterrupt: Bool, _ f: () -> I
+) -> Result<I, Errno> {
+  .success(f())
+}
+
 internal func nothingOrErrno<I: FixedWidthInteger>( // mirrors: Sources/System/Util.swift
   retryOnInterrupt: Bool, _ f: () -> I
 ) -> Result<(), Errno> {
@@ -263,11 +288,18 @@ internal struct Trace {
     internal var name: String
     internal var arguments: [AnyHashable]
   }
+  internal var isEmpty: Bool { true } // mirrors: Sources/System/Internals/Mocking.swift
   internal mutating func dequeue() -> Entry? { nil }
+}
+
+internal enum ForceErrno: Equatable {
+  case none
+  case always(errno: CInt) // mirrors: Sources/System/Internals/Mocking.swift
 }
 
 internal class MockingDriver {
   internal var trace = Trace()
+  internal var forceErrno = ForceErrno.none // mirrors: Sources/System/Internals/Mocking.swift
   internal static func withMockingEnabled( // mirrors: Sources/System/Internals/Mocking.swift
     _ f: (MockingDriver) throws -> ()
   ) rethrows {

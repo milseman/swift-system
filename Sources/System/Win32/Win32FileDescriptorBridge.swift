@@ -143,6 +143,16 @@ extension FileDescriptor {
     return handle
   }
 
+  /// Whether the descriptor is a pipe, a socket, or a character device such
+  /// as a console: a file with no position, which POSIX's seeks reject with
+  /// ESPIPE. `false` for a descriptor with no handle.
+  internal func _hasNoPosition() -> Bool {
+    let raw = _withReturningInvalidParameterHandler { system__get_osfhandle(rawValue) }
+    guard raw != -1, raw != -2, let handle = HANDLE(bitPattern: raw) else { return false }
+    let type = Win32.FileType(rawValue: system_GetFileType(handle))
+    return type == .pipe || type == .character
+  }
+
   @usableFromInline
   internal static func _adopt(
     _ handle: HANDLE, translation: CInt, append: Bool

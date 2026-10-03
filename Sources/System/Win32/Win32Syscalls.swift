@@ -851,8 +851,23 @@ internal func _withReturningInvalidParameterHandler<R>(_ body: () -> R) -> R {
 }
 
 // The streams' calls. macOS's C library declares most of them too, which
-// the qualified names keep the harness from calling. The C runtime calls
-// have no mock hooks yet, unlike POSIX's: see Prototype/Win32/REPORT.md.
+// the qualified names keep the harness from calling.
+//
+// In a mock test, as on POSIX, a stream that _wfopen or _fdopen "opened" is
+// a placeholder address, so every call that takes a stream and can fail is
+// mocked too, and none of them touches it. fgetc has no hook: readLine locks
+// the stream around it, which a placeholder can't be.
+
+#if ENABLE_MOCKING
+// What a mocked _wfopen or _fdopen returns: an address no stream is at.
+internal var _mockStream: UnsafeMutablePointer<ucrt.FILE> {
+  UnsafeMutablePointer<ucrt.FILE>(bitPattern: 0x5710)!
+}
+
+private func _mockStreamResult(_ result: CInt) -> UnsafeMutablePointer<ucrt.FILE>? {
+  result == -1 ? nil : _mockStream
+}
+#endif
 
 internal func system___acrt_iob_func(_ index: UInt32) -> UnsafeMutablePointer<ucrt.FILE> {
   __acrt_iob_func(index)
@@ -861,45 +876,73 @@ internal func system___acrt_iob_func(_ index: UInt32) -> UnsafeMutablePointer<uc
 internal func system__wfopen(
   _ path: UnsafePointer<WCHAR>, _ mode: UnsafePointer<WCHAR>
 ) -> UnsafeMutablePointer<ucrt.FILE>? {
-  _withReturningInvalidParameterHandler { _wfopen(path, mode) }
+#if ENABLE_MOCKING
+  if mockingEnabled {
+    return _mockStreamResult(_mock(path: path, String(decodingCString: mode, as: UTF16.self)))
+  }
+#endif
+  return _withReturningInvalidParameterHandler { _wfopen(path, mode) }
 }
 
 internal func system__fdopen(
   _ fd: CInt, _ mode: UnsafePointer<CChar>
 ) -> UnsafeMutablePointer<ucrt.FILE>? {
-  _withReturningInvalidParameterHandler { _fdopen(fd, mode) }
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mockStreamResult(_mock(fd, String(cString: mode))) }
+#endif
+  return _withReturningInvalidParameterHandler { _fdopen(fd, mode) }
 }
 
 internal func system_fclose(_ stream: UnsafeMutablePointer<ucrt.FILE>) -> CInt {
-  _withReturningInvalidParameterHandler { ucrt.fclose(stream) }
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(Int(bitPattern: stream)) }
+#endif
+  return _withReturningInvalidParameterHandler { ucrt.fclose(stream) }
 }
 
 internal func system_fflush(_ stream: UnsafeMutablePointer<ucrt.FILE>?) -> CInt {
-  _withReturningInvalidParameterHandler { ucrt.fflush(stream) }
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(stream.map { Int(bitPattern: $0) } ?? 0) }
+#endif
+  return _withReturningInvalidParameterHandler { ucrt.fflush(stream) }
 }
 
 // The count of bytes written, which is short only after an error.
 internal func system_fwrite(
   _ bytes: UnsafeRawPointer?, _ count: Int, _ stream: UnsafeMutablePointer<ucrt.FILE>
 ) -> Int {
-  _withReturningInvalidParameterHandler { ucrt.fwrite(bytes, 1, count, stream) }
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mockInt(Int(bitPattern: stream), count) == -1 ? 0 : count }
+#endif
+  return _withReturningInvalidParameterHandler { ucrt.fwrite(bytes, 1, count, stream) }
 }
 
 internal func system_fputs(
   _ string: UnsafePointer<CChar>, _ stream: UnsafeMutablePointer<ucrt.FILE>
 ) -> CInt {
-  _withReturningInvalidParameterHandler { ucrt.fputs(string, stream) }
+#if ENABLE_MOCKING
+  if mockingEnabled {
+    return _mock(Int(bitPattern: stream), String(cString: string)) == -1 ? _EOF : 0
+  }
+#endif
+  return _withReturningInvalidParameterHandler { ucrt.fputs(string, stream) }
 }
 
 internal func system_fputc(_ byte: CInt, _ stream: UnsafeMutablePointer<ucrt.FILE>) -> CInt {
-  _withReturningInvalidParameterHandler { ucrt.fputc(byte, stream) }
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(Int(bitPattern: stream), byte) == -1 ? _EOF : byte }
+#endif
+  return _withReturningInvalidParameterHandler { ucrt.fputc(byte, stream) }
 }
 
 // The count of bytes read, which is short at the end or after an error.
 internal func system_fread(
   _ bytes: UnsafeMutableRawPointer?, _ count: Int, _ stream: UnsafeMutablePointer<ucrt.FILE>
 ) -> Int {
-  _withReturningInvalidParameterHandler { ucrt.fread(bytes, 1, count, stream) }
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mockInt(Int(bitPattern: stream), count) == -1 ? 0 : count }
+#endif
+  return _withReturningInvalidParameterHandler { ucrt.fread(bytes, 1, count, stream) }
 }
 
 internal func system_fgetc(_ stream: UnsafeMutablePointer<ucrt.FILE>) -> CInt {
@@ -907,7 +950,26 @@ internal func system_fgetc(_ stream: UnsafeMutablePointer<ucrt.FILE>) -> CInt {
 }
 
 internal func system__fileno(_ stream: UnsafeMutablePointer<ucrt.FILE>) -> CInt {
-  _withReturningInvalidParameterHandler { _fileno(stream) }
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(Int(bitPattern: stream)) }
+#endif
+  return _withReturningInvalidParameterHandler { _fileno(stream) }
+}
+
+internal func system__fseeki64(
+  _ stream: UnsafeMutablePointer<ucrt.FILE>, _ offset: Int64, _ origin: CInt
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(Int(bitPattern: stream), offset, origin) }
+#endif
+  return _withReturningInvalidParameterHandler { _fseeki64(stream, offset, origin) }
+}
+
+internal func system__ftelli64(_ stream: UnsafeMutablePointer<ucrt.FILE>) -> Int64 {
+#if ENABLE_MOCKING
+  if mockingEnabled { return Int64(_mockInt(Int(bitPattern: stream))) }
+#endif
+  return _withReturningInvalidParameterHandler { _ftelli64(stream) }
 }
 
 internal func system_setvbuf(
@@ -916,8 +978,16 @@ internal func system_setvbuf(
   _ mode: CInt,
   _ size: Int
 ) -> CInt {
-  _withReturningInvalidParameterHandler { ucrt.setvbuf(stream, buffer, mode, size) }
+#if ENABLE_MOCKING
+  if mockingEnabled {
+    return _mock(Int(bitPattern: stream), buffer.map { Int(bitPattern: $0) } ?? 0, mode, size)
+  }
+#endif
+  return _withReturningInvalidParameterHandler { ucrt.setvbuf(stream, buffer, mode, size) }
 }
+
+// The calls that can't fail have no mock hooks, since a mock test's stream
+// is a placeholder that they'd touch; those tests don't call them.
 
 internal func system_ferror(_ stream: UnsafeMutablePointer<ucrt.FILE>) -> CInt {
   ucrt.ferror(stream)

@@ -12,7 +12,8 @@
 // Universal C Runtime, which names most of the calls as POSIX does. What
 // differs is noted in each doc comment: the UCRT opens streams in text mode
 // unless the mode says "b", its _IOLBF is full buffering, it has no
-// ftrylockfile, and it reports an argument it rejects to the invalid
+// ftrylockfile, its seeks don't reject a pipe or a console, which System
+// checks for, and it reports an argument it rejects to the invalid
 // parameter handler, whose default ends the process, so every call here
 // runs with one that returns, and the call fails with EINVAL instead.
 
@@ -417,6 +418,80 @@ extension FileStream {
   @usableFromInline
   internal func _clearError() {
     system_clearerr(rawValue)
+  }
+}
+
+// MARK: - Positioning
+
+@available(System 199, *)
+extension FileStream {
+  /// Moves the stream's position, where its next read or write starts.
+  ///
+  /// - Parameters:
+  ///   - offset: The new position, in bytes from `origin`.
+  ///   - origin: Where `offset` counts from:
+  ///     ``FileDescriptor/SeekOrigin/start``,
+  ///     ``FileDescriptor/SeekOrigin/current``,
+  ///     or ``FileDescriptor/SeekOrigin/end``.
+  ///
+  /// The stream first writes what it holds in its buffer,
+  /// and drops what it read ahead;
+  /// moving clears ``isAtEnd``.
+  /// A stream over a pipe, a socket, or a character device,
+  /// such as a console or `NUL`, can't move,
+  /// and throws ``Errno/illegalSeek``.
+  /// The C runtime doesn't check, and its result for one is undefined,
+  /// so this method checks the type of the stream's file first.
+  ///
+  /// In a stream that translates newlines,
+  /// positions count the file's bytes, so `\r\n` counts as two.
+  ///
+  /// The corresponding C function is `_fseeki64`.
+  @_alwaysEmitIntoClient
+  public func seek(offset: Int64, from origin: FileDescriptor.SeekOrigin) throws(Errno) {
+    try _seek(offset: offset, from: origin).get()
+  }
+
+  @usableFromInline
+  internal func _seek(offset: Int64, from origin: FileDescriptor.SeekOrigin) -> Result<(), Errno> {
+    if _hasNoPosition() { return .failure(.illegalSeek) }
+    return nothingOrErrno(retryOnInterrupt: false) {
+      system__fseeki64(rawValue, offset, origin.rawValue)
+    }
+  }
+
+  /// Returns the stream's position, where its next read or write starts,
+  /// in bytes from the start of the file.
+  ///
+  /// The position counts what the stream holds in its buffer:
+  /// it's after what was written to the stream and not yet flushed,
+  /// and before what the stream read ahead,
+  /// wherever its file descriptor's offset is.
+  /// A stream over a pipe, a socket, or a character device,
+  /// such as a console or `NUL`, has no position,
+  /// and throws ``Errno/illegalSeek``.
+  ///
+  /// In a stream that translates newlines,
+  /// positions count the file's bytes, so `\r\n` counts as two.
+  ///
+  /// The corresponding C function is `_ftelli64`.
+  @_alwaysEmitIntoClient
+  public func offset() throws(Errno) -> Int64 {
+    try _offset().get()
+  }
+
+  @usableFromInline
+  internal func _offset() -> Result<Int64, Errno> {
+    if _hasNoPosition() { return .failure(.illegalSeek) }
+    return valueOrErrno(retryOnInterrupt: false) { system__ftelli64(rawValue) }
+  }
+
+  /// Whether the stream's file is one with no position. A stream with no
+  /// file descriptor, or a descriptor with no handle, is left to the C
+  /// runtime's call, which reports it.
+  internal func _hasNoPosition() -> Bool {
+    let fd = system__fileno(rawValue)
+    return fd >= 0 && FileDescriptor(rawValue: fd)._hasNoPosition()
   }
 }
 

@@ -15,27 +15,29 @@ adds API for the adopters' top Windows gaps of section 8, in its order, checked 
 (sections 23 on, base system-next at `bb950db`) continues that list, then the gaps the earlier sections left.
 
 **Resume here:** windows-api's parts are done (sections 1 to 10), and so are windows-2's (11 to 22: P1 and P2,
-then section 8's gaps from processes to file information). windows-3 stopped 2026-10-02, at quota, with nothing in
-progress. Done, one section and commit each: long paths (23, `315f25b`), threads (24, `054e9e2`), `HRESULT` (25,
-`b89b78c`), path operations (26, `8326373`), overlapped I/O (27, `d479525`), system information (28, `c04d6b1`), and
-Winsock as a design (29, `052ae8a`), which finish section 8's list; then the gaps left within done ones:
-`BrokenDownTime` on Windows (30, `ada7eea`), ending the process and exit codes (31, `a7d4db9`), critical sections
-(32, `c353713`), console events and `SetStdHandle` (33, `3b9327e`), library search directories (34, `c5efe5d`),
-quoting a command line (35, `c536687`), and packages-5's `FileStream` (36, the last commit). system-next was merged
-at `bb225ab`.
-- **Next**, none of it started: Winsock's implementation, once the decisions triage's item 74 settles its module
-  (section 29); mock hooks for the Windows `FileStream` (36); one declaration each for `BrokenDownTime` and
-  `FileStream` across platforms (30, 36); and from the sections' "Not wrapped" lists, the pipes, job objects,
-  reparse points, events, directory enumeration and notification, and memory-mapping gaps of section 8's ranking.
-- **For other lanes**: P3 (section 22) landed on system-next with coverage-4 (`8caa741`, merged here at
-  `bb225ab`). The CMake list still lacks this lane's files, so the Win32 block in the windows-3 patches section must
-  land with this branch's next merge, or CI's CMake job fails. P4 there brings `FileDescriptor`'s Windows
-  canonicalization to section 23's rule, and P5 names `EOVERFLOW` on Windows (section 30). The PlatformEnum samples' Windows arms differ from `Win32.ProcessHandle`
-  (section 21).
+then section 8's gaps from processes to file information). windows-3's first session (2026-10-02) did, one section
+and commit each: long paths (23, `315f25b`), threads (24, `054e9e2`), `HRESULT` (25, `b89b78c`), path operations
+(26, `8326373`), overlapped I/O (27, `d479525`), system information (28, `c04d6b1`), and Winsock as a design (29,
+`052ae8a`), which finish section 8's list of top gaps; then the gaps left within done ones: `BrokenDownTime` on
+Windows (30, `ada7eea`), ending the process and exit codes (31, `a7d4db9`), critical sections (32, `c353713`),
+console events and `SetStdHandle` (33, `3b9327e`), library search directories (34, `c5efe5d`), quoting a command
+line (35, `c536687`), and packages-5's `FileStream` (36, `3b9ace4`). The second session (2026-10-03) merged
+system-next at `ffaa7e4` and did `FileStream`'s position and mock hooks (37, the last commit), with patch P6.
+- **Next**, none of it started: the rest of section 8's ranking, in its order: users, tokens and security
+  identifiers; pipes; job objects; reparse points; events; network interfaces; memory-mapped files; directory
+  enumeration; directory change notification; free space and volume paths. Then Winsock's implementation, once
+  the decisions triage's item 74 is applied (section 29), and one declaration each for `BrokenDownTime` and
+  `FileStream` across platforms (sections 30 and 36), which reshapes other lanes' files.
+- **For other lanes**, in the windows-3 patches section (the last): system-next merged this branch at `87c3fc6`
+  without its CMake list, so system-next's `Sources/System/CMakeLists.txt` lacks eight Win32 files, which CI's CMake
+  job's list check would fail on; the Win32 block there (P3, continued) must land with this branch's next merge. P4 brings
+  `FileDescriptor`'s Windows canonicalization to section 23's rule, P5 names `EOVERFLOW` on Windows (section 30), and
+  P6 gives `FileDescriptor` 64-bit offsets on Windows, where they're 32 bits (section 38). The PlatformEnum samples'
+  Windows arms differ from `Win32.ProcessHandle` (section 21).
 - **Tests**: no Windows test has run; each section lists what a Windows run must check. At each commit, Darwin
-  `swift build` and `swift test` pass, with the same tests skipped as before the lane (for counts, see
-  `Prototype/Status/STATUS.md`), and `check-windows.sh` compiles the Win32 files and the Windows test files. No
-  Linux build was run in these lanes.
+  `swift build` and `swift test` pass, with the same tests skipped as at the last merge of system-next (at
+  `ffaa7e4`: XCTest 575 tests, 5 skipped; swift-testing 504 tests in 82 suites), and `check-windows.sh` compiles the
+  Win32 files and the Windows test files. No Linux build was run in these lanes.
 
 ## How it was checked
 
@@ -1938,7 +1940,7 @@ backslashes, quotation marks and letters split back to what was quoted.
 A Windows run must check `testQuoting`, `testCommandLineToArgvWSplitsItBack` (which relies on shell32 following the
 C runtime's rules for what this quoting produces), and `testAChildReceivesTheArguments`.
 
-## 36. windows-3: FileStream on Windows: this commit
+## 36. windows-3: FileStream on Windows: `3b9ace4`
 
 packages-5's other Windows gap. swift-log's stream test buffers a stream with `setvbuf(_IOFBF)` on Windows, over
 `_fdopen`, `_lock_file`, `fwrite` and `fflush`, where its other platforms use System's provisional `FileStream`
@@ -1964,7 +1966,8 @@ Design calls, with the alternatives rejected:
   time with the stream locked, since the UCRT has no `getline`; and the docs say that `.line` buffers fully, that a
   stream translates newlines unless its mode adds `"b"`, and that `"N"` is POSIX's `"e"`.
 - **Paths are wide**, as the other Windows path API's are: `_wfopen`, and a C string of `CInterop.PlatformChar`.
-- **No mock hooks yet**, unlike POSIX's, which mock every call that takes a stream with a placeholder one; for later.
+- **No mock hooks yet**, unlike POSIX's, which mock every call that takes a stream with a placeholder one; section
+  37 adds them.
 
 Tests: `Win32FileStreamTests`: writing each way and reading lines back; text mode's `\r\n`; a full buffer that holds
 a write until `flush()`; rejected arguments (mode `"z"`, descriptor -1, an unknown mode, a 1-byte buffer) that throw
@@ -1973,7 +1976,48 @@ rather than end the process; and the standard error's descriptor and a recursive
 A Windows run must check those, and in particular that the UCRT reports `_fdopen(-1)` as `EBADF` and mode `"z"` as
 `EINVAL` through the returning handler, and that a stream of a process without a console reports descriptor -2.
 
-## 37. windows-3: findings
+## 37. windows-3: FileStream's position, and its mock hooks: this commit
+
+system-next gave the POSIX `FileStream` `seek(offset:from:)` and `offset()` (`fseeko`, `ftello`; `a6478fb`, merged
+here at `ffaa7e4`). Section 36's Windows declaration has the POSIX file's API, so it gets them too, and the mock hooks
+it left for later.
+
+What:
+- `FileStreamWindows.swift`: `seek(offset:from:)` (`_fseeki64`) and `offset()` (`_ftelli64`).
+- `Win32Syscalls.swift`: mock hooks for the stream calls that can fail, as `Syscalls+Provisional.swift` has them, with
+  the same kind of placeholder stream (`_mockStream`): `_wfopen`, `_fdopen`, `fclose`, `fflush`, `fwrite`, `fputs`,
+  `fputc`, `fread`, `_fileno`, `_fseeki64`, `_ftelli64` and `setvbuf`.
+- `Win32FileDescriptorBridge.swift`: `FileDescriptor._hasNoPosition()`, internal, for the first design call.
+
+Design calls, with the alternatives rejected:
+- **A pipe or a console has no position**, as POSIX's doc says: `seek` and `offset()` throw `illegalSeek` for a
+  stream over a pipe, a socket or a character device, by the type of its descriptor's handle (`GetFileType`). The C
+  runtime doesn't check: Microsoft documents the result of `_fseeki64` and `_ftelli64` on a device that can't seek
+  as undefined, and the C runtime drops what the stream read ahead before it moves the descriptor, so a seek on a
+  pipe's stream would lose input whatever it returned. Rejected: leaving it to the C runtime, with a doc that says
+  so; and pipes alone, which leaves consoles undefined. `NUL` is a character device, so it has no position either,
+  where POSIX's `/dev/null` has one; the doc names it.
+- **Positions are 64 bits**: `_fseeki64` and `_ftelli64`, not `fseek` and `ftell`, whose `long` is 32 bits on
+  Windows. The test seeks past 4 GiB.
+- **A text stream's positions are the file's bytes**, `\r\n` two of them, which the doc says.
+- **The mock test checks the trace call by call**, as `Win32BrokenDownTimeTests` does, since the harness has no
+  `MockTestCase`: each call's name and arguments, then a forced error for five of them, each of which throws it after
+  one call. Positioning records `_fileno` and `_get_osfhandle` before its call, for the check; a mocked descriptor
+  has no handle, so the check leaves it to the C runtime's call. Rejected: `MockTestCase`'s rounds of `EINTR`, which
+  would need `TestingInfrastructure.swift` and its dependencies in the harness.
+- **`fgetc` has no hook**: `readLine` locks the stream around it, which a placeholder can't be. `read(into:)` has one
+  but no mock test, as on POSIX, since its failure reads the placeholder's error indicator.
+
+Tests, in `Win32FileStreamTests`: `testSeekingAndTheOffset` (POSIX's, in binary mode, and past 4 GiB);
+`testTextModePositionsCountTheFilesBytes`; `testFilesWithNoPosition` (a pipe and `NUL`); `testTheCRuntimeCalls`
+(mock).
+
+A Windows run must check those, and in particular: that `_fseeki64` reports a negative position as `EINVAL` (the
+errno of `ERROR_NEGATIVE_SEEK`); that `_ftelli64` counts a text stream's buffered `\n` as two bytes, and its
+read-ahead back to the next character's byte; that `NUL` is `FILE_TYPE_CHAR`; and that a seek past 4 GiB in the
+temporary directory succeeds without growing the file.
+
+## 38. windows-3: findings
 
 - **`FileDescriptor`'s Windows canonicalization doesn't cover `CreateDirectoryW`'s limit** (P4).
   `withCanonicalPathRepresentation` passes `PATHCCH_ALLOW_LONG_PATHS`, so the `mkdir` adapter, which
@@ -1997,10 +2041,19 @@ A Windows run must check those, and in particular that the UCRT reports `_fdopen
   function-like macro, so they don't import, and a negative `HRESULT` cast directly, `((HRESULT)0x80004005)`,
   imports as an overflowing literal, an error at each use; only `S_OK` and `S_FALSE` work. That's why no adopter
   uses one, and why `Win32.HResult` names them (section 25).
+- **`FileDescriptor`'s offsets are 32 bits on Windows** (P6). `_COffT` is the UCRT's `off_t`, a 32-bit `long`, so
+  `seek(offset:from:)`, `read(fromAbsoluteOffset:into:)`, `write(toAbsoluteOffset:_:)` and `resize(to:)` trap
+  converting an offset or a size beyond 2 GiB, and `seek` reaches the `off_t` adapter over `_lseek`, whose result is
+  a `long`, not the `Int64` one over `_lseeki64` beside it, which nothing calls. With 64-bit offsets, the `pread` and
+  `pwrite` adapters would trap at 4 GiB instead (`UInt32(offset)`), and for a negative offset. So a file past 2 GiB
+  can only be read and written where its descriptor's offset already is. main has the same code; the `off_t` adapter
+  came with `036f567` (#105, 2022).
+- **The C runtime's seeks are undefined on a pipe or a console**, as Microsoft documents them (section 37).
+  `FileDescriptor.seek` reaches them too, through `_lseek`; P6 leaves that alone.
 - **macOS's CoreFoundation declares `S_OK` and `S_FALSE` too**, so the harness's tests spell `WinSDK.S_OK`; on
   Windows, where XCTest's Foundation is swift-corelibs-foundation, the bare names would do.
 
-## 38. windows-3: patches for files outside the lane
+## 39. windows-3: patches for files outside the lane
 
 **P3, continued: `Sources/System/CMakeLists.txt`.** The Win32 `target_sources` block as it should read with this
 lane's files. P3 itself landed with coverage-4 (`8caa741`); this block replaces the one it left, and is kept current
@@ -2117,3 +2170,162 @@ to this branch with `git apply`. With it, `BrokenDownTime._overflow` in `BrokenD
  #if SYSTEM_PACKAGE_DARWIN
  @_alwaysEmitIntoClient
 ```
+
+**P6, `Sources/System/Internals/Exports.swift`, `Syscalls.swift` and `WindowsSyscallAdapters.swift`: 64-bit offsets
+on Windows.** `_COffT` becomes `Int64` there, the four descriptor calls take `_COffT` rather than `off_t` (no change
+elsewhere, where they're the same type), the `off_t` adapter over `_lseek` goes, so `system_lseek` reaches
+`_lseeki64`, and the `pread` and `pwrite` adapters split the offset without trapping and reject a negative one with
+`EINVAL`, as POSIX's do; `WriteFile` would read an offset of −1 as the end of the file. Not compiled by the harness
+(the files are outside `Win32/`): the patched functions, the four callers as `FileOperations.swift` writes them,
+and the mock hooks compiled in a scratch copy against `WindowsModel`, with the UCRT's `off_t` as a 32-bit `int`, its
+`_lseek`, `_lseeki64` and POSIX-named `lseek`, and `FILE_BEGIN` and `FILE_CURRENT` as `DWORD`s, as the unchanged
+`ftruncate` adapter needs. It applies to this branch with `git apply`. The mock tests' integer arguments still match:
+`AnyHashable` compares integers of different types by value.
+
+```diff
+--- a/Sources/System/Internals/Exports.swift
++++ b/Sources/System/Internals/Exports.swift
+@@ -37,7 +37,13 @@
+ #error("Unsupported Platform")
+ #endif
+ 
++// A file offset. The UCRT's off_t is a 32-bit long, so on Windows the
++// descriptor calls take the 64-bit offsets that _lseeki64 does.
++#if os(Windows)
++internal typealias _COffT = Int64
++#else
+ internal typealias _COffT = off_t
++#endif
+ 
+ // MARK: syscalls and variables
+ 
+--- a/Sources/System/Internals/Syscalls.swift
++++ b/Sources/System/Internals/Syscalls.swift
+@@ -71,7 +71,7 @@
+ 
+ // pread
+ internal func system_pread(
+-  _ fd: Int32, _ buf: UnsafeMutableRawPointer?, _ nbyte: Int, _ offset: off_t
++  _ fd: Int32, _ buf: UnsafeMutableRawPointer?, _ nbyte: Int, _ offset: _COffT
+ ) -> Int {
+ #if ENABLE_MOCKING
+   if mockingEnabled { return _mockInt(fd, buf, nbyte, offset) }
+@@ -89,8 +89,8 @@
+ 
+ // lseek
+ internal func system_lseek(
+-  _ fd: Int32, _ off: off_t, _ whence: Int32
+-) -> off_t {
++  _ fd: Int32, _ off: _COffT, _ whence: Int32
++) -> _COffT {
+ #if ENABLE_MOCKING
+   if mockingEnabled { return _mockOffT(fd, off, whence) }
+ #endif
+@@ -109,7 +109,7 @@
+ 
+ // pwrite
+ internal func system_pwrite(
+-  _ fd: Int32, _ buf: UnsafeRawPointer?, _ nbyte: Int, _ offset: off_t
++  _ fd: Int32, _ buf: UnsafeRawPointer?, _ nbyte: Int, _ offset: _COffT
+ ) -> Int {
+ #if ENABLE_MOCKING
+   if mockingEnabled { return _mockInt(fd, buf, nbyte, offset) }
+@@ -166,7 +166,7 @@
+ }
+ #endif // !os(WASI)
+ 
+-internal func system_ftruncate(_ fd: Int32, _ length: off_t) -> Int32 {
++internal func system_ftruncate(_ fd: Int32, _ length: _COffT) -> Int32 {
+ #if ENABLE_MOCKING
+   if mockingEnabled { return _mock(fd, length) }
+ #endif
+--- a/Sources/System/Internals/WindowsSyscallAdapters.swift
++++ b/Sources/System/Internals/WindowsSyscallAdapters.swift
+@@ -121,13 +121,6 @@
+ }
+ 
+ @inline(__always)
+-internal func lseek(
+-  _ fd: Int32, _ off: off_t, _ whence: Int32
+-) -> off_t {
+-  _lseek(fd, off, whence)
+-}
+-
+-@inline(__always)
+ internal func dup(_ fd: Int32) -> Int32 {
+   _dup(fd)
+ }
+@@ -143,7 +136,7 @@
+ 
+ @inline(__always)
+ internal func pread(
+-  _ fd: Int32, _ buf: UnsafeMutableRawPointer!, _ nbyte: Int, _ offset: off_t
++  _ fd: Int32, _ buf: UnsafeMutableRawPointer!, _ nbyte: Int, _ offset: Int64
+ ) -> Int {
+   let handle: intptr_t = _get_osfhandle(fd)
+   if handle == /* INVALID_HANDLE_VALUE */ -1 { ucrt._set_errno(EBADF); return -1 }
+@@ -154,12 +147,18 @@
+     return -1
+   }
+ 
++  // A negative offset is EINVAL, as POSIX's pread reports it.
++  if offset < 0 {
++    ucrt._set_errno(EINVAL)
++    return -1
++  }
++
+   // NOTE: this is a non-owning handle, do *not* call CloseHandle on it
+   let hFile: HANDLE = HANDLE(bitPattern: handle)!
+ 
+   var ovlOverlapped: OVERLAPPED = OVERLAPPED()
+-  ovlOverlapped.OffsetHigh = DWORD(UInt32(offset >> 32) & 0xffffffff)
+-  ovlOverlapped.Offset = DWORD(UInt32(offset >> 0) & 0xffffffff)
++  ovlOverlapped.OffsetHigh = DWORD(truncatingIfNeeded: offset >> 32)
++  ovlOverlapped.Offset = DWORD(truncatingIfNeeded: offset)
+ 
+   var nNumberOfBytesRead: DWORD = 0
+   if !ReadFile(hFile, buf, DWORD(nbyte), &nNumberOfBytesRead, &ovlOverlapped) {
+@@ -171,7 +170,7 @@
+ 
+ @inline(__always)
+ internal func pwrite(
+-  _ fd: Int32, _ buf: UnsafeRawPointer!, _ nbyte: Int, _ offset: off_t
++  _ fd: Int32, _ buf: UnsafeRawPointer!, _ nbyte: Int, _ offset: Int64
+ ) -> Int {
+   let handle: intptr_t = _get_osfhandle(fd)
+   if handle == /* INVALID_HANDLE_VALUE */ -1 { ucrt._set_errno(EBADF); return -1 }
+@@ -182,12 +181,19 @@
+     return -1
+   }
+ 
++  // A negative offset is EINVAL, as POSIX's pwrite reports it. WriteFile
++  // would read an offset of -1 as the end of the file.
++  if offset < 0 {
++    ucrt._set_errno(EINVAL)
++    return -1
++  }
++
+   // NOTE: this is a non-owning handle, do *not* call CloseHandle on it
+   let hFile: HANDLE = HANDLE(bitPattern: handle)!
+ 
+   var ovlOverlapped: OVERLAPPED = OVERLAPPED()
+-  ovlOverlapped.OffsetHigh = DWORD(UInt32(offset >> 32) & 0xffffffff)
+-  ovlOverlapped.Offset = DWORD(UInt32(offset >> 0) & 0xffffffff)
++  ovlOverlapped.OffsetHigh = DWORD(truncatingIfNeeded: offset >> 32)
++  ovlOverlapped.Offset = DWORD(truncatingIfNeeded: offset)
+ 
+   var nNumberOfBytesWritten: DWORD = 0
+   if !WriteFile(hFile, buf, DWORD(nbyte), &nNumberOfBytesWritten,
+@@ -213,7 +219,7 @@
+ }
+ 
+ @inline(__always)
+-internal func ftruncate(_ fd: Int32, _ length: off_t) -> Int32 {
++internal func ftruncate(_ fd: Int32, _ length: Int64) -> Int32 {
+   let handle: intptr_t = _get_osfhandle(fd)
+   if handle == /* INVALID_HANDLE_VALUE */ -1 { ucrt._set_errno(EBADF); return -1 }
+ 
+```
+
+A Windows run with P6 must check that `FileOperationsTest`'s mock and real tests pass, and that a file can be resized
+past 4 GiB, read and written at an offset past 4 GiB, and its position read back there, from `.current`.

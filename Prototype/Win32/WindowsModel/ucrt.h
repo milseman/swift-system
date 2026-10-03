@@ -122,6 +122,8 @@ int fputs(const char *_Buffer, FILE *_Stream);
 int fputc(int _Character, FILE *_Stream);
 int fgetc(FILE *_Stream);
 int _fileno(FILE *_Stream);
+int _fseeki64(FILE *_Stream, long long _Offset, int _Origin);
+long long _ftelli64(FILE *_Stream);
 int setvbuf(FILE *_Stream, char *_Buffer, int _Mode, size_t _Size);
 int ferror(FILE *_Stream);
 int feof(FILE *_Stream);
