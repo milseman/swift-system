@@ -22,18 +22,19 @@ and commit each: long paths (23, `315f25b`), threads (24, `054e9e2`), `HRESULT` 
 Windows (30, `ada7eea`), ending the process and exit codes (31, `a7d4db9`), critical sections (32, `c353713`),
 console events and `SetStdHandle` (33, `3b9327e`), library search directories (34, `c5efe5d`), quoting a command
 line (35, `c536687`), and packages-5's `FileStream` (36, `3b9ace4`). The second session (2026-10-03) merged
-system-next at `ffaa7e4`, and did `FileStream`'s position and mock hooks (37, `6c34274`), with patch P6, and users,
-access tokens and security identifiers (38, the last commit), the first of section 8's gaps after its top ten.
-- **Next**, none of it started: the rest of section 8's ranking, in its order: pipes; job objects; reparse points;
-  events; network interfaces; memory-mapped files; directory enumeration; directory change notification; free space
-  and volume paths. Then Winsock's implementation, once the decisions triage's item 74 is applied (section 29), and
-  one declaration each for `BrokenDownTime` and `FileStream` across platforms (sections 30 and 36), which reshapes
-  other lanes' files.
+system-next at `ffaa7e4`, and did `FileStream`'s position and mock hooks (37, `6c34274`), with patch P6; then
+section 8's gaps after its top ten, in its order: users, access tokens and security identifiers (38, `32161bb`),
+and pipes (39, the last commit).
+- **Next**, none of it started: the rest of section 8's ranking, in its order: job objects; reparse points; events;
+  network interfaces; memory-mapped files; directory enumeration; directory change notification; free space and
+  volume paths. Then Winsock's implementation, once the decisions triage's item 74 is applied (section 29), and one
+  declaration each for `BrokenDownTime` and `FileStream` across platforms (sections 30 and 36), which reshapes other
+  lanes' files.
 - **For other lanes**, in the windows-3 patches section (the last): system-next merged this branch at `87c3fc6`
   without its CMake list, so system-next's `Sources/System/CMakeLists.txt` lacks eight Win32 files, which CI's CMake
   job's list check would fail on; the Win32 block there (P3, continued) must land with this branch's next merge. P4
   brings `FileDescriptor`'s Windows canonicalization to section 23's rule, P5 names `EOVERFLOW` on Windows (section
-  30), and P6 gives `FileDescriptor` 64-bit offsets on Windows, where they're 32 bits (section 39). The PlatformEnum
+  30), and P6 gives `FileDescriptor` 64-bit offsets on Windows, where they're 32 bits (see the windows-3 findings). The PlatformEnum
   samples' Windows arms differ from `Win32.ProcessHandle` (section 21).
 - **Tests**: no Windows test has run; each section lists what a Windows run must check. At each commit, Darwin
   `swift build` and `swift test` pass, with the same tests skipped as at the last merge of system-next (at
@@ -2018,7 +2019,7 @@ errno of `ERROR_NEGATIVE_SEEK`); that `_ftelli64` counts a text stream's buffere
 read-ahead back to the next character's byte; that `NUL` is `FILE_TYPE_CHAR`; and that a seek past 4 GiB in the
 temporary directory succeeds without growing the file.
 
-## 38. windows-3: users, access tokens and security identifiers: this commit
+## 38. windows-3: users, access tokens and security identifiers: `32161bb`
 
 The first of section 8's gaps after its top ten: 3 packages in its ranking, but 2 in fact, since SwiftPM's file
 counts only for `PLACEHOLDER_TOKEN_USER`, a string constant of its own that the survey took for an SDK name (the
@@ -2093,7 +2094,70 @@ local account, such as CI's; that `CreateWellKnownSid` fails for `WinAccountAdmi
 that SystemPackage links secur32 and userenv. Not covered: domain accounts, Microsoft and Entra ID accounts (whose
 name from `GetUserNameW` may not be the account's), impersonation, and the names on a Windows not in English.
 
-## 39. windows-3: findings
+## 39. windows-3: pipes: this commit
+
+The next gap of section 8: 2 packages, 4 files. swift-subprocess makes each standard handle's pipe a named pipe,
+since an anonymous pipe can't do overlapped I/O: `CreateNamedPipeW` with a unique name under `\\.\pipe\LOCAL\`,
+`FILE_FLAG_OVERLAPPED` and `FILE_FLAG_FIRST_PIPE_INSTANCE`, `PIPE_ACCESS_INBOUND` or `PIPE_ACCESS_OUTBOUND`, byte
+mode, `PIPE_REJECT_REMOTE_CLIENTS`, one instance and 64 KiB buffers, then `CreateFileW` for the child's end; it
+checks what a pipe holds with `PeekNamedPipe` before it reads one whose process it canceled, and its tests make
+anonymous pipes (`CreatePipe`). swift-log's test makes a pipe's read end nonblocking (`SetNamedPipeHandleState`
+with `PIPE_NOWAIT`), where its other platforms set `O_NONBLOCK`.
+
+What, in `Win32Pipes.swift`:
+- `Win32.FileHandle.pipe(bufferSize:)` (`CreatePipe`), which returns a `Win32.FileHandle.Pipe`, an owner of its two
+  ends, shaped like `OwnedFD.Pipe`.
+- `Win32.PipeDirection` and `Win32.PipeType`, and `createNamedPipe(_:direction:type:maximumInstances:firstInstance:
+  acceptsRemoteClients:bufferSize:inheritable:securityDescriptor:)` (`CreateNamedPipeW`) on `Win32.FileHandle` and,
+  with `FILE_FLAG_OVERLAPPED`, on `Win32.OverlappedFileHandle`, each returning the server's end.
+- On a `FileHandle`: `waitForClient()` (`ConnectNamedPipe`), `disconnectClient()` (`DisconnectNamedPipe`),
+  `bytesAvailable()` (`PeekNamedPipe`) and `setPipeMode(readMode:blocking:)` (`SetNamedPipeHandleState`); on an
+  `OverlappedFileHandle`, `bytesAvailable()`.
+
+Which API: **Win32**, as SYS-0011's future directions have it. `FileDescriptor.pipe()` makes the C runtime's pipes
+on Windows, which stay as they are; these are Windows' own handles, for `ProcessHandle.create` and overlapped I/O.
+
+Design calls, with the alternatives rejected:
+- **The creation's defaults are swift-subprocess's and Rust's**, the safe choices: one instance, the first one
+  (`FILE_FLAG_FIRST_PIPE_INSTANCE`, so a process that created the name first can't serve this server's clients),
+  no remote clients (`PIPE_REJECT_REMOTE_CLIENTS`), and 64 KiB each way. Each is a parameter of its own, so
+  changing one can't drop another, as it could in one option set: `acceptsRemoteClients: Bool = false` rather than
+  a `rejectRemoteClients` option to keep.
+- **The server's end reads as the pipe is written**: `type: .message` sets `PIPE_READMODE_MESSAGE` with
+  `PIPE_TYPE_MESSAGE`, and every pipe waits (`PIPE_WAIT`); `setPipeMode(readMode:blocking:)` changes a client's
+  end, or anyone's to nonblocking. Rejected: separate read-mode and type parameters, whose one invalid combination,
+  messages read from a byte pipe, `CreateNamedPipeW` would reject anyway.
+- **Two creations, one per handle type**, as `open` is, since an overlapped handle has its own type (section 27).
+  The overlapped one's doc says to give a child process a synchronous end: a program's reads and writes of an
+  overlapped handle without an `OVERLAPPED`, as the C runtime's are, can report that they finished before they
+  have, and swift-subprocess gives its children overlapped ends (section 40).
+- **`bytesAvailable()` throws `brokenPipe` at the end of the data**, as `PeekNamedPipe` reports it, where a read
+  returns 0: an empty pipe whose writer is alive, and one whose writer is gone, are different answers to a caller
+  deciding whether to read, as swift-subprocess's is.
+- **`waitForClient()` succeeds for a client that connected first** (`ERROR_PIPE_CONNECTED`), which Windows reports
+  as a failure; one that connected and left is `noData`, which its doc says needs `disconnectClient()`.
+- **Nonblocking mode is offered, and discouraged**: Microsoft keeps `PIPE_NOWAIT` for LAN Manager 2.0's programs,
+  but it's what swift-log's test needs, the counterpart of `O_NONBLOCK`. A write that doesn't fit writes nothing,
+  which `write` reports as `incompleteTransfer` (section 4's finding).
+- **Not wrapped**: an overlapped `ConnectNamedPipe`, `WaitNamedPipeW` and the default time-out, peeking at a pipe's
+  data and its messages' remaining bytes (`PeekNamedPipe`'s buffer), `GetNamedPipeInfo` and
+  `GetNamedPipeHandleStateW`, `TransactNamedPipe` and `CallNamedPipeW`, the server's view of its client
+  (`GetNamedPipeClientProcessId`, `ImpersonateNamedPipeClient`), and `NtCreateNamedPipeFile`, with which Rust makes
+  an anonymous pipe that can do overlapped I/O.
+
+Tests: `Win32PipesTests`: the constants; an anonymous pipe's data, availability, end, and buffer sizes; a named
+pipe's client, its first-instance guard and its limit; two instances with two clients; waiting for a client on
+another thread, disconnecting, a client that left before the wait; message pipes, read whole and in part, and a
+client switched to messages; nonblocking reads, as swift-log's test makes them; an overlapped server's
+availability; and rejected arguments.
+
+A Windows run must check those, and in particular: that `CreateNamedPipeW` gives `ERROR_ACCESS_DENIED` for a second
+first instance and `ERROR_PIPE_BUSY` past the limit; that a nonblocking read of an empty pipe fails with
+`ERROR_NO_DATA`; that `SetNamedPipeHandleState` works on `CreatePipe`'s read end, which swift-log's test relies on
+too; that a read of a message pipe into a short buffer gives `ERROR_MORE_DATA`, a short read; and what a disk file
+and a name outside `\\.\pipe\` give.
+
+## 40. windows-3: findings
 
 - **`FileDescriptor`'s Windows canonicalization doesn't cover `CreateDirectoryW`'s limit** (P4).
   `withCanonicalPathRepresentation` passes `PATHCCH_ALLOW_LONG_PATHS`, so the `mkdir` adapter, which
@@ -2135,10 +2199,16 @@ name from `GetUserNameW` may not be the account's), impersonation, and the names
 - **The survey counted SwiftPM for users and tokens** by its own `PLACEHOLDER_TOKEN_USER`; the script now classes
   the name with the packages' own, so a new run gives the concept 2 packages and 5 files (4 in sources). Section 8's
   table is as surveyed.
+- **swift-subprocess gives its children overlapped pipe ends.** `CreatedPipe` opens the child's end with
+  `FILE_FLAG_OVERLAPPED`, and a program's `ReadFile` or `WriteFile` without an `OVERLAPPED` on an overlapped handle,
+  as the C runtime's `_read` and `_write` are, "can incorrectly report that the read operation is complete"
+  (`ReadFile`'s documentation); it works while one operation at a time uses the handle. Rust's standard library
+  opens the child's end synchronously (`FILE_SYNCHRONOUS_IO_NONALERT`, in `anon_pipe`), and only its own end
+  overlapped (section 39).
 - **macOS's CoreFoundation declares `S_OK` and `S_FALSE` too**, so the harness's tests spell `WinSDK.S_OK`; on
   Windows, where XCTest's Foundation is swift-corelibs-foundation, the bare names would do.
 
-## 40. windows-3: patches for files outside the lane
+## 41. windows-3: patches for files outside the lane
 
 **P3, continued: `Sources/System/CMakeLists.txt`.** The Win32 `target_sources` block as it should read with this
 lane's files. P3 itself landed with coverage-4 (`8caa741`); this block replaces the one it left, and is kept current
@@ -2174,6 +2244,7 @@ target_sources(SystemPackage PRIVATE
   Win32/Win32Open.swift
   Win32/Win32OverlappedIO.swift
   Win32/Win32PathOperations.swift
+  Win32/Win32Pipes.swift
   Win32/Win32Process.swift
   Win32/Win32ProcessCreation.swift
   Win32/Win32SecurityDescriptor.swift

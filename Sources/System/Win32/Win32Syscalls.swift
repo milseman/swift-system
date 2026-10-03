@@ -1200,6 +1200,55 @@ internal func system_CreateHardLinkW(
   CreateHardLinkW(lpFileName, lpExistingFileName, nil)
 }
 
+// MARK: - Pipes
+
+internal func system_CreatePipe(
+  _ hReadPipe: UnsafeMutablePointer<HANDLE?>,
+  _ hWritePipe: UnsafeMutablePointer<HANDLE?>,
+  _ nSize: DWORD
+) -> Bool {
+  CreatePipe(hReadPipe, hWritePipe, nil, nSize)
+}
+
+internal func system_CreateNamedPipeW(
+  _ lpName: UnsafePointer<WCHAR>,
+  _ dwOpenMode: DWORD,
+  _ dwPipeMode: DWORD,
+  _ nMaxInstances: DWORD,
+  _ nOutBufferSize: DWORD,
+  _ nInBufferSize: DWORD,
+  _ nDefaultTimeOut: DWORD,
+  _ lpSecurityAttributes: UnsafeMutablePointer<SECURITY_ATTRIBUTES>?
+) -> HANDLE? {
+  CreateNamedPipeW(
+    lpName, dwOpenMode, dwPipeMode, nMaxInstances, nOutBufferSize, nInBufferSize,
+    nDefaultTimeOut, lpSecurityAttributes)
+}
+
+// The synchronous form: lpOverlapped is NULL.
+internal func system_ConnectNamedPipe(_ hNamedPipe: HANDLE) -> Bool {
+  ConnectNamedPipe(hNamedPipe, nil)
+}
+
+internal func system_DisconnectNamedPipe(_ hNamedPipe: HANDLE) -> Bool {
+  DisconnectNamedPipe(hNamedPipe)
+}
+
+// Only the count of bytes available: no buffer.
+internal func system_PeekNamedPipe(
+  _ hNamedPipe: HANDLE, _ lpTotalBytesAvail: UnsafeMutablePointer<DWORD>
+) -> Bool {
+  PeekNamedPipe(hNamedPipe, nil, 0, nil, lpTotalBytesAvail, nil)
+}
+
+// Only the mode: the collection count and time-out are a client's of a
+// remote pipe, and stay as they are.
+internal func system_SetNamedPipeHandleState(
+  _ hNamedPipe: HANDLE, _ lpMode: UnsafeMutablePointer<DWORD>
+) -> Bool {
+  SetNamedPipeHandleState(hNamedPipe, lpMode, nil, nil)
+}
+
 // MARK: - Access tokens, security identifiers and accounts
 
 internal func system_OpenProcessToken(

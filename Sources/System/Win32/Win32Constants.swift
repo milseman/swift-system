@@ -207,6 +207,26 @@ internal var _ERROR_TIMEOUT: DWORD { 1460 }
 @_alwaysEmitIntoClient
 internal var _ERROR_ENVVAR_NOT_FOUND: DWORD { 203 }
 
+// MARK: - Pipes
+
+@_alwaysEmitIntoClient
+internal var _FILE_FLAG_FIRST_PIPE_INSTANCE: DWORD { 0x0008_0000 }
+
+@_alwaysEmitIntoClient
+internal var _PIPE_NOWAIT: DWORD { 0x0000_0001 }
+
+@_alwaysEmitIntoClient
+internal var _PIPE_READMODE_MESSAGE: DWORD { 0x0000_0002 }
+
+@_alwaysEmitIntoClient
+internal var _PIPE_REJECT_REMOTE_CLIENTS: DWORD { 0x0000_0008 }
+
+@_alwaysEmitIntoClient
+internal var _PIPE_UNLIMITED_INSTANCES: DWORD { 255 }
+
+@_alwaysEmitIntoClient
+internal var _ERROR_PIPE_CONNECTED: DWORD { 535 }
+
 // MARK: - Security identifiers and accounts
 
 @_alwaysEmitIntoClient

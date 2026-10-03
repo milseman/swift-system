@@ -310,6 +310,11 @@ typedef struct _FILE_END_OF_FILE_INFO {
 #define PIPE_TYPE_BYTE 0x00000000
 #define PIPE_TYPE_MESSAGE 0x00000004
 #define PIPE_UNLIMITED_INSTANCES 255
+#define PIPE_ACCEPT_REMOTE_CLIENTS 0x00000000
+#define PIPE_REJECT_REMOTE_CLIENTS 0x00000008
+#define FILE_FLAG_FIRST_PIPE_INSTANCE 0x00080000
+#define ERROR_PIPE_CONNECTED 535
+#define ERROR_PIPE_LISTENING 536
 
 #define FORMAT_MESSAGE_ALLOCATE_BUFFER 0x00000100
 #define FORMAT_MESSAGE_IGNORE_INSERTS 0x00000200
@@ -377,6 +382,11 @@ HANDLE CreateNamedPipeW(LPCWSTR lpName, DWORD dwOpenMode, DWORD dwPipeMode,
                         DWORD nInBufferSize, DWORD nDefaultTimeOut,
                         LPSECURITY_ATTRIBUTES lpSecurityAttributes);
 BOOL ConnectNamedPipe(HANDLE hNamedPipe, LPOVERLAPPED lpOverlapped);
+BOOL DisconnectNamedPipe(HANDLE hNamedPipe);
+BOOL PeekNamedPipe(HANDLE hNamedPipe, LPVOID lpBuffer, DWORD nBufferSize, LPDWORD lpBytesRead,
+                   LPDWORD lpTotalBytesAvail, LPDWORD lpBytesLeftThisMessage);
+BOOL SetNamedPipeHandleState(HANDLE hNamedPipe, LPDWORD lpMode, LPDWORD lpMaxCollectionCount,
+                             LPDWORD lpCollectDataTimeout);
 DWORD GetCurrentProcessId(void);
 HLOCAL LocalFree(HLOCAL hMem);
 DWORD FormatMessageW(DWORD dwFlags, LPCVOID lpSource, DWORD dwMessageId,
