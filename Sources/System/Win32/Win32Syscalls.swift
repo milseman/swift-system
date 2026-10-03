@@ -1200,6 +1200,34 @@ internal func system_CreateHardLinkW(
   CreateHardLinkW(lpFileName, lpExistingFileName, nil)
 }
 
+// MARK: - Events
+
+// Unnamed: lpName is always NULL.
+internal func system_CreateEventW(
+  _ lpEventAttributes: UnsafeMutablePointer<SECURITY_ATTRIBUTES>?,
+  _ bManualReset: Bool,
+  _ bInitialState: Bool
+) -> HANDLE? {
+  CreateEventW(lpEventAttributes, bManualReset, bInitialState, nil)
+}
+
+internal func system_SetEvent(_ hEvent: HANDLE) -> Bool {
+  SetEvent(hEvent)
+}
+
+internal func system_ResetEvent(_ hEvent: HANDLE) -> Bool {
+  ResetEvent(hEvent)
+}
+
+internal func system_WaitForMultipleObjects(
+  _ nCount: DWORD,
+  _ lpHandles: UnsafePointer<HANDLE?>,
+  _ bWaitAll: Bool,
+  _ dwMilliseconds: DWORD
+) -> DWORD {
+  WaitForMultipleObjects(nCount, lpHandles, bWaitAll, dwMilliseconds)
+}
+
 // MARK: - Reparse points
 
 // The synchronous form: lpOverlapped is NULL.

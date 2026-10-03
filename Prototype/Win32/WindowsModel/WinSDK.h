@@ -1279,3 +1279,12 @@ BOOL IsProcessInJob(HANDLE ProcessHandle, HANDLE JobHandle, PBOOL Result);
 BOOL DeviceIoControl(HANDLE hDevice, DWORD dwIoControlCode, LPVOID lpInBuffer,
                      DWORD nInBufferSize, LPVOID lpOutBuffer, DWORD nOutBufferSize,
                      LPDWORD lpBytesReturned, LPOVERLAPPED lpOverlapped);
+
+// synchapi.h and winnt.h: events, and waiting for several objects.
+// WAIT_ABANDONED_0 is ((STATUS_ABANDONED_WAIT_0) + 0), which doesn't import.
+#define MAXIMUM_WAIT_OBJECTS 64
+
+BOOL SetEvent(HANDLE hEvent);
+BOOL ResetEvent(HANDLE hEvent);
+DWORD WaitForMultipleObjects(DWORD nCount, const HANDLE *lpHandles, BOOL bWaitAll,
+                             DWORD dwMilliseconds);

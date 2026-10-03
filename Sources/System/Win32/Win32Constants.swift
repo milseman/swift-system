@@ -207,6 +207,15 @@ internal var _ERROR_TIMEOUT: DWORD { 1460 }
 @_alwaysEmitIntoClient
 internal var _ERROR_ENVVAR_NOT_FOUND: DWORD { 203 }
 
+// MARK: - Events and waits
+
+// The SDK's is ((STATUS_ABANDONED_WAIT_0) + 0), which doesn't import.
+@_alwaysEmitIntoClient
+internal var _WAIT_ABANDONED_0: DWORD { 0x80 }
+
+@_alwaysEmitIntoClient
+internal var _MAXIMUM_WAIT_OBJECTS: Int { 64 }
+
 // MARK: - Reparse points
 
 // winioctl.h computes it with CTL_CODE, a function-like macro, which

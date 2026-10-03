@@ -24,11 +24,12 @@ console events and `SetStdHandle` (33, `3b9327e`), library search directories (3
 line (35, `c536687`), and packages-5's `FileStream` (36, `3b9ace4`). The second session (2026-10-03) merged
 system-next at `ffaa7e4`, and did `FileStream`'s position and mock hooks (37, `6c34274`), with patch P6; then
 section 8's gaps after its top ten, in its order: users, access tokens and security identifiers (38, `32161bb`),
-pipes (39, `1bfd761`), job objects (40, `6d2ca5b`), and reparse points (41, the last commit).
-- **Next**, none of it started: the rest of section 8's ranking, in its order: events; network interfaces;
-  memory-mapped files; directory enumeration; directory change notification; free space and volume paths. Then
-  Winsock's implementation, once the decisions triage's item 74 is applied (section 29), and one declaration each
-  for `BrokenDownTime` and `FileStream` across platforms (sections 30 and 36), which reshapes other lanes' files.
+pipes (39, `1bfd761`), job objects (40, `6d2ca5b`), reparse points (41, `5ad7c6c`), and events (42, the last
+commit).
+- **Next**, none of it started: the rest of section 8's ranking, in its order: network interfaces; memory-mapped
+  files; directory enumeration; directory change notification; free space and volume paths. Then Winsock's
+  implementation, once the decisions triage's item 74 is applied (section 29), and one declaration each for
+  `BrokenDownTime` and `FileStream` across platforms (sections 30 and 36), which reshapes other lanes' files.
 - **For other lanes**, in the windows-3 patches section (the last): system-next merged this branch at `87c3fc6`
   without its CMake list, so system-next's `Sources/System/CMakeLists.txt` lacks eight Win32 files, which CI's CMake
   job's list check would fail on; the Win32 block there (P3, continued) must land with this branch's next merge. P4
@@ -2213,7 +2214,7 @@ the tests' jobs nest; that `JOB_OBJECT_MSG_ACTIVE_PROCESS_ZERO` arrives after th
 console host the child starts joins the job too; and that `AssignProcessToJobObject` reports a handle without the
 rights as `ERROR_ACCESS_DENIED`.
 
-## 41. windows-3: reparse points: this commit
+## 41. windows-3: reparse points: `5ad7c6c`
 
 The next gap of section 8: 2 packages, 3 files, and SYS-0016's one future direction. swift-foundation's
 `destinationOfSymbolicLink(atPath:)` reads a symbolic link's or a junction's target with `DeviceIoControl` and
@@ -2262,7 +2263,49 @@ A Windows run must check those, and in particular: that `CreateSymbolicLinkW` st
 substitute name with a backslash, which `FilePath` drops either way; and that `FSCTL_GET_REPARSE_POINT` works on a
 handle with no access rights.
 
-## 42. windows-3: findings
+## 42. windows-3: events: this commit
+
+The next gap of section 8: 2 packages, 2 files. swift-subprocess makes a manual-reset event (`CreateEventW`) for an
+overlapped read it waits for itself, with the handle's low bit set in the `OVERLAPPED` so the completion stays off
+its port; swift-tools-support-core's directory watcher makes an auto-reset event for its `ReadDirectoryChangesW`
+and a manual-reset one to stop the watch, waits for either (`WaitForMultipleObjects`), and stops with `SetEvent`.
+
+What, in `Win32Events.swift`:
+- `Win32.EventHandle`, an owner, with `create(manualReset:initiallySignaled:inheritable:)` (`CreateEventW`),
+  `signal()` (`SetEvent`), `reset()` (`ResetEvent`), `wait(timeout:)` (`WaitForSingleObject`), and
+  `overlappedEvent(queuesCompletion:)`, the value for an `OVERLAPPED`'s `hEvent`.
+- `Win32.waitForAny(_:timeout:)` and `waitForAll(_:timeout:)` (`WaitForMultipleObjects`), over raw handles.
+
+Which API: **Win32.** POSIX has no event object; `PThread.Condition` and a mutex are its counterparts within a
+process, and an event is also what Windows' overlapped I/O signals.
+
+Design calls, with the alternatives rejected:
+- **`manualReset` has no default**: the two kinds wake different numbers of waiters, and a wrong guess is a bug
+  that shows only under load. `initiallySignaled` defaults to `false`.
+- **`overlappedEvent(queuesCompletion:)` names Windows' low-bit rule**, which `GetQueuedCompletionStatus`'s
+  documentation describes and swift-subprocess applies by hand; it's `@unsafe`, as section 27's `OVERLAPPED`
+  operations are, since the operation outlives no promise about the event.
+- **The multiple waits take raw handles and are `@unsafe`**: a wait can mix events, processes, threads and other
+  objects, which share no Swift type, and each handle must stay open while the wait lasts. Rejected: a protocol
+  that every owner adopts, for one function. They throw `invalidParameter` for no handles or more than 64, the
+  limit, before the call. `waitForAny` returns the signaled handle's index, the lowest if several are, as Windows
+  does, and `nil` at the time-out; an abandoned mutex, which no System type wraps, counts as signaled, as `_wait`
+  counts it. A time-out past `INFINITE` waits in parts, as the single waits do.
+- **`wait(timeout:)`'s result is discardable**, for a wait with no limit, which returns only `true`.
+- **Not wrapped**: named events (`OpenEventW`), `CreateEventExW`'s access, `PulseEvent`, which Microsoft calls
+  unreliable, alertable waits (`WaitForMultipleObjectsEx`) and `MsgWaitForMultipleObjects`, and
+  `SignalObjectAndWait`.
+
+Tests: `Win32EventsTests`: the constant; manual-reset and auto-reset events; a wait ended by another thread;
+`waitForAny` with events and a process, the lowest index, and its limits; `waitForAll`, which changes nothing until
+all are signaled, and its duplicates; and the low bit, which keeps an overlapped read's packet off the port of an
+overlapped named pipe while the event is signaled.
+
+A Windows run must check those, and in particular: that `waitForAll` leaves a signaled auto-reset event as it is
+while another isn't signaled; that `WaitForMultipleObjects` rejects a duplicated handle with
+`ERROR_INVALID_PARAMETER`; and that a low-bit event keeps the packet off the port.
+
+## 43. windows-3: findings
 
 - **`FileDescriptor`'s Windows canonicalization doesn't cover `CreateDirectoryW`'s limit** (P4).
   `withCanonicalPathRepresentation` passes `PATHCCH_ALLOW_LONG_PATHS`, so the `mkdir` adapter, which
@@ -2324,10 +2367,15 @@ handle with no access rights.
   a file on a disk's volume; if it does for a socket's file too, the cleanup always throws. A Windows run can tell,
   by `fileType()` and `reparsePoint()` of a bound socket's path. Its `guard let` on `CreateFileW`'s result can't see
   a failure, which is `INVALID_HANDLE_VALUE`, not `NULL`.
+- **swift-tools-support-core's directory watcher never delivers a change, and spins.** `RDCWatcher` walks the
+  `FILE_NOTIFY_INFORMATION` entries with `while var pNotify = pNotify { …; pNotify = … }`, whose condition binds the
+  outer constant again each time, so the loop never leaves the first entry; and it drops a name that
+  `AbsolutePath(validating:)` rejects with `continue`, which every name is, since the entries' names are relative to
+  the watched directory, so the loop spins without advancing either way (section 42).
 - **macOS's CoreFoundation declares `S_OK` and `S_FALSE` too**, so the harness's tests spell `WinSDK.S_OK`; on
   Windows, where XCTest's Foundation is swift-corelibs-foundation, the bare names would do.
 
-## 43. windows-3: patches for files outside the lane
+## 44. windows-3: patches for files outside the lane
 
 **P3, continued: `Sources/System/CMakeLists.txt`.** The Win32 `target_sources` block as it should read with this
 lane's files. P3 itself landed with coverage-4 (`8caa741`); this block replaces the one it left, and is kept current
@@ -2349,6 +2397,7 @@ target_sources(SystemPackage PRIVATE
   Win32/Win32Console.swift
   Win32/Win32Constants.swift
   Win32/Win32Error.swift
+  Win32/Win32Events.swift
   Win32/Win32FiberLocal.swift
   Win32/Win32FileDescriptorBridge.swift
   Win32/Win32FileHandle.swift
