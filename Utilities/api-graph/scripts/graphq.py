@@ -13,6 +13,7 @@ name's callers, a package's reach, and the difference between snapshots.
   graphq.py domain signals                     a domain's declarations, by C family
   graphq.py diff OLD NEW                       nodes and links added, removed, changed
   graphq.py summary --out GRAPH.md             the snapshot's report
+  graphq.py doc-sentences --out DOC-SENTENCES.md   the work list for doc sentences
 
 A NODE is an ID, a path (`FileDescriptor.setOwner(user:group:retryOnInterrupt:)`),
 a C name (`getpid`), a package key, or a unique part of a path. Link kinds
@@ -44,6 +45,29 @@ DERIVED = ["sameCFamily", "sameImplementation", "sameBlock", "sameMark", "couldU
 HUB = 20   # internal code more declarations than this reach is a shared helper, not a shared implementation
 DECL_COMPARE = ("path", "decl", "availability", "platforms", "symbolKind", "hiddenClass", "origin", "module",
                 "file", "renamedTo")
+
+
+def link_sources(ln):
+    """A wraps link's sources: `doc` (a doc sentence), `typealias` (a
+    CInterop typealias), `code` (what its code reaches). A snapshot before
+    schema 2 has one `source`."""
+    return ln.get("sources") or [ln.get("source") or "doc"]
+
+
+def stated(ln):
+    """A wraps link a doc sentence or a typealias makes, which says what the
+    declaration stands for: what reach, families, domains and pitch rules
+    read. A code-only link says what its implementation touches."""
+    return ln["kind"] == "wraps" and any(x in ("doc", "typealias") for x in link_sources(ln))
+
+
+def could_use(ln, nodes):
+    """Whether a package that calls the C name a link points to could use
+    the declaration instead: a stated link, not restricted to one use of the
+    name, not a field's (the coverage tools record a field as a member of its
+    struct's interface), to a name the base commit doesn't cover."""
+    return (stated(ln) and not ln["restricted"] and ln.get("cKind") != "field"
+            and not nodes[ln["to"]]["baseCovered"])
 
 
 def load(path):
@@ -139,13 +163,13 @@ class Graph:
         """[(other node, detail)] for a derived link kind."""
         out = []
         if kind == "sameCFamily":
-            fams = {self.nodes[ln["to"]]["family"] for ln in self.out[nid] if ln["kind"] == "wraps"
+            fams = {self.nodes[ln["to"]]["family"] for ln in self.out[nid] if stated(ln)
                     and self.nodes[ln["to"]].get("family")}
             for fam in sorted(fams):
                 for cid, c in self.nodes.items():
                     if c["kind"] == "cname" and c.get("family") == fam:
                         for ln in self.inc[cid]:
-                            if ln["kind"] == "wraps" and ln["from"] != nid:
+                            if stated(ln) and ln["from"] != nid:
                                 out.append((ln["from"], f"{fam} family ({c['name']})"))
         elif kind == "sameImplementation":
             for ln in self.out[nid]:
@@ -170,7 +194,7 @@ class Graph:
                             out.append((l2["from"], self.label(bid)))
         elif kind == "couldUse":
             for ln in self.out[nid]:
-                if ln["kind"] == "wraps" and not ln["restricted"] and not self.nodes[ln["to"]]["baseCovered"]:
+                if could_use(ln, self.nodes):
                     for l2 in self.inc[ln["to"]]:
                         if l2["kind"] == "calls":
                             n_ = len(l2["sites"])
@@ -228,7 +252,8 @@ def link_text(g, kind, arrow, other, detail):
         if detail.get("roles"):
             extra.append("/".join(detail["roles"]))
         if kind == "wraps":
-            extra.append(detail["role"] + (", restricted" if detail["restricted"] else ""))
+            extra.append(detail["role"] + (", restricted" if detail["restricted"] else "") + ", from "
+                         + "+".join(link_sources(detail)))
         if detail.get("sites"):
             s = detail["sites"]
             extra.append(f"{len(s)} site{'s' if len(s) != 1 else ''}: " + ", ".join(
@@ -321,7 +346,8 @@ def cmd_type(g, a):
         for k, d, o, detail in g.neighbors(nid, {"couldUse"}):
             callers[o].append(detail)
         out.append({"id": nid, "path": n.get("path"), "origin": n.get("origin"), "reach": n.get("reach"),
-                    "wraps": [g.nodes[ln["to"]]["name"] for ln in g.out[nid] if ln["kind"] == "wraps"]})
+                    "wraps": [g.nodes[ln["to"]]["name"] + ("" if stated(ln) else " (code)")
+                              for ln in g.out[nid] if ln["kind"] == "wraps"]})
     if a.json:
         return print(json.dumps(out, indent=1))
     for r in out:
@@ -333,7 +359,7 @@ def cmd_type(g, a):
                 if ln["kind"] == "usedBy":
                     for s in ln["sites"][:a.limit]:
                         print(f"      uses: {g.label(ln['to'])} {s['file']}:{s['line']} ({s['resolution']})")
-                if ln["kind"] == "wraps" and not ln["restricted"]:
+                if stated(ln) and not ln["restricted"]:
                     for l2 in g.inc[ln["to"]]:
                         if l2["kind"] == "calls":
                             for s in l2["sites"][:a.limit]:
@@ -366,15 +392,17 @@ def cnames_report(g, cids, title, a):
     out = []
     for cid in cids:
         c = g.nodes[cid]
-        wrappers = [(ln["from"], ln["role"], ln["restricted"]) for ln in g.inc[cid] if ln["kind"] == "wraps"]
+        wrappers = [(ln["from"], ln["role"], ln["restricted"], link_sources(ln)) for ln in g.inc[cid]
+                    if ln["kind"] == "wraps"]
         callers = [(ln["from"], ln["sites"]) for ln in g.inc[cid] if ln["kind"] == "calls"]
         users = set()
-        for w, _, _ in wrappers:
+        for w, _, _, _ in wrappers:
             for ln in g.out[w]:
                 if ln["kind"] == "usedBy" and not ln.get("qualifierOnly"):
                     users.add(ln["to"])
         out.append({"cname": c["name"], "baseCovered": c["baseCovered"], "cKinds": c["cKinds"],
-                    "wrappers": [{"id": w, "path": g.label(w), "role": r, "restricted": rs} for w, r, rs in wrappers],
+                    "wrappers": [{"id": w, "path": g.label(w), "role": r, "restricted": rs, "sources": src}
+                                 for w, r, rs, src in wrappers],
                     "callers": [{"package": g.label(p), "sites": s} for p, s in callers],
                     "wrappersUsedBy": sorted(g.label(u) for u in users)})
     if a.json:
@@ -384,7 +412,8 @@ def cnames_report(g, cids, title, a):
         print(f"\n{r['cname']}  ({', '.join(r['cKinds'])}"
               + (", covered on the base commit" if r["baseCovered"] else "") + ")")
         for w in r["wrappers"]:
-            print(f"  wrapped by {w['path']}  [{w['role']}{', restricted' if w['restricted'] else ''}]")
+            print(f"  wrapped by {w['path']}  [{w['role']}{', restricted' if w['restricted'] else ''}, from "
+                  f"{'+'.join(w['sources'])}]")
         if r["wrappersUsedBy"]:
             print(f"  its wrappers are used by: {', '.join(r['wrappersUsedBy'])}")
         for c in sorted(r["callers"], key=lambda c: -len(c["sites"])):
@@ -401,7 +430,7 @@ def cmd_domain(g, a):
     for nid, n in g.nodes.items():
         if n["kind"] == "declaration" and n.get("origin") == "head" and a.name in (n.get("domains") or []):
             fams = sorted({g.nodes[ln["to"]].get("family") or g.nodes[ln["to"]]["name"] for ln in g.out[nid]
-                           if ln["kind"] == "wraps" and a.name in (g.nodes[ln["to"]].get("domains") or [])})
+                           if stated(ln) and a.name in (g.nodes[ln["to"]].get("domains") or [])})
             rows[", ".join(fams)].append(nid)
     if a.json:
         return print(json.dumps({k: [g.label(x) for x in v] for k, v in rows.items()}, indent=1))
@@ -426,7 +455,7 @@ def cmd_package(g, a):
             continue
         c = g.nodes[ln["to"]]
         for l2 in g.inc[ln["to"]]:
-            if l2["kind"] == "wraps" and not l2["restricted"] and not c["baseCovered"]:
+            if could_use(l2, g.nodes):
                 could[l2["from"]].append((c["name"], len(ln["sites"])))
     if a.json:
         return print(json.dumps({"package": p, "uses": [{"id": u, "path": g.label(u), "sites": s} for u, s in uses],
@@ -588,6 +617,11 @@ def summary_md(doc, diff_file=None):
     L += ["", "## Links", "", "| Kind | Count |", "|---|---:|"]
     for k in STORED:
         L.append(f"| `{k}` | {lk.get(k, 0)} |")
+    by_src = collections.Counter("+".join(link_sources(ln)) for ln in doc["links"] if ln["kind"] == "wraps")
+    L += ["", "`wraps` links by source: " + ", ".join(f"{v} {k}" for k, v in sorted(by_src.items()))
+          + ". A `doc` link is a doc sentence's, a `typealias` link a CInterop typealias's, and a `code` link what "
+          "the declaration's code reaches through internal code; `DOC-SENTENCES.md` lists the declarations whose "
+          "C names come only from their code."]
     fams = collections.Counter(n.get("family") for n in doc["nodes"].values() if n["kind"] == "cname" and n.get("family"))
     L += ["", f"Derived at query time: `sameCFamily` ({len(fams)} C function families), `sameImplementation`, "
           "`sameBlock`, `sameMark`, `couldUse`.", ""]
@@ -608,8 +642,7 @@ def summary_md(doc, diff_file=None):
     rest = [x for x in could if not doc["nodes"][x]["reach"]["usedBy"]]
     for nid in sorted(rest, key=lambda x: (-len(doc["nodes"][x]["reach"]["couldUse"]), g.label(x)))[:25]:
         r = doc["nodes"][nid]["reach"]
-        via = sorted({g.nodes[ln["to"]]["name"] for ln in g.out[nid] if ln["kind"] == "wraps" and not ln["restricted"]
-                      and not g.nodes[ln["to"]]["baseCovered"]})
+        via = sorted({g.nodes[ln["to"]]["name"] for ln in g.out[nid] if could_use(ln, g.nodes)})
         L.append(f"| `{g.label(nid)}` | {len(r['couldUse'])} | {', '.join('`' + v + '`' for v in via[:4])} |")
     pk = [n for n in doc["nodes"].values() if n["kind"] == "package"]
     L += ["", "## Packages", "", "| Package | Migration | Declarations it uses | Interface data |", "|---|---|---:|---|"]
@@ -670,6 +703,86 @@ def summary_md(doc, diff_file=None):
     return "\n".join(L) + "\n"
 
 
+def doc_sentences_md(doc):
+    """The work list for doc sentences: the new public declarations whose
+    code reaches C that no doc sentence of theirs names, the types whose
+    members reach C that no doc sentence names a C type for, and the
+    declarations with no doc comment, by file."""
+    g = Graph(doc)
+    m = doc["meta"]
+    code_only, types, bare = (collections.defaultdict(list) for _ in range(3))
+
+    def wanted(nid):
+        n = doc["nodes"].get(nid) or {}
+        return (n.get("kind") == "declaration" and n.get("origin") == "head"
+                and n.get("hiddenClass") not in ("unavailable", "underscored"))
+
+    def member_names(nid, seen):
+        out = []
+        for ln in g.inc[nid]:
+            if ln["kind"] in ("memberOf", "nestedIn") and ln["from"] not in seen:
+                seen.add(ln["from"])
+                out += [g.nodes[x["to"]]["name"] for x in g.out[ln["from"]] if x["kind"] == "wraps"]
+                out += member_names(ln["from"], seen)
+        return out
+    for nid, n in doc["nodes"].items():
+        if not wanted(nid):
+            continue
+        ws = [ln for ln in g.out[nid] if ln["kind"] == "wraps"]
+        if ws and not any(stated(ln) for ln in ws):
+            code_only[n.get("file") or "?"].append((n.get("line") or 0, g.label(nid), sorted(
+                f"{g.nodes[ln['to']]['name']}" for ln in ws)))
+        elif n.get("isType") and n.get("reachesC") and not ws:
+            types[n.get("file") or "?"].append((n.get("line") or 0, g.label(nid),
+                                                list(dict.fromkeys(member_names(nid, {nid})))))
+        if not n.get("ownDoc"):
+            bare[n.get("file") or "?"].append((n.get("line") or 0, g.label(nid), bool(n.get("hasDoc"))))
+    L = [f"# Doc sentences to add: `{m['baseRef']}` → `{m['headRef']}`", "",
+         f"The work list for adding \"The corresponding C … is `x`.\" sentences to the doc comments of the "
+         f"declarations `{m['headRef']}` @ `{m['headCommit'][:10]}` adds, from the graph (`graph.json.gz`), by file "
+         "and line. Fix-it stubs and underscored declarations are left out: a stub's name is its C name.", "",
+         f"## Code that reaches C no doc sentence names ({sum(len(v) for v in code_only.values())})", "",
+         "Each declaration's code, through the internal code it calls, references these C functions, macros, "
+         "constants, variables or fields (a field as `struct.field`), and none of its doc sentences names a C "
+         "interface. They're where to start, not the sentence: code can reach C a declaration doesn't stand for, "
+         "such as the helpers a convenience combines.", ""]
+    for f in sorted(code_only):
+        L += [f"### `{f}`", ""]
+        for line, path, names in sorted(code_only[f]):
+            L.append(f"- {line}: `{path}`: " + ", ".join(f"`{x}`" for x in names[:12])
+                     + (f", and {len(names) - 12} more" if len(names) > 12 else ""))
+        L.append("")
+    L += [f"## Types whose members reach C, and no doc sentence names a C type ({sum(len(v) for v in types.values())})",
+          "", "A type gets no C names from its code, since its lines hold its members, so these are \"(no C name)\" on "
+          "the burn-down page. Some stand for a C type or a family of constants; some are only namespaces. Each is "
+          "listed with its members' C names.", ""]
+    for f in sorted(types):
+        L += [f"### `{f}`", ""]
+        for line, path, names in sorted(types[f]):
+            L.append(f"- {line}: `{path}`: " + (", ".join(f"`{x}`" for x in names[:8])
+                                                + (f", and {len(names) - 8} more" if len(names) > 8 else "")
+                                                if names else "only through a CSystem shim"))
+        L.append("")
+    own = sum(1 for v in bare.values() for x in v if not x[2])
+    L += [f"## No doc comment ({sum(len(v) for v in bare.values())})", "",
+          f"Declarations without a doc comment of their own. {own} have none at all; the rest inherit one from "
+          "the protocol requirement they implement (marked *inherits*), and usually need none.", ""]
+    for f in sorted(bare):
+        L += [f"### `{f}`", ""]
+        for line, path, inherits in sorted(bare[f]):
+            L.append(f"- {line}: `{path}`" + (" *inherits*" if inherits else ""))
+        L.append("")
+    return "\n".join(L) + "\n"
+
+
+def cmd_doc_sentences(g, a):
+    text = doc_sentences_md(g.doc)
+    if a.out:
+        open(a.out, "w").write(text)
+    else:
+        print(text)
+
+
 def cmd_summary(g, a):
     text = summary_md(g.doc, a.diff)
     if a.out:
@@ -719,6 +832,8 @@ def main():
     p = sub.add_parser("summary")
     p.add_argument("--out")
     p.add_argument("--diff")
+    p = sub.add_parser("doc-sentences")
+    p.add_argument("--out")
     a = ap.parse_args()
     for k, v in (("snapshot", None), ("store", None), ("json", False), ("limit", 20)):
         if not hasattr(a, k):
@@ -727,7 +842,8 @@ def main():
         return cmd_diff(None, a)
     g = Graph(load(find_snapshot(a.snapshot, a.store)))
     {"find": cmd_find, "show": cmd_show, "neighbors": cmd_neighbors, "type": cmd_type, "family": cmd_family,
-     "cname": cmd_cname, "package": cmd_package, "domain": cmd_domain, "summary": cmd_summary}[a.cmd](g, a)
+     "cname": cmd_cname, "package": cmd_package, "domain": cmd_domain, "summary": cmd_summary,
+     "doc-sentences": cmd_doc_sentences}[a.cmd](g, a)
 
 
 if __name__ == "__main__":

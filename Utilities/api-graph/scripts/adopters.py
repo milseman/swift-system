@@ -1477,9 +1477,17 @@ C_FILES = (".c", ".h", ".cpp", ".cc", ".cxx", ".hpp", ".hh", ".m", ".mm", ".def"
 def join_tables(cn):
     """From cnames.json: {nid: {names, restricted, baseCovered}} (what each
     declaration's would-benefit sites are joined on, and what's left out),
-    {name: [nid]} for the join, and every wrapped name with its kinds."""
+    {name: [nid]} for the join, and every wrapped name with its kinds.
+    Only stated links count, from a doc sentence or a typealias: a code-only
+    link says what a declaration's implementation touches, not that it
+    stands for the C interface. Fields don't either: the coverage tools
+    record a use of one as a member of its struct's interface."""
     per = collections.defaultdict(lambda: {"names": set(), "restricted": set(), "baseCovered": set()})
+    joined = set()
     for w in cn["wraps"]:
+        if w["cKind"] == "field" or not any(s in ("doc", "typealias") for s in w.get("sources") or ["doc"]):
+            continue
+        joined.add(w["name"])
         rec = per[w["node"]]
         if w["restricted"]:
             rec["restricted"].add(w["name"])
@@ -1493,7 +1501,7 @@ def join_tables(cn):
     for nid, v in per.items():
         for nm in v["names"]:
             name_nodes[nm].append(nid)
-    kinds = {n: v["kinds"] for n, v in cn["names"].items()}
+    kinds = {n: v["kinds"] for n, v in cn["names"].items() if n in joined}
     return per, name_nodes, kinds
 
 

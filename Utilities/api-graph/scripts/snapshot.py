@@ -10,7 +10,8 @@ sameBlock, sameMark, couldUse) are computed by graphq.py, not stored.
 
 The inputs are the pipeline's: build_graph.py's graph.json (declarations,
 their edges, blocks, tests, samples and implementation), cnames.py's
-cnames.json (the C names each declaration wraps, and their families),
+cnames.json (the C names each declaration wraps, from its doc sentences,
+typealiases and code, and their families),
 adopters.py's adopters.json (the packages, their adopted and would-benefit
 sites and hunks), and api-delta's symbol graphs (the base and external
 types' kinds). Nothing here clusters, promotes or cuts: every link is kept.
@@ -38,12 +39,17 @@ import os  # noqa: E402
 import re  # noqa: E402
 import shutil  # noqa: E402
 
-SCHEMA = "api-graph-snapshot/1"
+import graphq  # noqa: E402
+
+# 2: a wraps link has `sources` (doc, typealias, code), not one `source`, and
+# its `cKind`.
+SCHEMA = "api-graph-snapshot/2"
 # Protocols every type gets without spelling them, which link nothing.
 MARKER_PROTOCOLS = {"SendableMetatype", "BitwiseCopyable", "Copyable", "Escapable"}
 DECL_FIELDS = ("path", "title", "symbolKind", "isType", "module", "file", "line", "start", "end", "decl",
-               "availability", "system", "platforms", "docSummary", "hasDoc", "source", "hiddenClass", "noncopyable",
-               "nonescapable", "hasDeinit", "lifetime", "renamedTo", "parentPath", "deprecated")
+               "availability", "system", "platforms", "docSummary", "hasDoc", "ownDoc", "source", "hiddenClass",
+               "noncopyable", "nonescapable", "hasDeinit", "lifetime", "renamedTo", "parentPath", "deprecated",
+               "reachesC")
 
 
 def load(path):
@@ -188,7 +194,7 @@ def build(a):
     for w in cn["wraps"]:
         if w["node"] in nodes:
             link("wraps", w["node"], "cname:" + w["name"], role=w["role"], restricted=w["restricted"],
-                 source=w["source"], joiner=w.get("joiner"), sentence=w["sentence"])
+                 sources=w["sources"], cKind=w["cKind"], joiner=w.get("joiner"), sentence=w["sentence"])
 
     # ------------------------------------------------------------ implementation
     for nid, n in gnodes.items():
@@ -277,7 +283,8 @@ def build(a):
 
 def assign_domains(nodes, links, domains):
     """Each C name's domains, where its name or family matches a domain's
-    globs, and each head declaration's, from the names it wraps."""
+    globs, and each head declaration's, from the names its stated wraps
+    links name (a doc sentence's or a typealias's, not only its code's)."""
     import fnmatch
     for n in nodes.values():
         if n["kind"] != "cname":
@@ -287,7 +294,7 @@ def assign_domains(nodes, links, domains):
                                                          for pat in d["match"])]
     by_node = collections.defaultdict(set)
     for ln in links:
-        if ln["kind"] == "wraps":
+        if graphq.stated(ln):
             by_node[ln["from"]] |= set(nodes[ln["to"]].get("domains", []))
     # A type is in its members' domains too (TerminalDescriptor wraps nothing
     # itself; its members wrap tcgetattr and tcsetpgrp).
@@ -312,8 +319,9 @@ def assign_domains(nodes, links, domains):
 def reach_of(nodes, links):
     """Each head declaration's reach: the packages using it on their
     migration branch (not only to qualify a nested type), and the packages
-    calling a C name it wraps, unrestricted, that the base commit doesn't
-    cover."""
+    calling a C name a stated wraps link names, unrestricted, that the base
+    commit doesn't cover. (That a declaration's code reaches `close` doesn't
+    make it a replacement for calling `close`.)"""
     used = collections.defaultdict(set)
     callers = collections.defaultdict(set)
     wraps = collections.defaultdict(set)
@@ -322,7 +330,7 @@ def reach_of(nodes, links):
             used[ln["from"]].add(ln["to"][len("package:"):])
         elif ln["kind"] == "calls":
             callers[ln["to"]].add(ln["from"][len("package:"):])
-        elif ln["kind"] == "wraps" and not ln["restricted"] and not nodes[ln["to"]]["baseCovered"]:
+        elif graphq.could_use(ln, nodes):
             wraps[ln["from"]].add(ln["to"])
     for nid, n in nodes.items():
         if n["kind"] == "declaration" and n["origin"] == "head":
@@ -374,7 +382,6 @@ def main():
     if a.previous_out and previous and os.path.exists(previous):
         shutil.copyfile(previous, a.previous_out)
     if a.diff_out:
-        import graphq
         os.makedirs(a.diff_out, exist_ok=True)
         if previous and os.path.exists(previous):
             d = graphq.diff(load(previous), doc)

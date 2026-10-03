@@ -76,8 +76,10 @@ KIND_NAMES = {
     "swift.var": "Global Variable", "swift.macro": "Macro", "swift.associatedtype": "Associated Type",
 }
 ROLE_ORDER = {"subject": 0, "alternative": 1, "argument": 2}
+CODE_KIND_ORDER = {"function": 0, "field": 1, "constant": 2, "macro": 2, "variable": 3}
 NOT_DARWIN = "(not on Darwin)"
 NO_CNAME = "(no C name)"
+SWIFT_ONLY = "Swift-only"
 NOT_IN_SDK = "(not in the macOS SDK)"
 NO_MODULE = "(in no SDK module)"
 
@@ -357,7 +359,11 @@ def state_of(pitch_list, states, day):
 # ------------------------------------------------------------------ C names
 
 def c_names(doc, nid):
-    """[(name, role, cKinds, restricted, sentence position)] for a node's wraps links."""
+    """[{name, role, cKinds, restricted, code, pos}] for a node's wraps links,
+    the stated ones (a doc sentence's or a typealias's) first, then by role
+    and the sentence's order, or for code-only ones, by kind. `code` marks a
+    name only the declaration's code reaches; a snapshot before api-graph's
+    schema 2 has only stated links."""
     if not nid:
         return []
     nodes = doc["nodes"]
@@ -367,23 +373,43 @@ def c_names(doc, nid):
             continue
         c = nodes.get(ln["to"]) or {}
         name = c.get("name") or ln["to"].split(":", 1)[-1]
-        pos = (ln.get("sentence") or "").find(f"`{name}`")
-        out.append({"name": name, "role": ln.get("role") or "subject", "cKinds": c.get("cKinds") or [],
-                    "restricted": bool(ln.get("restricted")), "pos": pos if pos >= 0 else 999})
-    out.sort(key=lambda c: (ROLE_ORDER.get(c["role"], 9), c["pos"], c["name"]))
+        pos = (ln.get("sentence") or "").find(f"`{name.rsplit('.', 1)[-1]}`")
+        code = (ln.get("sources") or [ln.get("source") or "doc"]) == ["code"]
+        out.append({"name": name, "role": ln.get("role") or "subject",
+                    "cKinds": [ln["cKind"]] if ln.get("cKind") else c.get("cKinds") or [],
+                    "restricted": bool(ln.get("restricted")), "code": code, "pos": pos if pos >= 0 else 999})
+    # Among names only code reaches, functions first: they're what a wrapper
+    # calls; the constants are what it passes them.
+    out.sort(key=lambda c: (c["code"], ROLE_ORDER.get(c["role"], 9),
+                            CODE_KIND_ORDER.get(c["cKinds"][0] if c["code"] and c["cKinds"] else "", 0),
+                            c["pos"], c["name"]))
     return out
 
 
-def primary_header(cnames, platforms, headers):
-    """The C name a declaration is grouped by, with its header and module."""
+def locate(headers, c):
+    """A C name's header: a field's is its struct's (`stat.st_size` is in
+    sys/stat.h); one the code reaches but the graph has no struct for is
+    looked up as a field."""
+    if "field" in c["cKinds"] and "." in c["name"]:
+        return headers.locate(c["name"].split(".", 1)[0], ["type"])
+    return headers.locate(c["name"], c["cKinds"])
+
+
+def primary_header(cnames, platforms, headers, reaches_c=None):
+    """The C name a declaration is grouped by, with its header and module.
+    A declaration with no C name is Swift-only when its code reaches no C at
+    all (`reaches_c` False, from the graph), and has no C name otherwise."""
     if "Darwin" not in (platforms or []):
         return None, {"header": NOT_DARWIN, "module": NOT_DARWIN, "sdkModule": NOT_DARWIN, "how": "not on Darwin"}
     # `int`, as a type's doc comment can name it, isn't any header's.
     cnames = [c for c in cnames if c["name"] not in hdr.BUILTIN_TYPES]
     if not cnames:
+        if reaches_c is False:
+            return None, {"header": SWIFT_ONLY, "module": SWIFT_ONLY, "sdkModule": SWIFT_ONLY,
+                          "how": "Swift-only: its code reaches no C"}
         return None, {"header": NO_CNAME, "module": NO_CNAME, "sdkModule": NO_CNAME, "how": "no C name"}
-    located = [(c, headers.locate(c["name"], c["cKinds"])) for c in cnames]
-    for c, r in located:
+    for c in cnames:
+        r = locate(headers, c)
         if r["header"]:
             return c["name"], r
     return cnames[0]["name"], {"header": NOT_IN_SDK, "module": NOT_IN_SDK, "sdkModule": NOT_IN_SDK,
@@ -456,8 +482,10 @@ def build(a):
         if not u["docSummary"]:
             u["docSummary"] = n.get("docSummary") or ""
         cn = c_names(doc, nid)
-        u["cNames"] = [{"name": c["name"], "role": c["role"], "restricted": c["restricted"]} for c in cn]
-        u["cName"], loc = primary_header(cn, u["platforms"], headers)
+        u["cNames"] = [{"name": c["name"], "role": c["role"], "restricted": c["restricted"], "code": c["code"]}
+                       for c in cn]
+        u["cName"], loc = primary_header(cn, u["platforms"], headers, n.get("reachesC") if nid else None)
+        u["cNameFromCode"] = bool(u["cName"]) and next(c["code"] for c in cn if c["name"] == u["cName"])
         u["header"], u["sdkSubmodule"], u["sdkModule"], u["headerHow"] = (
             loc["header"], loc["module"] or NO_MODULE, loc["sdkModule"] or NO_MODULE, loc["how"])
         used = []

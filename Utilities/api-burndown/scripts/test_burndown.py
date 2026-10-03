@@ -239,14 +239,37 @@ class ModuleMapTests(unittest.TestCase):
         self.assertIsNone(h.locate("environ", ["variable"])["header"])     # only another library's header
         self.assertEqual(h.locate("int", ["type"])["how"], "a C built-in type")
 
+    def test_primary_header(self):
+        h = hdr.Headers(self.vocab, self.sdk, None)
+        # A field is in its struct's header; a stated name before a code-only one.
+        doc = {"nodes": {"n": {}, "cname:open": {"name": "open", "cKinds": ["function"]},
+                         "cname:kevent.ident": {"name": "kevent.ident", "cKinds": ["field"]}},
+               "_out": {"n": [{"kind": "wraps", "to": "cname:open", "role": "subject", "sources": ["code"],
+                               "cKind": "function"},
+                              {"kind": "wraps", "to": "cname:kevent.ident", "role": "subject", "sources": ["doc"],
+                               "cKind": "field", "sentence": "The corresponding C field is `ident`."}]}}
+        cn = bd.c_names(doc, "n")
+        self.assertEqual([(c["name"], c["code"]) for c in cn], [("kevent.ident", False), ("open", True)])
+        name, r = bd.primary_header(cn, ["Darwin"], h, True)
+        self.assertEqual((name, r["header"]), ("kevent.ident", "sys/event.h"))
+        # A link from a snapshot before api-graph's schema 2 is stated.
+        old = {"nodes": doc["nodes"], "_out": {"n": [{"kind": "wraps", "to": "cname:open", "source": "doc"}]}}
+        self.assertEqual([c["code"] for c in bd.c_names(old, "n")], [False])
+        # No C name: Swift-only when the code reaches none, else unknown.
+        self.assertEqual(bd.primary_header([], ["Darwin"], h, False)[1]["header"], bd.SWIFT_ONLY)
+        self.assertEqual(bd.primary_header([], ["Darwin"], h, True)[1]["header"], bd.NO_CNAME)
+        self.assertEqual(bd.primary_header([], ["Darwin"], h, None)[1]["header"], bd.NO_CNAME)
+        self.assertEqual(bd.primary_header([], ["Linux"], h, False)[1]["header"], bd.NOT_DARWIN)
+
 
 class PageTests(unittest.TestCase):
-    def test_codes_follow_the_rows(self):
+    def test_rows(self):
         decls = [{"id": "x", "state": 1, "flags": [], "module": "M", "path": "A", "kindName": "Structure",
                   "area": "System/A", "file": "f", "line": 1, "platforms": ["Darwin"], "pitch": None,
-                  "pitches": [], "cName": None, "header": "(no C name)", "sdkModule": "(no C name)",
-                  "sdkSubmodule": "(no C name)", "decl": "struct A", "availability": "", "docSummary": "",
-                  "usedBy": [], "couldUse": 0, "cNames": [], "headerHow": "no C name", "excluded": False}]
+                  "pitches": [], "cName": "sigaddset", "header": "signal.h", "sdkModule": "Darwin",
+                  "sdkSubmodule": "Darwin.C.signal", "decl": "struct A", "availability": "", "docSummary": "",
+                  "usedBy": [], "couldUse": 0, "headerHow": "prototype", "excluded": False, "cNameFromCode": True,
+                  "cNames": [{"name": "sigaddset", "role": "argument", "restricted": False, "code": True}]}]
         merged = [{"id": "m", "module": "M", "path": "B", "kindName": "Case", "area": "System/B", "file": "f",
                    "line": 2, "platforms": ["Linux"], "flags": [], "decl": "case b", "excluded": False}]
         history_units = [{"id": "x", "current": True},
@@ -266,8 +289,10 @@ class PageTests(unittest.TestCase):
                          "apiDelta": {"added": 1, "hidden": 0, "date": "", "swift": ""}, "tool": {}}}
         out = page.compact(data)
         self.assertEqual(len(out["D"]), 2)             # the declaration and the merged one
-        self.assertEqual(len(out["X"]), 1)             # the one only an earlier day has
-        self.assertEqual(out["days"][0]["codes"], "15a")
+        row = out["D"][0]
+        self.assertEqual(row[20], [[out["S"].index("sigaddset"), 2, 0, 1]])   # role argument, from the code
+        self.assertEqual(row[23], 1)
+        self.assertNotIn("days", out)                  # the history decides what's merged, not shown
 
 
 if __name__ == "__main__":

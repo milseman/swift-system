@@ -1,6 +1,6 @@
 // The burn-down page: decodes the inline data, then renders the totals, the
-// chart, the groups and the declaration list against one set of filters.
-// Every string from the data goes into the DOM as text, never as markup.
+// groups and the declaration list against one set of filters. Every string
+// from the data goes into the DOM as text, never as markup.
 (function () {
   "use strict";
 
@@ -25,20 +25,13 @@
     file: str(r[6]), line: r[7], plat: r[8], pitch: str(r[9]), more: r[10].map(str), cname: str(r[11]),
     header: str(r[12]), sdk: str(r[13]), sub: str(r[14]), decl: r[15], avail: str(r[16]), doc: r[17],
     used: r[18], could: r[19], cnames: r[20], how: str(r[21]), excluded: r[22] === 1, reach: r[18].length,
-    historyOnly: false,
+    fromCode: r[23] === 1,
   }));
-  const extra = DATA.X.map((r, k) => ({
-    i: decls.length + k, module: str(r[0]), path: r[1], kind: str(r[2]), area: str(r[3]), plat: r[4],
-    flagMask: r[5], excluded: r[6] === 1, historyOnly: true, state: 0, pitch: null, more: [], cname: null,
-    header: null, sdk: null, sub: null, reach: 0, used: [], cnames: [], decl: "", doc: "",
-  }));
-  const units = decls.concat(extra);
-  for (const u of units) {
+  for (const u of decls) {
     u.flags = FLAGS.filter((f, b) => u.flagMask & (1 << b));
     u.hay = [u.path, u.cname, u.header, u.pitch, u.decl, u.file, u.sub,
       ...(u.cnames || []).map((c) => str(c[0]))].filter(Boolean).join("\n").toLowerCase();
   }
-  const days = DATA.days;
 
   // ---------------------------------------------------------------- DOM helpers
 
@@ -58,26 +51,11 @@
     }
     return e;
   }
-  const SVG = "http://www.w3.org/2000/svg";
-  function sv(tag, attrs, ...kids) {
-    const e = document.createElementNS(SVG, tag);
-    for (const [k, v] of Object.entries(attrs || {})) {
-      if (v === null || v === undefined) continue;
-      if (k === "text") e.textContent = v;
-      else if (k === "style") e.setAttribute("style", v);
-      else if (k.startsWith("on")) e.addEventListener(k.slice(2), v);
-      else e.setAttribute(k, v);
-    }
-    for (const k of kids.flat()) if (k) e.appendChild(k);
-    return e;
-  }
   const $ = (id) => document.getElementById(id);
   const clear = (e) => { while (e.firstChild) e.removeChild(e.firstChild); return e; };
   const swatch = (id) => el("span", { class: "swatch", style: `background:${stateColor(id)}` });
-  const shortDay = (d) => {
-    const [y, m, dd] = d.split("-").map(Number);
-    return new Date(Date.UTC(y, m - 1, dd)).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
-  };
+  // A C name only the declaration's code reaches, not a doc sentence.
+  const codeTag = () => el("span", { class: "codetag", title: "From the code: no doc sentence names it", text: "code" });
 
   // ---------------------------------------------------------------- filters
 
@@ -136,14 +114,16 @@
 
   // ---------------------------------------------------------------- views
 
-  const SPECIAL = new Set(["(no C name)", "(not on Darwin)", "(not in the macOS SDK)", "(in no SDK module)",
-    "(no pitch)", "(unknown)"]);
+  const SPECIAL = new Set(["(no C name)", "Swift-only", "(not on Darwin)", "(not in the macOS SDK)",
+    "(in no SDK module)", "(no pitch)", "(unknown)"]);
   const VIEWS = [
-    { id: "header", label: "Darwin header", levels: [(u) => u.sdk || "(unknown)", (u) => u.header || "(unknown)",
-      (u) => u.cname || "(unknown)"],
-      caption: "Each declaration under the first C name its doc comment names that the macOS SDK declares, " +
-        "the header that declares it, and the header's SDK module. _DarwinFoundation1 to 3 are parts of the " +
-        "C library that Darwin re-exports." },
+    { id: "header", label: "Darwin header", levels: [(u) => u.header || "(unknown)", (u) => u.cname || "(unknown)"],
+      note: (g) => (g.items[0] && g.items[0].sub && !SPECIAL.has(g.items[0].sub) ? g.items[0].sub : null),
+      caption: "Each declaration under the header that declares its first C name the macOS SDK declares, " +
+        "with the header's SDK module in small print, then the C name. A C name is a doc sentence's, or, " +
+        "marked “code”, one only the declaration's code reaches. Swift-only declarations reach no C; " +
+        "those with no C name do, and no doc sentence says which. _DarwinFoundation1 to 3 are parts of " +
+        "the C library that Darwin re-exports." },
     { id: "area", label: "System area", levels: [(u) => u.area || "(unknown)"],
       caption: "The directory under Sources/System or Sources/SystemSockets, or for a file at the top, its file group." },
     { id: "pitch", label: "Pitch", levels: [(u) => u.pitch || "(no pitch)"],
@@ -177,13 +157,6 @@
     const add = (title, ...rest) => box.appendChild(el("div", { class: "notice", role: "note" },
       el("span", { class: "icon", "aria-hidden": "true", text: "!" }),
       el("div", null, el("strong", { text: title }), " ", ...rest)));
-    const up = META.upstream;
-    if (up) {
-      add(`${META.baseRef} is ${fmt(up.behind)} commits behind ${up.ref}.`,
-        `${up.ref} (${up.commit.slice(0, 10)}${up.updated ? `, as of ${up.updated}` : ""}) already has ` +
-        `${plural(up.declarations, "declaration")} counted here, flagged “upstream”. ` +
-        `States are against ${META.baseRef}, as api-delta's are; update ${META.baseRef} to count them as merged.`);
-    }
     const g = META.graph;
     if (!g.matchesHead) {
       add("The API graph isn't the head commit's.",
@@ -225,202 +198,6 @@
       el("span", { class: "value", text: fmt(outside) }),
       el("span", { class: "sub", text: "deprecated, underscored, SPI, fix-it stubs" })));
   }
-  // ---------------------------------------------------------------- chart
-
-  const tip = $("tooltip");
-  function showTip(evt, build) {
-    clear(tip);
-    build(tip);
-    tip.hidden = false;
-    const r = tip.getBoundingClientRect();
-    let x, y;
-    if (evt && evt.clientX !== undefined && evt.type !== "focus") { x = evt.clientX + 14; y = evt.clientY + 14; }
-    else { const b = evt.target.getBoundingClientRect(); x = b.right + 8; y = b.top; }
-    if (x + r.width > window.innerWidth - 8) x = Math.max(8, x - r.width - 28);
-    if (y + r.height > window.innerHeight - 8) y = Math.max(8, window.innerHeight - r.height - 8);
-    tip.style.left = `${x}px`;
-    tip.style.top = `${y}px`;
-  }
-  const hideTip = () => { tip.hidden = true; };
-
-  // Each day's counts by state. A day's code for a declaration says whether
-  // it was outside the count that day (a to e) or in it (1 to 5).
-  function dayCounts() {
-    return days.map((d) => {
-      if (!d.codes) return null;
-      const c = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-      let outside = 0;
-      for (let k = 0; k < d.codes.length; k++) {
-        const ch = d.codes.charCodeAt(k);
-        if (ch === 46 || !passesBase(units[k])) continue;  // "."
-        if (ch >= 49 && ch <= 53) c[ch - 48]++;
-        else if (F.outside) c[ch - 96]++;
-        else outside++;
-      }
-      c.scope = c[1] + c[2] + c[3] + c[4] + c[5];
-      c.outside = outside;
-      return c;
-    });
-  }
-
-  function niceMax(v) {
-    if (v <= 0) return 10;
-    const p = Math.pow(10, Math.floor(Math.log10(v)));
-    for (const m of [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10]) if (m * p >= v) return m * p;
-    return 10 * p;
-  }
-  function ticks(max) {
-    const p = Math.pow(10, Math.floor(Math.log10(max)));
-    let step = p;
-    for (const m of [0.2, 0.25, 0.5, 1, 2, 2.5, 5]) { if (max / (m * p) <= 5) { step = m * p; break; } }
-    const out = [];
-    for (let v = 0; v <= max + 1e-9; v += step) out.push(Math.round(v));
-    return out;
-  }
-
-  function renderChart() {
-    const box = clear($("chart"));
-    const counts = dayCounts();
-    const W = Math.max(520, box.clientWidth || 900);
-    const H = 340, mt = 22, mb = 40, ml = 54, mr = 120;
-    const pw = W - ml - mr, ph = H - mt - mb;
-    const n = days.length;
-    const band = pw / Math.max(1, n);
-    const cw = Math.min(24, band * 0.62);
-    const maxScope = Math.max(1, ...counts.filter(Boolean).map((c) => c.scope));
-    const ymax = niceMax(maxScope);
-    const y = (v) => mt + ph - (v / ymax) * ph;
-    const svg = sv("svg", { viewBox: `0 0 ${W} ${H}`, height: H, role: "img",
-      "aria-label": `Declarations by state per day, ${days[0].day} to ${days[n - 1].day}` });
-    const grid = sv("g", { class: "grid" });
-    const axis = sv("g", { class: "axis" });
-    for (const t of ticks(ymax)) {
-      if (t > 0) grid.appendChild(sv("line", { x1: ml, x2: ml + pw, y1: y(t), y2: y(t) }));
-      axis.appendChild(sv("text", { x: ml - 8, y: y(t) + 4, "text-anchor": "end", text: fmt(t) }));
-    }
-    svg.appendChild(grid);
-    svg.appendChild(sv("line", { class: "baseline", x1: ml, x2: ml + pw, y1: y(0), y2: y(0) }));
-    const every = Math.max(1, Math.ceil(n / Math.max(1, pw / 58)));
-    days.forEach((d, i) => {
-      if (i % every === 0 || i === n - 1) {
-        axis.appendChild(sv("text", { x: ml + band * (i + 0.5), y: H - mb + 18, "text-anchor": "middle",
-          text: shortDay(d.day) }));
-      }
-    });
-    svg.appendChild(axis);
-
-    const cols = sv("g");
-    const pts = [];
-    days.forEach((d, i) => {
-      const cx = ml + band * (i + 0.5);
-      const c = counts[i];
-      const g = sv("g", { class: "col", tabindex: "0", role: "img",
-        "aria-label": c ? `${d.day}: scope ${fmt(c.scope)}; ` +
-          STATES.map((s) => `${s.label} ${fmt(c[s.id])}`).join(", ") : `${d.day}: not computed` });
-      if (c) {
-        // Bottom up: merged, PR open, pitched, draft, not in a pitch.
-        let cum = 0;
-        const segs = [];
-        for (const s of [5, 4, 3, 2, 1]) {
-          if (!c[s]) continue;
-          const y0 = y(cum);
-          cum += c[s];
-          segs.push({ s, y0, y1: y(cum) });
-        }
-        segs.forEach((sg, k) => {
-          const top = k === segs.length - 1;
-          let y1 = top ? sg.y1 : sg.y1 + 2;
-          if (sg.y0 - y1 < 1) y1 = sg.y0 - 1;
-          const x0 = cx - cw / 2, x1 = cx + cw / 2;
-          let dpath;
-          if (top) {
-            const r = Math.min(4, (sg.y0 - y1) / 2, cw / 2);
-            dpath = `M${x0},${sg.y0}V${y1 + r}Q${x0},${y1} ${x0 + r},${y1}H${x1 - r}Q${x1},${y1} ${x1},${y1 + r}V${sg.y0}Z`;
-          } else {
-            dpath = `M${x0},${sg.y0}V${y1}H${x1}V${sg.y0}Z`;
-          }
-          g.appendChild(sv("path", { class: "seg", d: dpath, style: `fill:${stateColor(sg.s)}` }));
-        });
-        pts.push([cx, y(c.scope), c.scope]);
-      } else {
-        g.appendChild(sv("text", { class: "skip", x: cx, y: y(0) - 6, "text-anchor": "middle", text: "skipped" }));
-      }
-      g.appendChild(sv("rect", { class: "col-hit", x: cx - band / 2, y: mt, width: band, height: ph }));
-      const show = (evt) => showTip(evt, (t) => dayTip(t, d, c));
-      g.addEventListener("pointermove", show);
-      g.addEventListener("focus", show);
-      g.addEventListener("pointerleave", hideTip);
-      g.addEventListener("blur", hideTip);
-      cols.appendChild(g);
-    });
-    svg.appendChild(cols);
-    if (pts.length) {
-      svg.appendChild(sv("polyline", { class: "scope", points: pts.map((p) => `${p[0]},${p[1]}`).join(" ") }));
-      for (const p of pts) svg.appendChild(sv("circle", { class: "scope-dot", cx: p[0], cy: p[1], r: 4 }));
-      const last = pts[pts.length - 1];
-      svg.appendChild(sv("text", { class: "label", x: last[0] + 12, y: last[1] - 2, text: fmt(last[2]) }));
-      svg.appendChild(sv("text", { class: "label sub", x: last[0] + 12, y: last[1] + 13, text: "scope" }));
-    }
-    box.appendChild(svg);
-    renderChartTable(counts);
-    const first = counts.find(Boolean), lastc = [...counts].reverse().find(Boolean);
-    $("chart-caption").textContent = first && lastc
-      ? `The top of each column is the scope: what ${META.headRef} adds over ${META.baseRef} that day, ` +
-        `plus what has merged since. ${fmt(first.scope)} on ${shortDay(days[counts.indexOf(first)].day)}, ` +
-        `${fmt(lastc.scope)} now. A day without a commit repeats the day before.`
-      : "No day could be computed for these filters.";
-  }
-
-  function dayTip(t, d, c) {
-    t.appendChild(el("div", { class: "t-head" },
-      `${shortDay(d.day)} · ${d.commit}` + (d.newCommit ? "" : " (no commit that day)")));
-    if (!c) {
-      t.appendChild(el("div", { class: "t-note", text: `Not computed: ${d.skipped || "unknown"}` }));
-      return;
-    }
-    for (const s of [1, 2, 3, 4, 5]) {
-      t.appendChild(el("div", { class: "t-row" },
-        el("span", { class: "key", style: `border-color:${stateColor(s)}` }),
-        el("b", { text: fmt(c[s]) }), el("span", { text: STATE_LABEL[s] })));
-    }
-    t.appendChild(el("div", { class: "t-row" }, el("span", { class: "key", style: "border-color:var(--text-secondary)" }),
-      el("b", { text: fmt(c.scope) }), el("span", { text: "Scope" })));
-    if (c.outside) t.appendChild(el("div", { class: "t-note", text: `${fmt(c.outside)} more outside the count` }));
-    t.appendChild(el("div", { class: "t-note", text: methodText(d) }));
-  }
-  function methodText(d) {
-    const m = { "api-delta": "From api-delta's report", snapshot: "From the source scan and the stored graph",
-      scan: "From the source scan, which misses enum cases" }[d.method] || "";
-    return d.note ? `${m}; ${d.note}.` : `${m}.`;
-  }
-
-  function renderChartTable(counts) {
-    const box = clear($("chart-table"));
-    const head = el("tr", null, el("th", { text: "Day" }), el("th", { text: "Commit" }), el("th", { text: "Method" }),
-      ...STATES.map((s) => el("th", { class: "n", text: s.label })), el("th", { class: "n", text: "Scope" }),
-      el("th", { class: "n", text: "Outside the count" }));
-    const body = days.map((d, i) => {
-      const c = counts[i];
-      return el("tr", null, el("td", { text: d.day }), el("td", { class: "mono", text: d.commit }),
-        el("td", { text: c ? d.method : `skipped: ${d.skipped}` }),
-        ...STATES.map((s) => el("td", { class: "n", text: c ? fmt(c[s.id]) : "" })),
-        el("td", { class: "n", text: c ? fmt(c.scope) : "" }), el("td", { class: "n", text: c ? fmt(c.outside) : "" }));
-    });
-    box.appendChild(el("table", { class: "data" }, el("thead", null, head), el("tbody", null, body)));
-  }
-  $("chart-table-toggle").addEventListener("click", (e) => {
-    const t = $("chart-table");
-    t.hidden = !t.hidden;
-    e.target.setAttribute("aria-expanded", String(!t.hidden));
-    e.target.textContent = t.hidden ? "Show the table" : "Hide the table";
-  });
-
-  function renderLegend() {
-    const box = clear($("legend"));
-    for (const s of STATES) box.appendChild(el("span", null, swatch(s.id), s.label));
-    box.appendChild(el("span", null, el("span", { class: "key", style: "border-color:var(--text-secondary)" }), "Scope"));
-  }
-
   // ---------------------------------------------------------------- groups
 
   function renderViews() {
@@ -477,11 +254,14 @@
         const open = expanded.has(id);
         const sel = F.group && F.group.view === view && F.group.keys.join("\u0000") === id;
         const label = el("td", null,
-          hasKids ? el("button", { class: "link twisty", type: "button", "aria-expanded": String(open),
-            "aria-label": open ? "Collapse" : "Expand",
-            onclick: (e) => { e.stopPropagation(); open ? expanded.delete(id) : expanded.add(id); renderGroups(); },
-            text: open ? "▾" : "▸" }) : null,
-          el("span", { class: SPECIAL.has(g.key) ? "muted" : (view === "header" && level > 0 ? "mono" : ""), text: g.key }),
+          el("span", { class: "nw" },
+            hasKids ? el("button", { class: "link twisty", type: "button", "aria-expanded": String(open),
+              "aria-label": open ? "Collapse" : "Expand",
+              onclick: (e) => { e.stopPropagation(); open ? expanded.delete(id) : expanded.add(id); renderGroups(); },
+              text: open ? "▾" : "▸" }) : null,
+            el("span", { class: SPECIAL.has(g.key) ? "muted" : (view === "header" ? "mono" : ""), text: g.key })),
+          v.note && level === 0 && v.note(g) ? el("small", { class: "groupnote", text: v.note(g) }) : null,
+          view === "header" && level === 1 && !SPECIAL.has(g.key) && g.items.every((u) => u.fromCode) ? codeTag() : null,
           view === "pitch" && pitchState(g.key) ? el("span", { class: "flagtag", text: pitchState(g.key) }) : null);
         rows.push(el("tr", { class: `grp lvl${level}${sel ? " sel" : ""}`, tabindex: "0",
           onclick: () => selectGroup(view, k, g.key),
@@ -538,8 +318,8 @@
       el("td", { class: "nw" }, el("span", { class: "state-cell" }, swatch(u.state), STATE_LABEL[u.state])),
       el("td", { class: "decl-cell" }, el("span", { class: "path", text: u.path }), tags),
       el("td", { class: "nw", text: u.kind || "" }),
-      el("td", { class: "mono", text: u.cname || "" }),
-      el("td", { class: "mono", text: u.header && !SPECIAL.has(u.header) ? u.header : "" }),
+      el("td", { class: "mono" }, u.cname || "", u.cname && u.fromCode ? codeTag() : null),
+      SPECIAL.has(u.header) ? el("td", { class: "muted", text: u.header }) : el("td", { class: "mono", text: u.header || "" }),
       el("td", { text: u.pitch || "" }),
       el("td", { class: "n", text: u.reach ? fmt(u.reach) : "" })));
       if (open) rows.push(detailRow(u));
@@ -586,11 +366,12 @@
     if (u.avail) add("Availability", u.avail);
     if (u.cnames.length) {
       add("C names", u.cnames.map((c, k) =>
-        el("span", null, k ? ", " : "", el("code", { text: str(c[0]) }), ` (${ROLES[c[1]]}${c[2] ? ", restricted" : ""})`)));
+        el("span", null, k ? ", " : "", el("code", { text: str(c[0]) }),
+          ` (${ROLES[c[1]]}${c[2] ? ", restricted" : ""}${c[3] ? ", from the code" : ""})`)));
     }
     add("Header", u.header && !SPECIAL.has(u.header)
       ? el("span", null, el("code", { text: u.header }), ` in ${u.sub} (${u.sdk}), by ${u.how}`)
-      : (u.header || "unknown"));
+      : (u.how ? `${u.how[0].toUpperCase()}${u.how.slice(1)}` : u.header || "unknown"));
     if (u.used.length) {
       const blocks = [];
       for (const [pk, sites] of u.used) {
@@ -624,10 +405,13 @@
       `Pitches: ${META.pitchFiles.length ? META.pitchFiles.join(", ") : "none"}, resolved with api-graph's rules. ` +
         `Pitched and PR open come from Prototype/Burndown/states.json` +
         `${Object.keys(META.states).length ? "" : ", which is empty"}.`,
-      `C names and adopters: the API graph at ${(META.graph.headCommit || "?").slice(0, 10)} (${META.graph.date}). ` +
+      `C names and adopters: the API graph at ${(META.graph.headCommit || "?").slice(0, 10)} (${META.graph.date}): ` +
+        `each declaration's doc sentences and CInterop typealiases, and, marked “code”, the C its code reaches ` +
+        `through internal code that no doc sentence names. ` +
         `Headers: the macOS ${META.sdkVersion} SDK's module maps and headers, with the coverage tools' vocabulary ${META.vocab}.`,
-      `History: one day per column, the head ref's last first-parent commit that day; ` +
-        `api-delta's source scan of each, and the stored graph where the snapshot store has the commit` +
+      `Merged: a declaration an earlier day's set had that has left the delta while ${META.baseRef} gained its ` +
+        `module and path, from api-delta's source scan of each day's last first-parent commit, and the stored ` +
+        `graph where the snapshot store has the commit` +
         `${META.storeCommits.length ? ` (${META.storeCommits.join(", ")})` : ""}.`,
       `Data digest ${DATA.digest.slice(0, 16)}; nothing on this page loads from the network.`,
     ];
@@ -648,16 +432,12 @@
   function render() {
     renderChip();
     renderTiles();
-    renderChart();
     renderViews();
     renderGroups();
     renderList();
   }
   applyTheme();
   renderHead();
-  renderLegend();
   renderFoot();
   render();
-  let rt = null;
-  window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(renderChart, 120); });
 })();

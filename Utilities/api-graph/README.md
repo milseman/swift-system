@@ -1,6 +1,6 @@
 # api-graph
 
-`regenerate.sh` builds the **graph** of the public API that one commit adds over another, by default what `system-next` adds over `main`: every new declaration, the base and external types they build on, typed links between them (membership, nesting, extension, conformance, signature use, the C functions they wrap, shared implementation, blocks, tests, samples), and each declaration's adopter reach: which packages already use it on their migration branch, with file, line and the hunk that introduced the use, and which call the C interface it covers. The graph is the product, saved as a snapshot per commit, with diffs and a query command.
+`regenerate.sh` builds the **graph** of the public API that one commit adds over another, by default what `system-next` adds over `main`: every new declaration, the base and external types they build on, typed links between them (membership, nesting, extension, conformance, signature use, the C interfaces they wrap, by their doc sentences or as their code reaches them, shared implementation, blocks, tests, samples), and each declaration's adopter reach: which packages already use it on their migration branch, with file, line and the hunk that introduced the use, and which call the C interface it covers. The graph is the product, saved as a snapshot per commit, with diffs and a query command.
 
 On top of it:
 
@@ -53,7 +53,8 @@ In `API_GRAPH_OUT`:
 - **The graph**:
   - `graph.json.gz`, the snapshot: nodes, links and the adopters' hunks (schema: `Prototype/ApiGraph/REPORT.md`, section 1), also filed in the snapshot store;
   - `GRAPH.md`: counts by node and link kind, the declarations the most packages use and could use, the packages, the domains, and how to query it;
-  - `DIFF.md` and `diff.json`: nodes and links added, removed and changed since the store's previous snapshot of the same head ref.
+  - `DIFF.md` and `diff.json`: nodes and links added, removed and changed since the store's previous snapshot of the same head ref;
+  - `DOC-SENTENCES.md`: the work list for doc sentences ("The corresponding C function is `x`."): the declarations whose code reaches C that no doc sentence of theirs names, with what it reaches, the types whose members reach C that no sentence names a C type for, and the declarations with no doc comment, by file.
 - **The pitches**:
   - `PITCHES.md` and `pitches.json`: every pitch file resolved and checked;
   - `pitches/<id>/`, a bundle per pitch file: `bundle.md` (the brief, including the pitch file's rules and what they matched, open questions, prerequisites, declarations, source ranges, tests, samples, adopter examples with the hunks that introduced them, related API by domain, prior text and commit messages), `bundle.json`, `sources.md`, `tests.md`, `samples.md` and `adopters.md`.
@@ -89,7 +90,7 @@ For each declaration, and so for each pitch and suggestion:
 - **Adopted**: where a package's migration branch (`migrate-darwin`) uses the declaration, file and line, with the hunk of the migration's diff (against the branch's merge base with the package's `main`) that introduced each use. A site is `precise` when the compiler's index resolved it: the tool exports the branch's commit, points its swift-system dependency at an export of the head commit, and builds it with an index store as the coverage tools build that package. Files the build doesn't compile (tests), lines in `#if` branches Darwin doesn't take, and packages that don't build are matched by name, `lexical`.
   - The index is cached. When System has moved since, it's *revalidated*: kept if System's manifest and every System declaration it names are unchanged in the head commit's symbol graphs, and rebuilt otherwise. A use that would now resolve to a declaration System added isn't seen until the migration is rebuilt (`scripts/method.md`, decision 37). `GRAPH.md` lists each migration's index as reused, revalidated or rebuilt, and why.
   - A rebuild is incremental: the build directory is kept, and the exports it builds are updated in place, only the files that changed (decision 38).
-- **Could use**: where a package calls a C interface the declaration newly wraps, from the coverage tools' extraction (`interfaces.json.gz` in their results store) joined with the C names in the declarations' doc comments. C names the base commit already covers don't count.
+- **Could use**: where a package calls a C interface the declaration newly wraps, from the coverage tools' extraction (`interfaces.json.gz` in their results store) joined with the C names in the declarations' doc comments. C names the base commit already covers don't count, and neither do the C names only a declaration's code reaches (its `code` wraps links) or fields.
 
 **To add a package, clone it into `../ecosystem`, or, with a migration branch, into `../adopters`.** The next run picks it up. A clone's identity is its origin URL, so a package cloned in both is one package. A migration is built as the coverage tools' package file for it says (`Utilities/adopter-coverage/packages/`), or with a plain `swift build` when there's none. Its C interfaces are the coverage tools' extraction of its commit when their store has one, and a lexical scan of its library sources until then; `Utilities/adopter-coverage/ecosystem.sh survey` and `run` produce the extraction.
 

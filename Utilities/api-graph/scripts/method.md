@@ -7,8 +7,8 @@
 3. **Indexed build.** `swift build --build-tests -Xswiftc -index-store-path` builds the head export, tests and Samples included. `--skip-update` resolves swift-argument-parser from SwiftPM's local cache, so nothing is fetched. This runs at the same time as step 1.
 4. **Scans.** api-delta's `scan_sources.py` scans both exports, and `scripts/source_index.py` indexes the head export's declarations by extent and top-level block.
 5. **References.** `scripts/index_refs.py` reads the index store with the toolchain's libIndexStore.
-6. **Declarations.** `scripts/build_graph.py` lists the declarations, their structural and signature edges (with each signature use's role), conformances, blocks, tests, samples and the implementation each one reaches.
-7. **C names.** `scripts/cnames.py` runs adopter-coverage's derivation on both exports: the C names each declaration wraps, and their C function families.
+6. **Declarations.** `scripts/build_graph.py` lists the declarations, their structural and signature edges (with each signature use's role), conformances, blocks, tests, samples, the implementation each one reaches, and the C its code reaches.
+7. **C names.** `scripts/cnames.py` runs adopter-coverage's derivation on both exports, and reads the field and property sentences it leaves out with the same grammar: the C names each declaration's doc sentences and typealiases say it wraps, then the C names its code reaches, merged with them, and the C function families.
 8. **Adopters.** `scripts/adopters.py` finds the package clones in `API_GRAPH_ADOPTERS` and `API_GRAPH_ECOSYSTEM`. It builds each migration branch's commit against an export of the head commit, with an index store, in a build directory it keeps for the next build to be incremental, or reuses the references it cached from an earlier build, once it has checked that the System declarations they name haven't changed; matches what the build didn't compile lexically; attaches the diff hunk that introduced each use; and joins the packages' C interfaces, from the coverage tools' results store, with the C names.
 9. **Graph.** `scripts/snapshot.py` assembles the snapshot, with the domains (`domains.json`), files it in the store, and diffs it with the store's previous snapshot of the same head ref (`scripts/graphq.py`'s diff); `graphq.py summary` writes `GRAPH.md`.
 10. **Pitches.** `scripts/pitches.py` resolves the pitch files against the snapshot and checks them together (`PITCHES.md`), and `scripts/bundles.py` writes a bundle per pitch.
@@ -152,6 +152,16 @@ Each decision is listed with the alternative it rejected.
     - ordering by the path dependencies between migrations (swift-build after swift-driver): each build compiles its own export of the clones it depends on, so no build waits for another;
     - limiting each build's compiler jobs (`swift build -j`), to divide the CPUs between the builds: not tried; SwiftPM's default is kept.
 
+40. **The C a declaration's code reaches is a wraps link too, `code`, merged with the doc link that names the same C name.** The walk starts at the declaration's own lines and follows the internal code they reference, new or old, at any depth, through the index: functions, macros, enum constants, variables, and fields as `struct.field`. It doesn't follow public API (a `description` that lists a type's constants doesn't wrap them), except from a fix-it stub into the declaration it renames; nor a referenced internal type's whole body; nor a debug build's mock hooks (`#if ENABLE_MOCKING`), which every syscall wrapper starts with and whose thread-local state is `pthread_getspecific`'s; nor System's own CSystem shims, which are known by where the index saw them declared, and only make a declaration reach C. A type gets no code links (its lines hold its members), but reaches C if a member does. A code link's role is `subject` when the declaration's code reaches that one C name, else `argument`. Only the stated links, a doc sentence's or a typealias's, feed reach, families, domains and pitch rules (`graphq.stated`): a code link says what an implementation touches, not what the declaration stands for.
+    *Rejected:*
+    - following public API too: at `d5541b6`, the `attributes(...)` calls reach over 100 C names each;
+    - code links feeding reach and the pitch rules: a `strlen` or an error path's `close` in an implementation would make every package that calls them a would-be user, and a pitch rule naming `close` would take them in;
+    - excluding shims by name (`csystem_`, `_`): `_SC_CHILD_MAX` starts with `_`, and a name says nothing about where it's declared;
+    - following a shim's C body lexically to what it calls: few declarations reach C only through a shim (8 at `d5541b6`), and the index has no references in shim bodies.
+
+41. **Field and property sentences are read with derive.py's grammar, and each field is named for its struct where one can be found** (`rusage_info_v6.ri_pageins`): the struct of the declaration's own code reference to a field of that name; else the sentence's spelling (`sched_param.sched_priority`); else the struct whose field of that name the declaration's type's code references (a stored property its initializer fills from `tm.tm_sec`); else the one struct its other field references name; else the C struct it extends (`linger.isEnabled`). derive.py keeps its own reading of them out of what's covered, so the coverage reports are unchanged. A "field" that's a function, constant or type elsewhere, or spelled `x_t`, is the grammar's misreading and is dropped ("`f_favail`, reported on the `statvfs` platforms"); so is the path after ", of" (`kp_eproc` in "`e_ppid`, of `kp_eproc`").
+    *Rejected:* `build_graph.py`'s own C names (`cNames`), which have no roles and missed "property" sentences until this change.
+
 ### Where it's wrong
 
 - **Promotion depends on file layout.** A type used across features within one directory isn't promoted, which is why Terminal is one cluster with seven parts rather than seven clusters. A type used by a single root file isn't either, so FileLock and the fcntl layer share a cluster. `config.json`'s `promote` and `demote` lists override it.
@@ -170,6 +180,8 @@ Each decision is listed with the alternative it rejected.
 - **A build that fails partway can keep old index units.** A file whose recompile failed keeps the unit of its last successful build, so a `partial` index can have sites from an older version of that file.
 - **A revalidated index can miss what a rebuild would find**: a use that now resolves to a declaration System added since the build (decision 37). `API_GRAPH_ADOPTER_VALIDATE=interface` or `tree` trades that for rebuilds.
 - **Would-benefit sites are at the extraction's commit.** When that's the ecosystem's clone rather than the migration's merge base, line numbers differ from the branch's; the diff says whether a line survives on the branch, not whether Darwin still compiles it (a migration that adds a Darwin branch leaves the old line to the other platforms).
+- **Code links are what the Darwin build's code reaches**, so a declaration compiled only elsewhere has none, and one whose implementation combines calls gets them all (`FilePath.Attributes.value(of:as:)` reaches every `ATTR_` constant).
+- **A doc field the code doesn't touch can stay unqualified** (`si_pid`, read through a CSystem shim), and the grammar can still misread a sentence the filters don't catch.
 - **A C name reaches every declaration that names it.** `pthread_mutex_lock` counts for `PThread.Mutex.lock()` and `withLock(_:)` alike, so a carve-out holding either gets the site.
 - **The lexical interface scan is coarse**: library Swift sources only (no C), and no scope analysis beyond the package's own declarations.
 - **C function families are what the doc sentences and POSIX's naming say.** A family a sentence calls two calls stays two (`posix_spawn` and the credential calls it makes); a derivation artifact can be a one-name family (`progress`).
@@ -184,6 +196,7 @@ Each decision is listed with the alternative it rejected.
 | `API-GRAPH.md` | The index of the reports. |
 | `GRAPH.md`, `graph.json.gz` | The graph: its summary, and the snapshot. |
 | `DIFF.md`, `diff.json` | The snapshot against the store's previous one. |
+| `DOC-SENTENCES.md` | The work list for doc sentences: declarations whose code reaches C that no doc sentence of theirs names, types whose members reach C that no sentence names a C type for, and declarations with no doc comment, by file. |
 | `PITCHES.md`, `pitches.json`, `pitches/<id>/` | The pitch files' checks, and a bundle per pitch. |
 | `SUGGESTIONS.md` | This report. |
 | `suggestions.json`, `suggestions/<id>/`, `suggestions/drafts/` | The suggestions' data, bundles, and draft pitch files. |
