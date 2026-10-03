@@ -1249,6 +1249,49 @@ internal func system_SetNamedPipeHandleState(
   SetNamedPipeHandleState(hNamedPipe, lpMode, nil, nil)
 }
 
+// MARK: - Job objects
+
+// Unnamed: lpName is always NULL.
+internal func system_CreateJobObjectW(
+  _ lpJobAttributes: UnsafeMutablePointer<SECURITY_ATTRIBUTES>?
+) -> HANDLE? {
+  CreateJobObjectW(lpJobAttributes, nil)
+}
+
+internal func system_AssignProcessToJobObject(_ hJob: HANDLE, _ hProcess: HANDLE) -> Bool {
+  AssignProcessToJobObject(hJob, hProcess)
+}
+
+internal func system_TerminateJobObject(_ hJob: HANDLE, _ uExitCode: UINT) -> Bool {
+  TerminateJobObject(hJob, uExitCode)
+}
+
+internal func system_SetInformationJobObject(
+  _ hJob: HANDLE,
+  _ JobObjectInformationClass: JOBOBJECTINFOCLASS,
+  _ lpJobObjectInformation: UnsafeMutableRawPointer,
+  _ cbJobObjectInformationLength: DWORD
+) -> Bool {
+  SetInformationJobObject(
+    hJob, JobObjectInformationClass, lpJobObjectInformation, cbJobObjectInformationLength)
+}
+
+internal func system_QueryInformationJobObject(
+  _ hJob: HANDLE,
+  _ JobObjectInformationClass: JOBOBJECTINFOCLASS,
+  _ lpJobObjectInformation: UnsafeMutableRawPointer,
+  _ cbJobObjectInformationLength: DWORD
+) -> Bool {
+  QueryInformationJobObject(
+    hJob, JobObjectInformationClass, lpJobObjectInformation, cbJobObjectInformationLength, nil)
+}
+
+internal func system_IsProcessInJob(
+  _ ProcessHandle: HANDLE, _ JobHandle: HANDLE?, _ Result: UnsafeMutablePointer<WindowsBool>
+) -> Bool {
+  IsProcessInJob(ProcessHandle, JobHandle, Result)
+}
+
 // MARK: - Access tokens, security identifiers and accounts
 
 internal func system_OpenProcessToken(

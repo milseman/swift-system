@@ -24,10 +24,10 @@ console events and `SetStdHandle` (33, `3b9327e`), library search directories (3
 line (35, `c536687`), and packages-5's `FileStream` (36, `3b9ace4`). The second session (2026-10-03) merged
 system-next at `ffaa7e4`, and did `FileStream`'s position and mock hooks (37, `6c34274`), with patch P6; then
 section 8's gaps after its top ten, in its order: users, access tokens and security identifiers (38, `32161bb`),
-and pipes (39, the last commit).
-- **Next**, none of it started: the rest of section 8's ranking, in its order: job objects; reparse points; events;
-  network interfaces; memory-mapped files; directory enumeration; directory change notification; free space and
-  volume paths. Then Winsock's implementation, once the decisions triage's item 74 is applied (section 29), and one
+pipes (39, `1bfd761`), and job objects (40, the last commit).
+- **Next**, none of it started: the rest of section 8's ranking, in its order: reparse points; events; network
+  interfaces; memory-mapped files; directory enumeration; directory change notification; free space and volume
+  paths. Then Winsock's implementation, once the decisions triage's item 74 is applied (section 29), and one
   declaration each for `BrokenDownTime` and `FileStream` across platforms (sections 30 and 36), which reshapes other
   lanes' files.
 - **For other lanes**, in the windows-3 patches section (the last): system-next merged this branch at `87c3fc6`
@@ -2094,7 +2094,7 @@ local account, such as CI's; that `CreateWellKnownSid` fails for `WinAccountAdmi
 that SystemPackage links secur32 and userenv. Not covered: domain accounts, Microsoft and Entra ID accounts (whose
 name from `GetUserNameW` may not be the account's), impersonation, and the names on a Windows not in English.
 
-## 39. windows-3: pipes: this commit
+## 39. windows-3: pipes: `1bfd761`
 
 The next gap of section 8: 2 packages, 4 files. swift-subprocess makes each standard handle's pipe a named pipe,
 since an anonymous pipe can't do overlapped I/O: `CreateNamedPipeW` with a unique name under `\\.\pipe\LOCAL\`,
@@ -2130,7 +2130,7 @@ Design calls, with the alternatives rejected:
 - **Two creations, one per handle type**, as `open` is, since an overlapped handle has its own type (section 27).
   The overlapped one's doc says to give a child process a synchronous end: a program's reads and writes of an
   overlapped handle without an `OVERLAPPED`, as the C runtime's are, can report that they finished before they
-  have, and swift-subprocess gives its children overlapped ends (section 40).
+  have, and swift-subprocess gives its children overlapped ends (see the windows-3 findings).
 - **`bytesAvailable()` throws `brokenPipe` at the end of the data**, as `PeekNamedPipe` reports it, where a read
   returns 0: an empty pipe whose writer is alive, and one whose writer is gone, are different answers to a caller
   deciding whether to read, as swift-subprocess's is.
@@ -2157,7 +2157,64 @@ first instance and `ERROR_PIPE_BUSY` past the limit; that a nonblocking read of 
 too; that a read of a message pipe into a short buffer gives `ERROR_MORE_DATA`, a short read; and what a disk file
 and a name outside `\\.\pipe\` give.
 
-## 40. windows-3: findings
+## 40. windows-3: job objects: this commit
+
+The next gap of section 8: 2 packages, 3 files. swift-subprocess puts each child in a job of its own
+(`CreateJobObjectW`), created suspended and assigned before it runs (`AssignProcessToJobObject`), so that
+`terminate(toProcessGroup:)` can end it and everything it started (`TerminateJobObject`); it explains a failed
+assignment with `IsProcessInJob`, and its tests set `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`
+(`SetInformationJobObject` with `JobObjectExtendedLimitInformation`). swift-tools-support-core's `exec` runs a
+program in a job with `KILL_ON_JOB_CLOSE` and `SILENT_BREAKAWAY_OK`, and waits for the job to empty on a completion
+port (`JobObjectAssociateCompletionPortInformation`, then `GetQueuedCompletionStatus` until
+`JOB_OBJECT_MSG_ACTIVE_PROCESS_ZERO`).
+
+What, in `Win32Jobs.swift`:
+- `Win32.JobHandle`, an owner like `ProcessHandle`, with `create(inheritable:)` (`CreateJobObjectW`),
+  `assign(_:)` (`AssignProcessToJobObject`), `contains(_:)` (`IsProcessInJob`), `terminate(exitCode:)`
+  (`TerminateJobObject`), `options()` and `setOptions(_:)` (`QueryInformationJobObject` and
+  `SetInformationJobObject`, with `JobObjectExtendedLimitInformation`), and `associate(with:key:)`
+  (`JobObjectAssociateCompletionPortInformation`).
+- `Win32.JobOptions`: the limits that take no value, `killOnClose`, `silentBreakaway`, `breakawayAllowed` and
+  `dieOnUnhandledException`.
+- `Win32.JobNotification`, read from a section 27 `Win32.Completion`: its `Kind` (the `JOB_OBJECT_MSG_*`
+  message), its process's ID, and its key.
+- `Win32.ProcessHandle.isInJob()` (`IsProcessInJob` with no job).
+
+Which API: **Win32.** A job is Windows' own way to manage a group of processes. It covers what a POSIX process
+group is used for (ending a program and its children together), and more, since a process can't leave its job or
+start one of its children outside it unless the job allows, but it isn't a process group: the shared name stays
+POSIX's.
+
+Design calls, with the alternatives rejected:
+- **Options are the limits without values**, which the adopters set; `setOptions(_:)` reads the job's limits first
+  and changes only those four flags, since `SetInformationJobObject` sets every limit at once and would clear the
+  others. Rejected for now: the limits with values (active processes, memory, time, affinity, priority), which
+  take `JOBOBJECT_EXTENDED_LIMIT_INFORMATION`'s fields and no adopter sets.
+- **A notification is read from a completion packet** rather than dequeued by a method of its own: the port is
+  section 27's, and can carry the job's packets beside others, which the key tells apart. The packet's byte count
+  is the message and its `OVERLAPPED` pointer the process's ID, as Windows documents, so `Completion`'s fields
+  carry them unchanged and `JobNotification(_:)` names them. The doc says Windows doesn't promise to deliver every
+  packet, as Microsoft's does.
+- **`assign(_:)`'s doc says to create the process suspended**, assign it, and then resume it, as swift-subprocess
+  and swift-tools-support-core do, so that it can't start a process outside the job first; and that a job can't
+  always nest in the one a process is in already.
+- **`close()`'s and the type's docs say that `killOnClose` ends the processes when the last handle closes**, which
+  the deinit does too: an owner that a crash or a `return` drops ends its processes, which is the option's point.
+- **Not wrapped**: named jobs (`OpenJobObjectW`), the jobs' accounting and process lists
+  (`JobObjectBasicAccountingInformation`, `JobObjectBasicProcessIdList`), user interface restrictions, CPU rate and
+  network limits, notification limits, and silos.
+
+Tests: `Win32JobsTests`: the constants; a suspended child assigned, found in the job, and ended with the job's
+exit code; options set and replaced; a `killOnClose` job's close ending its process; the notifications for a child
+that joins and exits, with the last one's `noActiveProcesses`; and `accessDenied` for a process handle without the
+rights.
+
+A Windows run must check those, and in particular: that the test process's own job, if its runner made one, lets
+the tests' jobs nest; that `JOB_OBJECT_MSG_ACTIVE_PROCESS_ZERO` arrives after the child's exit, and whether a
+console host the child starts joins the job too; and that `AssignProcessToJobObject` reports a handle without the
+rights as `ERROR_ACCESS_DENIED`.
+
+## 41. windows-3: findings
 
 - **`FileDescriptor`'s Windows canonicalization doesn't cover `CreateDirectoryW`'s limit** (P4).
   `withCanonicalPathRepresentation` passes `PATHCCH_ALLOW_LONG_PATHS`, so the `mkdir` adapter, which
@@ -2208,7 +2265,7 @@ and a name outside `\\.\pipe\` give.
 - **macOS's CoreFoundation declares `S_OK` and `S_FALSE` too**, so the harness's tests spell `WinSDK.S_OK`; on
   Windows, where XCTest's Foundation is swift-corelibs-foundation, the bare names would do.
 
-## 41. windows-3: patches for files outside the lane
+## 42. windows-3: patches for files outside the lane
 
 **P3, continued: `Sources/System/CMakeLists.txt`.** The Win32 `target_sources` block as it should read with this
 lane's files. P3 itself landed with coverage-4 (`8caa741`); this block replaces the one it left, and is kept current
@@ -2239,6 +2296,7 @@ target_sources(SystemPackage PRIVATE
   Win32/Win32FinalPath.swift
   Win32/Win32HResult.swift
   Win32/Win32HandleOperations.swift
+  Win32/Win32Jobs.swift
   Win32/Win32Locking.swift
   Win32/Win32LongPaths.swift
   Win32/Win32Open.swift

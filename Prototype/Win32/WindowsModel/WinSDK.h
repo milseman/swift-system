@@ -1193,3 +1193,76 @@ BOOL ConvertSidToStringSidW(PSID Sid, LPWSTR *StringSid);
 BOOL ConvertStringSidToSidW(LPCWSTR StringSid, PSID *Sid);
 BOOL CreateWellKnownSid(WELL_KNOWN_SID_TYPE WellKnownSidType, PSID DomainSid, PSID pSid,
                         DWORD *cbSid);
+
+// jobapi.h, jobapi2.h and winnt.h: job objects.
+#define JOB_OBJECT_LIMIT_DIE_ON_UNHANDLED_EXCEPTION 0x00000400
+#define JOB_OBJECT_LIMIT_BREAKAWAY_OK 0x00000800
+#define JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK 0x00001000
+#define JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE 0x00002000
+#define JOB_OBJECT_MSG_END_OF_JOB_TIME 1
+#define JOB_OBJECT_MSG_END_OF_PROCESS_TIME 2
+#define JOB_OBJECT_MSG_ACTIVE_PROCESS_LIMIT 3
+#define JOB_OBJECT_MSG_ACTIVE_PROCESS_ZERO 4
+#define JOB_OBJECT_MSG_NEW_PROCESS 6
+#define JOB_OBJECT_MSG_EXIT_PROCESS 7
+#define JOB_OBJECT_MSG_ABNORMAL_EXIT_PROCESS 8
+#define JOB_OBJECT_MSG_PROCESS_MEMORY_LIMIT 9
+#define JOB_OBJECT_MSG_JOB_MEMORY_LIMIT 10
+#define JOB_OBJECT_MSG_NOTIFICATION_LIMIT 11
+
+typedef enum _JOBOBJECTINFOCLASS : int {
+  JobObjectBasicAccountingInformation = 1,
+  JobObjectBasicLimitInformation,
+  JobObjectBasicProcessIdList,
+  JobObjectBasicUIRestrictions,
+  JobObjectSecurityLimitInformation,
+  JobObjectEndOfJobTimeInformation,
+  JobObjectAssociateCompletionPortInformation,
+  JobObjectBasicAndIoAccountingInformation,
+  JobObjectExtendedLimitInformation,
+} JOBOBJECTINFOCLASS;
+
+typedef struct _JOBOBJECT_BASIC_LIMIT_INFORMATION {
+  LARGE_INTEGER PerProcessUserTimeLimit;
+  LARGE_INTEGER PerJobUserTimeLimit;
+  DWORD LimitFlags;
+  SIZE_T MinimumWorkingSetSize;
+  SIZE_T MaximumWorkingSetSize;
+  DWORD ActiveProcessLimit;
+  ULONG_PTR Affinity;
+  DWORD PriorityClass;
+  DWORD SchedulingClass;
+} JOBOBJECT_BASIC_LIMIT_INFORMATION;
+
+typedef struct _IO_COUNTERS {
+  ULONGLONG ReadOperationCount;
+  ULONGLONG WriteOperationCount;
+  ULONGLONG OtherOperationCount;
+  ULONGLONG ReadTransferCount;
+  ULONGLONG WriteTransferCount;
+  ULONGLONG OtherTransferCount;
+} IO_COUNTERS;
+
+typedef struct _JOBOBJECT_EXTENDED_LIMIT_INFORMATION {
+  JOBOBJECT_BASIC_LIMIT_INFORMATION BasicLimitInformation;
+  IO_COUNTERS IoInfo;
+  SIZE_T ProcessMemoryLimit;
+  SIZE_T JobMemoryLimit;
+  SIZE_T PeakProcessMemoryUsed;
+  SIZE_T PeakJobMemoryUsed;
+} JOBOBJECT_EXTENDED_LIMIT_INFORMATION;
+
+typedef struct _JOBOBJECT_ASSOCIATE_COMPLETION_PORT {
+  PVOID CompletionKey;
+  HANDLE CompletionPort;
+} JOBOBJECT_ASSOCIATE_COMPLETION_PORT;
+
+HANDLE CreateJobObjectW(LPSECURITY_ATTRIBUTES lpJobAttributes, LPCWSTR lpName);
+BOOL AssignProcessToJobObject(HANDLE hJob, HANDLE hProcess);
+BOOL TerminateJobObject(HANDLE hJob, UINT uExitCode);
+BOOL SetInformationJobObject(HANDLE hJob, JOBOBJECTINFOCLASS JobObjectInformationClass,
+                             LPVOID lpJobObjectInformation, DWORD cbJobObjectInformationLength);
+BOOL QueryInformationJobObject(HANDLE hJob, JOBOBJECTINFOCLASS JobObjectInformationClass,
+                               LPVOID lpJobObjectInformation, DWORD cbJobObjectInformationLength,
+                               LPDWORD lpReturnLength);
+BOOL IsProcessInJob(HANDLE ProcessHandle, HANDLE JobHandle, PBOOL Result);

@@ -227,6 +227,13 @@ internal var _PIPE_UNLIMITED_INSTANCES: DWORD { 255 }
 @_alwaysEmitIntoClient
 internal var _ERROR_PIPE_CONNECTED: DWORD { 535 }
 
+// MARK: - Job objects
+
+// The limits that JobOptions sets; the others, which need values, a job
+// keeps as they are.
+@_alwaysEmitIntoClient
+internal var _JOB_OBJECT_OPTION_FLAGS: DWORD { 0x0000_3C00 }
+
 // MARK: - Security identifiers and accounts
 
 @_alwaysEmitIntoClient
