@@ -184,5 +184,29 @@ class StatedTests(unittest.TestCase):
         self.assertFalse(graphq.could_use(dict(doc, restricted=True), nodes))
 
 
+class WorkListTests(unittest.TestCase):
+    def test_doc_sentences(self):
+        def decl(path, **kw):
+            return dict({"kind": "declaration", "origin": "head", "path": path, "file": "Sources/A.swift",
+                         "line": 1, "ownDoc": True, "hasDoc": True}, **kw)
+        doc = {"meta": {"baseRef": "main", "headRef": "next", "headCommit": "c" * 40},
+               "nodes": {"T": decl("T", isType=True, reachesC=True, line=1),
+                         "T.update": decl("T.update", line=5), "T.insert": decl("T.insert", line=9),
+                         "T.==": decl("T.==", line=12, ownDoc=False),
+                         "T.STUB": decl("T.STUB", hiddenClass="unavailable", ownDoc=False),
+                         "cname:sigaddset": {"kind": "cname", "name": "sigaddset"},
+                         "cname:NSIG": {"kind": "cname", "name": "NSIG"}},
+               "links": [{"kind": "memberOf", "from": m, "to": "T"} for m in ("T.update", "T.insert", "T.==")]
+               + [{"kind": "wraps", "from": "T.update", "to": "cname:sigaddset", "sources": ["code"]},
+                  {"kind": "wraps", "from": "T.update", "to": "cname:NSIG", "sources": ["code"]},
+                  {"kind": "wraps", "from": "T.insert", "to": "cname:sigaddset", "sources": ["code", "doc"]}]}
+        md = graphq.doc_sentences_md(doc)
+        self.assertIn("- 5: `T.update`: `NSIG`, `sigaddset`", md)
+        self.assertNotIn("`T.insert`:", md)                     # a doc sentence names its C name
+        self.assertIn("- 1: `T`: `sigaddset`, `NSIG`", md)       # a type, through its members
+        self.assertIn("- 12: `T.==` *inherits*", md)
+        self.assertNotIn("T.STUB", md)                          # a stub's name is its C name
+
+
 if __name__ == "__main__":
     unittest.main()

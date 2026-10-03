@@ -196,7 +196,7 @@ Each decision is listed with the alternative it rejected.
 | `API-GRAPH.md` | The index of the reports. |
 | `GRAPH.md`, `graph.json.gz` | The graph: its summary, and the snapshot. |
 | `DIFF.md`, `diff.json` | The snapshot against the store's previous one. |
-| `DOC-SENTENCES.md` | The work list for doc sentences: declarations whose code reaches C that no doc sentence of theirs names, and those with no doc comment, by file. |
+| `DOC-SENTENCES.md` | The work list for doc sentences: declarations whose code reaches C that no doc sentence of theirs names, types whose members reach C that no sentence names a C type for, and declarations with no doc comment, by file. |
 | `PITCHES.md`, `pitches.json`, `pitches/<id>/` | The pitch files' checks, and a bundle per pitch. |
 | `SUGGESTIONS.md` | This report. |
 | `suggestions.json`, `suggestions/<id>/`, `suggestions/drafts/` | The suggestions' data, bundles, and draft pitch files. |

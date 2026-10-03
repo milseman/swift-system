@@ -705,19 +705,36 @@ def summary_md(doc, diff_file=None):
 
 def doc_sentences_md(doc):
     """The work list for doc sentences: the new public declarations whose
-    code reaches C that no doc sentence of theirs names, and those with no
-    doc comment, by file."""
+    code reaches C that no doc sentence of theirs names, the types whose
+    members reach C that no doc sentence names a C type for, and the
+    declarations with no doc comment, by file."""
     g = Graph(doc)
     m = doc["meta"]
-    code_only, bare = collections.defaultdict(list), collections.defaultdict(list)
+    code_only, types, bare = (collections.defaultdict(list) for _ in range(3))
+
+    def wanted(nid):
+        n = doc["nodes"].get(nid) or {}
+        return (n.get("kind") == "declaration" and n.get("origin") == "head"
+                and n.get("hiddenClass") not in ("unavailable", "underscored"))
+
+    def member_names(nid, seen):
+        out = []
+        for ln in g.inc[nid]:
+            if ln["kind"] in ("memberOf", "nestedIn") and ln["from"] not in seen:
+                seen.add(ln["from"])
+                out += [g.nodes[x["to"]]["name"] for x in g.out[ln["from"]] if x["kind"] == "wraps"]
+                out += member_names(ln["from"], seen)
+        return out
     for nid, n in doc["nodes"].items():
-        if n["kind"] != "declaration" or n["origin"] != "head" or n.get("hiddenClass") in ("unavailable",
-                                                                                          "underscored"):
+        if not wanted(nid):
             continue
         ws = [ln for ln in g.out[nid] if ln["kind"] == "wraps"]
         if ws and not any(stated(ln) for ln in ws):
             code_only[n.get("file") or "?"].append((n.get("line") or 0, g.label(nid), sorted(
                 f"{g.nodes[ln['to']]['name']}" for ln in ws)))
+        elif n.get("isType") and n.get("reachesC") and not ws:
+            types[n.get("file") or "?"].append((n.get("line") or 0, g.label(nid),
+                                                list(dict.fromkeys(member_names(nid, {nid})))))
         if not n.get("ownDoc"):
             bare[n.get("file") or "?"].append((n.get("line") or 0, g.label(nid), bool(n.get("hasDoc"))))
     L = [f"# Doc sentences to add: `{m['baseRef']}` → `{m['headRef']}`", "",
@@ -734,6 +751,17 @@ def doc_sentences_md(doc):
         for line, path, names in sorted(code_only[f]):
             L.append(f"- {line}: `{path}`: " + ", ".join(f"`{x}`" for x in names[:12])
                      + (f", and {len(names) - 12} more" if len(names) > 12 else ""))
+        L.append("")
+    L += [f"## Types whose members reach C, and no doc sentence names a C type ({sum(len(v) for v in types.values())})",
+          "", "A type gets no C names from its code, since its lines hold its members, so these are \"(no C name)\" on "
+          "the burn-down page. Some stand for a C type or a family of constants; some are only namespaces. Each is "
+          "listed with its members' C names.", ""]
+    for f in sorted(types):
+        L += [f"### `{f}`", ""]
+        for line, path, names in sorted(types[f]):
+            L.append(f"- {line}: `{path}`: " + (", ".join(f"`{x}`" for x in names[:8])
+                                                + (f", and {len(names) - 8} more" if len(names) > 8 else "")
+                                                if names else "only through a CSystem shim"))
         L.append("")
     own = sum(1 for v in bare.values() for x in v if not x[2])
     L += [f"## No doc comment ({sum(len(v) for v in bare.values())})", "",

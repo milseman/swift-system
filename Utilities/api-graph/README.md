@@ -54,7 +54,7 @@ In `API_GRAPH_OUT`:
   - `graph.json.gz`, the snapshot: nodes, links and the adopters' hunks (schema: `Prototype/ApiGraph/REPORT.md`, section 1), also filed in the snapshot store;
   - `GRAPH.md`: counts by node and link kind, the declarations the most packages use and could use, the packages, the domains, and how to query it;
   - `DIFF.md` and `diff.json`: nodes and links added, removed and changed since the store's previous snapshot of the same head ref;
-  - `DOC-SENTENCES.md`: the work list for doc sentences ("The corresponding C function is `x`."): the declarations whose code reaches C that no doc sentence of theirs names, with what it reaches, and those with no doc comment, by file.
+  - `DOC-SENTENCES.md`: the work list for doc sentences ("The corresponding C function is `x`."): the declarations whose code reaches C that no doc sentence of theirs names, with what it reaches, the types whose members reach C that no sentence names a C type for, and the declarations with no doc comment, by file.
 - **The pitches**:
   - `PITCHES.md` and `pitches.json`: every pitch file resolved and checked;
   - `pitches/<id>/`, a bundle per pitch file: `bundle.md` (the brief, including the pitch file's rules and what they matched, open questions, prerequisites, declarations, source ranges, tests, samples, adopter examples with the hunks that introduced them, related API by domain, prior text and commit messages), `bundle.json`, `sources.md`, `tests.md`, `samples.md` and `adopters.md`.

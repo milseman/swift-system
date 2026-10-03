@@ -855,13 +855,15 @@ def main():
         return c_shim(usr, defs, shim_headers)
 
     # The index is Darwin's: off Darwin, whether a declaration reaches C is
-    # unknown (None).
+    # unknown (None). A member the compiler synthesizes (an enum's
+    # `init(rawValue:)`) has no source, and reaches none.
     for n in nodes.values():
         found, shim = walk_c((n["file"], n["start"], n["end"]), release_refs_in, body_of, is_shim,
                              stub=n["hiddenClass"] == "unavailable") if n["file"] else ({}, False)
         n["cRefs"] = [{"name": nm, "cKind": k} for nm, k in sorted(found.items())]
         n["cCalls"] = sorted(nm for nm, k in found.items() if k == "function")
-        n["reachesC"] = (bool(found) or shim) if "Darwin" in (n["platforms"] or []) else None
+        on_darwin = n["source"] == "graph" or "Darwin" in (n["platforms"] or [])
+        n["reachesC"] = (bool(found) or shim) if on_darwin else None
     hosted = collections.defaultdict(list)
     for e in edges:
         if e["kind"] in ("memberOf", "nestedIn") and e["to"] in nodes:
