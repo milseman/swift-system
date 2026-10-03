@@ -25,7 +25,7 @@ line (35, `c536687`), and packages-5's `FileStream` (36, `3b9ace4`). The second 
 system-next at `ffaa7e4`, and did `FileStream`'s position and mock hooks (37, `6c34274`), with patch P6; then
 section 8's gaps after its top ten, in its order: users, access tokens and security identifiers (38, `32161bb`),
 pipes (39, `1bfd761`), job objects (40, `6d2ca5b`), reparse points (41, `5ad7c6c`), events (42, `b1bc663`), and
-network adapters (43, the last commit).
+network adapters (43, `d2c4f60`). It stopped there, at quota, with nothing in progress.
 - **Next**, none of it started: the rest of section 8's ranking, in its order: memory-mapped files; directory
   enumeration; directory change notification; free space and volume paths. Then Winsock's implementation, once the
   decisions triage's item 74 is applied (section 29), and one declaration each for `BrokenDownTime` and `FileStream`
@@ -2308,7 +2308,7 @@ A Windows run must check those, and in particular: that `waitForAll` leaves a si
 while another isn't signaled; that `WaitForMultipleObjects` rejects a duplicated handle with
 `ERROR_INVALID_PARAMETER`; and that a low-bit event keeps the packet off the port.
 
-## 43. windows-3: network adapters: this commit
+## 43. windows-3: network adapters: `d2c4f60`
 
 The next gap of section 8, which is 1 package, not 2: swift-foundation's file counts only for `NETWORK_PREFIX`, a
 constant of its own, which the survey took for an SDK name (the script now classes it with the packages' own
