@@ -24,9 +24,12 @@ clusters. Members of namespace blocks (CInterop by default) are atoms of
 their own, since one CInterop block holds the aliases of many features.
 
 Last, it attaches what the index store says about each node: the tests and
-samples that reference it, and the new internal declarations its body
-reaches (`_foo`, `system_foo`, constants, CSystem shims), which a carve-out
-has to bring along.
+samples that reference it, the new internal declarations its body reaches
+(`_foo`, `system_foo`, constants, CSystem shims), which a carve-out has to
+bring along, and the C its code reaches through internal code of any age:
+functions, macros, enum constants, variables and fields (`cRefs`, each with
+its C kind; `cCalls`, the functions), and whether it reaches any C at all
+(`reachesC`), a CSystem shim included.
 
 Usage: build_graph.py --delta-dir DIR --head-scan F --base-scan F
                       --source-index F --refs F --diff F --root DIR
@@ -55,10 +58,13 @@ SCAN_KIND = {"struct": "swift.struct", "enum": "swift.enum", "class": "swift.cla
              "subscript": "swift.subscript", "case": "swift.enum.case", "macro": "swift.macro"}
 # "The corresponding C function is `fsync`." and its variants.
 C_NAME_RE = re.compile(r"[Tt]he corresponding C (?:[a-z]+ )?(function|functions|constant|constants|type|types|"
-                       r"macro|macros|call|calls|struct|structure|field|fields|value|values|option|options|"
-                       r"command|commands|flag|flags|request|requests)[^`]*((?:`[^`]+`[^`.]*)+)")
+                       r"macro|macros|call|calls|struct|structure|field|fields|property|properties|value|values|"
+                       r"option|options|command|commands|flag|flags|request|requests)[^`]*((?:`[^`]+`[^`.]*)+)")
 TOKEN_RE = re.compile(r"\b[A-Z][A-Za-z0-9_]*(?:\.[A-Z][A-Za-z0-9_]*)*")
 NOT_C = {"true", "false", "nil", "self", "super", "errno"}
+# A named struct or union in a C USR: `c:@S@stat`, `c:@SA@DIR` (a typedef's
+# anonymous struct), `c:@U@...`, `c:@UA@...`.
+C_RECORD_RE = re.compile(r"@(?:S|SA|U|UA)@([A-Za-z_]\w*)")
 
 
 def load(path):
@@ -145,6 +151,106 @@ def c_names(doc):
                     and name not in NOT_C and name not in out:
                 out.append(name)
     return out
+
+
+def c_reference(usr):
+    """(name, C kind) for a `c:` USR that a declaration's code references: a
+    function, a macro, an enum constant, a global variable, or a struct or
+    union field, named `record.field` (`stat.st_size`). None for a type or a
+    module, which aren't counted.
+
+    Clang's USRs spell a field under its record (`c:@S@stat@FI@st_size`), a
+    constant under its enum (`c:@E@vtype@VREG`; `@Ea@` and `@EA@` for an
+    anonymous one), and a macro under its file when the header isn't a
+    system one (`c:CSystemDarwin.h@386@macro@X`). The importer's member for
+    a field of an anonymous record has no `@FI@`
+    (`c:@UA@malloc_type_descriptor_v0_t@summary`)."""
+    if not usr.startswith("c:"):
+        return None
+    body = usr[2:]
+    if "@macro@" in body:
+        return body.rsplit("@macro@", 1)[1], "macro"
+    m = re.search(r"@F@([A-Za-z_]\w*)$", body)
+    if m:
+        return m.group(1), "function"
+    m = re.search(r"@(?:E|Ea|EA)@[A-Za-z_]\w*@([A-Za-z_]\w*)$", body)
+    if m:
+        return m.group(1), "constant"
+    if "@FI@" in body:
+        head, field = body.rsplit("@FI@", 1)
+        records = C_RECORD_RE.findall(head)
+        return (f"{records[-1]}.{field}" if records else field), "field"
+    m = re.match(r"^@(?:S|SA|U|UA)@([A-Za-z_]\w*)@([A-Za-z_]\w*)$", body)
+    if m:
+        return f"{m.group(1)}.{m.group(2)}", "field"
+    m = re.match(r"^(?:[^@]+)?@([A-Za-z_]\w*)$", body)
+    if m:
+        return m.group(1), "variable"
+    return None
+
+
+def mock_only_lines(lines):
+    """The 1-based lines a build without ENABLE_MOCKING doesn't compile: an
+    `#if ENABLE_MOCKING` branch, and the other branches of an
+    `#if !ENABLE_MOCKING`. The index is a debug build's, so it has the mock
+    hook every syscall wrapper starts with, whose thread-local state is
+    `pthread_getspecific`'s; a release build has none of it."""
+    out, stack = set(), []
+    for k, line in enumerate(lines, 1):
+        m = re.match(r"\s*#(if|elseif|else|endif)\b(.*)", line)
+        if m:
+            kw, cond = m.group(1), m.group(2).strip()
+            if kw == "if":
+                stack.append([cond == "ENABLE_MOCKING", cond == "!ENABLE_MOCKING"])
+            elif kw == "elseif" and stack:
+                stack[-1][0] = stack[-1][1] or cond == "ENABLE_MOCKING"
+            elif kw == "else" and stack:
+                stack[-1][0] = stack[-1][1]
+            elif kw == "endif" and stack:
+                stack.pop()
+            continue
+        if any(f[0] for f in stack):
+            out.add(k)
+    return out
+
+
+def c_shim(usr, defs, shim_headers):
+    """Whether a C USR is System's own CSystem module's: declared under
+    Sources/CSystem, where the index saw it, or, for a macro, in the header
+    its USR names (one of `shim_headers`). Not by its name: `_SC_CHILD_MAX`
+    starts with `_` too."""
+    if any(rel.startswith("Sources/CSystem/") for rel, _line, _col in defs.get(usr, ())):
+        return True
+    m = re.match(r"c:([^@]+)@", usr)
+    return bool(m and m.group(1) in shim_headers)
+
+
+def walk_c(start, refs_in, body_of, is_shim, stub=False):
+    """({name: C kind}, reaches a shim) for the C references code reaches
+    from `start`, (file, first line, last line): the USRs `refs_in(file,
+    first, last)` gives, and on through the bodies `body_of(usr)` gives as
+    (file, first, last, access), unless public (or open). A fix-it stub's
+    own references are followed into public API too, one level."""
+    found, shim = {}, False
+    seen, stack = set(), [tuple(start) + (True,)]
+    while stack:
+        rel, first, last, own = stack.pop()
+        for usr in refs_in(rel, first, last):
+            if usr in seen:
+                continue
+            seen.add(usr)
+            if usr.startswith("c:"):
+                if is_shim(usr):
+                    shim = True
+                else:
+                    ref = c_reference(usr)
+                    if ref:
+                        found.setdefault(*ref)
+                continue
+            b = body_of(usr)
+            if b and (b[3] not in ("public", "open") or (stub and own)):
+                stack.append((b[0], b[1], b[2], False))
+    return found, shim
 
 
 class Graphs:
@@ -677,7 +783,6 @@ def main():
         piece_cache[usr] = out
         return out
 
-    c_calls = collections.defaultdict(set)
     for nid, n in nodes.items():
         if n["source"] != "graph" or not n["file"]:
             continue
@@ -688,17 +793,12 @@ def main():
                 if usr in seen:
                     continue
                 seen.add(usr)
-                if usr.startswith("c:"):
-                    nm = re.sub(r"\(.*$", "", syms.get(usr, {}).get("name", ""))
-                    if nm and not nm.startswith("_") and "@F@" in usr:
-                        c_calls[nid].add(nm)
                 p = piece_for(usr)
                 if p:
                     pieces.append(p)
                     if not p["kind"].startswith("c-"):
                         stack.append((p["file"], p["start"], p["end"]))
         n["implementation"] = sorted(pieces, key=lambda p: (p["file"], p["start"]))
-        n["cCalls"] = sorted(c_calls[nid])
         # Other new public API its implementation uses, such as a CInterop
         # alias no signature names.
         used = set(refs_in(n["file"], n["start"], n["end"], uses=True))
@@ -706,6 +806,77 @@ def main():
             if not p["kind"].startswith("c-"):
                 used |= set(refs_in(p["file"], p["start"], p["end"], uses=True))
         n["implUses"] = sorted({usr_node[u] for u in used if u in usr_node and usr_node[u] != nid})
+
+    # ------------------------------------------------------------ C references
+    # The C each declaration's code reaches: what its own lines reference,
+    # then what the internal code they reference does, at any depth, new or
+    # not. Public API isn't followed (a `description` that lists a type's
+    # constants doesn't wrap them), except from a fix-it stub, whose body is
+    # the declaration it renames; nor is an internal type's whole body. A
+    # type's own lines hold the members declared in it, and it reaches C if
+    # any of its members does, wherever they're declared. System's own C
+    # shims, declared in Sources/CSystem, reach C but aren't C names, and
+    # the mock hooks of a debug build (which the index is) aren't code.
+    # cnames.py makes the wraps links (not a type's).
+    shim_headers = {os.path.basename(rel) for rel in sindex if rel.startswith("Sources/CSystem/")}
+    mock_lines = {}
+
+    def release_refs_in(rel, start, end):
+        """refs_in, less the lines only a build with ENABLE_MOCKING has."""
+        if rel not in mock_lines:
+            mock_lines[rel] = mock_only_lines(code_lines(rel))
+        rs = refs_by_file.get(rel, [])
+        k = bisect.bisect_left(rs, [start, -1, "", 0])
+        out = []
+        while k < len(rs) and rs[k][0] <= end:
+            if rs[k][0] not in mock_lines[rel]:
+                out.append(rs[k][2])
+            k += 1
+        return out
+
+    body_cache = {}
+
+    def body_of(usr):
+        """(file, start, end, access) of the declaration in the package's own
+        Sources (not Samples) that a Swift USR names, unless it's a type."""
+        if usr not in body_cache:
+            out = None
+            for rel, line, _col in defs.get(usr, []):
+                if not rel.startswith("Sources/") or rel.startswith(("Sources/Samples/", "Sources/CSystem/")):
+                    continue
+                d = decl_at(rel, line)
+                if d and d["line"] == line and d["kw"] not in SCAN_TYPE_KWS and d["kw"] != "extension":
+                    out = (rel, d["start"], d["end"], d.get("access"))
+                    break
+            body_cache[usr] = out
+        return body_cache[usr]
+
+    def is_shim(usr):
+        return c_shim(usr, defs, shim_headers)
+
+    # The index is Darwin's: off Darwin, whether a declaration reaches C is
+    # unknown (None).
+    for n in nodes.values():
+        found, shim = walk_c((n["file"], n["start"], n["end"]), release_refs_in, body_of, is_shim,
+                             stub=n["hiddenClass"] == "unavailable") if n["file"] else ({}, False)
+        n["cRefs"] = [{"name": nm, "cKind": k} for nm, k in sorted(found.items())]
+        n["cCalls"] = sorted(nm for nm, k in found.items() if k == "function")
+        n["reachesC"] = (bool(found) or shim) if "Darwin" in (n["platforms"] or []) else None
+    hosted = collections.defaultdict(list)
+    for e in edges:
+        if e["kind"] in ("memberOf", "nestedIn") and e["to"] in nodes:
+            hosted[e["to"]].append(e["from"])
+
+    def type_reaches(nid, seen):
+        for m in hosted.get(nid, ()):
+            if m not in seen:
+                seen.add(m)
+                if nodes[m]["reachesC"] or type_reaches(m, seen):
+                    return True
+        return False
+    for nid, n in nodes.items():
+        if n["isType"] and n["reachesC"] is False:
+            n["reachesC"] = type_reaches(nid, {nid})
 
     for n in nodes.values():
         n["tests"] = sorted(n.get("tests", ()))

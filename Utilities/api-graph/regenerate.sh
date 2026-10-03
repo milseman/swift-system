@@ -335,6 +335,7 @@ if [ -n "$SNAPSHOTS" ]; then snapshot+=(--store "$SNAPSHOTS"); fi
 if [ -n "${API_GRAPH_SNAPSHOT_PREVIOUS:-}" ]; then snapshot+=(--previous "$API_GRAPH_SNAPSHOT_PREVIOUS"); fi
 python3 "$S/snapshot.py" "${snapshot[@]}"
 python3 "$S/graphq.py" --snapshot "$STAGE/graph.json.gz" summary --diff "$STAGE/DIFF.md" --out "$STAGE/GRAPH.md"
+python3 "$S/graphq.py" --snapshot "$STAGE/graph.json.gz" doc-sentences --out "$STAGE/DOC-SENTENCES.md"
 PITCHES="${API_GRAPH_PITCHES:-$REPO/Prototype/Pitches}"
 log "pitch files ($PITCHES)"
 pitches=(--snapshot "$STAGE/graph.json.gz" --pitches "$PITCHES" --out "$STAGE" --units-out "$WORK/pitch-units.json"

@@ -145,17 +145,18 @@ class Resolver:
                         problems.append(f"no C function family `{fam}`")
                 for cid in cids:
                     for ln in self.g.inc[cid]:
-                        if ln["kind"] == "wraps" and ln["role"] in ("subject", "alternative"):
+                        if graphq.stated(ln) and ln["role"] in ("subject", "alternative"):
                             out.add(ln["from"])
         elif key == "cNames":
             for nm in val:
                 cid = "cname:" + nm
-                if cid not in self.nodes:
-                    problems.append(f"no declaration wraps `{nm}`")
+                wrappers = [ln["from"] for ln in self.g.inc.get(cid, ()) if graphq.stated(ln)]
+                if not wrappers:
+                    problems.append(f"no declaration wraps `{nm}`" + (
+                        " (only code reaches it; a rule names what a doc sentence or typealias does)"
+                        if cid in self.nodes else ""))
                     continue
-                for ln in self.g.inc[cid]:
-                    if ln["kind"] == "wraps":
-                        out.add(ln["from"])
+                out.update(wrappers)
         elif key == "match":
             try:
                 pat = re.compile(val)
@@ -373,7 +374,7 @@ def pattern_report(R, r, owner):
         fams = collections.Counter()
         for x in api:
             for ln in R.g.out[x]:
-                if ln["kind"] == "wraps" and ln["role"] in ("subject", "alternative"):
+                if graphq.stated(ln) and ln["role"] in ("subject", "alternative"):
                     fam = nodes[ln["to"]].get("family")
                     if fam:
                         fams[fam] += 1
@@ -605,7 +606,7 @@ def related_api(G, mine, owner, pid, limit=40):
     for x in mine:
         for ln in G.out[x]:
             linked.add(ln["to"])
-            if ln["kind"] == "wraps" and nodes[ln["to"]].get("family"):
+            if graphq.stated(ln) and nodes[ln["to"]].get("family"):
                 fams.add(nodes[ln["to"]]["family"])
             if ln["kind"] == "inBlock":
                 blocks.add(ln["to"])
@@ -620,7 +621,7 @@ def related_api(G, mine, owner, pid, limit=40):
         shared = set(n.get("domains") or []) & doms
         if not shared:
             continue
-        nf = {nodes[ln["to"]].get("family") or nodes[ln["to"]]["name"] for ln in G.out[nid] if ln["kind"] == "wraps"}
+        nf = {nodes[ln["to"]].get("family") or nodes[ln["to"]]["name"] for ln in G.out[nid] if graphq.stated(ln)}
         nb = {ln["to"] for ln in G.out[nid] if ln["kind"] == "inBlock"}
         if nf & fams or nb & blocks or any(ln["to"] in mine for ln in G.out[nid]):
             continue

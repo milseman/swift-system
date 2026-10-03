@@ -14,7 +14,9 @@ file's), then the status, then the milestones.
 
 ## 1. Graph schema
 
-A snapshot is one JSON document (`graph.json.gz`): `meta`, `nodes` (by ID),
+A snapshot is one JSON document (`graph.json.gz`): `schema`
+(`api-graph-snapshot/2` since the cnames lane: a `wraps` link has `sources`
+and `cKind`, where schema 1 had one `source`), `meta`, `nodes` (by ID),
 `links` (a list), and `hunks` (the adopters' diff hunks, by ID, which links
 cite). IDs are stable across commits: a declaration's is its USR, which only a
 change to its signature or context changes.
@@ -23,8 +25,8 @@ change to its signature or context changes.
 
 | Kind | ID | What |
 |---|---|---|
-| `declaration` | USR, or `scan:<module>:<path>` for one only the source scan sees | A Swift declaration. `origin` is `head` (system-next adds it), `base` (a type on main: FileDescriptor, FilePath, Errno, CInterop, UserID, …; kept so links to them aren't cut), or `external` (a C or standard-library type System extends, or a protocol it conforms to). Each head declaration carries its reach (below). |
-| `cname` | `cname:<name>` | A C interface a doc comment names: function, constant, type, macro, field or variable, with the C function family it's in, and whether the base commit already covers it. |
+| `declaration` | USR, or `scan:<module>:<path>` for one only the source scan sees | A Swift declaration. `origin` is `head` (system-next adds it), `base` (a type on main: FileDescriptor, FilePath, Errno, CInterop, UserID, …; kept so links to them aren't cut), or `external` (a C or standard-library type System extends, or a protocol it conforms to). Each head declaration carries its reach (below), `hasDoc` and `ownDoc` (a doc comment, inherited or its own), and `reachesC`: whether its code reaches any C at all, a CSystem shim included (a type: if a member's does); `null` when it doesn't compile on Darwin, whose index this is. |
+| `cname` | `cname:<name>` | A C interface a doc comment names or a declaration's code reaches: function, constant, type, macro, field or variable, with the C function family it's in, and whether the base commit already covers it. A field is named for its struct where one can be found, `struct.field` (`cname:stat.st_size`). `cKinds` are what the doc sentences call it, or for a name only code reaches, what its USR says. |
 | `internal` | `internal:<USR>`, `internal:c:<name>` | New internal code a declaration's body reaches: `_foo`, `system_foo`, a `_FOO` constant, a CSystem shim. |
 | `block` | `block:<file>:<subject>[:<MARK>]#<n>` | A top-level block, a type declaration or one `extension X { … }`, with its `// MARK:` title; `n` counts blocks with the same subject and MARK in the file. |
 | `test` | `test:<file>::<scope>.<name>` | A test function, XCTest or swift-testing. |
@@ -62,7 +64,7 @@ Stored links, each kind separate:
 | `extends` | declaration → type | A member an extension adds outside its host's own file: to a base or external type, or to a new type declared elsewhere. (An `extension T` beside `T` is how this repository writes most members, and isn't one.) | `FileDescriptor.setOwner(user:group:retryOnInterrupt:)` → `FileDescriptor`; `timespec.seconds` → `timespec` |
 | `conformsTo` | type → protocol | A conformance, to a new, base or external protocol (not the ones every type gets: Copyable, Escapable, BitwiseCopyable, SendableMetatype). | `FileDescriptor.StatusFlags` → `OptionSet` |
 | `usesInSignature` | declaration → type | A type its signature names, with its roles: `parameter`, `return`, `throws`, `type` (a property's or case payload's), `aliased` (a typealias's target), `generic` (a constraint). | `FileDescriptor.setOwner(user:group:retryOnInterrupt:)` → `UserID` (parameter), → `Errno` (throws); `FileDescriptor.statusFlags()` → `FileDescriptor.StatusFlags` (return) |
-| `wraps` | declaration → cname | A C interface its doc comment names ("The corresponding C function is `x`."), as adopter-coverage's `derive.py` reads it: role `subject`, `alternative` or `argument`, and whether the sentence restricts it to one use. | `PThread.Mutex.lock()` → `pthread_mutex_lock` (subject); `FileDescriptor.statusFlags()` → `fcntl` (subject, restricted), → `F_GETFL` (argument) |
+| `wraps` | declaration → cname | A C interface the declaration wraps, with its `sources`: `doc`, its doc comment names it ("The corresponding C function is `x`."), as adopter-coverage's `derive.py` reads it, field and property sentences included; `typealias`, a CInterop typealias stands for it; `code`, its code reaches it, through the internal code it calls (not public API, a type's members, mock hooks or CSystem shims; `scripts/method.md`, decisions 40-41). A doc or typealias link has the sentence's role, `subject`, `alternative` or `argument`, and whether the sentence restricts it to one use; a code-only link is `subject` when the declaration's code reaches that one C name, else `argument`. A doc link and a code link to the same C name are one link with both sources. `cKind` is the link's C kind. Only the stated links (a `doc` or `typealias` source) feed reach, families, domains and pitch rules (`graphq.stated`). | `PThread.Mutex.lock()` → `pthread_mutex_lock` (subject, doc and code); `FileDescriptor.statusFlags()` → `fcntl` (subject, restricted), → `F_GETFL` (argument); `ProcessID.ResourceUsageInfo.pageIns` → `rusage_info_v6.ri_pageins` (subject, field, doc and code); `Signal.SIGTTIN`, a fix-it stub → `SIGTTIN` (subject, code) |
 | `reaches` | declaration → internal | New internal code its body reaches, through the index. | `FileDescriptor.setOwner(…)` → `system_fchown(_:_:_:)` |
 | `inBlock` | declaration → block | Its top-level block. | `FileDescriptor.setOwner(…)` → the `extension FileDescriptor` block in FileOperations.swift |
 | `testedBy` | declaration → test | A test that references it (by USR, from the index; by name for code not compiled here). | `FilePath.setTimes(access:modification:followTargetSymlink:retryOnInterrupt:)` → `FileTimesTest.testSetTimes()` |
@@ -76,10 +78,10 @@ snapshot and its diffs hold each fact once:
 
 | Kind | From | Example |
 |---|---|---|
-| `sameCFamily` | two declarations that `wrap` C functions of one family: functions a sentence names as spellings of one call (`chmod`, or `lchmod` if …), joined with POSIX's variants of the call (`x`, `xat`, `fx`, `lx`, `fxat`) | `FilePath.setTimes(…)` and `FileDescriptor.setTimes(…)` (the utimensat family: futimens, utimensat) |
+| `sameCFamily` | two declarations whose stated links `wrap` C functions of one family: functions a sentence names as spellings of one call (`chmod`, or `lchmod` if …), joined with POSIX's variants of the call (`x`, `xat`, `fx`, `lx`, `fxat`) | `FilePath.setTimes(…)` and `FileDescriptor.setTimes(…)` (the utimensat family: futimens, utimensat) |
 | `sameImplementation` | two declarations that `reach` one internal piece, unless more than 20 do (a shared helper, like the mock hooks) | the fcntl command accessors, through `system_fcntl` |
 | `sameBlock`, `sameMark` | two declarations in one block, or in blocks under one MARK title in one file | the members of one `extension FilePath` family |
-| `couldUse` (reach) | a declaration, and a package that `calls` a cname it wraps (as subject, alternative or argument, not restricted), unless the base commit covers the cname | `ProcessID.current` → every package that calls `getpid` |
+| `couldUse` (reach) | a declaration, and a package that `calls` a cname a stated link says it wraps (as subject, alternative or argument, not restricted, not a field), unless the base commit covers the cname (`graphq.could_use`) | `ProcessID.current` → every package that calls `getpid` |
 
 Each head declaration's **reach** is `{usedBy: [packages], couldUse:
 [packages]}`, with the sites a query lists, and its **domains** (from
@@ -96,7 +98,12 @@ members' domains).
   links added, removed and changed.
 - `scripts/graphq.py` queries a snapshot: a node's neighborhood by link kind,
   a type with or without its members, everything reaching a C family, a C
-  name's callers, a package's reach, and the diff of two snapshots.
+  name's callers, a package's reach, and the diff of two snapshots. `show`
+  and `cname` print each `wraps` link's sources (`from doc+code`), and
+  `type --members` marks a code-only C name `(code)`.
+- The first snapshot of schema 2 diffed with one of schema 1 shows every
+  `wraps` link changed (it gained `sources` and `cKind`) and the code and
+  field links added: a one-time jump, not a change to System.
 
 ## 2. Pitch file format
 

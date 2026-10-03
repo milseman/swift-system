@@ -36,6 +36,8 @@ def main():
          f"into {pk} packages. The snapshot is `graph.json.gz`, also filed in the snapshot store; "
          "`Utilities/api-graph/scripts/graphq.py` queries it.",
          f"- [`DIFF.md`](DIFF.md): what changed since the previous snapshot. {diff_line}",
+         "- [`DOC-SENTENCES.md`](DOC-SENTENCES.md): the work list for doc sentences: the declarations whose code "
+         "reaches C that no doc sentence of theirs names, and those with no doc comment, by file.",
          f"- [`PITCHES.md`](PITCHES.md): the hand-curated pitch files (`Prototype/Pitches`), checked together: "
          f"{len(p['pitches'])} pitches cover {t['covered']} of the {t['declarations']} declarations. Each has a "
          "bundle in `pitches/`.",
