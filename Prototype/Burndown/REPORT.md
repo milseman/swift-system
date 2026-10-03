@@ -4,6 +4,8 @@ Lane `burndown`, worktree `../burndown`, branch `burndown`. It was made from sys
 
 ## Resume here
 
+Since then, the `cnames` lane (2026-10-03) changed the page: it has no chart of the days and no stale-`main` banner, groups the Darwin header view by header with the SDK module in small print, marks C names only the code reaches, and labels declarations that reach no C "Swift-only". The README's design calls and `Prototype/ApiGraph/CNAMES-REPORT.md` describe it; this report describes the page as of `5d23529`.
+
 Done, 2026-10-02. Every item of "done" is built and checked:
 
 - `Utilities/api-burndown/regenerate.sh` writes `.build/api-burndown/burndown.json` and `Prototype/Burndown/burndown.html` from a clean checkout. The page is one self-contained file under 5 MB, with no network requests, and it works opened as a file.
