@@ -7,7 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-#if !os(Windows) && !os(WASI)
+#if !os(Windows)
 
 import Testing
 
@@ -17,6 +17,8 @@ import Darwin
 import Glibc
 #elseif canImport(Musl)
 import Musl
+#elseif canImport(WASILibc)
+import WASILibc
 #elseif canImport(Android)
 import Android
 #else
@@ -140,6 +142,7 @@ private struct DirectoryWalkTests {
     }
   }
 
+  #if !os(WASI) // WASI's files have no permissions
   // Permissions don't stop the superuser from opening a directory.
   @available(System 199, *)
   @Test(.enabled(if: geteuid() != 0))
@@ -158,7 +161,9 @@ private struct DirectoryWalkTests {
       }
     }
   }
+  #endif
 
+  #if !os(WASI) // WasmKit, which runs WASI's tests, can't rename (ENOTSUP)
   @available(System 199, *)
   @Test func aDirectoryReplacedByALinkIsNotFollowed() throws {
     try DirectoryFixture.withTemporaryDirectory("DirectoryWalk_replaced") { root in
@@ -195,6 +200,7 @@ private struct DirectoryWalkTests {
       #expect(entry.error == .notDirectory || entry.error == .tooManySymbolicLinkLevels)
     }
   }
+  #endif
 
   @available(System 199, *)
   @Test func theParentDirectoryContainsTheEntry() throws {
@@ -275,4 +281,4 @@ private struct DirectoryWalkTests {
   }
 }
 
-#endif // !os(Windows) && !os(WASI)
+#endif // !os(Windows)

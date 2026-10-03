@@ -9,7 +9,7 @@
 
 // Pseudoterminals: posix_openpt, grantpt, unlockpt, and ptsname_r.
 
-#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
+#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD)
 
 #if SYSTEM_PACKAGE_DARWIN
 import Darwin
@@ -63,8 +63,8 @@ internal func system_unlockpt(_ fd: CInt) -> CInt {
   #endif
 }
 
-// Returns an error number, as the Linux C libraries' ptsname_r does. Darwin's
-// returns -1 and sets errno, which this converts.
+// Returns an error number, as the Linux C libraries' ptsname_r does.
+// Darwin's and FreeBSD's return -1 and set errno, which this converts.
 @available(macOS 10.13.4, iOS 11.3, watchOS 4.3, tvOS 11.3, *)
 internal func system_ptsname_r(
   _ fd: CInt, _ buffer: UnsafeMutablePointer<CChar>, _ length: Int
@@ -79,4 +79,4 @@ internal func system_ptsname_r(
   #endif
 }
 
-#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
+#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD)

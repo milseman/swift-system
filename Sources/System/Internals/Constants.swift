@@ -471,7 +471,7 @@ internal var _ENOTRECOVERABLE: CInt { ENOTRECOVERABLE }
 internal var _EOWNERDEAD: CInt { EOWNERDEAD }
 #endif
 
-#if canImport(Darwin, _version: 346) || os(FreeBSD)
+#if SYSTEM_PACKAGE_DARWIN && canImport(Darwin, _version: 346) || os(FreeBSD)
 @_alwaysEmitIntoClient
 internal var _ENOTCAPABLE: CInt { ENOTCAPABLE }
 #endif
@@ -1196,7 +1196,7 @@ internal var _AT_REALDEV: CInt { AT_REALDEV }
 internal var _AT_FDONLY: CInt { AT_FDONLY }
 #endif
 
-#if canImport(Darwin, _version: 346) || os(FreeBSD)
+#if SYSTEM_PACKAGE_DARWIN && canImport(Darwin, _version: 346) || os(FreeBSD)
 @_alwaysEmitIntoClient
 internal var _AT_RESOLVE_BENEATH: CInt { AT_RESOLVE_BENEATH }
 #endif

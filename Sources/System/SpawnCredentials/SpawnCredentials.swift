@@ -24,7 +24,7 @@
 // which change only that thread's, and spawns the program from it with
 // posix_spawn. Elsewhere, the child would have to apply the file actions
 // and attributes itself. Not on Android, whose posix_spawn is from API
-// level 28.
+// level 28 (Spawn.swift calls it through CSystem shims there).
 
 #if SYSTEM_PACKAGE_DARWIN || os(Linux)
 

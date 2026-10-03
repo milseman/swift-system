@@ -7,7 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-#if !os(Windows) && !os(WASI)
+#if !os(Windows)
 
 import Testing
 
@@ -17,6 +17,8 @@ import Darwin
 import Glibc
 #elseif canImport(Musl)
 import Musl
+#elseif canImport(WASILibc)
+import WASILibc
 #elseif canImport(Android)
 import Android
 #else
@@ -80,6 +82,7 @@ private struct DirectoryWalkVisitsTests {
     }
   }
 
+  #if !os(WASI) // WASI's files have no permissions
   /// A directory the walk can't open is visited once, with its error.
   @available(System 199, *)
   @Test(.enabled(if: geteuid() != 0, "root can read any directory"))
@@ -98,6 +101,7 @@ private struct DirectoryWalkVisitsTests {
       #expect(b.first?.isPostorderVisit == false)
     }
   }
+  #endif
 
   /// Opening directories as the walk enters them visits the same entries,
   /// in the same order.
@@ -124,7 +128,11 @@ private struct DirectoryWalkVisitsTests {
       try DirectoryFixture.makeTree(in: root)
       func addingOnFirstVisit(_ opening: DirectoryWalk.DirectoryOpening) throws -> [String] {
         let added = root.appending("a/added-\(opening).txt")
+        #if os(WASI) // FilePath.remove() isn't on WASI
+        defer { _ = try? added.unlink() }
+        #else
         defer { _ = try? added.remove() }
+        #endif
         return try visits(root, opening: opening) { visit in
           if visit == "a" {
             try FileDescriptor.open(
@@ -140,6 +148,7 @@ private struct DirectoryWalkVisitsTests {
     }
   }
 
+  #if !os(WASI) // WASI's files have no permissions
   /// A directory that a walk can't open when it enters it is visited
   /// twice: first without an error, then with it, as its postorder visit,
   /// in place of its contents (fts's FTS_D and FTS_DNR). Skipping its
@@ -172,6 +181,7 @@ private struct DirectoryWalkVisitsTests {
       #expect(skipped.filter { $0.hasPrefix("a/b") } == ["a/b"])
     }
   }
+  #endif
 
   /// In a postorder walk, a directory's only visit is its postorder one.
   @available(System 199, *)
@@ -186,4 +196,4 @@ private struct DirectoryWalkVisitsTests {
   }
 }
 
-#endif // !os(Windows) && !os(WASI)
+#endif // !os(Windows)

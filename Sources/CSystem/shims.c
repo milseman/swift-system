@@ -52,10 +52,11 @@ uint64_t _system_get_ST_APPEND(void) { return ST_APPEND; }
 uint64_t _system_get_ST_IMMUTABLE(void) { return ST_IMMUTABLE; }
 #endif
 
-// O_TMPFILE and AT_EMPTY_PATH, which <fcntl.h> declares only with
-// _GNU_SOURCE in glibc and Musl.
+// O_PATH, O_TMPFILE and AT_EMPTY_PATH, which <fcntl.h> declares only with
+// _GNU_SOURCE in glibc, as Musl's does the last two.
 #include <fcntl.h>
 int _system_get_AT_EMPTY_PATH(void) { return AT_EMPTY_PATH; }
+int _system_get_O_PATH(void) { return O_PATH; }
 int _system_get_O_TMPFILE(void) { return O_TMPFILE; }
 
 // MAXSYMLINKS, and XATTR_NAME_MAX, which Musl's <limits.h> doesn't define:
@@ -119,6 +120,7 @@ char *csystem_mktemp(char *path) {
 
 #include <CSystemShared.h>
 #include <sys/ioctl.h>
+#include <sys/param.h>
 
 // Terminal ioctl shims for FreeBSD and OpenBSD
 int _system_ioctl_TIOCGWINSZ(int fd, void *ws) {
@@ -128,6 +130,9 @@ int _system_ioctl_TIOCGWINSZ(int fd, void *ws) {
 int _system_ioctl_TIOCSWINSZ(int fd, const void *ws) {
   return ioctl(fd, TIOCSWINSZ, ws);
 }
+
+// 32 on both: FreeBSD's is a literal, OpenBSD's its SYMLOOP_MAX.
+int _system_get_MAXSYMLINKS(void) { return MAXSYMLINKS; }
 
 #endif
 
@@ -579,6 +584,78 @@ extern int csystem_posix_spawn_file_actions_addclosefrom(void *actions, int from
   return ENOSYS;
   #endif
 }
+
+#if defined(__ANDROID__)
+// Bionic has these from API level 28, and below it doesn't declare them.
+#if __ANDROID_API__ >= 28
+#define CSYSTEM_SPAWN_API_28(call) return call
+#else
+#define CSYSTEM_SPAWN_API_28(call) return ENOSYS
+#endif
+
+extern int csystem_posix_spawn(int *pid, const char *path, const void *actions,
+                               const void *attributes, char *const arguments[],
+                               char *const environment[]) {
+  CSYSTEM_SPAWN_API_28(posix_spawn(pid, path, actions, attributes, arguments, environment));
+}
+
+extern int csystem_posix_spawnp(int *pid, const char *file, const void *actions,
+                                const void *attributes, char *const arguments[],
+                                char *const environment[]) {
+  CSYSTEM_SPAWN_API_28(posix_spawnp(pid, file, actions, attributes, arguments, environment));
+}
+
+extern int csystem_posix_spawnattr_init(void *attributes) {
+  CSYSTEM_SPAWN_API_28(posix_spawnattr_init(attributes));
+}
+
+extern int csystem_posix_spawnattr_destroy(void *attributes) {
+  CSYSTEM_SPAWN_API_28(posix_spawnattr_destroy(attributes));
+}
+
+extern int csystem_posix_spawnattr_getflags(const void *attributes, short *flags) {
+  CSYSTEM_SPAWN_API_28(posix_spawnattr_getflags(attributes, flags));
+}
+
+extern int csystem_posix_spawnattr_setflags(void *attributes, short flags) {
+  CSYSTEM_SPAWN_API_28(posix_spawnattr_setflags(attributes, flags));
+}
+
+extern int csystem_posix_spawnattr_setpgroup(void *attributes, int group) {
+  CSYSTEM_SPAWN_API_28(posix_spawnattr_setpgroup(attributes, group));
+}
+
+extern int csystem_posix_spawnattr_setsigmask(void *attributes, const void *mask) {
+  CSYSTEM_SPAWN_API_28(posix_spawnattr_setsigmask(attributes, mask));
+}
+
+extern int csystem_posix_spawnattr_setsigdefault(void *attributes, const void *mask) {
+  CSYSTEM_SPAWN_API_28(posix_spawnattr_setsigdefault(attributes, mask));
+}
+
+extern int csystem_posix_spawn_file_actions_init(void *actions) {
+  CSYSTEM_SPAWN_API_28(posix_spawn_file_actions_init(actions));
+}
+
+extern int csystem_posix_spawn_file_actions_destroy(void *actions) {
+  CSYSTEM_SPAWN_API_28(posix_spawn_file_actions_destroy(actions));
+}
+
+extern int csystem_posix_spawn_file_actions_addopen(void *actions, int fd, const char *path,
+                                                    int flags, unsigned int mode) {
+  CSYSTEM_SPAWN_API_28(posix_spawn_file_actions_addopen(actions, fd, path, flags, (mode_t)mode));
+}
+
+extern int csystem_posix_spawn_file_actions_adddup2(void *actions, int fd, int target) {
+  CSYSTEM_SPAWN_API_28(posix_spawn_file_actions_adddup2(actions, fd, target));
+}
+
+extern int csystem_posix_spawn_file_actions_addclose(void *actions, int fd) {
+  CSYSTEM_SPAWN_API_28(posix_spawn_file_actions_addclose(actions, fd));
+}
+
+#undef CSYSTEM_SPAWN_API_28
+#endif // defined(__ANDROID__)
 #endif // !defined(_WIN32) && !defined(__wasi__)
 
 #ifdef __linux__
@@ -652,8 +729,13 @@ extern int csystem_recvmmsg(int fd, void *msgvec, unsigned int vlen, int flags, 
 
 // MARK: - Locales
 
-#if defined(__linux__) && !defined(__ANDROID__)
+#ifdef __linux__
 #include <locale.h>
+
+int _system_get_LC_ALL_MASK(void) { return LC_ALL_MASK; }
+#endif // __linux__
+
+#if defined(__linux__) && !defined(__ANDROID__)
 #include <stdlib.h>
 
 // With _GNU_SOURCE, which this file defines on Linux, <stdlib.h> declares
@@ -665,8 +747,6 @@ extern double csystem_strtod_l(const char *string, char **end, void *locale) {
 extern float csystem_strtof_l(const char *string, char **end, void *locale) {
   return strtof_l(string, end, (locale_t)locale);
 }
-
-int _system_get_LC_ALL_MASK(void) { return LC_ALL_MASK; }
 
 // MARK: - Time zone files
 
@@ -752,7 +832,31 @@ extern void csystem_get_mallinfo2(struct csystem_mallinfo2 *info) {
 extern size_t csystem_malloc_usable_size(const void *pointer) {
   return malloc_usable_size(pointer);
 }
+
+#include <stdlib.h>
+#include <strings.h>
+#include <xlocale.h>
+
+extern double csystem_strtod_l(const char *string, char **end, void *locale) {
+  return strtod_l(string, end, (locale_t)locale);
+}
+
+extern float csystem_strtof_l(const char *string, char **end, void *locale) {
+  return strtof_l(string, end, (locale_t)locale);
+}
+
+extern int csystem_strncasecmp_l(const char *a, const char *b, size_t count, void *locale) {
+  return strncasecmp_l(a, b, count, (locale_t)locale);
+}
 #endif // defined(__FreeBSD__)
+
+#if defined(__wasi__)
+#include <malloc.h>
+
+extern size_t csystem_malloc_usable_size(const void *pointer) {
+  return malloc_usable_size((void *)pointer);
+}
+#endif // defined(__wasi__)
 
 #ifdef __ANDROID__
 #include <string.h>

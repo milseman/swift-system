@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:">
+<title><!--PAGE_TITLE--></title>
+<style>
+/*PAGE_CSS*/
+</style>
+</head>
+<body>
+<div class="viz-root" id="app">
+  <header class="page-head">
+    <div class="titles">
+      <h1>System's new API: the burn-down</h1>
+      <p class="subtitle" id="subtitle"></p>
+    </div>
+    <button type="button" class="theme" id="theme" aria-label="Color theme"></button>
+  </header>
+  <div id="notices" class="notices"></div>
+
+  <section class="filters" aria-label="Filters">
+    <label class="search"><span class="vh">Search</span>
+      <input type="search" id="f-q" placeholder="Search declarations, C names, headers, pitches" autocomplete="off"></label>
+    <label><span>Module</span><select id="f-module"></select></label>
+    <label><span>Kind</span><select id="f-kind"></select></label>
+    <label><span>Platform</span><select id="f-plat"></select></label>
+    <label><span>Area</span><select id="f-area"></select></label>
+    <label class="check"><input type="checkbox" id="f-outside"> <span>Include the declarations outside the count</span></label>
+    <span id="f-group" class="chip-slot"></span>
+    <button type="button" id="f-reset" class="link">Reset</button>
+  </section>
+
+  <section class="tiles" id="tiles" aria-label="Totals"></section>
+
+  <section class="card" aria-labelledby="chart-title">
+    <div class="card-head">
+      <div>
+        <h2 id="chart-title">Declarations by state, per day</h2>
+        <p class="caption" id="chart-caption"></p>
+      </div>
+      <button type="button" class="link" id="chart-table-toggle" aria-expanded="false">Show the table</button>
+    </div>
+    <div class="legend" id="legend"></div>
+    <div class="chart" id="chart"></div>
+    <div class="table-view" id="chart-table" hidden></div>
+  </section>
+
+  <section class="card" aria-labelledby="groups-title">
+    <div class="card-head">
+      <div>
+        <h2 id="groups-title">By group</h2>
+        <p class="caption" id="groups-caption"></p>
+      </div>
+      <div class="segmented" role="tablist" id="views"></div>
+    </div>
+    <div id="groups"></div>
+  </section>
+
+  <section class="card" aria-labelledby="list-title">
+    <div class="card-head">
+      <div>
+        <h2 id="list-title">Declarations</h2>
+        <p class="caption" id="list-caption"></p>
+      </div>
+      <label class="sort"><span>Sort by</span><select id="list-sort">
+        <option value="state">State, then path</option>
+        <option value="path">Path</option>
+        <option value="reach">Adopter reach</option>
+        <option value="header">Header</option>
+      </select></label>
+    </div>
+    <div id="list"></div>
+  </section>
+
+  <footer class="foot" id="foot"></footer>
+  <div class="tooltip" id="tooltip" role="tooltip" hidden></div>
+</div>
+<script id="burndown-data" type="application/json">/*PAGE_DATA*/</script>
+<script>
+/*PAGE_JS*/
+</script>
+</body>
+</html>

@@ -10,7 +10,7 @@
 // PROTOTYPE: exploring a typed pthread layer. Not API. See Prototype/Threads
 // for the design and Sources/Samples/Threads*.swift for uses.
 
-#if !os(Windows) && !os(WASI)
+#if !os(Windows) && (!os(WASI) || _runtime(_multithreaded))
 
 /// A thread of execution that the caller owns, and must join or detach.
 ///
@@ -153,6 +153,7 @@ extension PThread {
     _ = system_sched_yield()
   }
 
+  #if !os(WASI)
   /// Ends the calling thread.
   ///
   /// The code on the thread's stack doesn't finish:
@@ -168,6 +169,7 @@ extension PThread {
   /// which runs until its last thread ends.
   ///
   /// The corresponding C function is `pthread_exit`.
+  /// - Note: Not available on WASI.
   @_alwaysEmitIntoClient
   @available(*, noasync, message: "A task's code can't end the thread it runs on")
   public static func exit() -> Never {
@@ -178,6 +180,7 @@ extension PThread {
   internal static func _exit() -> Never {
     system_pthread_exit()
   }
+  #endif
 
   #if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
   /// Whether the calling thread is the process's main thread.
@@ -272,4 +275,4 @@ internal func _pthreadDiscardContext(_ context: UnsafeMutableRawPointer) {
   Unmanaged<_PThreadStart>.fromOpaque(context).release()
 }
 
-#endif // !os(Windows) && !os(WASI)
+#endif // !os(Windows) && (!os(WASI) || _runtime(_multithreaded))

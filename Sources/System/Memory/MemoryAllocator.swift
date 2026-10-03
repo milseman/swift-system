@@ -16,7 +16,7 @@ import Glibc
 
 // MARK: - Block sizes
 
-#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD)
+#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD) || os(WASI)
 @available(System 199, *)
 extension Memory {
   /// Returns the number of bytes in a block,

@@ -234,6 +234,22 @@ internal func system_getline(
   return getline(line, capacity, stream)
 }
 
+// fseeko
+internal func system_fseeko(_ stream: _CFilePointer, _ offset: off_t, _ whence: CInt) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(Int(bitPattern: stream), Int64(offset), whence) }
+#endif
+  return fseeko(stream, offset, whence)
+}
+
+// ftello
+internal func system_ftello(_ stream: _CFilePointer) -> off_t {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mockOffT(Int(bitPattern: stream)) }
+#endif
+  return ftello(stream)
+}
+
 // fileno
 internal func system_fileno(_ stream: _CFilePointer) -> CInt {
 #if ENABLE_MOCKING
@@ -275,7 +291,8 @@ internal func system_clearerr(_ stream: _CFilePointer) {
   clearerr(stream)
 }
 
-#if !os(WASI)
+// wasi-libc defines the stream locks only with threads.
+#if !os(WASI) || _runtime(_multithreaded)
 // flockfile
 internal func system_flockfile(_ stream: _CFilePointer) {
   flockfile(stream)
@@ -290,6 +307,6 @@ internal func system_funlockfile(_ stream: _CFilePointer) {
 internal func system_ftrylockfile(_ stream: _CFilePointer) -> CInt {
   ftrylockfile(stream)
 }
-#endif // !os(WASI)
+#endif // !os(WASI) || _runtime(_multithreaded)
 
 #endif // !os(Windows)

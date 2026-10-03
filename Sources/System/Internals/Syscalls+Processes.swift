@@ -218,15 +218,16 @@ internal func _idTypeValue(_ type: idtype_t) -> Int { Int(type.rawValue) }
 
 // MARK: - Spawning and executing
 //
-// posix_spawn is unavailable on watchOS and tvOS, and this package doesn't
-// wrap it on Android, where it needs API level 28 and where its pointers'
-// nullability has changed between NDK releases.
+// posix_spawn is unavailable on watchOS and tvOS. On Android, Bionic has it
+// from API level 28, and its pointers' nullability has changed between NDK
+// releases, so the posix_spawn calls go through CSystem shims there, which
+// return ENOSYS below that level.
 
-#if !os(watchOS) && !os(tvOS) && !os(Android)
+#if !os(watchOS) && !os(tvOS)
 
-// The storage types: opaque pointers on Darwin, FreeBSD, and OpenBSD, and
-// structures elsewhere.
-#if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
+// The storage types: opaque pointers on Darwin, Android, FreeBSD, and
+// OpenBSD, and structures elsewhere.
+#if SYSTEM_PACKAGE_DARWIN || os(Android) || os(FreeBSD) || os(OpenBSD)
 @usableFromInline internal typealias _SpawnAttributesStorage = posix_spawnattr_t?
 @usableFromInline internal typealias _SpawnFileActionsStorage = posix_spawn_file_actions_t?
 
@@ -259,7 +260,11 @@ internal func system_posix_spawn(
     return result
   }
 #endif
+#if os(Android)
+  return csystem_posix_spawn(pid, path, fileActions, attributes, arguments, environment)
+#else
   return posix_spawn(pid, path, fileActions, attributes, arguments, environment)
+#endif
 }
 
 internal func system_posix_spawnp(
@@ -278,7 +283,11 @@ internal func system_posix_spawnp(
     return result
   }
 #endif
+#if os(Android)
+  return csystem_posix_spawnp(pid, file, fileActions, attributes, arguments, environment)
+#else
   return posix_spawnp(pid, file, fileActions, attributes, arguments, environment)
+#endif
 }
 
 // Larger than any system's maximum process ID, so no process has it.
@@ -290,39 +299,63 @@ internal var _mockedChildProcessID: pid_t { .max }
 internal func system_posix_spawnattr_init(
   _ attributes: UnsafeMutablePointer<_SpawnAttributesStorage>
 ) -> CInt {
+#if os(Android)
+  csystem_posix_spawnattr_init(attributes)
+#else
   posix_spawnattr_init(attributes)
+#endif
 }
 
 internal func system_posix_spawnattr_destroy(
   _ attributes: UnsafeMutablePointer<_SpawnAttributesStorage>
 ) -> CInt {
+#if os(Android)
+  csystem_posix_spawnattr_destroy(attributes)
+#else
   posix_spawnattr_destroy(attributes)
+#endif
 }
 
 internal func system_posix_spawnattr_setflags(
   _ attributes: UnsafeMutablePointer<_SpawnAttributesStorage>, _ flags: CShort
 ) -> CInt {
+#if os(Android)
+  csystem_posix_spawnattr_setflags(attributes, flags)
+#else
   posix_spawnattr_setflags(attributes, flags)
+#endif
 }
 
 internal func system_posix_spawnattr_setpgroup(
   _ attributes: UnsafeMutablePointer<_SpawnAttributesStorage>, _ group: pid_t
 ) -> CInt {
+#if os(Android)
+  csystem_posix_spawnattr_setpgroup(attributes, group)
+#else
   posix_spawnattr_setpgroup(attributes, group)
+#endif
 }
 
 internal func system_posix_spawnattr_setsigmask(
   _ attributes: UnsafeMutablePointer<_SpawnAttributesStorage>,
   _ mask: UnsafePointer<sigset_t>
 ) -> CInt {
+#if os(Android)
+  csystem_posix_spawnattr_setsigmask(attributes, mask)
+#else
   posix_spawnattr_setsigmask(attributes, mask)
+#endif
 }
 
 internal func system_posix_spawnattr_setsigdefault(
   _ attributes: UnsafeMutablePointer<_SpawnAttributesStorage>,
   _ signals: UnsafePointer<sigset_t>
 ) -> CInt {
+#if os(Android)
+  csystem_posix_spawnattr_setsigdefault(attributes, signals)
+#else
   posix_spawnattr_setsigdefault(attributes, signals)
+#endif
 }
 
 #if SYSTEM_PACKAGE_DARWIN
@@ -336,13 +369,21 @@ internal func system_posix_spawnattr_set_qos_class_np(
 internal func system_posix_spawn_file_actions_init(
   _ actions: UnsafeMutablePointer<_SpawnFileActionsStorage>
 ) -> CInt {
+#if os(Android)
+  csystem_posix_spawn_file_actions_init(actions)
+#else
   posix_spawn_file_actions_init(actions)
+#endif
 }
 
 internal func system_posix_spawn_file_actions_destroy(
   _ actions: UnsafeMutablePointer<_SpawnFileActionsStorage>
 ) -> CInt {
+#if os(Android)
+  csystem_posix_spawn_file_actions_destroy(actions)
+#else
   posix_spawn_file_actions_destroy(actions)
+#endif
 }
 
 internal func system_posix_spawn_file_actions_addopen(
@@ -352,19 +393,31 @@ internal func system_posix_spawn_file_actions_addopen(
   _ oflag: CInt,
   _ mode: CInterop.Mode
 ) -> CInt {
+#if os(Android)
+  csystem_posix_spawn_file_actions_addopen(actions, fd, path, oflag, CUnsignedInt(mode))
+#else
   posix_spawn_file_actions_addopen(actions, fd, path, oflag, mode)
+#endif
 }
 
 internal func system_posix_spawn_file_actions_adddup2(
   _ actions: UnsafeMutablePointer<_SpawnFileActionsStorage>, _ fd: CInt, _ target: CInt
 ) -> CInt {
+#if os(Android)
+  csystem_posix_spawn_file_actions_adddup2(actions, fd, target)
+#else
   posix_spawn_file_actions_adddup2(actions, fd, target)
+#endif
 }
 
 internal func system_posix_spawn_file_actions_addclose(
   _ actions: UnsafeMutablePointer<_SpawnFileActionsStorage>, _ fd: CInt
 ) -> CInt {
+#if os(Android)
+  csystem_posix_spawn_file_actions_addclose(actions, fd)
+#else
   posix_spawn_file_actions_addclose(actions, fd)
+#endif
 }
 
 // ENOSYS where the C library or OS version lacks it; see shims.c.
@@ -428,7 +481,7 @@ internal func system_execvp(
 #endif
   return execvp(file, arguments)
 }
-#endif // !os(watchOS) && !os(tvOS) && !os(Android)
+#endif // !os(watchOS) && !os(tvOS)
 
 // MARK: - Resource limits
 

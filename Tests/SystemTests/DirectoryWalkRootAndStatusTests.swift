@@ -7,7 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-#if !os(Windows) && !os(WASI)
+#if !os(Windows)
 
 import Testing
 
@@ -17,6 +17,8 @@ import Darwin
 import Glibc
 #elseif canImport(Musl)
 import Musl
+#elseif canImport(WASILibc)
+import WASILibc
 #elseif canImport(Android)
 import Android
 #else
@@ -147,6 +149,7 @@ private struct DirectoryWalkRootAndStatusTests {
     }
   }
 
+  #if !os(WASI) // WASI's files have no permissions
   /// The entries of a directory that can be read but not searched have no
   /// status (fts's FTS_NS): the error is permissionDenied, and the type is
   /// the one the directory records.
@@ -178,6 +181,7 @@ private struct DirectoryWalkRootAndStatusTests {
       }
     }
   }
+  #endif
 }
 
-#endif // !os(Windows) && !os(WASI)
+#endif // !os(Windows)
