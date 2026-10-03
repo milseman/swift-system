@@ -62,44 +62,18 @@ def compact(data):
             [[S(x["package"]), [[S(s[0]), s[1] or 0, s[2] or 0, 1 if s[3] == "precise" else 0] for s in x["sites"]]]
              for x in u["usedBy"]],
             u["couldUse"], [[S(c["name"]), ROLES.index(c["role"]) if c["role"] in ROLES else 0,
-                             1 if c["restricted"] else 0] for c in u["cNames"]],
-            S(u["headerHow"]), 1 if u["excluded"] else 0,
+                             1 if c["restricted"] else 0, 1 if c.get("code") else 0] for c in u["cNames"]],
+            S(u["headerHow"]), 1 if u["excluded"] else 0, 1 if u.get("cNameFromCode") else 0,
         ])
     # Declarations merged by now: in the list and the groups, as merged.
     for g in data["merged"]:
         rows.append([
             5, fmask(g.get("flags")), S(g["module"]), g["path"], S(g.get("kindName")), S(g.get("area")),
             S(g.get("file")), g.get("line") or 0, pmask(g.get("platforms")), -1, [], -1, -1, -1, -1,
-            g.get("decl") or "", -1, "", [], 0, [], -1, 1 if g.get("excluded") else 0,
+            g.get("decl") or "", -1, "", [], 0, [], -1, 1 if g.get("excluded") else 0, 0,
         ])
-    # Every declaration a day has, in the order of the rows, then the ones
-    # only earlier days have (removed since).
-    hu = data["historyUnits"]
-    position = {}
-    for i, u in enumerate(data["declarations"]):
-        position[u["id"]] = i
-    for j, g in enumerate(data["merged"]):
-        position[g["id"]] = len(data["declarations"]) + j
-    extra = []
-    for g in hu:
-        if g["current"] or g["id"] in position:
-            continue
-        position[g["id"]] = len(rows) + len(extra)
-        extra.append([S(g["module"]), g["path"], S(g.get("kindName")), S(g.get("area")), pmask(g.get("platforms")),
-                      fmask(g.get("flags")), 1 if g.get("excluded") else 0])
-    order = [position[g["id"]] for g in hu]
-    n = len(rows) + len(extra)
-    days = []
-    for d in data["history"]["days"]:
-        codes = None
-        if d.get("codes") is not None:
-            out = ["."] * n
-            for k, ch in enumerate(d["codes"]):
-                out[order[k]] = ch
-            codes = "".join(out)
-        days.append({"day": d["day"], "commit": d["commit"][:10], "newCommit": d["newCommit"],
-                     "subject": d["subject"], "method": d["method"], "note": d.get("note"),
-                     "skipped": d.get("skipped"), "codes": codes})
+    # The days' history isn't on the page: it shows what the lanes added each
+    # day, not what landed. It still decides what's merged.
     m = data["meta"]
     meta = {
         "generated": m["generated"], "baseRef": m["baseRef"], "baseCommit": m["baseCommit"],
@@ -118,7 +92,7 @@ def compact(data):
     return {
         "digest": data["digest"], "meta": meta, "states": data["states"], "flags": flags,
         "flagText": data["flags"], "excluded": data["excludedFlags"], "platforms": PLATFORMS, "roles": ROLES,
-        "S": S.items, "D": rows, "X": extra, "days": days, "totals": data["totals"],
+        "S": S.items, "D": rows, "totals": data["totals"],
     }
 
 

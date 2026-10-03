@@ -7,9 +7,9 @@
 3. **Pitched**, and 4. **PR open:** its pitch's entry in `Prototype/Burndown/states.json` says so, from a date on.
 5. **Merged:** it was in an earlier day's set and is now in `main`'s public API.
 
-There's one point per day for history, from the branch's first day to today. At each point, the scope is the total to land that day: what the head ref added over the base ref then, plus what had merged by then.
+The history, one point per day from the branch's first day to today, decides what's merged. At each point, the scope is the total to land that day: what the head ref added over the base ref then, plus what had merged by then. The page doesn't chart it: the days show what the lanes added, not what landed.
 
-The page, `Prototype/Burndown/burndown.html`, is one self-contained file: all of its CSS, JavaScript and data are inline, it makes no network request, and it works opened as a file. It shows the totals, a column per day stacked by state with the scope line over it, and the declarations grouped six ways: by Darwin header (C name, then the header that declares it, then the SDK module), System area, pitch, platform, kind, and adopter reach. For each declaration it shows the state, the C names and header, the pitch, and which files in which packages use it, with line numbers.
+The page, `Prototype/Burndown/burndown.html`, is one self-contained file: all of its CSS, JavaScript and data are inline, it makes no network request, and it works opened as a file. It shows the totals and the declarations grouped six ways: by Darwin header (the header that declares the declaration's C name, with the header's SDK module in small print, then the C name), System area, pitch, platform, kind, and adopter reach. A C name is one a doc sentence or a CInterop typealias names, or, marked "code", one only the declaration's code reaches. A declaration whose code reaches no C at all is Swift-only; one that reaches C that no C name says is "(no C name)". For each declaration the page shows the state, the C names and header, the pitch, the flags (`upstream` for what `origin/main` already has), and which files in which packages use it, with line numbers.
 
 ## Running it
 
@@ -52,12 +52,12 @@ A hand-kept object, committed empty (`{}`): pitch ID → `{state, date, link}`, 
 }
 ```
 
-`state` is `pitched` or `pr`. A pitch's declarations are in that state from its date on, on the page and on every day of the chart. Merged isn't an entry: it comes from `main`. The page lists entries it can't use (an unknown state, a bad date, a date after today, a pitch with no file).
+`state` is `pitched` or `pr`. A pitch's declarations are in that state from its date on, on the page and on every day of the history. Merged isn't an entry: it comes from `main`. The page lists entries it can't use (an unknown state, a bad date, a date after today, a pitch with no file).
 
 ## What it reads
 
 - **api-delta** (`Utilities/api-delta/regenerate.sh`): `api-delta.json`, for the added declarations, their kinds, platforms and availability. `scripts/scan_sources.py`, api-delta's source scanner, runs on each day's commit.
-- **The API graph** (`Utilities/api-graph`): `graph.json.gz` (schema: `Prototype/ApiGraph/REPORT.md`, section 1), for each declaration's node, its C names (`wraps` links) and its adopters (`usedBy` links, with each site's file, line and column). The pitch files (section 2) are resolved with api-graph's own `scripts/pitches.py`. The page records the graph's commit.
+- **The API graph** (`Utilities/api-graph`): `graph.json.gz` (schema: `Prototype/ApiGraph/REPORT.md`, section 1), for each declaration's node, its C names (`wraps` links, with their sources: `doc`, `typealias`, `code`), whether its code reaches any C (`reachesC`), and its adopters (`usedBy` links, with each site's file, line and column). The pitch files (section 2) are resolved with api-graph's own `scripts/pitches.py`. The page records the graph's commit.
 - **The snapshot store** (`../api-graph-snapshots`): the graph of each commit it has, for those days.
 - **The SDK vocabulary** (`../coverage-results/vocab/macosx26.0-*.json.gz`, from `Utilities/adopter-coverage/scripts/vocab.py`): `{clang module: {name: [kind mask, language mask]}}`, from one package's index store. With the macOS SDK's module maps and headers (`xcrun --show-sdk-path`), it gives each C name's header and module.
 - **git**: the first-parent history of both refs, and the pitch files at each day's commit.
@@ -67,7 +67,7 @@ A hand-kept object, committed empty (`{}`): pitch ID → `{state, date, link}`, 
 - `.build/api-burndown/burndown.json`:
   - `meta`: the commits, and each input with its commit, path or problems;
   - `totals`: by state, in and outside the main count;
-  - `declarations`: one per api-delta entry, with its state, pitch and pitches, flags, C names and primary C name, header, SDK submodule and module, area, adopters (`usedBy`: package, then `[file, line, column, resolution]` sites), and `couldUse` (how many packages call a C name it wraps);
+  - `declarations`: one per api-delta entry, with its state, pitch and pitches, flags, C names (each with `code`: only its code reaches it) and primary C name (`cNameFromCode`), header, SDK submodule and module, area, adopters (`usedBy`: package, then `[file, line, column, resolution]` sites), and `couldUse` (how many packages call a C name it wraps);
   - `merged`: the declarations merged by now, from history;
   - `history.days`: one per day, with the commit, the method, the counts by state, and a code per declaration (`.` absent, `1`–`5` its state, `a`–`e` the same but outside the main count), against `historyUnits`, every declaration any day had;
   - `digest`, which the page embeds.
@@ -121,7 +121,7 @@ Each is listed with the alternative it rejected.
    *Rejected:*
    - Matching the whole signature: an availability edit on landing (`System 199` to `System 1.9`) would hide the merge.
    - Counting everything that leaves the delta: removals and renames would count as merges.
-5. **The base is `main`, as in api-delta, with a warning when `origin/main` isn't in it.** The page counts against `main` and flags the declarations `origin/main` already has. Today local `main` is 27 commits behind `origin/main`, which system-next merged on 2026-09-25, so 17 io_uring `PollEvents` declarations are counted as added and flagged `upstream`.
+5. **The base is `main`, as in api-delta, and the declarations `origin/main` already has are flagged `upstream`.** The page counts against `main`. On 2026-10-02 local `main` was 27 commits behind `origin/main`, which system-next merged on 2026-09-25, so 17 io_uring `PollEvents` declarations were counted as added and flagged. The page has no banner for it: the flag is on each row, and `burndown.json`'s `meta.upstream` says how far behind `main` is.
    *Rejected:* defaulting to `origin/main`. Its totals wouldn't match what api-delta and api-graph report by default, and a remote-tracking ref moves only when someone fetches.
 6. **One point per day.** Each is the head ref's last first-parent commit that day, from the day of its first commit not on the base, to today. A day with no commit repeats the day before. The base is the base ref's last first-parent commit that day. A commit's day is its committer date, in its own time zone.
    *Rejected:*
@@ -155,19 +155,21 @@ Each is listed with the alternative it rejected.
     *Rejected:*
     - The vocabulary alone. A name gets the module of the first declaration the index saw: `sockaddr_in` lands in `bsm/audit_record.h` from a forward declaration. It also lacks macros the index didn't record, such as `O_SYNC`.
     - The headers alone, which can't tell a function's prototype from a use.
-13. **The C name a declaration is grouped by** is the first of its C names the macOS SDK declares, taken in role order (subject, alternative, argument), then in the order the sentence names them. Only declarations that compile on Darwin get one; the rest are "not on Darwin". `int` and the other built-in types don't count.
+    - A field named for its struct (`stat.st_size`, as api-graph names one when it can) is in its struct's header.
+13. **The C name a declaration is grouped by** is the first of its C names the macOS SDK declares: the stated ones (a doc sentence's or a typealias's) first, in role order (subject, alternative, argument), then in the order the sentence names them; then the ones only its code reaches, functions first, since they're what a wrapper calls and the constants are what it passes them. Only declarations that compile on Darwin get one; the rest are "not on Darwin". `int` and the other built-in types don't count.
     *Rejected:* looking up every declaration's C name. A Windows-only declaration's `TRUE` would land in `curses.h`.
+    *Rejected:* ordering a code-only declaration's C names by name, which put `SignalSet.update(with:)` under `NSIG`'s header rather than `sigaddset`'s.
 14. **The System area** is the directory under `Sources/System` or `Sources/SystemSockets`. A file at the top goes in its file group: the shortest top-level file stem or directory name its own stem starts with. So `FileControlCommand.swift` is in `FileControl`, `ErrnoWindows.swift` in `Errno`, and `Util+StringArray.swift` in `Util`.
     *Rejected:* api-delta's `area`, its top-level type, which puts `FileDescriptor`'s new members, from 22 files, in one group.
 15. **Adopter reach is the number of packages whose migration branch uses the declaration**, from the graph's `usedBy`. The packages that call a C name it wraps (`couldUse`) are in each declaration's details, not a grouping.
 16. **A platform grouping counts a declaration under every platform it compiles on.**
     *Rejected:* one group per platform set, which makes 38 groups and hides the per-platform totals.
-17. **The page is one file with the data inline, in a compact form**: a string table, bit masks for platforms and flags, and one code string per day. It sets a Content-Security-Policy that allows nothing from the network.
+17. **The page is one file with the data inline, in a compact form**: a string table, and bit masks for platforms and flags. It sets a Content-Security-Policy that allows nothing from the network.
     *Rejected:* a separate data file that the page fetches. Browsers block `fetch` from `file://`, and any fetch is a request.
-18. **The chart is stacked columns by state, one per day, with the scope line over them.** Merged sits at the baseline, then PR open, pitched, pitch draft and not in a pitch. The states are ordered, so they take one blue ramp, light to dark (dark mode reverses it), validated with the dataviz skill's `validate_palette.js --ordinal` in both modes. The table view lists the same numbers.
-    *Rejected:*
-    - A stacked area, which makes large saturated blocks.
-    - Categorical hues, which drop the order of the states.
+18. **The page has no chart of the days, and no banner for a stale `main`** (Michael, 2026-10-03): the history is the lanes' output, not landing. The history still decides what's merged, and `burndown.json` keeps it (`history.days`); `upstream` stays a flag on each row. The states keep one blue ramp, light to dark (dark mode reverses it), validated with the dataviz skill's `validate_palette.js --ordinal` in both modes, in the tiles and the groups' bars.
+    *Rejected:* the stacked columns by state, one per day, with the scope line over them, which the page had until then.
+19. **A declaration with no C name is Swift-only when its code reaches no C at all**: no C function, macro, constant, variable or field, and no CSystem shim, through the internal code it calls (api-graph's `reachesC`; for a type, through any of its members). One whose code reaches C but has no C name is "(no C name)": on 2026-10-03 those were types whose members reach C and no doc sentence names a C type for, and a few declarations that reach C only through a shim.
+    *Rejected:* "(no C name)" for both, which hid the `rawValue`, `==`, `hash(into:)` and `description` declarations, which wrap nothing, among those that need a doc sentence.
 
 ### Limitations
 
@@ -181,6 +183,7 @@ Each is listed with the alternative it rejected.
 - **Pitches on days the store has no graph for** are resolved against the newest graph, so a declaration that graph no longer has counts as in no pitch that day.
 - **The SPI flag** sees `@_spi` on a declaration, not on its enclosing extension. There's no SPI in either module today.
 - **A declaration renamed as it lands** counts as removed, and its new name, being in main, is in no state.
-- **A struct field's header** is the first that the vocabulary gives, since field names aren't unique.
+- **A field the graph couldn't name for its struct** (`si_pid`, which System reads through a CSystem shim) gets the first header the vocabulary gives, since field names aren't unique.
+- **A code-only C name is what the Darwin build's code reaches**: a declaration whose implementation combines calls is under its first function's header (`DirectoryWalk.skipDescendants()` under `close`'s).
 - **States follow the pitch files in the working tree**, as api-graph's do. The page warns when they have uncommitted changes.
 - **The header index covers the macOS SDK's `usr/include`.** A framework's name maps to the framework's header of the same name.
