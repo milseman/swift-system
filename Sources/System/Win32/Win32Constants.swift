@@ -207,6 +207,21 @@ internal var _ERROR_TIMEOUT: DWORD { 1460 }
 @_alwaysEmitIntoClient
 internal var _ERROR_ENVVAR_NOT_FOUND: DWORD { 203 }
 
+// MARK: - Network adapters
+
+@_alwaysEmitIntoClient
+internal var _AF_UNSPEC: ULONG { 0 }
+
+// The unicast addresses alone.
+@_alwaysEmitIntoClient
+internal var _GAA_FLAGS_UNICAST_ONLY: ULONG { 0x0002 | 0x0004 | 0x0008 }
+
+@_alwaysEmitIntoClient
+internal var _IP_ADAPTER_NO_MULTICAST: ULONG { 0x0010 }
+
+@_alwaysEmitIntoClient
+internal var _ERROR_BUFFER_OVERFLOW: ULONG { 111 }
+
 // MARK: - Events and waits
 
 // The SDK's is ((STATUS_ABANDONED_WAIT_0) + 0), which doesn't import.

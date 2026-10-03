@@ -1200,6 +1200,19 @@ internal func system_CreateHardLinkW(
   CreateHardLinkW(lpFileName, lpExistingFileName, nil)
 }
 
+// MARK: - Network adapters
+
+// In iphlpapi.dll. Returns an error code, rather than setting the last
+// error.
+internal func system_GetAdaptersAddresses(
+  _ Family: ULONG,
+  _ Flags: ULONG,
+  _ AdapterAddresses: UnsafeMutablePointer<IP_ADAPTER_ADDRESSES>?,
+  _ SizePointer: UnsafeMutablePointer<ULONG>
+) -> ULONG {
+  GetAdaptersAddresses(Family, Flags, nil, AdapterAddresses, SizePointer)
+}
+
 // MARK: - Events
 
 // Unnamed: lpName is always NULL.

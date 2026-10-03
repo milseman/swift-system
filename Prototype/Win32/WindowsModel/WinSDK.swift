@@ -5,7 +5,10 @@
 
 @_exported import ucrt
 @_exported import WinSDK // Clang module
-@_exported import ObjectiveC // For ObjCBool, which stands in for WindowsBool.
+// ObjCBool stands in for WindowsBool. Only it is re-exported: the whole
+// ObjectiveC module would bring macOS's C library, through Darwin, into
+// every file that imports this one.
+@_exported import struct ObjectiveC.ObjCBool
 
 // WinBase.h
 @inlinable

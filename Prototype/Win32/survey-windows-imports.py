@@ -461,7 +461,7 @@ CONCEPTS = [
       "in_port_t", "ip_mreq", "ipv6_mreq", "linger", "msghdr", "pollfd", "u_short",
       "re:^CNIOWindows_(CMSG_[A-Z_]+|getsockopt|setsockopt|recv|recvmmsg|send|mmsghdr)$"]),
     ("gap", "Network interfaces", "NetworkInterfaces is POSIX-only",
-     ["GetAdaptersAddresses", "IP_ADAPTER_ADDRESSES", "IP_ADAPTER_UNICAST_ADDRESS", "NETWORK_PREFIX"]),
+     ["GetAdaptersAddresses", "IP_ADAPTER_ADDRESSES", "IP_ADAPTER_UNICAST_ADDRESS"]),
 
     # ---- other: not System's
     ("other", "Shell and COM: known folders, file info, MIME types", "the Shell; not System's",
@@ -501,8 +501,9 @@ CONCEPTS = [
       "ChannelInitializerResult", "CommandResult", "CommandStatusKind", "ConditionTrait", "ConvertibleFromBytes",
       "CycleAction", "DateFormatter", "Deque", "DestinationType", "DiscoveredDependencyKind", "HTTPURLResponse",
       "In", "InputElement", "InputString", "re:^LanguageServerProtocol[A-Za-z]*$", "ManagedAtomic", "ObjCBool",
-      "Out", "PLACEHOLDER_TOKEN_USER", "RuleRunReason", "SIG_FIG", "SymbolGraph", "TX", "TargetEncoding",
-      "TargetStream", "URLResponse", "UnsafeAtomic", "ToolsProtocolsSwiftExtensions", "SKLogging"]),
+      "NETWORK_PREFIX", "Out", "PLACEHOLDER_TOKEN_USER", "RuleRunReason", "SIG_FIG", "SymbolGraph", "TX",
+      "TargetEncoding", "TargetStream", "URLResponse", "UnsafeAtomic", "ToolsProtocolsSwiftExtensions",
+      "SKLogging"]),
 ]
 
 

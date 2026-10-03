@@ -1288,3 +1288,90 @@ BOOL SetEvent(HANDLE hEvent);
 BOOL ResetEvent(HANDLE hEvent);
 DWORD WaitForMultipleObjects(DWORD nCount, const HANDLE *lpHandles, BOOL bWaitAll,
                              DWORD dwMilliseconds);
+
+// ws2def.h, iptypes.h, ifdef.h, ipifcons.h and iphlpapi.h: network adapters.
+// The structures keep only the fields System reads, under the SDK's names,
+// with the anonymous unions that put IfIndex and the address's Length first.
+typedef int INT;
+typedef unsigned char UINT8;
+typedef unsigned short ADDRESS_FAMILY;
+#define AF_UNSPEC 0
+#define AF_INET 2
+#define AF_INET6 23
+#define MAX_ADAPTER_ADDRESS_LENGTH 8
+#define GAA_FLAG_SKIP_ANYCAST 0x0002
+#define GAA_FLAG_SKIP_MULTICAST 0x0004
+#define GAA_FLAG_SKIP_DNS_SERVER 0x0008
+#define IP_ADAPTER_NO_MULTICAST 0x0010
+#define IF_TYPE_OTHER 1
+#define IF_TYPE_ETHERNET_CSMACD 6
+#define IF_TYPE_ISO88025_TOKENRING 9
+#define IF_TYPE_PPP 23
+#define IF_TYPE_SOFTWARE_LOOPBACK 24
+#define IF_TYPE_ATM 37
+#define IF_TYPE_IEEE80211 71
+#define IF_TYPE_TUNNEL 131
+#define IF_TYPE_IEEE1394 144
+#define ERROR_BUFFER_OVERFLOW 111
+
+// The SDK's tag is sockaddr, which the macOS SDK's Darwin module, which
+// files that import this one see too, defines differently; Swift code
+// reaches it only through LPSOCKADDR.
+typedef struct _winsdk_model_sockaddr {
+  ADDRESS_FAMILY sa_family;
+  CHAR sa_data[14];
+} SOCKADDR, *PSOCKADDR, *LPSOCKADDR;
+
+typedef struct _SOCKET_ADDRESS {
+  LPSOCKADDR lpSockaddr;
+  INT iSockaddrLength;
+} SOCKET_ADDRESS;
+
+typedef enum _IF_OPER_STATUS : int {
+  IfOperStatusUp = 1,
+  IfOperStatusDown,
+  IfOperStatusTesting,
+  IfOperStatusUnknown,
+  IfOperStatusDormant,
+  IfOperStatusNotPresent,
+  IfOperStatusLowerLayerDown
+} IF_OPER_STATUS;
+
+typedef struct _IP_ADAPTER_UNICAST_ADDRESS_LH {
+  union {
+    ULONGLONG Alignment;
+    struct {
+      ULONG Length;
+      DWORD Flags;
+    };
+  };
+  struct _IP_ADAPTER_UNICAST_ADDRESS_LH *Next;
+  SOCKET_ADDRESS Address;
+  UINT8 OnLinkPrefixLength;
+} IP_ADAPTER_UNICAST_ADDRESS_LH, IP_ADAPTER_UNICAST_ADDRESS, *PIP_ADAPTER_UNICAST_ADDRESS;
+
+typedef struct _IP_ADAPTER_ADDRESSES_LH {
+  union {
+    ULONGLONG Alignment;
+    struct {
+      ULONG Length;
+      ULONG IfIndex;
+    };
+  };
+  struct _IP_ADAPTER_ADDRESSES_LH *Next;
+  CHAR *AdapterName;
+  PIP_ADAPTER_UNICAST_ADDRESS FirstUnicastAddress;
+  WCHAR *DnsSuffix;
+  WCHAR *Description;
+  WCHAR *FriendlyName;
+  BYTE PhysicalAddress[MAX_ADAPTER_ADDRESS_LENGTH];
+  ULONG PhysicalAddressLength;
+  ULONG Flags;
+  ULONG Mtu;
+  ULONG IfType;
+  IF_OPER_STATUS OperStatus;
+  ULONG Ipv6IfIndex;
+} IP_ADAPTER_ADDRESSES_LH, IP_ADAPTER_ADDRESSES, *PIP_ADAPTER_ADDRESSES;
+
+ULONG GetAdaptersAddresses(ULONG Family, ULONG Flags, PVOID Reserved,
+                           PIP_ADAPTER_ADDRESSES AdapterAddresses, PULONG SizePointer);

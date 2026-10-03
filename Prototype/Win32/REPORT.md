@@ -24,12 +24,13 @@ console events and `SetStdHandle` (33, `3b9327e`), library search directories (3
 line (35, `c536687`), and packages-5's `FileStream` (36, `3b9ace4`). The second session (2026-10-03) merged
 system-next at `ffaa7e4`, and did `FileStream`'s position and mock hooks (37, `6c34274`), with patch P6; then
 section 8's gaps after its top ten, in its order: users, access tokens and security identifiers (38, `32161bb`),
-pipes (39, `1bfd761`), job objects (40, `6d2ca5b`), reparse points (41, `5ad7c6c`), and events (42, the last
-commit).
-- **Next**, none of it started: the rest of section 8's ranking, in its order: network interfaces; memory-mapped
-  files; directory enumeration; directory change notification; free space and volume paths. Then Winsock's
-  implementation, once the decisions triage's item 74 is applied (section 29), and one declaration each for
-  `BrokenDownTime` and `FileStream` across platforms (sections 30 and 36), which reshapes other lanes' files.
+pipes (39, `1bfd761`), job objects (40, `6d2ca5b`), reparse points (41, `5ad7c6c`), events (42, `b1bc663`), and
+network adapters (43, the last commit).
+- **Next**, none of it started: the rest of section 8's ranking, in its order: memory-mapped files; directory
+  enumeration; directory change notification; free space and volume paths. Then Winsock's implementation, once the
+  decisions triage's item 74 is applied (section 29), and one declaration each for `BrokenDownTime` and `FileStream`
+  across platforms (sections 30 and 36), and a Windows `NetworkInterface.Addresses` (section 43), which reshape
+  other lanes' files.
 - **For other lanes**, in the windows-3 patches section (the last): system-next merged this branch at `87c3fc6`
   without its CMake list, so system-next's `Sources/System/CMakeLists.txt` lacks eight Win32 files, which CI's CMake
   job's list check would fail on; the Win32 block there (P3, continued) must land with this branch's next merge. P4
@@ -56,8 +57,10 @@ commit).
   It catches Swift errors: types, optionality, ownership, typed throws, `@_alwaysEmitIntoClient` visibility,
   MemberImportVisibility. It can't catch where the model differs from the SDK (a macro that doesn't import, a
   pointer the SDK annotates), runtime behavior, a name that collides with a Windows-only internal in a file it
-  doesn't compile, or, in a file that imports `WinSDK`, a use of macOS's C library, which the `ObjectiveC` module
-  behind `WindowsBool`'s stand-in brings in (a file that imports only `ucrt` doesn't see it; section 31); the new internal names were checked against all of `Sources/` and `Tests/` by grep. A
+  doesn't compile, or, in a test file, a use of macOS's C library, which XCTest brings in through Foundation, so
+  the tests spell a name both have through `WinSDK` or `ucrt`. A source file sees none of it since section 43,
+  which has the model's overlay re-export `ObjCBool` alone; before, a file that imported `WinSDK` saw it through
+  `ObjectiveC` (section 31). The new internal names were checked against all of `Sources/` and `Tests/` by grep. A
   deliberate use after `close()` and a type error in a test file both fail it. It takes a few seconds.
 - **The constants** are spelled as values. Each one was checked against Rust's standard library bindings
   (`library/std/src/sys/pal/windows/c/windows_sys.rs`, generated from Microsoft's Windows metadata) where they
@@ -2263,7 +2266,7 @@ A Windows run must check those, and in particular: that `CreateSymbolicLinkW` st
 substitute name with a backslash, which `FilePath` drops either way; and that `FSCTL_GET_REPARSE_POINT` works on a
 handle with no access rights.
 
-## 42. windows-3: events: this commit
+## 42. windows-3: events: `b1bc663`
 
 The next gap of section 8: 2 packages, 2 files. swift-subprocess makes a manual-reset event (`CreateEventW`) for an
 overlapped read it waits for itself, with the handle's low bit set in the `OVERLAPPED` so the completion stays off
@@ -2305,7 +2308,54 @@ A Windows run must check those, and in particular: that `waitForAll` leaves a si
 while another isn't signaled; that `WaitForMultipleObjects` rejects a duplicated handle with
 `ERROR_INVALID_PARAMETER`; and that a low-bit event keeps the packet off the port.
 
-## 43. windows-3: findings
+## 43. windows-3: network adapters: this commit
+
+The next gap of section 8, which is 1 package, not 2: swift-foundation's file counts only for `NETWORK_PREFIX`, a
+constant of its own, which the survey took for an SDK name (the script now classes it with the packages' own
+names). NIO's `NIONetworkDevice.enumerateDevices()` reads the adapters with `GetAdaptersAddresses` (`AF_UNSPEC`, a
+15 KiB buffer, retried at `ERROR_BUFFER_OVERFLOW`), and makes a device of each unicast address: the adapter's
+`FriendlyName`, the address, a netmask from `OnLinkPrefixLength`, and `IfIndex` or `Ipv6IfIndex` by family. On
+Darwin, NIO reads System's `NetworkInterface.Addresses`.
+
+What, in `Win32NetworkAdapters.swift`: `Win32.networkAdapters()` (`GetAdaptersAddresses`), which returns
+`Win32.NetworkAdapter`s: `name`, `friendlyName`, `adapterDescription`, `index`, `ipv6Index`, `type`
+(`InterfaceType`), `operationalStatus` (`OperationalStatus`), `mtu`, `physicalAddress`, `supportsMulticast`, and
+`unicastAddresses`, each with its `bytes`, `family` and `prefixLength`.
+
+Which API: **Win32**, for now. System's `NetworkInterface` is POSIX's `getifaddrs`, and its shape doesn't carry
+over unchanged: its flags are the `IFF_*` bits, which `GetAdaptersAddresses` doesn't report; its names are the ones
+`if_nametoindex` takes, which on Windows are neither of an adapter's names here; and its entry has the
+`ifaddrs` node. Proposed for later, as for sections 30 and 36: `NetworkInterface.Addresses` on Windows over this,
+with an entry for each unicast address, flags derived from the type and the status, and a netmask from the prefix,
+which NIO's Windows code computes now, so that its Darwin path would serve Windows too.
+
+Design calls, with the alternatives rejected:
+- **Copies, not a view of the list**: the adapters and their addresses are values, with no lifetime to manage,
+  where `NetworkInterface.Addresses` lends its entries. Enumerating adapters is slow and rare, and the list is a
+  linked structure of variable records in a buffer that Windows can ask to grow. Rejected for now: an owner of the
+  buffer with nonescapable entries, as POSIX's is, which the shared declaration would need.
+- **The unicast addresses only**: anycast, multicast and DNS server addresses are skipped
+  (`GAA_FLAG_SKIP_ANYCAST` and the rest), which Microsoft recommends for speed, and no adopter reads.
+- **An address is its `sockaddr`'s bytes**, as `NetworkInterface`'s `RawSpan`s are, with its family and prefix
+  length beside them: no socket address type until Winsock's module is settled (section 29).
+- **`AF_INET6` is 23 on Windows**, which `family`'s doc says, where Darwin's is 30 and Linux's 10.
+- **Not wrapped**: the other addresses, gateways (`GAA_FLAG_INCLUDE_GATEWAYS`), DNS suffixes, the LUID, the
+  adapter's flags but multicast, the `IP_ADAPTER_UNICAST_ADDRESS` lifetimes and duplicate detection state, and
+  `if_nametoindex` and `if_indextoname`, which iphlpapi has on Windows.
+
+Tests: `Win32NetworkAdaptersTests`: the constants; the loopback adapter, up, with no physical address, and
+127.0.0.1/8 and ::1/128 as `sockaddr` bytes; and every adapter's addresses, families, prefix lengths and indexes.
+
+The harness: the new test needs `AF_INET6`, which Darwin defines too, as 30, so `WinSDK.AF_INET6` was ambiguous: the
+model's overlay re-exported all of `ObjectiveC`, and Darwin with it. It now re-exports `ObjCBool` alone, which
+`WindowsBool`'s stand-in needs, and every Win32 file and test still compiles, and a source file that imports
+`WinSDK` no longer sees macOS's C library (see *How it was checked*).
+
+A Windows run must check those, and in particular: that `GetAdaptersAddresses` lists the loopback adapter, as
+`IF_TYPE_SOFTWARE_LOOPBACK`, in a container too; that `AdapterName` is a GUID in braces for it; and that
+`ERROR_NO_DATA` is what it returns for no adapters, which isn't covered.
+
+## 44. windows-3: findings
 
 - **`FileDescriptor`'s Windows canonicalization doesn't cover `CreateDirectoryW`'s limit** (P4).
   `withCanonicalPathRepresentation` passes `PATHCCH_ALLOW_LONG_PATHS`, so the `mkdir` adapter, which
@@ -2319,8 +2369,10 @@ while another isn't signaled; that `WaitForMultipleObjects` rejects a duplicated
   `<stdint.h>` and `<wchar.h>`, which belong to its Darwin modules, so every file that imported the model saw
   Darwin's C library: a call to `gmtime_r`, or a read of `tm_gmtoff`, compiled as if Windows had them. The model now
   includes only the compiler's own headers, so a file that imports only `ucrt` sees none of it; a file that
-  imports `WinSDK` still does, through the `ObjectiveC` module that `WindowsBool`'s stand-in needs, so for a name
-  both have, such as `tm` and `strftime`, the code spells `ucrt.tm`, which Windows accepts too.
+  imported `WinSDK` still did, through the `ObjectiveC` module that `WindowsBool`'s stand-in needs, so for a name
+  both have, such as `tm` and `strftime`, the code spells `ucrt.tm`, which Windows accepts too. Since section 43,
+  the overlay's model re-exports `ObjCBool` alone, and a source file that imports `WinSDK` doesn't see macOS's C
+  library either: a probe's `gmtime_r` and `tm_gmtoff` fail to compile.
 - **The UCRT's `strftime` ends the process for a field outside its range**, or a conversion it doesn't know: it
   reports them to the invalid parameter handler, whose default terminates. Code that passes it a `struct tm` it
   didn't get from the C runtime, as cross-platform code does, should install a handler that returns (section 30).
@@ -2344,9 +2396,10 @@ while another isn't signaled; that `WaitForMultipleObjects` rejects a duplicated
   since only a domain's accounts have a display name (section 38).
 - **swift-foundation's `homeDirectoryPath(forUser:)` leaks** the string `ConvertSidToStringSidW` allocates, which
   needs `LocalFree`, and calls `fatalError` if the conversion fails.
-- **The survey counted SwiftPM for users and tokens** by its own `PLACEHOLDER_TOKEN_USER`; the script now classes
-  the name with the packages' own, so a new run gives the concept 2 packages and 5 files (4 in sources). Section 8's
-  table is as surveyed.
+- **The survey counted SwiftPM for users and tokens** by its own `PLACEHOLDER_TOKEN_USER`, and swift-foundation for
+  network interfaces by its own `NETWORK_PREFIX`; the script now classes both names with the packages' own, so a
+  new run gives those concepts 2 packages and 5 files (4 in sources), and 1 package and 2 files. Section 8's table
+  is as surveyed.
 - **swift-subprocess gives its children overlapped pipe ends.** `CreatedPipe` opens the child's end with
   `FILE_FLAG_OVERLAPPED`, and a program's `ReadFile` or `WriteFile` without an `OVERLAPPED` on an overlapped handle,
   as the C runtime's `_read` and `_write` are, "can incorrectly report that the read operation is complete"
@@ -2375,7 +2428,7 @@ while another isn't signaled; that `WaitForMultipleObjects` rejects a duplicated
 - **macOS's CoreFoundation declares `S_OK` and `S_FALSE` too**, so the harness's tests spell `WinSDK.S_OK`; on
   Windows, where XCTest's Foundation is swift-corelibs-foundation, the bare names would do.
 
-## 44. windows-3: patches for files outside the lane
+## 45. windows-3: patches for files outside the lane
 
 **P3, continued: `Sources/System/CMakeLists.txt`.** The Win32 `target_sources` block as it should read with this
 lane's files. P3 itself landed with coverage-4 (`8caa741`); this block replaces the one it left, and is kept current
@@ -2410,6 +2463,7 @@ target_sources(SystemPackage PRIVATE
   Win32/Win32Jobs.swift
   Win32/Win32Locking.swift
   Win32/Win32LongPaths.swift
+  Win32/Win32NetworkAdapters.swift
   Win32/Win32Open.swift
   Win32/Win32OverlappedIO.swift
   Win32/Win32PathOperations.swift
