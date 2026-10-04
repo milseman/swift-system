@@ -129,7 +129,7 @@ internal var _LC_ALL_MASK: CInt { LC_ALL_MASK }
 #endif
 
 // The items that CLocale.information(_:) returns. glibc declares them in an
-// anonymous enum, which imports as Int, and the others as macros.
+// anonymous enum, whose constants import as Int, and the others as macros.
 #if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(FreeBSD)
 @_alwaysEmitIntoClient
 internal var _CODESET: nl_item { nl_item(CODESET) }
@@ -170,6 +170,18 @@ internal var _RADIXCHAR: nl_item { nl_item(RADIXCHAR) }
 @_alwaysEmitIntoClient
 internal var _THOUSEP: nl_item { nl_item(THOUSEP) }
 
+#if os(Linux) && canImport(Glibc)
+// glibc's YESEXPR, NOEXPR and CRNCYSTR are macros for these enum constants,
+// which Swift doesn't import under the macros' names.
+@_alwaysEmitIntoClient
+internal var _YESEXPR: nl_item { nl_item(__YESEXPR) }
+
+@_alwaysEmitIntoClient
+internal var _NOEXPR: nl_item { nl_item(__NOEXPR) }
+
+@_alwaysEmitIntoClient
+internal var _CRNCYSTR: nl_item { nl_item(_NL_MONETARY_CRNCYSTR) }
+#else
 @_alwaysEmitIntoClient
 internal var _YESEXPR: nl_item { nl_item(YESEXPR) }
 
@@ -178,6 +190,7 @@ internal var _NOEXPR: nl_item { nl_item(NOEXPR) }
 
 @_alwaysEmitIntoClient
 internal var _CRNCYSTR: nl_item { nl_item(CRNCYSTR) }
+#endif
 
 #if SYSTEM_PACKAGE_DARWIN || os(FreeBSD)
 @_alwaysEmitIntoClient
