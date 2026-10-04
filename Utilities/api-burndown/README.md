@@ -140,7 +140,7 @@ Each check prints pass, warn or fail lines:
 4. **A known error warns rather than fails.** *Rejected:* failing until someone fixes it outside this tool, which stops every run on an error already recorded, and teaches everyone `--no-verify`.
 5. **25 of each sample, seeded from `burndown.json`'s digest**, so a rerun on the same output checks the same sample, and each new output another one. *Rejected:* a fixed seed, which checks the same sites until the data shifts. `--sample all` checks everything in about 15 seconds; the hook could run that instead.
 6. **The page's data, not its rendering.** *Rejected:* rendering the page in a headless browser, which can't run in the sandbox here.
-7. **The code walk follows only System's internal spellings.** *Rejected:* following every internal name, which reaches nearly all of System (47% of wrong C names passed, on 2026-10-04); and the graph's recorded code alone (0.2%, but it missed the 56 of 2,281 names reached through older internal code).
+7. **The code walk follows only System's internal spellings.** *Rejected:* following every internal name, which reaches nearly all of System (47% of wrong C names passed, on 2026-10-04); and the graph's recorded code alone (1 wrong C name in 2,984 passed, but it missed 68 of the 2,281 right ones, reached through older internal code).
 
 ## How this was generated
 
