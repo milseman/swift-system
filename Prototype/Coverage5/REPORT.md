@@ -5,12 +5,11 @@ which didn't move during the lane.
 
 ## Resume here
 
-- Stopped with every row of the ranked list (below) done, skipped for a reason, or under "Needs design". Nothing
-  is uncommitted.
-- Next, if wanted: the rows' "left" parts, in section 18: SocketDescriptor's socket types, flags and calls on
-  WASI (with `_getConst_` shims), `CLocale.information(_:)` on Android, OpenBSD and WASI, `RUSAGE_THREAD`,
-  `setCloseOnExecForAll`'s `EPERM` case, and the 1-site rows in `../adopters-unix/gaps/*.md` that 6.1's table
-  doesn't show (section 18).
+- Stopped at `4ea62b6` with every row of the ranked list (below) done, skipped for a reason, or under "Needs
+  design"; `Prototype/Status/STATUS.md` regenerated at the stop (`6ffa704`). Nothing is uncommitted, and
+  `system-next` hasn't moved since `4bf3afd`.
+- Next, if wanted: "Next", at the end: the rows' parts left out, and the 1-site rows in
+  `../adopters-unix/gaps/*.md` that 6.1's table doesn't show.
 - Then the Decisions session's questions ("Needs design").
 
 ## The ranked list
@@ -265,6 +264,8 @@ spells the constants.
     (`../linux-logs/coverage-5-68bb779-test.log`), with sections 3, 11 and 16's Linux tests among them.
 - **Win32 harness**: `Prototype/Win32/check-windows.sh` compiles the Win32 files and the Windows tests after
   section 8.
+- **API delta** (STATUS.md, `4ea62b6`): one changed declaration, `FileDescriptor.close()` (section 8);
+  `-diagnose-sdk` reports no breaking changes.
 - Not built: WASI, Musl, Android, FreeBSD, OpenBSD (coordinator's rule; written from the headers in
   `../linux-logs/cross/sdks` where they exist).
 
@@ -288,9 +289,28 @@ spells the constants.
 - `CLAUDE.md`'s SystemSockets bullet ("its files `#error` outside Darwin, Glibc, Musl, and Android"): on WASI it
   now builds its address subset (section 2).
 - `Sources/Samples` (the demos lane's): the socket samples need `#if !os(WASI)` for a WASI build of the whole
-  package, which now gets past SystemSockets.
+  package, which now gets past SystemSockets; and `Platforms/Samples/LibraryEscape.swift`'s `handToStdio`
+  returns `UnsafeMutablePointer<FILE>`, which can't compile on Android or OpenBSD (section 6; it was so before).
 - `Prototype/Win32/WindowsModel/SystemPackageStubs.swift` (windows lanes): `close() throws` →
   `throws(Errno)`, to match section 8.
 - platforms-2's `cross.sh` WASI copy can keep SystemSockets now.
 - The adopter lanes: rerun `scripts/inventory.py` (UNIX-REPORT) and `tools-p6` (PACKAGES-6) to close this lane's
   rows; swift-build's `off_t` marker (Findings).
+
+## Next
+
+- **The rows' parts left out**:
+  - WASI's sockets (section 2): `ConnectionType` (`_getConst_SOCK_STREAM` and `_DGRAM` shims in
+    `CSystemWASI.h`), `MessageFlags` and `ShutdownKind` (wasip1's `MSG_PEEK`, `MSG_WAITALL`, `MSG_TRUNC` and
+    `SHUT_*`, cast expressions that may import as they are), then the calls wasip1 has (`accept`, `recv`, `send`,
+    `shutdown`) and the options NIO's 1-site W rows name (`IPOption`, `IPv6Option`, `TCPOption.noDelay`).
+  - `CLocale.information(_:)` (section 16) on Android (a shim for API levels below 26), OpenBSD (a POSIX locale
+    from `newlocale`, as Linux's `_posixLocale`), and WASI (Musl's, as Linux).
+  - `ResourceUsageScope.currentThread` (`RUSAGE_THREAD`, Linux and FreeBSD), and `EPERM` as a fallback case in
+    section 11, if something asks.
+- **1-site rows in `gaps/<pkg>.md` that 6.1's table leaves out** (not ranked here; the per-package files list
+  their sites): `SocketDescriptor.SocketOption.reusePort` on Android and OpenBSD (NIO; platforms-2 section 5),
+  `MAP_ANONYMOUS` on Linux and Musl (WasmKit), `SystemConfig.maxIOVectors`, `FileDescriptor.cloneContents` and
+  `FilePath.makeUniqueFile` on FreeBSD and OpenBSD, `ClockID.monotonicRaw` (FreeBSD, OpenBSD and WASI have no
+  `CLOCK_MONOTONIC_RAW`), and on WASI `UserID.real` (no `getuid`), `SystemConfig.maxSymbolicLinks`, and
+  `MemoryMapping` (needs `Package.swift`'s `_WASI_EMULATED_MMAN`, platforms-2 section 5).
