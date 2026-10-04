@@ -331,14 +331,14 @@ extension DynamicLibrary {
   }
 }
 
-#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
+#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD)
 @available(System 199, *)
 extension DynamicLibrary {
   /// Where an address is among the loaded libraries:
   /// the library that contains it, and the nearest symbol at or below it.
   ///
   /// The corresponding C type is `Dl_info`.
-  /// - Note: Only available on Darwin, Linux, and Android.
+  /// - Note: Only available on Darwin, Linux, Android, FreeBSD, and OpenBSD.
   public struct SymbolInfo: Hashable {
     /// The path of the library, or of the program, that contains the address,
     /// as the dynamic loader loaded it.
@@ -388,7 +388,7 @@ extension DynamicLibrary {
   /// such as one built with Musl, it finds no library.
   ///
   /// The corresponding C function is `dladdr`.
-  /// - Note: Only available on Darwin, Linux, and Android.
+  /// - Note: Only available on Darwin, Linux, Android, FreeBSD, and OpenBSD.
   @_alwaysEmitIntoClient
   public static func symbolInfo(containing address: UnsafeRawPointer) -> SymbolInfo? {
     _symbolInfo(containing: address)
@@ -404,7 +404,7 @@ extension DynamicLibrary {
       symbolAddress: info.symbolAddress)
   }
 }
-#endif
+#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD)
 
 /// The calling thread's last dynamic linking error.
 @available(System 199, *)

@@ -7,9 +7,10 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-// O_SYNC and O_DSYNC on FreeBSD, whose O_DSYNC (from 13.0) is a flag of its
-// own, and OpenBSD, whose O_DSYNC is O_SYNC. SmallGapsTests has Darwin's,
-// and SmallLinuxGapsTests Linux's.
+// Small widenings to FreeBSD and OpenBSD, where nothing here builds: O_SYNC
+// and O_DSYNC (FreeBSD's O_DSYNC, from 13.0, is a flag of its own, and
+// OpenBSD's is O_SYNC), and dladdr. SmallGapsTests, SmallDarwinGapsTests and
+// SmallLinuxGapsTests have the other platforms'.
 
 #if os(FreeBSD) || os(OpenBSD)
 
@@ -22,7 +23,7 @@ import XCTest
 #endif
 
 @available(System 199, *)
-final class SynchronizedIOBSDTest: XCTestCase {
+final class SmallBSDGapsTests: XCTestCase {
   func testSynchronizedIO() throws {
     #if os(OpenBSD)
     XCTAssertEqual(FileDescriptor.OpenOptions.dataSync, .sync)
@@ -40,6 +41,22 @@ final class SynchronizedIOBSDTest: XCTestCase {
       XCTAssertTrue(try dataSync.statusFlags().contains(.dataSync))
       try dataSync.writeAll("synchronized".utf8)
     }
+  }
+
+  /// dladdr finds the library that contains a function, and its symbol.
+  func testSymbolInfo() throws {
+    let program = try DynamicLibrary.mainProgram()
+    let found = program.address(of: "getpid")
+    let getpidAddress = try XCTUnwrap(found)
+    try program.close()
+    let info = try XCTUnwrap(DynamicLibrary.symbolInfo(containing: getpidAddress))
+    // The nearest symbol can be an alias, such as _getpid.
+    XCTAssertTrue(info.symbolName?.hasSuffix("getpid") == true, "\(String(describing: info.symbolName))")
+    XCTAssertEqual(info.symbolAddress, UnsafeRawPointer(getpidAddress))
+    XCTAssertTrue(info.libraryPath.string.contains("libc.so"), "\(info.libraryPath)")
+    XCTAssertNotNil(info.libraryAddress)
+    // An address that no library contains.
+    XCTAssertNil(DynamicLibrary.symbolInfo(containing: UnsafeRawPointer(bitPattern: 0x10)!))
   }
 }
 
