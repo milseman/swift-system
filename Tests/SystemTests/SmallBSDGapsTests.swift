@@ -9,7 +9,7 @@
 
 // Small widenings to FreeBSD and OpenBSD, where nothing here builds: O_SYNC
 // and O_DSYNC (FreeBSD's O_DSYNC, from 13.0, is a flag of its own, and
-// OpenBSD's is O_SYNC), and dladdr. SmallGapsTests, SmallDarwinGapsTests and
+// OpenBSD's is O_SYNC), dladdr, and FreeBSD's pthread_suspend_all_np. SmallGapsTests, SmallDarwinGapsTests and
 // SmallLinuxGapsTests have the other platforms'.
 
 #if os(FreeBSD) || os(OpenBSD)
@@ -58,6 +58,17 @@ final class SmallBSDGapsTests: XCTestCase {
     // An address that no library contains.
     XCTAssertNil(DynamicLibrary.symbolInfo(containing: UnsafeRawPointer(bitPattern: 0x10)!))
   }
+
+  #if os(FreeBSD)
+  /// A thread that's running, or about to, when the others are suspended
+  /// finishes once they're resumed.
+  func testSuspendingTheOtherThreads() throws {
+    let thread = try PThread { _ = (0..<1000).reduce(0, +) }
+    PThread.suspendAll()
+    PThread.resumeAll()
+    try thread.join()
+  }
+  #endif
 }
 
 #endif // os(FreeBSD) || os(OpenBSD)

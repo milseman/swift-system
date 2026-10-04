@@ -196,6 +196,47 @@ extension PThread {
     system_pthread_main_np() == 1
   }
   #endif
+
+  #if os(FreeBSD)
+  /// Suspends every thread in the process but the calling one,
+  /// until ``resumeAll()``.
+  ///
+  /// A process that's about to run another program
+  /// suspends its other threads first,
+  /// so that none of them opens a descriptor
+  /// between its closing the ones the program shouldn't inherit
+  /// and the exec.
+  /// A suspended thread can hold a lock that the calling thread then waits
+  /// for, such as the memory allocator's,
+  /// so between this call and ``resumeAll()``,
+  /// call only what can't take one.
+  ///
+  /// The corresponding C function is `pthread_suspend_all_np`.
+  /// - Note: Only available on FreeBSD.
+  @_alwaysEmitIntoClient
+  public static func suspendAll() {
+    _suspendAll()
+  }
+
+  @usableFromInline
+  internal static func _suspendAll() {
+    system_pthread_suspend_all_np()
+  }
+
+  /// Resumes the threads that ``suspendAll()`` suspended.
+  ///
+  /// The corresponding C function is `pthread_resume_all_np`.
+  /// - Note: Only available on FreeBSD.
+  @_alwaysEmitIntoClient
+  public static func resumeAll() {
+    _resumeAll()
+  }
+
+  @usableFromInline
+  internal static func _resumeAll() {
+    system_pthread_resume_all_np()
+  }
+  #endif
 }
 
 // MARK: - Implementation

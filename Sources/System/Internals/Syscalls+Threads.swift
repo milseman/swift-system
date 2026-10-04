@@ -164,6 +164,17 @@ internal func system_pthread_main_np() -> CInt {
 }
 #endif
 
+#if os(FreeBSD)
+// FreeBSD's <pthread_np.h>. Neither can fail, so they have no mock hooks.
+internal func system_pthread_suspend_all_np() {
+  pthread_suspend_all_np()
+}
+
+internal func system_pthread_resume_all_np() {
+  pthread_resume_all_np()
+}
+#endif
+
 // MARK: - Thread names
 
 #if SYSTEM_PACKAGE_DARWIN
