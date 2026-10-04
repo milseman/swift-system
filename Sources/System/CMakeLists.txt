@@ -241,6 +241,7 @@ target_sources(SystemPackage PRIVATE
   Processes/ProcessGroups.swift
   Processes/ProcessWait.swift
   Processes/ResourceLimits.swift
+  Processes/ResourceUsage.swift
   Processes/Signal.swift
   Processes/SignalAction.swift
   Processes/SignalDescriptor.swift
@@ -355,29 +356,48 @@ target_sources(SystemPackage PRIVATE
 target_sources(SystemPackage PRIVATE
   VectoredIO/VectoredIO.swift)
 target_sources(SystemPackage PRIVATE
+  Win32/BrokenDownTimeWindows.swift
   Win32/DynamicLibraryWindows.swift
+  Win32/FilePathResolutionWindows.swift
+  Win32/FileStreamWindows.swift
   Win32/PathsWindows.swift
   Win32/ProcessEnvironmentWindows.swift
+  Win32/ProcessExitWindows.swift
   Win32/ProcessIDWindows.swift
   Win32/Win32.swift
+  Win32/Win32AccessToken.swift
+  Win32/Win32CommandLine.swift
   Win32/Win32Console.swift
   Win32/Win32Constants.swift
   Win32/Win32Error.swift
+  Win32/Win32Events.swift
+  Win32/Win32FiberLocal.swift
   Win32/Win32FileDescriptorBridge.swift
   Win32/Win32FileHandle.swift
   Win32/Win32FileIO.swift
   Win32/Win32FileInformation.swift
   Win32/Win32FileType.swift
   Win32/Win32FinalPath.swift
+  Win32/Win32HResult.swift
   Win32/Win32HandleOperations.swift
+  Win32/Win32Jobs.swift
   Win32/Win32Locking.swift
+  Win32/Win32LongPaths.swift
+  Win32/Win32NetworkAdapters.swift
   Win32/Win32Open.swift
+  Win32/Win32OverlappedIO.swift
+  Win32/Win32PathOperations.swift
+  Win32/Win32Pipes.swift
   Win32/Win32Process.swift
   Win32/Win32ProcessCreation.swift
+  Win32/Win32ReparsePoints.swift
   Win32/Win32SecurityDescriptor.swift
+  Win32/Win32SecurityIdentifier.swift
   Win32/Win32Synchronization.swift
   Win32/Win32Syscalls.swift
+  Win32/Win32SystemInformation.swift
   Win32/Win32Thread.swift
+  Win32/Win32ThreadCreation.swift
   Win32/Win32Time.swift
   Win32/Win32VolumeInformation.swift
   Win32/Win32Wait.swift)

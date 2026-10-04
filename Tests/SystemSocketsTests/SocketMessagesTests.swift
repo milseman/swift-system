@@ -7,7 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-#if !os(Windows)
+#if !os(Windows) && !os(WASI)
 
 import Testing
 
@@ -392,4 +392,4 @@ private func readText(from descriptor: FileDescriptor) throws -> String {
   return String(decoding: bytes.prefix(count), as: UTF8.self)
 }
 
-#endif
+#endif // !os(Windows) && !os(WASI)

@@ -561,4 +561,103 @@ extension CInterop.Stat {
   #endif
 }
 
+// MARK: - rusage
+
+// Read-only: the structure is what ProcessID.resourceUsage(of:) returns.
+// Its ru_ixrss, ru_idrss and ru_isrss, which neither Linux nor Darwin keeps,
+// have no accessors.
+#if !os(WASI)
+@available(System 199, *)
+extension CInterop.ResourceUsage {
+  /// The processor time spent running the process's own code.
+  ///
+  /// The corresponding C field is `ru_utime`.
+  @_alwaysEmitIntoClient
+  public var userTime: CInterop.TimeVal { ru_utime }
+
+  /// The processor time that the kernel spent on the process's behalf.
+  ///
+  /// The corresponding C field is `ru_stime`.
+  @_alwaysEmitIntoClient
+  public var systemTime: CInterop.TimeVal { ru_stime }
+
+  /// The most physical memory that the process has held at once,
+  /// its largest resident set, in bytes.
+  ///
+  /// The corresponding C field is `ru_maxrss`,
+  /// which counts kilobytes, but on Darwin bytes.
+  @_alwaysEmitIntoClient
+  public var maxResidentSetSize: Int64 {
+    #if SYSTEM_PACKAGE_DARWIN
+    Int64(ru_maxrss)
+    #else
+    Int64(ru_maxrss) * 1024
+    #endif
+  }
+
+  /// The page faults that needed no I/O,
+  /// such as for a page that was still in memory.
+  ///
+  /// The corresponding C field is `ru_minflt`.
+  @_alwaysEmitIntoClient
+  public var minorPageFaults: Int { Int(ru_minflt) }
+
+  /// The page faults that read a page from storage.
+  ///
+  /// The corresponding C field is `ru_majflt`.
+  @_alwaysEmitIntoClient
+  public var majorPageFaults: Int { Int(ru_majflt) }
+
+  /// The times the process was swapped out of memory.
+  ///
+  /// The corresponding C field is `ru_nswap`.
+  @_alwaysEmitIntoClient
+  public var swaps: Int { Int(ru_nswap) }
+
+  /// The times the file system read from storage for the process.
+  ///
+  /// The corresponding C field is `ru_inblock`.
+  @_alwaysEmitIntoClient
+  public var blockInputs: Int { Int(ru_inblock) }
+
+  /// The times the file system wrote to storage for the process.
+  ///
+  /// The corresponding C field is `ru_oublock`.
+  @_alwaysEmitIntoClient
+  public var blockOutputs: Int { Int(ru_oublock) }
+
+  /// The IPC messages that the process sent.
+  ///
+  /// The corresponding C field is `ru_msgsnd`.
+  @_alwaysEmitIntoClient
+  public var messagesSent: Int { Int(ru_msgsnd) }
+
+  /// The IPC messages that the process received.
+  ///
+  /// The corresponding C field is `ru_msgrcv`.
+  @_alwaysEmitIntoClient
+  public var messagesReceived: Int { Int(ru_msgrcv) }
+
+  /// The signals that the process received.
+  ///
+  /// The corresponding C field is `ru_nsignals`.
+  @_alwaysEmitIntoClient
+  public var signalsReceived: Int { Int(ru_nsignals) }
+
+  /// The times the process gave up the processor before its time slice
+  /// ended, usually to wait for something.
+  ///
+  /// The corresponding C field is `ru_nvcsw`.
+  @_alwaysEmitIntoClient
+  public var voluntaryContextSwitches: Int { Int(ru_nvcsw) }
+
+  /// The times the system took the processor from the process,
+  /// to run another thread or at the end of its time slice.
+  ///
+  /// The corresponding C field is `ru_nivcsw`.
+  @_alwaysEmitIntoClient
+  public var involuntaryContextSwitches: Int { Int(ru_nivcsw) }
+}
+#endif // !os(WASI)
+
 #endif // !os(Windows)

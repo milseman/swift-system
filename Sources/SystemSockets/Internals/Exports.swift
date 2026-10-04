@@ -20,6 +20,8 @@ import Musl
 #elseif canImport(Android)
 @_implementationOnly import CSystem
 import Android
+#elseif canImport(WASILibc)
+import WASILibc
 #else
 #error("Unsupported Platform")
 #endif
@@ -47,6 +49,11 @@ internal var system_errno: CInt {
 internal var system_errno: CInt {
   get { Android.errno }
   set { Android.errno = newValue }
+}
+#elseif canImport(WASILibc)
+internal var system_errno: CInt {
+  get { WASILibc.errno }
+  set { WASILibc.errno = newValue }
 }
 #endif
 

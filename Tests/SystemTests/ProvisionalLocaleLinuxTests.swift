@@ -7,7 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-#if os(Linux) || os(Android)
+#if os(Linux) || os(Android) || os(WASI)
 
 import XCTest
 
@@ -17,6 +17,8 @@ import Glibc
 import Musl
 #elseif canImport(Android)
 import Android
+#elseif canImport(WASILibc)
+import WASILibc
 #endif
 
 #if SYSTEM_PACKAGE
@@ -25,8 +27,8 @@ import Android
 @testable import System
 #endif
 
-// The provisional C locales on Linux and Android, where the categories'
-// values differ from Darwin's, the POSIX and global locales are passed
+// The provisional C locales on Linux, Android and WASI (whose C library is
+// Musl's), where the categories' values differ from Darwin's, the POSIX and global locales are passed
 // differently (see Syscalls+ProvisionalLocale.swift), and a container may
 // have no locales but C, POSIX and C.UTF-8, which with en_US.UTF-8 are
 // Android's only ones. XCTest, since setting the global locale changes the
@@ -119,6 +121,24 @@ final class ProvisionalLocaleLinuxTest: XCTestCase {
     #endif
   }
 
+  #if os(Linux)
+  /// The POSIX locale's information, which glibc and Musl share but for its
+  /// character encoding's name, and the global locale's, through
+  /// nl_langinfo.
+  func testInformation() {
+    let posix = CLocale.posix
+    XCTAssertFalse(posix.information(.characterEncoding).isEmpty)
+    XCTAssertEqual(posix.information(.dateFormat), "%m/%d/%y")
+    XCTAssertEqual(posix.information(.timeFormat), "%H:%M:%S")
+    XCTAssertEqual(posix.information(.dayName(1)), "Sunday")
+    XCTAssertEqual(posix.information(.abbreviatedDayName(7)), "Sat")
+    XCTAssertEqual(posix.information(.monthName(1)), "January")
+    XCTAssertEqual(posix.information(.abbreviatedMonthName(12)), "Dec")
+    XCTAssertEqual(posix.information(.decimalSeparator), ".")
+    XCTAssertFalse(CLocale.global.information(.dateFormat).isEmpty)
+  }
+  #endif
+
   /// The global locale's calls follow the thread's locale, which is the
   /// global one here.
   func testTheGlobalLocale() throws {
@@ -139,4 +159,4 @@ final class ProvisionalLocaleLinuxTest: XCTestCase {
   }
 }
 
-#endif // os(Linux) || os(Android)
+#endif // os(Linux) || os(Android) || os(WASI)

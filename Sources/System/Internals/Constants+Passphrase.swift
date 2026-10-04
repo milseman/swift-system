@@ -31,11 +31,12 @@ internal var _RPP_SEVENBIT: CInt { RPP_SEVENBIT }
 @_alwaysEmitIntoClient
 internal var _RPP_STDIN: CInt { RPP_STDIN }
 
-#elseif os(Linux) || os(Android)
+#elseif os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD)
 
 // Linux's C libraries have no <readpassphrase.h>, and System reads the
 // passphrase itself (ReadPassphrase.swift), so these are the flags' values
-// in the BSDs' and libbsd's header.
+// in the BSDs' and libbsd's header. The BSDs' Swift modules may not include
+// it, so there they're the same values, which shims.c checks.
 
 @_alwaysEmitIntoClient
 internal var _RPP_ECHO_ON: CInt { 0x01 }
@@ -55,4 +56,4 @@ internal var _RPP_SEVENBIT: CInt { 0x10 }
 @_alwaysEmitIntoClient
 internal var _RPP_STDIN: CInt { 0x20 }
 
-#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
+#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD)

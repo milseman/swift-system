@@ -20,11 +20,20 @@ import Musl
 #elseif canImport(Android)
 @_implementationOnly import CSystem
 import Android
+#elseif canImport(WASILibc)
+import WASILibc
 #else
 #error("Unsupported Platform")
 #endif
 
 import SystemPackage
+
+// On WASI, SystemSockets has the address types alone: these aliases, but
+// cmsghdr's and addrinfo's, which wasi-libc doesn't declare; SocketAddress,
+// with its families and IPv4 and IPv6 addresses; and SocketDescriptor, with
+// its domains and protocols. wasip1 has only preopened sockets, with accept,
+// recv, send and shutdown (but no socket, bind or connect), and System wraps
+// none of them there yet.
 
 @available(System 199, *)
 extension CInterop {
@@ -93,15 +102,21 @@ extension CInterop {
   /// The corresponding C type is `msghdr`.
   public typealias MsgHdr = msghdr
 
+  #if !os(WASI)
   /// Control message header structure.
   ///
   /// The corresponding C type is `cmsghdr`.
+  ///
+  /// - Note: Not available on WASI.
   public typealias CMsgHdr = cmsghdr
 
   /// Address info structure for getaddrinfo.
   ///
   /// The corresponding C type is `addrinfo`.
+  ///
+  /// - Note: Not available on WASI.
   public typealias AddrInfo = addrinfo
+  #endif
 
   /// The value of the linger-on-close socket option.
   ///

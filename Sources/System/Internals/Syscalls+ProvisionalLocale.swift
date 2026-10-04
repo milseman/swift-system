@@ -19,12 +19,15 @@
 // <xlocale.h>, so these are CSystem shims there. OpenBSD has no strtod_l or
 // strtof_l, and its LC_NUMERIC is always the POSIX locale's, so these call
 // strtod and strtof there; its strncasecmp_l ignores the locale, so this
-// calls strncasecmp, as on Android.
+// calls strncasecmp, as on Android. wasi-libc's are Musl's, which ignore the
+// locale (its numbers are always the POSIX locale's), and it declares
+// strtod_l and strtof_l only with _GNU_SOURCE, so these call strtod, strtof
+// and strncasecmp there too.
 //
 // In a mock test, a locale that newlocale "created" is a placeholder
 // address, so freelocale is mocked too, and neither touches it.
 
-#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD)
+#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD) || os(WASI)
 import CSystem
 #if SYSTEM_PACKAGE_DARWIN
 import Darwin
@@ -34,6 +37,8 @@ import Glibc
 import Musl
 #elseif canImport(Android)
 import Android
+#elseif canImport(WASILibc)
+import WASILibc
 #endif
 
 #if ENABLE_MOCKING
@@ -102,7 +107,7 @@ internal func system_strtod_l(
   strtod_l(string, end, locale)
 #elseif os(FreeBSD)
   csystem_strtod_l(string, end, UnsafeMutableRawPointer(locale))
-#elseif os(Android) || os(OpenBSD)
+#elseif os(Android) || os(OpenBSD) || os(WASI)
   strtod(string, end)
 #else
   if _isGlobalLocale(locale) { return strtod(string, end) }
@@ -120,7 +125,7 @@ internal func system_strtof_l(
   strtof_l(string, end, locale)
 #elseif os(FreeBSD)
   csystem_strtof_l(string, end, UnsafeMutableRawPointer(locale))
-#elseif os(Android) || os(OpenBSD)
+#elseif os(Android) || os(OpenBSD) || os(WASI)
   strtof(string, end)
 #else
   if _isGlobalLocale(locale) { return strtof(string, end) }
@@ -136,7 +141,7 @@ internal func system_strncasecmp_l(
   strncasecmp_l(a, b, count, locale)
 #elseif os(FreeBSD)
   csystem_strncasecmp_l(a, b, count, UnsafeMutableRawPointer(locale))
-#elseif os(Android) || os(OpenBSD)
+#elseif os(Android) || os(OpenBSD) || os(WASI)
   strncasecmp(a, b, count)
 #else
   if _isGlobalLocale(locale) { return strncasecmp(a, b, count) }
@@ -144,4 +149,22 @@ internal func system_strncasecmp_l(
 #endif
 }
 
-#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD)
+#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(FreeBSD)
+// nl_langinfo_l. Darwin's and FreeBSD's take LC_GLOBAL_LOCALE, and a null
+// locale as the POSIX locale; glibc's and Musl's take neither, so on Linux
+// the global locale's is nl_langinfo, and the POSIX locale's _posixLocale.
+internal func system_nl_langinfo_l(
+  _ item: nl_item, _ locale: locale_t?
+) -> UnsafeMutablePointer<CChar>? {
+#if SYSTEM_PACKAGE_DARWIN
+  nl_langinfo_l(item, locale)
+#elseif os(FreeBSD)
+  csystem_nl_langinfo_l(item, UnsafeMutableRawPointer(locale))
+#else
+  if _isGlobalLocale(locale) { return nl_langinfo(item) }
+  return nl_langinfo_l(item, locale ?? _posixLocale)
+#endif
+}
+#endif
+
+#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD) || os(WASI)

@@ -1,9 +1,9 @@
 # Status: System's API and its adopters
 
-Generated 2026-10-01 by `Utilities/adopter-coverage/status.sh`, from commits only; rerun it rather than editing this file. How each figure is made, and what it can't see, is in [How this is computed](#how-this-is-computed).
+Generated 2026-10-04 by `Utilities/adopter-coverage/status.sh`, from commits only; rerun it rather than editing this file. How each figure is made, and what it can't see, is in [How this is computed](#how-this-is-computed).
 
-- **System**: `coverage-4` @ `79ee4f78` (Add a _SystemPackageForPlugin product: SystemPackage's sources as a module of another name, for SourceKit-LSP's plugins), which contains `system-next` @ `bb950dbd` (Merge branch 'api-graph-speed' into system-next); 4 commit(s) of `coverage-4` aren't in `system-next`.
-- **API delta**: `main` @ `1b452c29` → `HEAD` @ `79ee4f78`.
+- **System**: `coverage-5` @ `6ffa7040` (Prototype/Coverage5/REPORT.md: the ranked list, each row's state, Needs design (N1-N9), sections 1-16, tests, findings), which contains `system-next` @ `4bf3afd4` (Merge branch 'windows-3' into system-next); 18 commit(s) of `coverage-5` aren't in `system-next`.
+- **API delta**: `main` @ `1b452c29` → `HEAD` @ `6ffa7040`.
 - **Adopters** (`../adopters`, branch `migrate-darwin`, against its merge base with `main`):
   - WasmKit @ `4917e060`, base `1e9c513d`
   - indexstore-db @ `53bf43b6`, base `441ead77`
@@ -32,27 +32,27 @@ Copied verbatim from `Utilities/api-delta/regenerate.sh` (`BASE_REF=main`, `HEAD
 
 ## Summary
 
-- **3187 added, 0 removed, 0 changed** declarations in the macOS symbol graphs.
-  - SystemPackage: +2603 (448 → 3051 public symbols).
+- **3239 added, 0 removed, 1 changed** declarations in the macOS symbol graphs.
+  - SystemPackage: +2655, 1 changed (448 → 3103 public symbols).
   - SystemSockets: +584 (0 → 584 public symbols). SystemSockets is a new module; it doesn't exist on `main`.
 - Availability of the additions:
-  - System 199: 3149
+  - System 199: 3201
   - System 199 + explicit OS floor: 26
   - System 0.0.1 + explicit OS floor: 8
   - System 0.0.1: 2
   - System 1.7.0: 2
 - The source scan finds these new public declarations, which the macOS graphs can't show:
-  - 1019 compiled only on other platforms;
-  - 239 new `@available(*, unavailable, renamed:)` stubs;
+  - 1539 compiled only on other platforms;
+  - 244 new `@available(*, unavailable, renamed:)` stubs;
   - 1 new underscored public declaration(s).
   - 5 declarations the scan couldn't classify; see the list below.
   - 29 added, removed or changed graph symbols the scan didn't find (enum case: 28, no source location: 1). Enum cases have no `public` keyword, and synthesized members have no location; any others are scanner misses. Their platforms show as `?`.
 - 0 public declarations hidden from the graphs were removed.
 - No public declaration is conditional on `ENABLE_MOCKING` or `DEBUG`, so a release build has the same public API as the debug graphs.
 - Cross-check with `swift-api-digester`, which dumps every declaration, implicit ones included:
-  - SystemPackage: +2921 / -0 declarations, which is the graphs' +2603 plus 313 implicit ones; explicit declarations it has that the graphs don't: `_opaque_pthread_cond_t.initializer`, `_opaque_pthread_mutex_t.errorCheckingInitializer`, `_opaque_pthread_mutex_t.initializer`, `_opaque_pthread_mutex_t.recursiveInitializer`, `_opaque_pthread_rwlock_t.initializer`; it has every graph addition; `-diagnose-sdk` reports no breaking changes.
+  - SystemPackage: +2976 / -1 declarations, which is the graphs' +2655 plus 315 implicit ones; explicit declarations it has that the graphs don't: `FileDescriptor.close()`, `_opaque_pthread_cond_t.initializer`, `_opaque_pthread_mutex_t.errorCheckingInitializer`, `_opaque_pthread_mutex_t.initializer`, `_opaque_pthread_mutex_t.recursiveInitializer`, `_opaque_pthread_rwlock_t.initializer`; it has every graph addition; `-diagnose-sdk` reports no breaking changes.
   - SystemSockets: +657 / -0 declarations, which is the graphs' +584 plus 72 implicit ones; explicit declarations it has that the graphs don't: `SocketAddress._withUnsafeMutablePointer(_:)`; it has every graph addition.
-- Nothing was removed or changed: no public declaration left the graphs or the source scan. The *changed* check compares declaration text (including default arguments), availability, conformances, generic and extension constraints, and access level, and pairs symbols by path when a signature change alters the USR.
+- 0 removed and 1 changed in the graphs, and 0 removed among the declarations the graphs can't see. The full list below gives the first kind, and section 5 the second. The *changed* check compares declaration text (including default arguments), availability, conformances, generic and extension constraints, and access level, and pairs symbols by path when a signature change alters the USR.
 
 ### By area
 
@@ -62,8 +62,8 @@ Each row is a top-level type, and nested types count toward it: `FilePath.Resolu
 |---|---|---:|---:|---:|---|
 | SystemPackage | [`BaudRate`](#systempackage-baudrate) | 26 | 0 | 0 | S199 ×26 |
 | SystemPackage | [`BrokenDownTime`](#systempackage-brokendowntime) | 29 | 0 | 0 | S199 ×29 |
-| SystemPackage | [`CInterop`](#systempackage-cinterop) | 46 | 0 | 0 | S199 ×46 |
-| SystemPackage | [`CLocale`](#systempackage-clocale) | 32 | 0 | 0 | S199 ×32 |
+| SystemPackage | [`CInterop`](#systempackage-cinterop) | 48 | 0 | 0 | S199 ×48 |
+| SystemPackage | [`CLocale`](#systempackage-clocale) | 53 | 0 | 0 | S199 ×53 |
 | SystemPackage | [`CString`](#systempackage-cstring) | 8 | 0 | 0 | S199 ×8 |
 | SystemPackage | [`CType`](#systempackage-ctype) | 15 | 0 | 0 | S199 ×15 |
 | SystemPackage | [`CallStack`](#systempackage-callstack) | 3 | 0 | 0 | S199 ×3 |
@@ -81,10 +81,10 @@ Each row is a top-level type, and nested types count toward it: `FilePath.Resolu
 | SystemPackage | [`ExitStatus`](#systempackage-exitstatus) | 6 | 0 | 0 | S199 ×6 |
 | SystemPackage | [`ExtendedAttributeName`](#systempackage-extendedattributename) | 3 | 0 | 0 | S199 ×3 |
 | SystemPackage | [`ExtendedAttributeOptions`](#systempackage-extendedattributeoptions) | 5 | 0 | 0 | S199 ×5 |
-| SystemPackage | [`FileDescriptor`](#systempackage-filedescriptor) | 246 | 0 | 0 | S199 ×233, S0.0.1+OS ×8, S199+OS ×5 |
-| SystemPackage | [`FilePath`](#systempackage-filepath) | 443 | 0 | 0 | S199 ×429, S199+OS ×14 |
+| SystemPackage | [`FileDescriptor`](#systempackage-filedescriptor) | 247 | 0 | 1 | S199 ×234, S0.0.1+OS ×8, S199+OS ×5 |
+| SystemPackage | [`FilePath`](#systempackage-filepath) | 449 | 0 | 0 | S199 ×435, S199+OS ×14 |
 | SystemPackage | [`FilePermissions`](#systempackage-filepermissions) | 1 | 0 | 0 | S199 ×1 |
-| SystemPackage | [`FileStream`](#systempackage-filestream) | 35 | 0 | 0 | S199 ×35 |
+| SystemPackage | [`FileStream`](#systempackage-filestream) | 37 | 0 | 0 | S199 ×37 |
 | SystemPackage | [`FileSystemID`](#systempackage-filesystemid) | 8 | 0 | 0 | S199 ×8 |
 | SystemPackage | [`FileSystemSubtype`](#systempackage-filesystemsubtype) | 4 | 0 | 0 | S199 ×4 |
 | SystemPackage | [`FileSystemType`](#systempackage-filesystemtype) | 4 | 0 | 0 | S199 ×4 |
@@ -108,7 +108,7 @@ Each row is a top-level type, and nested types count toward it: `FilePath.Resolu
 | SystemPackage | [`POSIXErrorCode (extends _DarwinFoundation1)`](#systempackage-posixerrorcode-extends-darwinfoundation1) | 2 | 0 | 0 | S199 ×2 |
 | SystemPackage | [`PThread`](#systempackage-pthread) | 128 | 0 | 0 | S199 ×128 |
 | SystemPackage | [`ProcessEnvironment`](#systempackage-processenvironment) | 7 | 0 | 0 | S199 ×7 |
-| SystemPackage | [`ProcessID`](#systempackage-processid) | 218 | 0 | 0 | S199 ×218 |
+| SystemPackage | [`ProcessID`](#systempackage-processid) | 225 | 0 | 0 | S199 ×225 |
 | SystemPackage | [`ProcessPriority`](#systempackage-processpriority) | 8 | 0 | 0 | S199 ×8 |
 | SystemPackage | [`ProcessStateChange`](#systempackage-processstatechange) | 7 | 0 | 0 | S199 ×7 |
 | SystemPackage | [`ProcessTimer`](#systempackage-processtimer) | 18 | 0 | 0 | S199 ×18 |
@@ -133,6 +133,7 @@ Each row is a top-level type, and nested types count toward it: `FilePath.Resolu
 | SystemPackage | [`iovec (extends Darwin)`](#systempackage-iovec-extends-darwin) | 4 | 0 | 0 | S199 ×4 |
 | SystemPackage | [`kevent (extends Darwin)`](#systempackage-kevent-extends-darwin) | 7 | 0 | 0 | S199 ×7 |
 | SystemPackage | [`kinfo_proc (extends Darwin)`](#systempackage-kinfo-proc-extends-darwin) | 10 | 0 | 0 | S199 ×10 |
+| SystemPackage | [`rusage (extends _DarwinFoundation3)`](#systempackage-rusage-extends-darwinfoundation3) | 13 | 0 | 0 | S199 ×13 |
 | SystemPackage | [`stat (extends Darwin)`](#systempackage-stat-extends-darwin) | 17 | 0 | 0 | S199 ×17 |
 | SystemPackage | [`timespec (extends _DarwinFoundation2)`](#systempackage-timespec-extends-darwinfoundation2) | 7 | 0 | 0 | S199 ×7 |
 | SystemPackage | [`timeval (extends _DarwinFoundation2)`](#systempackage-timeval-extends-darwinfoundation2) | 5 | 0 | 0 | S199 ×5 |
@@ -156,15 +157,15 @@ Each row is a top-level type, and nested types count toward it: `FilePath.Resolu
 | SystemSockets | [`sockaddr_storage (extends Darwin)`](#systemsockets-sockaddr-storage-extends-darwin) | 3 | 0 | 0 | S199 ×3 |
 | SystemSockets | [`sockaddr_un (extends Darwin)`](#systemsockets-sockaddr-un-extends-darwin) | 5 | 0 | 0 | S199 ×5 |
 | SystemSockets | [`sockaddr_vm (extends Darwin)`](#systemsockets-sockaddr-vm-extends-darwin) | 5 | 0 | 0 | S199 ×5 |
-| **Total** | | **3187** | **0** | **0** | |
+| **Total** | | **3239** | **0** | **1** | |
 
 ## ABI: exported symbols
 
-What each module's release build exports, at `main` (`1b452c29`) → HEAD (`79ee4f78`), beside the API points above: `nm`'s external symbols in the objects of `swift build -c release`, built from an export of the commit. Every public property exports a property descriptor, `@_alwaysEmitIntoClient` or not (the SDK's System does too), so the descriptors grow with the API. *Code* is functions and accessors, what `@_alwaysEmitIntoClient` leaves to the client: of *public* declarations, in the symbol graphs, and *other*, which the graphs don't show (`@usableFromInline` internals, synthesized Equatable and Hashable members, deinitializers, stored properties' initial values).
+What each module's release build exports, at `main` (`1b452c29`) → HEAD (`6ffa7040`), beside the API points above: `nm`'s external symbols in the objects of `swift build -c release`, built from an export of the commit. Every public property exports a property descriptor, `@_alwaysEmitIntoClient` or not (the SDK's System does too), so the descriptors grow with the API. *Code* is functions and accessors, what `@_alwaysEmitIntoClient` leaves to the client: of *public* declarations, in the symbol graphs, and *other*, which the graphs don't show (`@usableFromInline` internals, synthesized Equatable and Hashable members, deinitializers, stored properties' initial values).
 
 | Module | Exported | Property descriptors | Conformances | Types | Code, public | Code, other |
 |---|---:|---:|---:|---:|---:|---:|
-| SystemPackage | 830 → 4848 | 406 → 2124 | 167 → 803 | 90 → 640 | 118 → 508 | 49 → 773 |
+| SystemPackage | 830 → 4901 | 406 → 2156 | 167 → 809 | 90 → 646 | 118 → 508 | 49 → 782 |
 | SystemSockets | — → 901 | — → 336 | — → 139 | — → 132 | — → 188 | — → 106 |
 
 ### Candidates for `@_alwaysEmitIntoClient`
@@ -173,45 +174,45 @@ Of the 342 declarations added since `main` that export code, 39 only forward a C
 
 | Module | Declaration | Forwards | Exports | Where |
 |---|---|---|---|---|
-| SystemSockets | `SocketAddress.ResolutionFlags.init(rawValue:)` | raw value | initializer | `Sources/SystemSockets/Sockets/SocketAddress+Resolution.swift:90` |
-| SystemSockets | `SocketAddress.ResolutionFlags.passive` | constant `AI_PASSIVE` | getter | `Sources/SystemSockets/Sockets/SocketAddress+Resolution.swift:97` |
-| SystemSockets | `SocketAddress.ResolutionFlags.canonicalName` | constant `AI_CANONNAME` | getter | `Sources/SystemSockets/Sockets/SocketAddress+Resolution.swift:102` |
-| SystemSockets | `SocketAddress.ResolutionFlags.numericHost` | constant `AI_NUMERICHOST` | getter | `Sources/SystemSockets/Sockets/SocketAddress+Resolution.swift:107` |
-| SystemSockets | `SocketAddress.ResolutionFlags.numericService` | constant `AI_NUMERICSERV` | getter | `Sources/SystemSockets/Sockets/SocketAddress+Resolution.swift:112` |
-| SystemSockets | `SocketAddress.ResolutionFlags.v4Mapped` | constant `AI_V4MAPPED` | getter | `Sources/SystemSockets/Sockets/SocketAddress+Resolution.swift:117` |
-| SystemSockets | `SocketAddress.ResolutionFlags.all` | constant `AI_ALL` | getter | `Sources/SystemSockets/Sockets/SocketAddress+Resolution.swift:122` |
-| SystemSockets | `SocketAddress.ResolutionFlags.addressConfigured` | constant `AI_ADDRCONFIG` | getter | `Sources/SystemSockets/Sockets/SocketAddress+Resolution.swift:127` |
-| SystemSockets | `SocketAddress.ReverseResolutionFlags.init(rawValue:)` | raw value | initializer | `Sources/SystemSockets/Sockets/SocketAddress+Resolution.swift:264` |
-| SystemSockets | `SocketAddress.ReverseResolutionFlags.numericHost` | constant `NI_NUMERICHOST` | getter | `Sources/SystemSockets/Sockets/SocketAddress+Resolution.swift:271` |
-| SystemSockets | `SocketAddress.ReverseResolutionFlags.numericService` | constant `NI_NUMERICSERV` | getter | `Sources/SystemSockets/Sockets/SocketAddress+Resolution.swift:276` |
-| SystemSockets | `SocketAddress.ReverseResolutionFlags.datagram` | constant `NI_DGRAM` | getter | `Sources/SystemSockets/Sockets/SocketAddress+Resolution.swift:281` |
-| SystemSockets | `SocketAddress.ReverseResolutionFlags.noFullyQualified` | constant `NI_NOFQDN` | getter | `Sources/SystemSockets/Sockets/SocketAddress+Resolution.swift:286` |
-| SystemSockets | `SocketAddress.ReverseResolutionFlags.nameRequired` | constant `NI_NAMEREQD` | getter | `Sources/SystemSockets/Sockets/SocketAddress+Resolution.swift:291` |
-| SystemSockets | `SocketDescriptor.AncillaryMessageBuffer.Message.level` | accessor `cmsg_level` | getter | `Sources/SystemSockets/Sockets/SocketMessages.swift:526` |
-| SystemSockets | `SocketDescriptor.AncillaryMessageBuffer.Message.type` | accessor `cmsg_type` | getter | `Sources/SystemSockets/Sockets/SocketMessages.swift:533` |
-| SystemSockets | `SocketDescriptor.TCPConnectionInfo.state` | accessor `tcpi_state` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:322` |
-| SystemSockets | `SocketDescriptor.TCPConnectionInfo.options` | accessor `tcpi_options` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:327` |
-| SystemSockets | `SocketDescriptor.TCPConnectionInfo.sendWindowScale` | accessor `tcpi_snd_wscale` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:334` |
-| SystemSockets | `SocketDescriptor.TCPConnectionInfo.receiveWindowScale` | accessor `tcpi_rcv_wscale` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:339` |
-| SystemSockets | `SocketDescriptor.TCPConnectionInfo.isRecoveringFromLoss` | accessor `tcpi_flags`, `TCPCI_FLAG_LOSSRECOVERY` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:344` |
-| SystemSockets | `SocketDescriptor.TCPConnectionInfo.hasDetectedReordering` | accessor `tcpi_flags`, `TCPCI_FLAG_REORDERING_DETECTED` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:351` |
-| SystemSockets | `SocketDescriptor.TCPConnectionInfo.maximumSegmentSize` | accessor `tcpi_maxseg` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:358` |
-| SystemSockets | `SocketDescriptor.TCPConnectionInfo.sendSlowStartThreshold` | accessor `tcpi_snd_ssthresh` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:363` |
-| SystemSockets | `SocketDescriptor.TCPConnectionInfo.sendCongestionWindow` | accessor `tcpi_snd_cwnd` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:368` |
-| SystemSockets | `SocketDescriptor.TCPConnectionInfo.sendWindow` | accessor `tcpi_snd_wnd` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:373` |
-| SystemSockets | `SocketDescriptor.TCPConnectionInfo.sendBufferedBytes` | accessor `tcpi_snd_sbbytes` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:379` |
-| SystemSockets | `SocketDescriptor.TCPConnectionInfo.receiveWindow` | accessor `tcpi_rcv_wnd` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:384` |
-| SystemSockets | `SocketDescriptor.TCPConnectionInfo.packetsSent` | accessor `tcpi_txpackets` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:389` |
-| SystemSockets | `SocketDescriptor.TCPConnectionInfo.bytesSent` | accessor `tcpi_txbytes` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:394` |
-| SystemSockets | `SocketDescriptor.TCPConnectionInfo.packetsRetransmitted` | accessor `tcpi_txretransmitpackets` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:399` |
-| SystemSockets | `SocketDescriptor.TCPConnectionInfo.bytesRetransmitted` | accessor `tcpi_txretransmitbytes` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:404` |
-| SystemSockets | `SocketDescriptor.TCPConnectionInfo.packetsReceived` | accessor `tcpi_rxpackets` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:409` |
-| SystemSockets | `SocketDescriptor.TCPConnectionInfo.bytesReceived` | accessor `tcpi_rxbytes` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:414` |
-| SystemSockets | `SocketDescriptor.TCPConnectionInfo.bytesReceivedOutOfOrder` | accessor `tcpi_rxoutoforderbytes` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:419` |
-| SystemSockets | `SocketDescriptor.TCPConnectionInfo.retransmitTimeout` | accessor `tcpi_rto` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:431` |
-| SystemSockets | `SocketDescriptor.TCPConnectionInfo.roundTripTime` | accessor `tcpi_rttcur` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:436` |
-| SystemSockets | `SocketDescriptor.TCPConnectionInfo.smoothedRoundTripTime` | accessor `tcpi_srtt` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:441` |
-| SystemSockets | `SocketDescriptor.TCPConnectionInfo.roundTripTimeVariance` | accessor `tcpi_rttvar` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:446` |
+| SystemSockets | `SocketAddress.ResolutionFlags.init(rawValue:)` | raw value | initializer | `Sources/SystemSockets/Sockets/SocketAddress+Resolution.swift:92` |
+| SystemSockets | `SocketAddress.ResolutionFlags.passive` | constant `AI_PASSIVE` | getter | `Sources/SystemSockets/Sockets/SocketAddress+Resolution.swift:99` |
+| SystemSockets | `SocketAddress.ResolutionFlags.canonicalName` | constant `AI_CANONNAME` | getter | `Sources/SystemSockets/Sockets/SocketAddress+Resolution.swift:104` |
+| SystemSockets | `SocketAddress.ResolutionFlags.numericHost` | constant `AI_NUMERICHOST` | getter | `Sources/SystemSockets/Sockets/SocketAddress+Resolution.swift:109` |
+| SystemSockets | `SocketAddress.ResolutionFlags.numericService` | constant `AI_NUMERICSERV` | getter | `Sources/SystemSockets/Sockets/SocketAddress+Resolution.swift:114` |
+| SystemSockets | `SocketAddress.ResolutionFlags.v4Mapped` | constant `AI_V4MAPPED` | getter | `Sources/SystemSockets/Sockets/SocketAddress+Resolution.swift:119` |
+| SystemSockets | `SocketAddress.ResolutionFlags.all` | constant `AI_ALL` | getter | `Sources/SystemSockets/Sockets/SocketAddress+Resolution.swift:124` |
+| SystemSockets | `SocketAddress.ResolutionFlags.addressConfigured` | constant `AI_ADDRCONFIG` | getter | `Sources/SystemSockets/Sockets/SocketAddress+Resolution.swift:129` |
+| SystemSockets | `SocketAddress.ReverseResolutionFlags.init(rawValue:)` | raw value | initializer | `Sources/SystemSockets/Sockets/SocketAddress+Resolution.swift:266` |
+| SystemSockets | `SocketAddress.ReverseResolutionFlags.numericHost` | constant `NI_NUMERICHOST` | getter | `Sources/SystemSockets/Sockets/SocketAddress+Resolution.swift:273` |
+| SystemSockets | `SocketAddress.ReverseResolutionFlags.numericService` | constant `NI_NUMERICSERV` | getter | `Sources/SystemSockets/Sockets/SocketAddress+Resolution.swift:278` |
+| SystemSockets | `SocketAddress.ReverseResolutionFlags.datagram` | constant `NI_DGRAM` | getter | `Sources/SystemSockets/Sockets/SocketAddress+Resolution.swift:283` |
+| SystemSockets | `SocketAddress.ReverseResolutionFlags.noFullyQualified` | constant `NI_NOFQDN` | getter | `Sources/SystemSockets/Sockets/SocketAddress+Resolution.swift:288` |
+| SystemSockets | `SocketAddress.ReverseResolutionFlags.nameRequired` | constant `NI_NAMEREQD` | getter | `Sources/SystemSockets/Sockets/SocketAddress+Resolution.swift:293` |
+| SystemSockets | `SocketDescriptor.AncillaryMessageBuffer.Message.level` | accessor `cmsg_level` | getter | `Sources/SystemSockets/Sockets/SocketMessages.swift:528` |
+| SystemSockets | `SocketDescriptor.AncillaryMessageBuffer.Message.type` | accessor `cmsg_type` | getter | `Sources/SystemSockets/Sockets/SocketMessages.swift:535` |
+| SystemSockets | `SocketDescriptor.TCPConnectionInfo.state` | accessor `tcpi_state` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:324` |
+| SystemSockets | `SocketDescriptor.TCPConnectionInfo.options` | accessor `tcpi_options` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:329` |
+| SystemSockets | `SocketDescriptor.TCPConnectionInfo.sendWindowScale` | accessor `tcpi_snd_wscale` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:336` |
+| SystemSockets | `SocketDescriptor.TCPConnectionInfo.receiveWindowScale` | accessor `tcpi_rcv_wscale` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:341` |
+| SystemSockets | `SocketDescriptor.TCPConnectionInfo.isRecoveringFromLoss` | accessor `tcpi_flags`, `TCPCI_FLAG_LOSSRECOVERY` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:346` |
+| SystemSockets | `SocketDescriptor.TCPConnectionInfo.hasDetectedReordering` | accessor `tcpi_flags`, `TCPCI_FLAG_REORDERING_DETECTED` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:353` |
+| SystemSockets | `SocketDescriptor.TCPConnectionInfo.maximumSegmentSize` | accessor `tcpi_maxseg` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:360` |
+| SystemSockets | `SocketDescriptor.TCPConnectionInfo.sendSlowStartThreshold` | accessor `tcpi_snd_ssthresh` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:365` |
+| SystemSockets | `SocketDescriptor.TCPConnectionInfo.sendCongestionWindow` | accessor `tcpi_snd_cwnd` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:370` |
+| SystemSockets | `SocketDescriptor.TCPConnectionInfo.sendWindow` | accessor `tcpi_snd_wnd` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:375` |
+| SystemSockets | `SocketDescriptor.TCPConnectionInfo.sendBufferedBytes` | accessor `tcpi_snd_sbbytes` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:381` |
+| SystemSockets | `SocketDescriptor.TCPConnectionInfo.receiveWindow` | accessor `tcpi_rcv_wnd` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:386` |
+| SystemSockets | `SocketDescriptor.TCPConnectionInfo.packetsSent` | accessor `tcpi_txpackets` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:391` |
+| SystemSockets | `SocketDescriptor.TCPConnectionInfo.bytesSent` | accessor `tcpi_txbytes` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:396` |
+| SystemSockets | `SocketDescriptor.TCPConnectionInfo.packetsRetransmitted` | accessor `tcpi_txretransmitpackets` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:401` |
+| SystemSockets | `SocketDescriptor.TCPConnectionInfo.bytesRetransmitted` | accessor `tcpi_txretransmitbytes` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:406` |
+| SystemSockets | `SocketDescriptor.TCPConnectionInfo.packetsReceived` | accessor `tcpi_rxpackets` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:411` |
+| SystemSockets | `SocketDescriptor.TCPConnectionInfo.bytesReceived` | accessor `tcpi_rxbytes` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:416` |
+| SystemSockets | `SocketDescriptor.TCPConnectionInfo.bytesReceivedOutOfOrder` | accessor `tcpi_rxoutoforderbytes` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:421` |
+| SystemSockets | `SocketDescriptor.TCPConnectionInfo.retransmitTimeout` | accessor `tcpi_rto` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:433` |
+| SystemSockets | `SocketDescriptor.TCPConnectionInfo.roundTripTime` | accessor `tcpi_rttcur` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:438` |
+| SystemSockets | `SocketDescriptor.TCPConnectionInfo.smoothedRoundTripTime` | accessor `tcpi_srtt` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:443` |
+| SystemSockets | `SocketDescriptor.TCPConnectionInfo.roundTripTimeVariance` | accessor `tcpi_rttvar` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:448` |
 
 # 2. Adoption
 
@@ -488,7 +489,7 @@ Verbatim, not rerun: each package's own test totals (at the start, and the lates
 
 # 3. Gaps
 
-Every `SYSTEM-GAP:` marker in the packages' sources at the commits above: 22 markers in 18 files, of which 0 are outside the packages' targets. Each marker's text is read for the C interfaces it names (see [How this is computed](#how-this-is-computed)); a marker that names none is counted under its phrase, with the Darwin names imported under it deciding its status. Status is against System at `79ee4f78`:
+Every `SYSTEM-GAP:` marker in the packages' sources at the commits above: 22 markers in 18 files, of which 0 are outside the packages' targets. Each marker's text is read for the C interfaces it names (see [How this is computed](#how-this-is-computed)); a marker that names none is counted under its phrase, with the Darwin names imported under it deciding its status. Status is against System at `6ffa7040`:
 
 - **missing**: System documents none of it (or only some: *k of n*), and `mapping.ini` has no answer outside System for it.
 - **covered**: a System declaration's doc comment names it as the corresponding C interface, a CInterop alias names it, or, for `X members`, System gives `CInterop` alias of `X` Swift-named accessors. The marker is stale, or the package hasn't adopted the API yet. *Not yet in `system-next`* means only this branch has it.
@@ -500,7 +501,7 @@ The last two are answers outside System, read from `mapping.ini` at System's com
 
 A family marked *(provisional)* is a C-library layer above the OS (math, stdio, locales, string.h and ctype.h) that System wraps provisionally, in `Sources/System/Provisional/`, since it may move to the standard library; it counts like everything else.
 
-Interfaces: 12 covered, 7 standard library, 25 not System's, 44 in all.
+Interfaces: 13 covered, 6 standard library, 25 not System's, 44 in all.
 
 | # | Interface | Status | Files | Packages | Family |
 |---:|---|---|---:|---|---|
@@ -508,7 +509,7 @@ Interfaces: 12 covered, 7 standard library, 25 not System's, 44 in all.
 | 2 | `OSStatus` | standard library ([MacTypes]: Int32 for OSStatus, UInt16 for UniChar, and Bool for DarwinBoolean and Boolean) | 2 | swift-build | MacTypes |
 | 3 | `segment_command` | not System's ([Mach-O file format]) | 2 | swift-build | Mach-O file structures |
 | 4 | `_dyld_image_count` | covered (doc comment) | 1 | swift-foundation | _dyld_image_count |
-| 5 | `abort` | standard library ([termination]: fatalError(_:file:line:)) | 1 | swift-build | abort |
+| 5 | `abort` | covered (doc comment; not yet in `system-next`) | 1 | swift-build | abort |
 | 6 | adding a file action to C file actions | covered (doc comment) | 1 | swift-subprocess | posix_spawn |
 | 7 | `AR_EFMT1` | standard library ([ar archive header]: the header's fields, read from the archive's bytes: ar_hdr is 60 bytes of text (ar_name …) | 1 | swift-build | ar.h archive headers |
 | 8 | `ar_hdr` | standard library ([ar archive header]: the header's fields, read from the archive's bytes: ar_hdr is 60 bytes of text (ar_name …) | 1 | swift-build | ar.h archive headers |
@@ -569,7 +570,7 @@ The missing interfaces above, grouped, largest first: the order to fill them in.
 - `OSStatus` (standard library): swift-build: `Sources/SWBUtil/Error.swift:21`; swift-build: `Sources/SWBUtil/PbxCp.swift:22`
 - `segment_command` (not System's): swift-build: `Sources/SWBUtil/MachO.swift:16`; swift-build: `Tests/SWBUtilTests/MachOTests.swift:20`
 - `_dyld_image_count` (covered): swift-foundation: `Sources/FoundationEssentials/AttributedString/AttributeScope.swift:69`
-- `abort` (standard library): swift-build: `Sources/SwiftBuild/SWBBuildServiceConnection.swift:23`
+- `abort` (covered): swift-build: `Sources/SwiftBuild/SWBBuildServiceConnection.swift:23`
 - adding a file action to C file actions (covered): swift-subprocess: `Tests/SubprocessTests/DarwinTests.swift:15`
 - `AR_EFMT1` (standard library): swift-build: `Sources/SWBUtil/MachO.swift:71`
 - `ar_hdr` (standard library): swift-build: `Sources/SWBUtil/MachO.swift:71`
@@ -618,15 +619,15 @@ The goal: no library of the repositories that swift's update-checkout clones for
 
 | Platform | Library files that import one | Repositories | Library files, lexical |
 |---|---:|---:|---:|
-| Darwin | 22 | 8 | 25 |
-| Linux (glibc) | 83 (5 maybe) | 20 | 124 |
-| Musl | 74 (4 maybe) | 17 | 74 |
-| Android | 94 (5 maybe) | 18 | 94 |
-| WASI | 56 (3 maybe) | 6 | 56 |
-| FreeBSD | 119 (6 maybe) | 20 | 124 |
-| OpenBSD | 119 (6 maybe) | 20 | 124 |
-| Windows | 184 (4 maybe) | 21 | 184 |
-| **Any** | 241 | 25 | 243 |
+| Darwin | 20 | 7 | 23 |
+| Linux (glibc) | 37 (1 maybe) | 12 | 77 |
+| Musl | 31 (1 maybe) | 10 | 32 |
+| Android | 44 (1 maybe) | 12 | 44 |
+| WASI | 47 | 6 | 47 |
+| FreeBSD | 75 (1 maybe) | 13 | 77 |
+| OpenBSD | 74 (1 maybe) | 12 | 77 |
+| Windows | 183 (4 maybe) | 21 | 183 |
+| **Any** | 222 | 24 | 224 |
 
 | Repository | Read at | Library, lexical | Darwin | Linux | Musl | Android | WASI | FreeBSD | OpenBSD | Windows | Tests | Other | Nested packages |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
@@ -637,71 +638,71 @@ The goal: no library of the repositories that swift's update-checkout clones for
 | curl | not cloned | | | | | | | | | | | | |
 | indexstore-db | `../adopters/indexstore-db` `migrate-all` @ `96d2a952` | 4 | — | — | — | — | — | — | — | 4 | — | — | — |
 | libxml2 | not cloned | | | | | | | | | | | | |
-| llbuild | `../adopters/swift-llbuild` `migrate-unix` @ `f7a0650b` | 5 | — | 5 | 5 | 5 | — | 5 | 5 | 5 | 2 | — | — |
+| llbuild | `../adopters/swift-llbuild` `migrate-unix` @ `314f1127` | 5 | — | — | — | — | — | — | — | 5 | 2 | — | — |
 | llvm-project | not cloned | | | | | | | | | | | | |
 | mimalloc | not cloned | | | | | | | | | | | | |
 | ninja | not cloned | | | | | | | | | | | | |
-| sourcekit-lsp | `../adopters/sourcekit-lsp` `migrate-darwin` @ `cb2881c5` | 16 | — | 9 | 9 | 11 | — | 9 | 9 | 14 | 3 | — | — |
+| sourcekit-lsp | `../adopters/sourcekit-lsp` `migrate-all` @ `79583cc1` | 14 | — | — | — | — | — | — | — | 14 | 2 | — | — |
 | swift-argument-parser | `../adopters/swift-argument-parser` `migrate-all` @ `22831ad7` | 2 | — | — | — | — | — | — | — | 2 | — | — | — |
 | swift-asn1 | `../ecosystem/swift-asn1` @ `a54383ad` | — | — | — | — | — | — | — | — | — | — | — | — |
 | swift-async-algorithms | `../adopters/swift-async-algorithms` `migrate-all` @ `b9ff7c2f` | 1 | — | 1 | 1 | 1 | — | 1 | 1 | 1 | — | — | — |
 | swift-atomics | `../ecosystem/swift-atomics` @ `0442cb5a` | — | — | — | — | — | — | — | — | — | — | — | — |
-| swift-build | `../adopters/swift-build` `migrate-darwin` @ `59372bbc` | 15 | 6 | 1 | 1 | 1 | — | 1 | 1 | 9 | 2 | — | — |
-| swift-certificates | `../adopters/swift-certificates` `migrate-all` @ `7d492a42` | 3 | — | 1 | 1 | 1 | 1 | 1 | 1 | 3 | — | — | — |
+| swift-build | `../adopters/swift-build` `migrate-all` @ `f17c1695` | 15 | 6 | 1 | 1 | 1 | — | 1 | 1 | 9 | 2 | — | — |
+| swift-certificates | `../adopters/swift-certificates` `migrate-all` @ `925dfaa0` | 3 | — | 1 | 1 | 1 | 1 | 1 | 1 | 3 | — | — | — |
 | swift-collections | `../ecosystem/swift-collections` @ `c11818f3` | — | — | — | — | — | — | — | — | — | — | — | — |
 | swift-corelibs-blocksruntime | not cloned | | | | | | | | | | | | |
 | swift-corelibs-foundation | `../ecosystem/swift-corelibs-foundation` @ `6f21ccf1` | 25 | 9 | 11 | 7 | 19 | 6 | 11 | 11 | 19 | 7 | — | — |
 | swift-corelibs-libdispatch | not cloned | | | | | | | | | | | | |
 | swift-corelibs-xctest | `../adopters/swift-corelibs-xctest` `migrate-darwin` @ `80a3f954` | 1 | 1 | 1 | — | — | — | 1 | 1 | — | — | — | — |
-| swift-crypto | `../ecosystem/swift-crypto` @ `d79c573e` | 2 | — | — | — | 2 (1 maybe) | — | — | — | 1 | — | — | — |
-| swift-docc | `../adopters/swift-docc` `migrate-darwin` @ `ad021e35` | 5 | 1 | 1 | 1 | — | — | 1 | 1 | 4 | 2 | — | — |
+| swift-crypto | `../adopters/swift-crypto` `migrate-all` @ `ef1e59aa` | 1 | — | — | — | — | — | — | — | 1 | — | — | — |
+| swift-docc | `../adopters/swift-docc` `migrate-all` @ `4e6a5cea` | 3 | — | — | — | — | — | — | — | 3 | 2 | — | — |
 | swift-docc-render-artifact | not cloned | | | | | | | | | | | | |
 | swift-docc-symbolkit | `../ecosystem/swift-docc-symbolkit` @ `e9a4c0f2` | — | — | — | — | — | — | — | — | — | — | — | — |
-| swift-driver | `../adopters/swift-driver` `migrate-unix` @ `ddb51ccd` | 8 | — | 6 | 6 | 6 | — | 6 | 6 | 7 | 5 | — | — |
+| swift-driver | `../adopters/swift-driver` `migrate-unix` @ `e7850bd0` | 7 | — | — | — | — | — | — | — | 7 | 5 | — | — |
 | swift-experimental-string-processing | `../ecosystem/swift-experimental-string-processing` @ `db4678c7` | 1 | 1 | 1 | — | — | — | 1 | 1 | — | — | — | — |
 | swift-format | `../ecosystem/swift-format` @ `b15dd59f` | 3 | — | — | — | 1 | — | — | — | 2 | — | — | — |
-| swift-foundation | `../adopters/swift-foundation` `migrate-unix` @ `83bde529` | 31 | — | 9 | 9 | 9 | 21 | 23 | 23 | 27 | 7 | — | 2 |
+| swift-foundation | `../adopters/swift-foundation` `migrate-unix` @ `d7589041` | 31 | — | 8 | 8 | 9 | 21 | 23 | 23 | 27 | 7 | — | 2 |
 | swift-foundation-icu | `../ecosystem/swift-foundation-icu` @ `e8538d25` | — | — | — | — | — | — | — | — | — | — | — | 1 |
 | swift-installer-scripts | not cloned | | | | | | | | | | | | |
 | swift-integration-tests | not cloned | | | | | | | | | | | | |
 | swift-llvm-bindings | `../ecosystem/swift-llvm-bindings` @ `c1fffb92` | — | — | — | — | — | — | — | — | — | — | — | — |
 | swift-lmdb | `../ecosystem/swift-lmdb` @ `866bc256` | — | — | — | — | — | — | — | — | — | — | — | — |
-| swift-log | `../adopters/swift-log` `migrate-all` @ `afe82828` | 3 | — | 1 | 1 | 1 | 3 | 1 | 1 | 3 | 3 | — | — |
+| swift-log | `../adopters/swift-log` `migrate-all` @ `13c36e9a` | 3 | — | 1 | 1 | 1 | 2 | 1 | 1 | 3 | 3 | — | — |
 | swift-markdown | `../ecosystem/swift-markdown` @ `392b73b8` | — | — | — | — | — | — | — | — | — | — | — | — |
-| swift-nio | `../adopters/swift-nio` `migrate-unix` @ `d486207c` | 50 | — | 5 | 5 | 4 | 17 | 29 | 29 | 34 | 19 | — | 2 |
+| swift-nio | `../adopters/swift-nio` `migrate-unix` @ `aa73fe55` | 50 | — | 4 | 4 | 3 | 14 | 26 | 26 | 34 | 19 | — | 2 |
 | swift-numerics | `../ecosystem/swift-numerics` @ `0a5bc040` | — | — | — | — | — | — | — | — | — | — | — | — |
-| swift-sdk-generator | `../adopters/swift-sdk-generator` `migrate-unix` @ `5956672b` | 1 | — | 1 | — | — | — | 1 | 1 | — | 1 | — | — |
-| swift-stress-tester | not cloned | | | | | | | | | | | | |
-| swift-subprocess | `../adopters/swift-subprocess` `migrate-unix` @ `d6b58669` | 16 | — | 11 (1 maybe) | 10 | 10 | — | 10 (2 maybe) | 10 (2 maybe) | 10 | 10 | — | — |
+| swift-sdk-generator | `../adopters/swift-sdk-generator` `migrate-unix` @ `bc251e13` | — | — | — | — | — | — | — | — | — | 1 | — | — |
+| swift-stress-tester | `../adopters/swift-stress-tester` `migrate-all` @ `e1702563` | — | — | — | — | — | — | — | — | — | — | — | — |
+| swift-subprocess | `../adopters/swift-subprocess` `migrate-unix` @ `661de35c` | 10 | — | — | — | — | — | — | — | 10 | 8 | — | — |
 | swift-syntax | `../adopters/swift-syntax` `migrate-all` @ `c222965d` | 1 | 1 | 1 | 1 | 1 | — | 1 | 1 | — | — | 1 | 2 |
-| swift-testing | `../ecosystem/swift-testing` @ `ea850751` | 10 | — | — | — | — | — | — | — | 10 (1 maybe) | 1 | — | — |
+| swift-testing | `../adopters/swift-testing` `migrate-all` @ `ea850751` | 10 | — | — | — | — | — | — | — | 10 (1 maybe) | 1 | — | — |
 | swift-toolchain-sarif | `../ecosystem/swift-toolchain-sarif` @ `d611f23a` | — | — | — | — | — | — | — | — | — | — | — | — |
 | swift-toolchain-sqlite | `../ecosystem/swift-toolchain-sqlite` @ `c0ecc1e0` | — | — | — | — | — | — | — | — | — | — | — | — |
-| swift-tools-protocols | `../adopters/swift-tools-protocols` `migrate-unix` @ `18e8a9f9` | 3 | — | 1 | 1 | 1 | — | 1 | 1 | 3 | 2 | — | — |
-| swift-tools-support-core | `../adopters/swift-tools-support-core` `migrate-unix` @ `1ad4129f` | 8 | 2 | 1 | 1 | 1 | — | 1 | 1 | 6 | — | — | — |
+| swift-tools-protocols | `../adopters/swift-tools-protocols` `migrate-unix` @ `2b2c75dc` | 3 | — | — | — | — | — | — | — | 3 | 2 | — | — |
+| swift-tools-support-core | `../adopters/swift-tools-support-core` `migrate-unix` @ `b723dcf7` | 7 | 1 | 1 | 1 | 1 | — | 1 | 1 | 6 | — | — | — |
 | swift-xcode-playground-support | not cloned | | | | | | | | | | | | |
-| swiftpm | `../adopters/swift-package-manager` `migrate-unix` @ `dbe05ec1` | 15 | — | 4 | 3 | 10 | — | 4 | 4 | 11 | — | — | 1 |
+| swiftpm | `../adopters/swift-package-manager` `migrate-unix` @ `efff7333` | 12 | — | — | — | 1 | — | 1 | — | 11 | — | — | 1 |
 | wasi-libc | not cloned | | | | | | | | | | | | |
-| wasmkit | `../adopters/WasmKit` `migrate-unix` @ `4917e060` | 14 | 1 | 12 (4 maybe) | 12 (4 maybe) | 10 (4 maybe) | 8 (3 maybe) | 11 (4 maybe) | 11 (4 maybe) | 9 (3 maybe) | 3 | — | 1 |
+| wasmkit | `../adopters/WasmKit` `migrate-unix` @ `fd06e2a3` | 12 | 1 | 6 (1 maybe) | 6 (1 maybe) | 5 (1 maybe) | 3 | 6 (1 maybe) | 6 (1 maybe) | 9 (3 maybe) | 2 | — | 1 |
 | zlib | not cloned | | | | | | | | | | | | |
 
-37 repositories read; 25 compile an import of a platform module in library code on some platform: indexstore-db, llbuild, sourcekit-lsp, swift-argument-parser, swift-async-algorithms, swift-build, swift-certificates, swift-corelibs-foundation, swift-corelibs-xctest, swift-crypto, swift-docc, swift-driver, swift-experimental-string-processing, swift-format, swift-foundation, swift-log, swift-nio, swift-sdk-generator, swift-subprocess, swift-syntax, swift-testing, swift-tools-protocols, swift-tools-support-core, swiftpm, wasmkit.
+38 repositories read; 24 compile an import of a platform module in library code on some platform: indexstore-db, llbuild, sourcekit-lsp, swift-argument-parser, swift-async-algorithms, swift-build, swift-certificates, swift-corelibs-foundation, swift-corelibs-xctest, swift-crypto, swift-docc, swift-driver, swift-experimental-string-processing, swift-format, swift-foundation, swift-log, swift-nio, swift-subprocess, swift-syntax, swift-testing, swift-tools-protocols, swift-tools-support-core, swiftpm, wasmkit.
 
 All repositories, files by module and kind, lexically:
 
 | Module | Library | Tests | Other | Nested packages | All |
 |---|---:|---:|---:|---:|---:|
-| Darwin | 25 | 3 | 1 | 5 | 34 |
-| Glibc | 124 | 31 | 0 | 6 | 161 |
-| Musl | 74 | 16 | 0 | 2 | 92 |
-| Bionic | 33 | 6 | 0 | 0 | 39 |
-| Android | 62 | 19 | 0 | 1 | 82 |
-| WASILibc | 56 | 5 | 0 | 1 | 62 |
+| Darwin | 23 | 3 | 1 | 5 | 32 |
+| Glibc | 77 | 16 | 0 | 6 | 99 |
+| Musl | 32 | 1 | 0 | 2 | 35 |
+| Bionic | 13 | 3 | 0 | 0 | 16 |
+| Android | 32 | 12 | 0 | 1 | 45 |
+| WASILibc | 47 | 5 | 0 | 1 | 53 |
 | ucrt | 38 | 9 | 0 | 1 | 48 |
 | WinSDK | 157 | 35 | 0 | 2 | 194 |
-| CRT | 35 | 12 | 0 | 0 | 47 |
+| CRT | 34 | 12 | 0 | 0 | 46 |
 | visualc | 0 | 0 | 0 | 0 | 0 |
-| **Any** | 243 | 67 | 1 | 9 | 320 |
+| **Any** | 224 | 63 | 1 | 9 | 297 |
 
 # How this is computed
 

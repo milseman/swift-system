@@ -485,6 +485,13 @@ internal func system_execvp(
 
 // MARK: - Resource limits
 
+internal func system_getrusage(_ who: CInt, _ usage: UnsafeMutablePointer<rusage>) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(who) }
+#endif
+  return getrusage(numericCast(who), usage)
+}
+
 internal func system_getrlimit(_ resource: CInt, _ limit: UnsafeMutablePointer<rlimit>) -> CInt {
 #if ENABLE_MOCKING
   if mockingEnabled { return _mock(resource) }

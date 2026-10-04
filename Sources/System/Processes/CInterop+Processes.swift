@@ -48,6 +48,12 @@ extension CInterop {
 
   /// The C `rlim_t` type, the value of a resource limit.
   public typealias ResourceLimitValue = rlim_t
+
+  /// The resources, such as processor time and memory,
+  /// that a process or its children have used.
+  ///
+  /// The corresponding C type is `struct rusage`.
+  public typealias ResourceUsage = rusage
 }
 
 #endif // !os(Windows) && !os(WASI)

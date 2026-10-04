@@ -7,7 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-#if !os(Windows) && ENABLE_MOCKING
+#if !os(Windows) && !os(WASI) && ENABLE_MOCKING
 
 import Testing
 
@@ -215,4 +215,4 @@ private func drain(_ mocking: MockingDriver) -> [Trace.Entry] {
   return calls
 }
 
-#endif // !os(Windows) && ENABLE_MOCKING
+#endif // !os(Windows) && !os(WASI) && ENABLE_MOCKING

@@ -18,6 +18,8 @@ import Musl
 #elseif canImport(Android)
 @_implementationOnly import CSystem
 import Android
+#elseif canImport(WASILibc)
+import WASILibc
 #else
 #error("Unsupported Platform")
 #endif
@@ -45,9 +47,16 @@ extension SocketAddress {
 
     /// Local address family.
     ///
-    /// The corresponding C constants are `AF_LOCAL` and its synonym `AF_UNIX`.
+    /// The corresponding C constants are `AF_LOCAL` and its synonym `AF_UNIX`,
+    /// which is WASI's only spelling.
     @_alwaysEmitIntoClient
-    public static var local: Family { Family(CInterop.SAFamily(AF_LOCAL)) }
+    public static var local: Family {
+      #if os(WASI)
+      Family(CInterop.SAFamily(AF_UNIX))
+      #else
+      Family(CInterop.SAFamily(AF_LOCAL))
+      #endif
+    }
 
     /// UNIX address family. (Renamed `local`.)
     ///
@@ -62,11 +71,15 @@ extension SocketAddress {
     @_alwaysEmitIntoClient
     public static var ipv4: Family { Family(CInterop.SAFamily(AF_INET)) }
 
+    #if !os(WASI)
     /// Internal routing address family.
     ///
     /// The corresponding C constant is `AF_ROUTE`.
+    ///
+    /// - Note: Not available on WASI.
     @_alwaysEmitIntoClient
     public static var routing: Family { Family(CInterop.SAFamily(AF_ROUTE)) }
+    #endif
 
     /// IPv6 address family.
     ///
@@ -97,7 +110,9 @@ extension SocketAddress.Family: CustomStringConvertible {
     case .unspecified: return "unspecified"
     case .local: return "local"
     case .ipv4: return "ipv4"
+    #if !os(WASI)
     case .routing: return "routing"
+    #endif
     case .ipv6: return "ipv6"
     #if SYSTEM_PACKAGE_DARWIN
     case .system: return "system"

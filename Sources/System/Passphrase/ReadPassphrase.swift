@@ -9,11 +9,12 @@
 
 // readpassphrase: a prompt, and a line read with echo off, from the
 // controlling terminal or, without one, from standard input. FreeBSD and
-// OpenBSD have it too; their module maps are unchecked, so they're left
-// out. Linux's C libraries don't have it, so there System takes the same
-// steps itself, but for readpassphrase's signal handling.
+// OpenBSD have it too, through CSystem, since their module maps may not
+// include <readpassphrase.h>. Linux's C libraries don't have it, so there
+// System takes the same steps itself, but for readpassphrase's signal
+// handling.
 
-#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
+#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD)
 
 #if SYSTEM_PACKAGE_DARWIN
 import Darwin
@@ -29,7 +30,7 @@ import Android
 extension TerminalDescriptor {
   /// Options for reading a passphrase.
   ///
-  /// - Note: Only available on Darwin, Linux, and Android.
+  /// - Note: Only available on Darwin, Linux, Android, FreeBSD, and OpenBSD.
   @frozen
   public struct PassphraseOptions: OptionSet, Sendable, Hashable, Codable {
     /// The raw C flags.
@@ -127,7 +128,7 @@ extension TerminalDescriptor {
   /// as glibc's `getpass` does.
   ///
   /// The corresponding C function is `readpassphrase`.
-  /// - Note: Only available on Darwin, Linux, and Android.
+  /// - Note: Only available on Darwin, Linux, Android, FreeBSD, and OpenBSD.
   @_alwaysEmitIntoClient
   public static func readPassphrase(
     prompt: String,
@@ -146,7 +147,7 @@ extension TerminalDescriptor {
     guard let start = buffer.baseAddress, buffer.count > 0 else {
       return .failure(.invalidArgument)
     }
-    #if SYSTEM_PACKAGE_DARWIN
+    #if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
     let characters = start.assumingMemoryBound(to: CChar.self)
     return prompt.withCString { prompt in
       guard system_readpassphrase(prompt, characters, buffer.count, options.rawValue) != nil else {
@@ -259,7 +260,7 @@ extension TerminalDescriptor {
   /// which describes the rest of this method's behavior.
   ///
   /// The corresponding C function is `readpassphrase`.
-  /// - Note: Only available on Darwin, Linux, and Android.
+  /// - Note: Only available on Darwin, Linux, Android, FreeBSD, and OpenBSD.
   @_alwaysEmitIntoClient
   public static func readPassphrase(
     prompt: String,
@@ -287,4 +288,4 @@ extension TerminalDescriptor {
   }
 }
 
-#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
+#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD)

@@ -134,6 +134,20 @@ int _system_ioctl_TIOCSWINSZ(int fd, const void *ws) {
 // 32 on both: FreeBSD's is a literal, OpenBSD's its SYMLOOP_MAX.
 int _system_get_MAXSYMLINKS(void) { return MAXSYMLINKS; }
 
+#include <readpassphrase.h>
+
+// TerminalDescriptor.PassphraseOptions spells the flags as these values,
+// which Darwin's, the BSDs' and libbsd's headers share.
+_Static_assert(RPP_ECHO_ON == 0x01 && RPP_REQUIRE_TTY == 0x02 &&
+                   RPP_FORCELOWER == 0x04 && RPP_FORCEUPPER == 0x08 &&
+                   RPP_SEVENBIT == 0x10 && RPP_STDIN == 0x20,
+               "TerminalDescriptor.PassphraseOptions");
+
+char *csystem_readpassphrase(const char *prompt, char *buffer,
+                             unsigned long size, int flags) {
+  return readpassphrase(prompt, buffer, size, flags);
+}
+
 #endif
 
 #if defined(_WIN32)
@@ -725,6 +739,59 @@ extern int csystem_sendmmsg(int fd, void *msgvec, unsigned int vlen, int flags) 
 extern int csystem_recvmmsg(int fd, void *msgvec, unsigned int vlen, int flags, void *timeout) {
   return recvmmsg(fd, (struct mmsghdr *)msgvec, vlen, flags, (struct timespec *)timeout);
 }
+
+// UDP_SEGMENT and UDP_GRO, which SystemSockets' UDPOption spells as the
+// kernel's numbers, since glibc's and Bionic's Swift modules don't include
+// <netinet/udp.h>; a C library older than the options doesn't define them.
+#include <netinet/udp.h>
+#ifdef UDP_SEGMENT
+_Static_assert(UDP_SEGMENT == 103, "SocketDescriptor.UDPOption.segmentSize");
+#endif
+#ifdef UDP_GRO
+_Static_assert(UDP_GRO == 104, "SocketDescriptor.UDPOption.receiveOffload");
+#endif
+
+// VM sockets. <linux/vm_sockets.h> needs struct sockaddr, from
+// <sys/socket.h>, first.
+#if __has_include(<linux/vm_sockets.h>)
+#include <linux/vm_sockets.h>
+
+// CInterop.SockAddrVM, in Swift, is these fields, laid out as C lays them
+// out; Linux 5.11 took svm_flags from the start of svm_zero. And the
+// context IDs that VMSocketAddress.ContextID spells as numbers.
+struct csystem_sockaddr_vm_layout {
+  sa_family_t svm_family;
+  unsigned short svm_reserved1;
+  unsigned int svm_port;
+  unsigned int svm_cid;
+  unsigned char svm_flags;
+  unsigned char svm_zero[3];
+};
+_Static_assert(sizeof(struct sockaddr_vm) == sizeof(struct csystem_sockaddr_vm_layout),
+               "CInterop.SockAddrVM must match struct sockaddr_vm");
+_Static_assert(offsetof(struct sockaddr_vm, svm_port) ==
+                   offsetof(struct csystem_sockaddr_vm_layout, svm_port),
+               "CInterop.SockAddrVM must match struct sockaddr_vm");
+_Static_assert(offsetof(struct sockaddr_vm, svm_cid) ==
+                   offsetof(struct csystem_sockaddr_vm_layout, svm_cid),
+               "CInterop.SockAddrVM must match struct sockaddr_vm");
+_Static_assert(VMADDR_CID_HYPERVISOR == 0, "VMADDR_CID_HYPERVISOR");
+_Static_assert(VMADDR_CID_HOST == 2, "VMADDR_CID_HOST");
+_Static_assert(VMADDR_CID_ANY == -1U, "VMADDR_CID_ANY");
+_Static_assert(VMADDR_PORT_ANY == -1U, "VMADDR_PORT_ANY");
+#ifdef VMADDR_CID_LOCAL
+_Static_assert(VMADDR_CID_LOCAL == 1, "VMADDR_CID_LOCAL");
+#endif
+#endif // __has_include(<linux/vm_sockets.h>)
+
+#ifndef IOCTL_VM_SOCKETS_GET_LOCAL_CID
+// The kernel's value, for a C library without the header.
+#define IOCTL_VM_SOCKETS_GET_LOCAL_CID _IO(7, 0xb9)
+#endif
+
+unsigned long _system_get_IOCTL_VM_SOCKETS_GET_LOCAL_CID(void) {
+  return IOCTL_VM_SOCKETS_GET_LOCAL_CID;
+}
 #endif // __linux__
 
 // MARK: - Locales
@@ -833,6 +900,7 @@ extern size_t csystem_malloc_usable_size(const void *pointer) {
   return malloc_usable_size(pointer);
 }
 
+#include <langinfo.h>
 #include <stdlib.h>
 #include <strings.h>
 #include <xlocale.h>
@@ -847,6 +915,10 @@ extern float csystem_strtof_l(const char *string, char **end, void *locale) {
 
 extern int csystem_strncasecmp_l(const char *a, const char *b, size_t count, void *locale) {
   return strncasecmp_l(a, b, count, (locale_t)locale);
+}
+
+extern char *csystem_nl_langinfo_l(int item, void *locale) {
+  return nl_langinfo_l((nl_item)item, (locale_t)locale);
 }
 #endif // defined(__FreeBSD__)
 

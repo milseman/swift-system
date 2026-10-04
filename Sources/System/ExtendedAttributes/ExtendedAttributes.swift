@@ -207,6 +207,73 @@ extension FilePath {
     }
   }
 
+  /// Returns the size of one of the file's extended attributes,
+  /// without reading its value.
+  ///
+  /// - Parameters:
+  ///   - name: The attribute's name, such as `"user.origin"` on Linux.
+  ///   - followTargetSymlink: Whether to measure the attribute of the file
+  ///     that a symbolic link at this path points to,
+  ///     rather than that of the link itself. The default is `true`.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  /// - Returns: The size of the attribute's value in bytes,
+  ///   or `nil` if the file doesn't have it.
+  ///
+  /// The value can change before you read it;
+  /// ``extendedAttribute(_:followTargetSymlink:retryOnInterrupt:)``
+  /// reads it whatever its size.
+  ///
+  /// The corresponding C function is `getxattr`, with no buffer,
+  /// or on Linux `lgetxattr` for a link itself.
+  @_alwaysEmitIntoClient
+  public func extendedAttributeSize(
+    _ name: String, followTargetSymlink: Bool = true, retryOnInterrupt: Bool = true
+  ) throws(Errno) -> Int? {
+    try withPlatformString {
+      FilePath._extendedAttributeSize(
+        $0, name, followTargetSymlink: followTargetSymlink, retryOnInterrupt: retryOnInterrupt)
+    }.get()
+  }
+
+  /// Returns the size of one of the extended attributes of the file
+  /// at a path, without reading its value.
+  ///
+  /// - Parameters:
+  ///   - path: The location of the file.
+  ///   - name: The attribute's name.
+  ///   - followTargetSymlink: Whether to measure the attribute of the file
+  ///     that a symbolic link at `path` points to. The default is `true`.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``. The default is `true`.
+  /// - Returns: The size of the attribute's value in bytes,
+  ///   or `nil` if the file doesn't have it.
+  ///
+  /// The corresponding C function is `getxattr`, with no buffer.
+  @_alwaysEmitIntoClient
+  public static func extendedAttributeSize(
+    _ path: UnsafePointer<CChar>, _ name: String,
+    followTargetSymlink: Bool = true, retryOnInterrupt: Bool = true
+  ) throws(Errno) -> Int? {
+    try _extendedAttributeSize(
+      path, name, followTargetSymlink: followTargetSymlink, retryOnInterrupt: retryOnInterrupt
+    ).get()
+  }
+
+  @usableFromInline
+  internal static func _extendedAttributeSize(
+    _ path: UnsafePointer<CChar>, _ name: String,
+    followTargetSymlink: Bool, retryOnInterrupt: Bool
+  ) -> Result<Int?, Errno> {
+    name.withCString { name in
+      _readAttributeSize(retryOnInterrupt: retryOnInterrupt) {
+        system_getxattr(path, name, nil, 0, noFollow: !followTargetSymlink)
+      }
+    }
+  }
+
   /// Sets one of the file's extended attributes.
   ///
   /// - Parameters:
@@ -401,6 +468,35 @@ extension FileDescriptor {
     }
   }
 
+  /// Returns the size of one of the extended attributes of the file
+  /// that this descriptor refers to, without reading its value.
+  ///
+  /// - Parameters:
+  ///   - name: The attribute's name.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``. The default is `true`.
+  /// - Returns: The size of the attribute's value in bytes,
+  ///   or `nil` if the file doesn't have it.
+  ///
+  /// The corresponding C function is `fgetxattr`, with no buffer.
+  @_alwaysEmitIntoClient
+  public func extendedAttributeSize(
+    _ name: String, retryOnInterrupt: Bool = true
+  ) throws(Errno) -> Int? {
+    try _extendedAttributeSize(name, retryOnInterrupt: retryOnInterrupt).get()
+  }
+
+  @usableFromInline
+  internal func _extendedAttributeSize(
+    _ name: String, retryOnInterrupt: Bool
+  ) -> Result<Int?, Errno> {
+    name.withCString { name in
+      _readAttributeSize(retryOnInterrupt: retryOnInterrupt) {
+        system_fgetxattr(rawValue, name, nil, 0)
+      }
+    }
+  }
+
   /// Sets one of the extended attributes of the file
   /// that this descriptor refers to.
   ///
@@ -494,6 +590,19 @@ internal func _readAttributeValue(
     case .failure(let error):
       return error == .attributeNotFound ? .success(nil) : .failure(error)
     }
+  }
+}
+
+/// Returns the size that `size` returns, a getxattr call with no buffer,
+/// or `nil` for a missing attribute, as `_readAttributeValue` does.
+@available(System 199, *)
+internal func _readAttributeSize(
+  retryOnInterrupt: Bool, _ size: () -> Int
+) -> Result<Int?, Errno> {
+  switch valueOrErrno(retryOnInterrupt: retryOnInterrupt, size) {
+  case .success(let count): return .success(count)
+  case .failure(let error):
+    return error == .attributeNotFound ? .success(nil) : .failure(error)
   }
 }
 

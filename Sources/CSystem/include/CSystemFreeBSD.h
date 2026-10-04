@@ -28,5 +28,6 @@ extern size_t csystem_malloc_usable_size(const void *pointer);
 extern double csystem_strtod_l(const char *string, char **end, void *locale);
 extern float csystem_strtof_l(const char *string, char **end, void *locale);
 extern int csystem_strncasecmp_l(const char *a, const char *b, size_t count, void *locale);
+extern char *csystem_nl_langinfo_l(int item, void *locale);
 
 #endif // defined(__FreeBSD__)

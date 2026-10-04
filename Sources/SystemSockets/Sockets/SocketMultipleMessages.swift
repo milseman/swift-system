@@ -7,6 +7,8 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
+#if !os(WASI)
+
 import SystemPackage
 
 #if SYSTEM_PACKAGE_DARWIN
@@ -400,3 +402,5 @@ extension SocketDescriptor {
 }
 
 #endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
+
+#endif // !os(WASI)

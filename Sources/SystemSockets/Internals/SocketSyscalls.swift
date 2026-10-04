@@ -20,11 +20,18 @@ import Musl
 #elseif canImport(Android)
 @_implementationOnly import CSystem
 import Android
+#elseif canImport(WASILibc)
+import WASILibc
 #else
 #error("Unsupported Platform")
 #endif
 
 import SystemPackage
+
+// On WASI, only what SocketDescriptor's checked init and the address types
+// call: getsockopt, inet_ntop and inet_pton.
+
+#if !os(WASI)
 
 // MARK: - Socket creation and management
 
@@ -183,6 +190,8 @@ internal func system_recvmsg(
   return recvmsg(socket, message, flags)
 }
 
+#endif // !os(WASI)
+
 // MARK: - Socket options
 
 internal func system_getsockopt(
@@ -197,6 +206,8 @@ internal func system_getsockopt(
 #endif
   return getsockopt(socket, level, option, value, length)
 }
+
+#if !os(WASI)
 
 internal func system_setsockopt(
   _ socket: CInt,
@@ -233,6 +244,8 @@ internal func system_getpeername(
   return getpeername(socket, addr, len)
 }
 
+#endif // !os(WASI)
+
 // MARK: - Address conversion
 
 @usableFromInline
@@ -261,6 +274,8 @@ internal func system_inet_pton(
 #endif
   return inet_pton(af, src, dst)
 }
+
+#if !os(WASI)
 
 // MARK: - Name resolution
 
@@ -315,3 +330,5 @@ internal func system_freeaddrinfo(
 internal func system_gai_strerror(_ error: CInt) -> UnsafePointer<CChar> {
   gai_strerror(error)
 }
+
+#endif // !os(WASI)

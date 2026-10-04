@@ -83,6 +83,19 @@ private struct ProcessExitTests {
     #expect(!output.contains("handler"))
   }
 
+  @available(System 199, *)
+  @Test func abortEndsTheProcessWithTheAbortSignalAndNoHandlers() async throws {
+    let result = try await #require(
+      processExitsWith: .signal(SIGABRT), observing: [\.standardOutputContent]
+    ) {
+      try ProcessID.addExitHandler {
+        _ = try? FileDescriptor.standardOutput.writeAll("handler".utf8)
+      }
+      ProcessID.abort()
+    }
+    #expect(!String(decoding: result.standardOutputContent, as: UTF8.self).contains("handler"))
+  }
+
   /// A parent that waits with `waitpid` gets only the status's low 8 bits.
   /// swift-testing waits with `waitid`, which on Darwin reports more of them.
   @available(System 199, *)

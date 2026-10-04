@@ -17,6 +17,7 @@
 #define COMPATIBILITY_O_CLOFORK 0
 #endif
 
+#include <langinfo.h>
 #include <locale.h>
 #include <removefile.h>
 #include <sys/ioctl.h>
@@ -24,15 +25,17 @@
 #include <termios.h>
 #include <tzfile.h>
 #include <xlocale.h>
+#include <xlocale/_langinfo.h>
 #include <xlocale/_stdlib.h>
 #include <xlocale/_string.h>
 
 // <removefile.h> is for removefile and its state, <sys/random.h> for
-// getentropy, <tzfile.h> for TZDIR and TZDEFAULT, and <locale.h> and the
-// <xlocale.h> headers for the locale calls that System wraps provisionally
-// (setlocale, newlocale, strtod_l, strncasecmp_l): the Darwin module doesn't
-// export them, and in the macOS 26 SDK the locale calls are in explicit
-// submodules that an `import Darwin` leaves out.
+// getentropy, <tzfile.h> for TZDIR and TZDEFAULT, and <langinfo.h>,
+// <locale.h> and the <xlocale.h> headers for the locale calls that System
+// wraps provisionally (setlocale, newlocale, strtod_l, strncasecmp_l,
+// nl_langinfo_l): the Darwin module doesn't export them, and in the macOS 26
+// SDK the locale calls are in explicit submodules that an `import Darwin`
+// leaves out.
 
 // Terminal ioctl shims
 int _system_ioctl_TIOCGWINSZ(int fd, struct winsize *ws);

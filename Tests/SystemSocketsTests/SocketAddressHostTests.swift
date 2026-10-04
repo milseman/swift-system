@@ -7,7 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-#if !os(Windows)
+#if !os(Windows) && !os(WASI)
 
 import Testing
 
@@ -83,4 +83,4 @@ private struct SocketAddressHostTests {
   }
 }
 
-#endif // !os(Windows)
+#endif // !os(Windows) && !os(WASI)

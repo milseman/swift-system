@@ -86,6 +86,29 @@ final class ProvisionalLocaleTest: XCTestCase {
     XCTAssertNil(CLocale.setGlobal("no_SUCH.locale", for: .numeric))
     XCTAssertEqual(CLocale.globalName(for: .numeric), "fr_FR.UTF-8")
   }
+
+  /// The POSIX locale's information, and a French one's, whose dates put
+  /// the day first.
+  func testInformation() throws {
+    let posix = CLocale.posix
+    XCTAssertEqual(posix.information(.characterEncoding), "US-ASCII")
+    XCTAssertEqual(posix.information(.dateFormat), "%m/%d/%y")
+    XCTAssertEqual(posix.information(.timeFormat), "%H:%M:%S")
+    XCTAssertEqual(posix.information(.amSymbol), "AM")
+    XCTAssertEqual(posix.information(.dayName(1)), "Sunday")
+    XCTAssertEqual(posix.information(.abbreviatedDayName(7)), "Sat")
+    XCTAssertEqual(posix.information(.monthName(1)), "January")
+    XCTAssertEqual(posix.information(.abbreviatedMonthName(12)), "Dec")
+    XCTAssertEqual(posix.information(.decimalSeparator), ".")
+    XCTAssertEqual(posix.information(.monthDayOrder), "md")
+    let french = try CLocale.named("fr_FR.UTF-8")
+    defer { french.free() }
+    XCTAssertEqual(french.information(.characterEncoding), "UTF-8")
+    XCTAssertEqual(french.information(.decimalSeparator), ",")
+    XCTAssertEqual(french.information(.monthDayOrder), "dm")
+    // The global locale's, through LC_GLOBAL_LOCALE.
+    XCTAssertFalse(CLocale.global.information(.monthDayOrder).isEmpty)
+  }
 }
 
 #endif // SYSTEM_PACKAGE_DARWIN

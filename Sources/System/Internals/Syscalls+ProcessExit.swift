@@ -7,7 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-// Ending the calling process: exit, _exit, and atexit.
+// Ending the calling process: exit, _exit, abort, and atexit.
 
 #if !os(Windows)
 
@@ -25,7 +25,7 @@ import Android
 #error("Unsupported Platform")
 #endif
 
-// exit and _exit never return, so they have no mock hook.
+// exit, _exit and abort never return, so they have no mock hook.
 
 @usableFromInline
 internal func system_exit(_ status: CInt) -> Never {
@@ -35,6 +35,11 @@ internal func system_exit(_ status: CInt) -> Never {
 @usableFromInline
 internal func system__exit(_ status: CInt) -> Never {
   _exit(status)
+}
+
+@usableFromInline
+internal func system_abort() -> Never {
+  abort()
 }
 
 // atexit returns a nonzero value, not necessarily -1, when it fails, and

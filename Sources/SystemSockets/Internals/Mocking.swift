@@ -19,6 +19,12 @@ import Glibc
 import Musl
 #elseif canImport(Android)
 import Android
+#elseif canImport(WASILibc)
+import WASILibc
+#if _runtime(_multithreaded)
+// WASILibc doesn't re-export the module of <pthread.h>.
+import wasi_pthread
+#endif
 #endif
 
 import SystemPackage
@@ -69,6 +75,25 @@ internal class MockingDriver {
 // TLS support
 #if os(Windows)
 internal typealias _PlatformTLSKey = DWORD
+#elseif os(WASI) && (swift(<6.1) || !_runtime(_multithreaded))
+// Single-threaded WASI has no thread-specific storage, so a key indexes a
+// table of one thread's values, as in SystemPackage's Exports.swift.
+internal final class _PlatformTLSKey: @unchecked Sendable {
+  fileprivate init() {}
+}
+private final class TLSStorage: @unchecked Sendable {
+  var storage = [ObjectIdentifier: UnsafeMutableRawPointer]()
+}
+private let sharedTLSStorage = TLSStorage()
+
+private func pthread_setspecific(_ key: _PlatformTLSKey, _ p: UnsafeMutableRawPointer?) -> Int {
+  sharedTLSStorage.storage[ObjectIdentifier(key)] = p
+  return 0
+}
+
+private func pthread_getspecific(_ key: _PlatformTLSKey) -> UnsafeMutableRawPointer? {
+  sharedTLSStorage.storage[ObjectIdentifier(key)]
+}
 #else
 internal typealias _PlatformTLSKey = pthread_key_t
 #endif
@@ -80,6 +105,8 @@ private func makeTLSKey() -> _PlatformTLSKey {
     fatalError("Unable to create key")
   }
   return raw
+  #elseif os(WASI) && (swift(<6.1) || !_runtime(_multithreaded))
+  return _PlatformTLSKey()
   #else
   var raw = pthread_key_t()
   guard 0 == pthread_key_create(&raw, nil) else {

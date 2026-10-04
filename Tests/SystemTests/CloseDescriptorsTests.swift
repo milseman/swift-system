@@ -86,6 +86,25 @@ final class CloseDescriptorsTests: XCTestCase {
   }
   #endif
 
+  #if os(Linux) || os(Android)
+  /// The fallback for kernels before 5.11, which have no
+  /// CLOSE_RANGE_CLOEXEC: the descriptors that /proc/self/fd lists.
+  func testMarkingARangeFromTheListing() throws {
+    let first = try occupyThreeDescriptors()
+    defer {
+      for fd in first.rawValue..<(first.rawValue + 3) { close(fd) }
+    }
+    try FileDescriptor._markListedDescriptorsCloseOnExec(
+      first, FileDescriptor(rawValue: first.rawValue + 1)
+    ).get()
+    XCTAssertTrue(try first.descriptorFlags().contains(.closeOnExec))
+    XCTAssertTrue(
+      try FileDescriptor(rawValue: first.rawValue + 1).descriptorFlags().contains(.closeOnExec))
+    XCTAssertFalse(
+      try FileDescriptor(rawValue: first.rawValue + 2).descriptorFlags().contains(.closeOnExec))
+  }
+  #endif
+
   func testAnEmptyRangeIsInvalid() {
     XCTAssertThrowsError(
       try FileDescriptor.closeAll(

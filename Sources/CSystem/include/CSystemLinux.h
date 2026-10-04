@@ -243,6 +243,12 @@ extern int csystem_accept4(int fd, void *addr, void *addrlen, int flags);
 // timespec, untyped for the same reason as accept4's arguments.
 extern int csystem_sendmmsg(int fd, void *msgvec, unsigned int vlen, int flags);
 extern int csystem_recvmmsg(int fd, void *msgvec, unsigned int vlen, int flags, void *timeout);
+
+// IOCTL_VM_SOCKETS_GET_LOCAL_CID, from <linux/vm_sockets.h>, which no C
+// library's Swift module includes, and which this header doesn't include
+// either, so as not to declare struct sockaddr_vm here: SystemSockets'
+// CInterop.SockAddrVM mirrors it, and shims.c checks the two agree.
+unsigned long _system_get_IOCTL_VM_SOCKETS_GET_LOCAL_CID(void);
 #endif // __linux__
 
 #if defined(__linux__) && !defined(__ANDROID__)

@@ -47,9 +47,10 @@ internal func system_dlerror() -> UnsafeMutablePointer<CChar>? {
   dlerror()
 }
 
-#if SYSTEM_PACKAGE_DARWIN
+#if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
 // dladdr reports no error; it returns 0 when no loaded image contains the
-// address.
+// address. FreeBSD's and OpenBSD's <dlfcn.h> declare it, and Darwin's
+// Dl_info, by default (__BSD_VISIBLE).
 internal func system_dladdr(
   _ address: UnsafeRawPointer
 ) -> (path: UnsafePointer<CChar>, base: UnsafeRawPointer?,

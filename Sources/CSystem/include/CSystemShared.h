@@ -22,6 +22,11 @@ extern int _system_ioctl_TIOCSWINSZ(int fd, const void *ws);
 
 // MAXSYMLINKS, from <sys/param.h>, as CSystemLinux.h declares it.
 extern int _system_get_MAXSYMLINKS(void);
+
+// readpassphrase, from <readpassphrase.h>, which the BSDs' Swift modules
+// may not include; shims.c does. The size is a size_t.
+extern char *csystem_readpassphrase(const char *prompt, char *buffer,
+                                    unsigned long size, int flags);
 #endif
 
 #if !defined(_WIN32) && !defined(__wasi__) && !defined(__ANDROID__)

@@ -33,9 +33,11 @@ import Android
 #error("Unsupported Platform")
 #endif
 
-// wasi-libc's FILE is an incomplete type, which Swift doesn't import, so
-// WASI has no CInterop.File, and a stream's rawValue is an OpaquePointer.
-#if !os(WASI)
+// wasi-libc's FILE is an incomplete type, which Swift doesn't import, and
+// so are OpenBSD's and Bionic's (from API level 24; the Swift SDK for
+// Android targets 28 and up), so they have no CInterop.File, and a stream's
+// rawValue is an OpaquePointer.
+#if !os(WASI) && !os(Android) && !os(OpenBSD)
 @available(System 199, *)
 extension CInterop {
   /// The state of a C standard I/O stream.
@@ -43,6 +45,8 @@ extension CInterop {
   /// The corresponding C type is `FILE`.
   ///
   /// - Note: Provisional: C standard I/O may move to the Swift standard library.
+  /// - Note: Not available on WASI, Android, or OpenBSD,
+  ///   whose `FILE` is an incomplete type.
   public typealias File = FILE
 }
 #endif
@@ -73,10 +77,10 @@ extension CInterop {
 @frozen
 @available(System 199, *)
 public struct FileStream: RawRepresentable, Hashable, @unchecked Sendable {
-  #if os(WASI)
+  #if os(WASI) || os(Android) || os(OpenBSD)
   /// The C stream.
   ///
-  /// WASI's `FILE` is an incomplete type,
+  /// On WASI, Android, and OpenBSD, `FILE` is an incomplete type,
   /// so Swift imports a pointer to one as `OpaquePointer`.
   @_alwaysEmitIntoClient
   public var rawValue: OpaquePointer
@@ -381,7 +385,7 @@ extension FileStream {
     try _flush(nil).get()
   }
 
-  #if os(WASI)
+  #if os(WASI) || os(Android) || os(OpenBSD)
   @usableFromInline
   internal static func _flush(_ stream: OpaquePointer?) -> Result<(), Errno> {
     nothingOrErrno(retryOnInterrupt: false) { system_fflush(stream) }
