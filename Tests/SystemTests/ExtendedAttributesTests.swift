@@ -93,6 +93,31 @@ private struct ExtendedAttributesTests {
   }
 
   @available(System 199, *)
+  @Test func sizesWithoutValues() throws {
+    try withAttributedFile { file in
+      #expect(try file.extendedAttributeSize(name) == nil)
+      try file.setExtendedAttribute(name, to: [1, 2, 3])
+      #expect(try file.extendedAttributeSize(name) == 3)
+      try file.setExtendedAttribute(name, to: [])
+      #expect(try file.extendedAttributeSize(name) == 0)
+      let fd = try FileDescriptor.open(file, .readOnly)
+      defer { try? fd.close() }
+      try file.setExtendedAttribute(name, to: Array(repeating: 7, count: 3000))
+      #expect(try fd.extendedAttributeSize(name) == 3000)
+      try file.withPlatformString { path in
+        let size = try FilePath.extendedAttributeSize(path, name)
+        #expect(size == 3000)
+      }
+      let link = file.removingLastComponent().appending("link")
+      try link.makeSymbolicLink(to: file)
+      #expect(try link.extendedAttributeSize(name) == 3000)
+      #expect(try link.extendedAttributeSize(name, followTargetSymlink: false) == nil)
+      try fd.removeExtendedAttribute(name)
+      #expect(try fd.extendedAttributeSize(name) == nil)
+    }
+  }
+
+  @available(System 199, *)
   @Test func symbolicLinksAndCStrings() throws {
     try withAttributedFile { file in
       let link = file.removingLastComponent().appending("link")

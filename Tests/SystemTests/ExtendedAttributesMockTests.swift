@@ -42,6 +42,15 @@ final class ExtendedAttributesMockTests: XCTestCase {
       MockTestCase(name: "fremovexattr", .interruptable, 3, "user.a") { retryOnInterrupt in
         try fd.removeExtendedAttribute("user.a", retryOnInterrupt: retryOnInterrupt)
       },
+      // A size is the call without a buffer, alone.
+      MockTestCase(name: "getxattr", .interruptable, "a path", "user.a", 0, true) {
+        retryOnInterrupt in
+        _ = try path.extendedAttributeSize(
+          "user.a", followTargetSymlink: false, retryOnInterrupt: retryOnInterrupt)
+      },
+      MockTestCase(name: "fgetxattr", .interruptable, 3, "user.a", 0) { retryOnInterrupt in
+        _ = try fd.extendedAttributeSize("user.a", retryOnInterrupt: retryOnInterrupt)
+      },
     ]
     for test in cases { test.runAllTests() }
   }
