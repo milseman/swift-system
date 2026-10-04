@@ -130,11 +130,24 @@ private struct CInteropSocketAccessorsTests {
     #if SYSTEM_PACKAGE_DARWIN
     ipv4.length = 16
     #expect(ipv4.sin_len == 16)
+    #endif
+    #if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
     var vm = CInterop.SockAddrVM(family: .vsock, port: 1024, contextID: 2)
     #expect(vm.svm_family == sa_family_t(AF_VSOCK) && vm.svm_port == 1024 && vm.svm_cid == 2)
+    #if SYSTEM_PACKAGE_DARWIN
     vm.length = 12
     #expect(vm.svm_len == 12)
     #expect(sameBytes(CInterop.SockAddrVM(), sockaddr_vm()))
+    #else
+    // Linux's is System's structure, with the C layout: 16 bytes.
+    vm.contextID = 3
+    vm.port = 1025
+    #expect(vm.svm_cid == 3 && vm.svm_port == 1025 && vm.family == .vsock)
+    #expect(MemoryLayout<CInterop.SockAddrVM>.size == 16)
+    #expect(MemoryLayout<CInterop.SockAddrVM>.offset(of: \.svm_port) == 4)
+    #expect(MemoryLayout<CInterop.SockAddrVM>.offset(of: \.svm_cid) == 8)
+    #expect(sameBytes(CInterop.SockAddrVM(), CInterop.SockAddrVM(family: .unspecified)))
+    #endif
     #endif
   }
 

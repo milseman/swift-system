@@ -187,6 +187,8 @@ extension SocketDescriptor {
       #if SYSTEM_PACKAGE_DARWIN
       case .system: return "system"
       case .networkDevice: return "networkDevice"
+      #endif
+      #if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
       case .vsock: return "vsock"
       #endif
       default: return "Domain(\(rawValue))"

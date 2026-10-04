@@ -581,7 +581,7 @@ extension CInterop.In6Addr {
 
 // MARK: - sockaddr_vm
 
-#if SYSTEM_PACKAGE_DARWIN
+#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
 @available(System 199, *)
 extension CInterop.SockAddrVM {
   /// Creates a VM socket address from its fields, by default all zero.
@@ -602,14 +602,18 @@ extension CInterop.SockAddrVM {
     self.contextID = contextID
   }
 
+  #if SYSTEM_PACKAGE_DARWIN
   /// The address's length in bytes.
   ///
   /// The corresponding C field is `svm_len`.
+  ///
+  /// - Note: Only available on Darwin.
   @_alwaysEmitIntoClient
   public var length: UInt8 {
     get { svm_len }
     set { svm_len = newValue }
   }
+  #endif
 
   /// The address's family.
   ///
@@ -638,7 +642,7 @@ extension CInterop.SockAddrVM {
     set { svm_cid = newValue }
   }
 }
-#endif // SYSTEM_PACKAGE_DARWIN
+#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
 
 // MARK: - linger
 
