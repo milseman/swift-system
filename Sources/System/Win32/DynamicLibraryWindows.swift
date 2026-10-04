@@ -285,4 +285,108 @@ extension DynamicLibrary {
   }
 }
 
+
+// MARK: - Search directories
+
+@available(System 199, *)
+extension DynamicLibrary {
+  /// A directory that ``addSearchDirectory(_:)`` added to the process's
+  /// library search.
+  ///
+  /// Pass it to ``removeSearchDirectory(_:)`` to take the directory out of
+  /// the search again.
+  ///
+  /// The corresponding C type is `DLL_DIRECTORY_COOKIE`.
+  @frozen
+  public struct SearchDirectory: RawRepresentable, Hashable, @unchecked Sendable {
+    /// The raw C cookie.
+    @_alwaysEmitIntoClient
+    public var rawValue: DLL_DIRECTORY_COOKIE
+
+    /// Creates a strongly-typed search directory from a raw C cookie.
+    @_alwaysEmitIntoClient
+    public init(rawValue: DLL_DIRECTORY_COOKIE) { self.rawValue = rawValue }
+  }
+
+  /// Adds a directory to the ones the loader searches for a library loaded
+  /// with ``LoadOptions/searchUserDirectories`` or
+  /// ``LoadOptions/searchDefaultDirectories``.
+  ///
+  /// - Parameter path: The directory. A relative path is resolved against
+  ///   the current directory, since the loader takes only an absolute one.
+  /// - Returns: The directory's registration, for
+  ///   ``removeSearchDirectory(_:)``.
+  ///
+  /// The directories belong to the process, so the change affects every
+  /// thread's loads. The order in which the loader searches added
+  /// directories isn't specified. A load with no `search` options, such as
+  /// one with `LoadLibraryW`'s search, doesn't search them.
+  ///
+  /// The corresponding C function is `AddDllDirectory`.
+  @_alwaysEmitIntoClient
+  @discardableResult
+  public static func addSearchDirectory(_ path: FilePath) throws(Win32.Error) -> SearchDirectory {
+    SearchDirectory(rawValue: try _addSearchDirectory(path).get())
+  }
+
+  /// Removes a directory that ``addSearchDirectory(_:)`` added.
+  ///
+  /// Libraries already loaded from it stay loaded.
+  ///
+  /// The corresponding C function is `RemoveDllDirectory`.
+  @_alwaysEmitIntoClient
+  public static func removeSearchDirectory(_ directory: SearchDirectory) throws(Win32.Error) {
+    try _removeSearchDirectory(directory.rawValue).get()
+  }
+
+  /// Sets the search that a load uses when it names no `search` options,
+  /// for the rest of the process's life.
+  ///
+  /// - Parameter options: The `search` options that become the default,
+  ///   such as ``LoadOptions/searchDefaultDirectories``, which leaves out
+  ///   the current directory and `PATH`. Other options throw
+  ///   ``Win32/Error/invalidParameter``.
+  ///
+  /// The change belongs to the process, and can't be undone except by
+  /// setting another default, so it suits a program's start, before it
+  /// loads anything. Microsoft recommends it to keep a program from loading
+  /// a library planted in the current directory.
+  ///
+  /// The corresponding C function is `SetDefaultDllDirectories`.
+  @_alwaysEmitIntoClient
+  public static func setDefaultSearch(_ options: LoadOptions) throws(Win32.Error) {
+    try _setDefaultSearch(options.rawValue).get()
+  }
+
+  @usableFromInline
+  internal static func _addSearchDirectory(
+    _ path: FilePath
+  ) -> Result<DLL_DIRECTORY_COOKIE, Win32.Error> {
+    // A full path, but without the \\?\ prefix, which the loader's search
+    // doesn't document taking.
+    _withCanonicalPath(path, prefix: .never) { path in
+      guard let cookie = system_AddDllDirectory(path) else {
+        return .failure(Win32.Error(GetLastError()))
+      }
+      return .success(cookie)
+    }
+  }
+
+  @usableFromInline
+  internal static func _removeSearchDirectory(
+    _ cookie: DLL_DIRECTORY_COOKIE
+  ) -> Result<Void, Win32.Error> {
+    guard system_RemoveDllDirectory(cookie) else { return .failure(Win32.Error(GetLastError())) }
+    return .success(())
+  }
+
+  @usableFromInline
+  internal static func _setDefaultSearch(_ options: DWORD) -> Result<Void, Win32.Error> {
+    guard system_SetDefaultDllDirectories(options) else {
+      return .failure(Win32.Error(GetLastError()))
+    }
+    return .success(())
+  }
+}
+
 #endif // os(Windows)

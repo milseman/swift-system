@@ -126,6 +126,21 @@ internal var _WAIT_OBJECT_0: DWORD { 0x0 }
 @_alwaysEmitIntoClient
 internal var _WAIT_TIMEOUT: DWORD { 0x102 }
 
+// MARK: - C standard I/O
+
+@_alwaysEmitIntoClient
+internal var _EOF: CInt { -1 }
+
+// MARK: - Ending the process
+
+// stdlib.h's, which Constants+ExitCodes.swift spells for the other
+// platforms.
+@_alwaysEmitIntoClient
+internal var _EXIT_SUCCESS: CInt { 0 }
+
+@_alwaysEmitIntoClient
+internal var _EXIT_FAILURE: CInt { 1 }
+
 // MARK: - Creating threads
 
 @_alwaysEmitIntoClient
@@ -174,6 +189,11 @@ internal var _STD_INPUT_HANDLE: DWORD { DWORD(bitPattern: -10) }
 @_alwaysEmitIntoClient
 internal var _STD_OUTPUT_HANDLE: DWORD { DWORD(bitPattern: -11) }
 
+// MARK: - Consoles
+
+@_alwaysEmitIntoClient
+internal var _ATTACH_PARENT_PROCESS: DWORD { DWORD(bitPattern: -1) }
+
 // MARK: - Condition variables
 
 @_alwaysEmitIntoClient
@@ -186,5 +206,86 @@ internal var _ERROR_TIMEOUT: DWORD { 1460 }
 
 @_alwaysEmitIntoClient
 internal var _ERROR_ENVVAR_NOT_FOUND: DWORD { 203 }
+
+// MARK: - Network adapters
+
+@_alwaysEmitIntoClient
+internal var _AF_UNSPEC: ULONG { 0 }
+
+// The unicast addresses alone.
+@_alwaysEmitIntoClient
+internal var _GAA_FLAGS_UNICAST_ONLY: ULONG { 0x0002 | 0x0004 | 0x0008 }
+
+@_alwaysEmitIntoClient
+internal var _IP_ADAPTER_NO_MULTICAST: ULONG { 0x0010 }
+
+@_alwaysEmitIntoClient
+internal var _ERROR_BUFFER_OVERFLOW: ULONG { 111 }
+
+// MARK: - Events and waits
+
+// The SDK's is ((STATUS_ABANDONED_WAIT_0) + 0), which doesn't import.
+@_alwaysEmitIntoClient
+internal var _WAIT_ABANDONED_0: DWORD { 0x80 }
+
+@_alwaysEmitIntoClient
+internal var _MAXIMUM_WAIT_OBJECTS: Int { 64 }
+
+// MARK: - Reparse points
+
+// winioctl.h computes it with CTL_CODE, a function-like macro, which
+// doesn't import; Swift's WinSDK overlay declares it.
+@_alwaysEmitIntoClient
+internal var _FSCTL_GET_REPARSE_POINT: DWORD { 0x0009_00A8 }
+
+@_alwaysEmitIntoClient
+internal var _MAXIMUM_REPARSE_DATA_BUFFER_SIZE: Int { 16 * 1024 }
+
+@_alwaysEmitIntoClient
+internal var _SYMLINK_FLAG_RELATIVE: DWORD { 0x0000_0001 }
+
+// MARK: - Pipes
+
+@_alwaysEmitIntoClient
+internal var _FILE_FLAG_FIRST_PIPE_INSTANCE: DWORD { 0x0008_0000 }
+
+@_alwaysEmitIntoClient
+internal var _PIPE_NOWAIT: DWORD { 0x0000_0001 }
+
+@_alwaysEmitIntoClient
+internal var _PIPE_READMODE_MESSAGE: DWORD { 0x0000_0002 }
+
+@_alwaysEmitIntoClient
+internal var _PIPE_REJECT_REMOTE_CLIENTS: DWORD { 0x0000_0008 }
+
+@_alwaysEmitIntoClient
+internal var _PIPE_UNLIMITED_INSTANCES: DWORD { 255 }
+
+@_alwaysEmitIntoClient
+internal var _ERROR_PIPE_CONNECTED: DWORD { 535 }
+
+// MARK: - Job objects
+
+// The limits that JobOptions sets; the others, which need values, a job
+// keeps as they are.
+@_alwaysEmitIntoClient
+internal var _JOB_OBJECT_OPTION_FLAGS: DWORD { 0x0000_3C00 }
+
+// MARK: - Security identifiers and accounts
+
+@_alwaysEmitIntoClient
+internal var _SID_REVISION: UInt8 { 1 }
+
+@_alwaysEmitIntoClient
+internal var _SID_MAX_SUB_AUTHORITIES: Int { 15 }
+
+// winnt.h computes it, with sizeof, so it doesn't import: the 8 bytes of a
+// SID's header, and 15 subauthorities of 4.
+@_alwaysEmitIntoClient
+internal var _SECURITY_MAX_SID_SIZE: Int { 68 }
+
+// The longest user name, in characters, without the terminator.
+@_alwaysEmitIntoClient
+internal var _UNLEN: Int { 256 }
 
 #endif // os(Windows)

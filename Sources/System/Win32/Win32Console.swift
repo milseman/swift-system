@@ -92,6 +92,34 @@ extension Win32.FileHandle {
   }
 }
 
+@available(System 199, *)
+extension Win32.FileHandle {
+  /// Makes a handle one of the process's standard handles, which
+  /// ``withStandardHandle(_:_:)`` lends from then on, and which the processes
+  /// it creates without handles of their own inherit.
+  ///
+  /// - Parameters:
+  ///   - which: The standard handle to replace.
+  ///   - handle: The new standard handle, which the process keeps until it
+  ///     exits. If the call throws, the handle is closed.
+  ///
+  /// The process's previous standard handle isn't closed, since something
+  /// else can own it: the C runtime's descriptor 0, 1 or 2 opened with it,
+  /// or the console. Those descriptors keep their handles, so `print` and
+  /// `FileDescriptor.standardOutput` still write where they did.
+  ///
+  /// The corresponding C function is `SetStdHandle`.
+  @_alwaysEmitIntoClient
+  public static func setStandardHandle(
+    _ which: Win32.StandardHandle, to handle: consuming Win32.FileHandle
+  ) throws(Win32.Error) {
+    let raw = handle._handle
+    try Win32._setStandardHandle(which.rawValue, raw).get()
+    // The process holds it now.
+    _ = handle.relinquish()
+  }
+}
+
 // MARK: - Console modes
 
 @available(System 199, *)
@@ -521,6 +549,89 @@ extension Win32 {
   }
 }
 
+// MARK: - Attaching and generating events
+
+@available(System 199, *)
+extension Win32 {
+  /// Attaches the calling process to another process's console.
+  ///
+  /// - Parameter process: The process whose console to attach to.
+  ///
+  /// A process has at most one console: one that has a console already
+  /// throws ``Win32/Error/accessDenied``, and calls ``freeConsole()`` first.
+  /// A process with no console throws ``Win32/Error/invalidHandle``, and
+  /// one that doesn't exist ``Win32/Error/invalidParameter``.
+  ///
+  /// Attaching makes the console's input and screen buffer the process's
+  /// standard handles, but not the C runtime's descriptors 0, 1 and 2,
+  /// which keep the handles they were opened with.
+  ///
+  /// The corresponding C function is `AttachConsole`.
+  @_alwaysEmitIntoClient
+  public static func attachConsole(of process: ProcessID) throws(Win32.Error) {
+    try _attachConsole(process.rawValue).get()
+  }
+
+  /// Attaches the calling process to its parent's console.
+  ///
+  /// See ``attachConsole(of:)``.
+  ///
+  /// The corresponding C function is `AttachConsole`, with
+  /// `ATTACH_PARENT_PROCESS`.
+  @_alwaysEmitIntoClient
+  public static func attachParentConsole() throws(Win32.Error) {
+    try _attachConsole(_ATTACH_PARENT_PROCESS).get()
+  }
+
+  /// Detaches the calling process from its console.
+  ///
+  /// The console closes when no process is attached to it. The process's
+  /// handles to it, its standard handles included, stop working.
+  ///
+  /// The corresponding C function is `FreeConsole`.
+  @_alwaysEmitIntoClient
+  public static func freeConsole() throws(Win32.Error) {
+    try _freeConsole().get()
+  }
+
+  /// Creates a console for the calling process, which has none, and makes
+  /// its input and screen buffer the process's standard handles.
+  ///
+  /// A process that has a console throws ``Win32/Error/accessDenied``. The
+  /// C runtime's descriptors 0, 1 and 2 keep the handles they were opened
+  /// with.
+  ///
+  /// The corresponding C function is `AllocConsole`.
+  @_alwaysEmitIntoClient
+  public static func allocateConsole() throws(Win32.Error) {
+    try _allocateConsole().get()
+  }
+
+  /// Delivers Ctrl+C or Ctrl+Break to the processes attached to the calling
+  /// process's console.
+  ///
+  /// - Parameters:
+  ///   - event: ``ConsoleControlEvent/controlC`` or
+  ///     ``ConsoleControlEvent/controlBreak``; another event throws
+  ///     ``Win32/Error/invalidParameter``.
+  ///   - group: The process group to deliver it to, the ID of the process
+  ///     that ``ProcessCreationFlags/newProcessGroup`` created, or `nil` for
+  ///     every process attached to the console, the calling one included.
+  ///
+  /// Ctrl+C doesn't reach a process group: a process created with
+  /// ``ProcessCreationFlags/newProcessGroup`` ignores it, so deliver
+  /// Ctrl+Break to one. A process with no handler of its own ends, as
+  /// ``addConsoleControlHandler(_:)`` describes.
+  ///
+  /// The corresponding C function is `GenerateConsoleCtrlEvent`.
+  @_alwaysEmitIntoClient
+  public static func generateConsoleControlEvent(
+    _ event: ConsoleControlEvent, toProcessGroup group: ProcessID? = nil
+  ) throws(Win32.Error) {
+    try _generateConsoleControlEvent(event.rawValue, group?.rawValue ?? 0).get()
+  }
+}
+
 // MARK: - Terminals
 
 @available(System 199, *)
@@ -609,6 +720,40 @@ extension Win32 {
       return .failure(Win32.Error(GetLastError()))
     }
     return .success(info)
+  }
+
+  @usableFromInline
+  internal static func _setStandardHandle(_ which: DWORD, _ handle: HANDLE) -> Result<Void, Win32.Error> {
+    guard system_SetStdHandle(which, handle) else { return .failure(Win32.Error(GetLastError())) }
+    return .success(())
+  }
+
+  @usableFromInline
+  internal static func _attachConsole(_ process: DWORD) -> Result<Void, Win32.Error> {
+    guard system_AttachConsole(process) else { return .failure(Win32.Error(GetLastError())) }
+    return .success(())
+  }
+
+  @usableFromInline
+  internal static func _freeConsole() -> Result<Void, Win32.Error> {
+    guard system_FreeConsole() else { return .failure(Win32.Error(GetLastError())) }
+    return .success(())
+  }
+
+  @usableFromInline
+  internal static func _allocateConsole() -> Result<Void, Win32.Error> {
+    guard system_AllocConsole() else { return .failure(Win32.Error(GetLastError())) }
+    return .success(())
+  }
+
+  @usableFromInline
+  internal static func _generateConsoleControlEvent(
+    _ event: DWORD, _ group: DWORD
+  ) -> Result<Void, Win32.Error> {
+    guard system_GenerateConsoleCtrlEvent(event, group) else {
+      return .failure(Win32.Error(GetLastError()))
+    }
+    return .success(())
   }
 
   @usableFromInline

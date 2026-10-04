@@ -371,6 +371,28 @@ internal func system_WaitForSingleObject(_ hHandle: HANDLE, _ dwMilliseconds: DW
   WaitForSingleObject(hHandle, dwMilliseconds)
 }
 
+// MARK: - Ending the process
+
+// exit and _exit never return, so they have no mock hook. macOS's C library
+// declares all three too, which the qualified names keep the harness from
+// calling.
+
+internal func system_exit(_ status: CInt) -> Never {
+  ucrt.exit(status)
+}
+
+internal func system__exit(_ status: CInt) -> Never {
+  ucrt._exit(status)
+}
+
+// atexit returns a nonzero value, not necessarily -1, when it fails.
+internal func system_atexit(_ function: @convention(c) () -> Void) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock() }
+#endif
+  return ucrt.atexit(function)
+}
+
 // MARK: - Threads
 
 internal func system_GetCurrentThread() -> HANDLE {
@@ -621,6 +643,44 @@ internal func system_WakeAllConditionVariable(
   WakeAllConditionVariable(ConditionVariable)
 }
 
+internal func system_InitializeCriticalSection(
+  _ lpCriticalSection: UnsafeMutablePointer<CRITICAL_SECTION>
+) {
+  InitializeCriticalSection(lpCriticalSection)
+}
+
+internal func system_EnterCriticalSection(
+  _ lpCriticalSection: UnsafeMutablePointer<CRITICAL_SECTION>
+) {
+  EnterCriticalSection(lpCriticalSection)
+}
+
+internal func system_TryEnterCriticalSection(
+  _ lpCriticalSection: UnsafeMutablePointer<CRITICAL_SECTION>
+) -> Bool {
+  TryEnterCriticalSection(lpCriticalSection)
+}
+
+internal func system_LeaveCriticalSection(
+  _ lpCriticalSection: UnsafeMutablePointer<CRITICAL_SECTION>
+) {
+  LeaveCriticalSection(lpCriticalSection)
+}
+
+internal func system_DeleteCriticalSection(
+  _ lpCriticalSection: UnsafeMutablePointer<CRITICAL_SECTION>
+) {
+  DeleteCriticalSection(lpCriticalSection)
+}
+
+internal func system_SleepConditionVariableCS(
+  _ ConditionVariable: UnsafeMutablePointer<CONDITION_VARIABLE>,
+  _ CriticalSection: UnsafeMutablePointer<CRITICAL_SECTION>,
+  _ dwMilliseconds: DWORD
+) -> Bool {
+  SleepConditionVariableCS(ConditionVariable, CriticalSection, dwMilliseconds)
+}
+
 // MARK: - Consoles
 
 internal func system_GetConsoleMode(
@@ -642,6 +702,28 @@ internal func system_GetConsoleScreenBufferInfo(
 
 internal func system_SetConsoleCtrlHandler(_ HandlerRoutine: PHANDLER_ROUTINE?, _ Add: Bool) -> Bool {
   SetConsoleCtrlHandler(HandlerRoutine, Add)
+}
+
+internal func system_SetStdHandle(_ nStdHandle: DWORD, _ hHandle: HANDLE) -> Bool {
+  SetStdHandle(nStdHandle, hHandle)
+}
+
+internal func system_AttachConsole(_ dwProcessId: DWORD) -> Bool {
+  AttachConsole(dwProcessId)
+}
+
+internal func system_FreeConsole() -> Bool {
+  FreeConsole()
+}
+
+internal func system_AllocConsole() -> Bool {
+  AllocConsole()
+}
+
+internal func system_GenerateConsoleCtrlEvent(
+  _ dwCtrlEvent: DWORD, _ dwProcessGroupId: DWORD
+) -> Bool {
+  GenerateConsoleCtrlEvent(dwCtrlEvent, dwProcessGroupId)
 }
 
 // MARK: - Directories and paths
@@ -702,6 +784,18 @@ internal func system_FreeLibrary(_ hLibModule: HMODULE) -> Bool {
   FreeLibrary(hLibModule)
 }
 
+internal func system_AddDllDirectory(_ NewDirectory: UnsafePointer<WCHAR>) -> DLL_DIRECTORY_COOKIE? {
+  AddDllDirectory(NewDirectory)
+}
+
+internal func system_RemoveDllDirectory(_ Cookie: DLL_DIRECTORY_COOKIE) -> Bool {
+  RemoveDllDirectory(Cookie)
+}
+
+internal func system_SetDefaultDllDirectories(_ DirectoryFlags: DWORD) -> Bool {
+  SetDefaultDllDirectories(DirectoryFlags)
+}
+
 internal func system_GetModuleHandleExW(
   _ dwFlags: DWORD,
   _ lpModuleName: UnsafePointer<WCHAR>?,
@@ -743,6 +837,259 @@ internal func system__wputenv_s(
   }
 #endif
   return _wputenv_s(varname, value_string)
+}
+
+// MARK: - C standard I/O
+
+/// Calls `body` with a thread-local invalid parameter handler that returns,
+/// so that a C runtime call that rejects an argument fails with EINVAL or
+/// EBADF, rather than ending the process, as the default handler does.
+internal func _withReturningInvalidParameterHandler<R>(_ body: () -> R) -> R {
+  let previous = _set_thread_local_invalid_parameter_handler { _, _, _, _, _ in }
+  defer { _ = _set_thread_local_invalid_parameter_handler(previous) }
+  return body()
+}
+
+// The streams' calls. macOS's C library declares most of them too, which
+// the qualified names keep the harness from calling.
+//
+// In a mock test, as on POSIX, a stream that _wfopen or _fdopen "opened" is
+// a placeholder address, so every call that takes a stream and can fail is
+// mocked too, and none of them touches it. fgetc has no hook: readLine locks
+// the stream around it, which a placeholder can't be.
+
+#if ENABLE_MOCKING
+// What a mocked _wfopen or _fdopen returns: an address no stream is at.
+internal var _mockStream: UnsafeMutablePointer<ucrt.FILE> {
+  UnsafeMutablePointer<ucrt.FILE>(bitPattern: 0x5710)!
+}
+
+private func _mockStreamResult(_ result: CInt) -> UnsafeMutablePointer<ucrt.FILE>? {
+  result == -1 ? nil : _mockStream
+}
+#endif
+
+internal func system___acrt_iob_func(_ index: UInt32) -> UnsafeMutablePointer<ucrt.FILE> {
+  __acrt_iob_func(index)
+}
+
+internal func system__wfopen(
+  _ path: UnsafePointer<WCHAR>, _ mode: UnsafePointer<WCHAR>
+) -> UnsafeMutablePointer<ucrt.FILE>? {
+#if ENABLE_MOCKING
+  if mockingEnabled {
+    return _mockStreamResult(_mock(path: path, String(decodingCString: mode, as: UTF16.self)))
+  }
+#endif
+  return _withReturningInvalidParameterHandler { _wfopen(path, mode) }
+}
+
+internal func system__fdopen(
+  _ fd: CInt, _ mode: UnsafePointer<CChar>
+) -> UnsafeMutablePointer<ucrt.FILE>? {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mockStreamResult(_mock(fd, String(cString: mode))) }
+#endif
+  return _withReturningInvalidParameterHandler { _fdopen(fd, mode) }
+}
+
+internal func system_fclose(_ stream: UnsafeMutablePointer<ucrt.FILE>) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(Int(bitPattern: stream)) }
+#endif
+  return _withReturningInvalidParameterHandler { ucrt.fclose(stream) }
+}
+
+internal func system_fflush(_ stream: UnsafeMutablePointer<ucrt.FILE>?) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(stream.map { Int(bitPattern: $0) } ?? 0) }
+#endif
+  return _withReturningInvalidParameterHandler { ucrt.fflush(stream) }
+}
+
+// The count of bytes written, which is short only after an error.
+internal func system_fwrite(
+  _ bytes: UnsafeRawPointer?, _ count: Int, _ stream: UnsafeMutablePointer<ucrt.FILE>
+) -> Int {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mockInt(Int(bitPattern: stream), count) == -1 ? 0 : count }
+#endif
+  return _withReturningInvalidParameterHandler { ucrt.fwrite(bytes, 1, count, stream) }
+}
+
+internal func system_fputs(
+  _ string: UnsafePointer<CChar>, _ stream: UnsafeMutablePointer<ucrt.FILE>
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled {
+    return _mock(Int(bitPattern: stream), String(cString: string)) == -1 ? _EOF : 0
+  }
+#endif
+  return _withReturningInvalidParameterHandler { ucrt.fputs(string, stream) }
+}
+
+internal func system_fputc(_ byte: CInt, _ stream: UnsafeMutablePointer<ucrt.FILE>) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(Int(bitPattern: stream), byte) == -1 ? _EOF : byte }
+#endif
+  return _withReturningInvalidParameterHandler { ucrt.fputc(byte, stream) }
+}
+
+// The count of bytes read, which is short at the end or after an error.
+internal func system_fread(
+  _ bytes: UnsafeMutableRawPointer?, _ count: Int, _ stream: UnsafeMutablePointer<ucrt.FILE>
+) -> Int {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mockInt(Int(bitPattern: stream), count) == -1 ? 0 : count }
+#endif
+  return _withReturningInvalidParameterHandler { ucrt.fread(bytes, 1, count, stream) }
+}
+
+internal func system_fgetc(_ stream: UnsafeMutablePointer<ucrt.FILE>) -> CInt {
+  _withReturningInvalidParameterHandler { ucrt.fgetc(stream) }
+}
+
+internal func system__fileno(_ stream: UnsafeMutablePointer<ucrt.FILE>) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(Int(bitPattern: stream)) }
+#endif
+  return _withReturningInvalidParameterHandler { _fileno(stream) }
+}
+
+internal func system__fseeki64(
+  _ stream: UnsafeMutablePointer<ucrt.FILE>, _ offset: Int64, _ origin: CInt
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(Int(bitPattern: stream), offset, origin) }
+#endif
+  return _withReturningInvalidParameterHandler { _fseeki64(stream, offset, origin) }
+}
+
+internal func system__ftelli64(_ stream: UnsafeMutablePointer<ucrt.FILE>) -> Int64 {
+#if ENABLE_MOCKING
+  if mockingEnabled { return Int64(_mockInt(Int(bitPattern: stream))) }
+#endif
+  return _withReturningInvalidParameterHandler { _ftelli64(stream) }
+}
+
+internal func system_setvbuf(
+  _ stream: UnsafeMutablePointer<ucrt.FILE>,
+  _ buffer: UnsafeMutablePointer<CChar>?,
+  _ mode: CInt,
+  _ size: Int
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled {
+    return _mock(Int(bitPattern: stream), buffer.map { Int(bitPattern: $0) } ?? 0, mode, size)
+  }
+#endif
+  return _withReturningInvalidParameterHandler { ucrt.setvbuf(stream, buffer, mode, size) }
+}
+
+// The calls that can't fail have no mock hooks, since a mock test's stream
+// is a placeholder that they'd touch; those tests don't call them.
+
+internal func system_ferror(_ stream: UnsafeMutablePointer<ucrt.FILE>) -> CInt {
+  ucrt.ferror(stream)
+}
+
+internal func system_feof(_ stream: UnsafeMutablePointer<ucrt.FILE>) -> CInt {
+  ucrt.feof(stream)
+}
+
+internal func system_clearerr(_ stream: UnsafeMutablePointer<ucrt.FILE>) {
+  ucrt.clearerr(stream)
+}
+
+internal func system__lock_file(_ stream: UnsafeMutablePointer<ucrt.FILE>) {
+  _lock_file(stream)
+}
+
+internal func system__unlock_file(_ stream: UnsafeMutablePointer<ucrt.FILE>) {
+  _unlock_file(stream)
+}
+
+// MARK: - Broken-down time
+
+// The C runtime's 64-bit time functions, which report errors as their
+// result or as -1, without setting errno. The time is recorded by value, and
+// the fields that _mkgmtime64 and _mktime64 read; a mocked success leaves
+// the result as it was.
+
+internal func system__gmtime64_s(
+  _ result: UnsafeMutablePointer<ucrt.tm>, _ time: UnsafePointer<__time64_t>
+) -> errno_t {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mockReturningErrno(Int(time.pointee)) }
+#endif
+  return _gmtime64_s(result, time)
+}
+
+internal func system__localtime64_s(
+  _ result: UnsafeMutablePointer<ucrt.tm>, _ time: UnsafePointer<__time64_t>
+) -> errno_t {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mockReturningErrno(Int(time.pointee)) }
+#endif
+  return _localtime64_s(result, time)
+}
+
+#if ENABLE_MOCKING
+private func _mockTimeFields(
+  name: String = #function, _ time: UnsafeMutablePointer<ucrt.tm>
+) -> __time64_t {
+  let t = time.pointee
+  return __time64_t(_mock(
+    name: name, t.tm_year, t.tm_mon, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec,
+    t.tm_isdst))
+}
+#endif
+
+internal func system__mkgmtime64(_ time: UnsafeMutablePointer<ucrt.tm>) -> __time64_t {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mockTimeFields(time) }
+#endif
+  return _mkgmtime64(time)
+}
+
+internal func system__mktime64(_ time: UnsafeMutablePointer<ucrt.tm>) -> __time64_t {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mockTimeFields(time) }
+#endif
+  return _mktime64(time)
+}
+
+// The zone's queries and tzset can't fail on valid arguments, and strftime
+// reports only a result that doesn't fit, or fields it rejects, so they have
+// no mock hook, as on the other platforms.
+
+internal func system__tzset() {
+  _tzset()
+}
+
+// Windows' long is 32 bits.
+internal func system__get_timezone(_ seconds: UnsafeMutablePointer<Int32>) -> errno_t {
+  _get_timezone(seconds)
+}
+
+internal func system__get_dstbias(_ seconds: UnsafeMutablePointer<Int32>) -> errno_t {
+  _get_dstbias(seconds)
+}
+
+internal func system__get_tzname(
+  _ returnValue: UnsafeMutablePointer<Int>,
+  _ buffer: UnsafeMutablePointer<CChar>?,
+  _ sizeInBytes: Int,
+  _ index: CInt
+) -> errno_t {
+  _get_tzname(returnValue, buffer, sizeInBytes, index)
+}
+
+internal func system_strftime(
+  _ buffer: UnsafeMutablePointer<CChar>, _ capacity: Int,
+  _ format: UnsafePointer<CChar>, _ time: UnsafePointer<ucrt.tm>
+) -> Int {
+  ucrt.strftime(buffer, capacity, format, time)
 }
 
 // MARK: - File information
@@ -851,6 +1198,241 @@ internal func system_CreateHardLinkW(
   _ lpExistingFileName: UnsafePointer<WCHAR>
 ) -> Bool {
   CreateHardLinkW(lpFileName, lpExistingFileName, nil)
+}
+
+// MARK: - Network adapters
+
+// In iphlpapi.dll. Returns an error code, rather than setting the last
+// error.
+internal func system_GetAdaptersAddresses(
+  _ Family: ULONG,
+  _ Flags: ULONG,
+  _ AdapterAddresses: UnsafeMutablePointer<IP_ADAPTER_ADDRESSES>?,
+  _ SizePointer: UnsafeMutablePointer<ULONG>
+) -> ULONG {
+  GetAdaptersAddresses(Family, Flags, nil, AdapterAddresses, SizePointer)
+}
+
+// MARK: - Events
+
+// Unnamed: lpName is always NULL.
+internal func system_CreateEventW(
+  _ lpEventAttributes: UnsafeMutablePointer<SECURITY_ATTRIBUTES>?,
+  _ bManualReset: Bool,
+  _ bInitialState: Bool
+) -> HANDLE? {
+  CreateEventW(lpEventAttributes, bManualReset, bInitialState, nil)
+}
+
+internal func system_SetEvent(_ hEvent: HANDLE) -> Bool {
+  SetEvent(hEvent)
+}
+
+internal func system_ResetEvent(_ hEvent: HANDLE) -> Bool {
+  ResetEvent(hEvent)
+}
+
+internal func system_WaitForMultipleObjects(
+  _ nCount: DWORD,
+  _ lpHandles: UnsafePointer<HANDLE?>,
+  _ bWaitAll: Bool,
+  _ dwMilliseconds: DWORD
+) -> DWORD {
+  WaitForMultipleObjects(nCount, lpHandles, bWaitAll, dwMilliseconds)
+}
+
+// MARK: - Reparse points
+
+// The synchronous form: lpOverlapped is NULL.
+internal func system_DeviceIoControl(
+  _ hDevice: HANDLE,
+  _ dwIoControlCode: DWORD,
+  _ lpInBuffer: UnsafeMutableRawPointer?,
+  _ nInBufferSize: DWORD,
+  _ lpOutBuffer: UnsafeMutableRawPointer?,
+  _ nOutBufferSize: DWORD,
+  _ lpBytesReturned: UnsafeMutablePointer<DWORD>
+) -> Bool {
+  DeviceIoControl(
+    hDevice, dwIoControlCode, lpInBuffer, nInBufferSize, lpOutBuffer, nOutBufferSize,
+    lpBytesReturned, nil)
+}
+
+// MARK: - Pipes
+
+internal func system_CreatePipe(
+  _ hReadPipe: UnsafeMutablePointer<HANDLE?>,
+  _ hWritePipe: UnsafeMutablePointer<HANDLE?>,
+  _ nSize: DWORD
+) -> Bool {
+  CreatePipe(hReadPipe, hWritePipe, nil, nSize)
+}
+
+internal func system_CreateNamedPipeW(
+  _ lpName: UnsafePointer<WCHAR>,
+  _ dwOpenMode: DWORD,
+  _ dwPipeMode: DWORD,
+  _ nMaxInstances: DWORD,
+  _ nOutBufferSize: DWORD,
+  _ nInBufferSize: DWORD,
+  _ nDefaultTimeOut: DWORD,
+  _ lpSecurityAttributes: UnsafeMutablePointer<SECURITY_ATTRIBUTES>?
+) -> HANDLE? {
+  CreateNamedPipeW(
+    lpName, dwOpenMode, dwPipeMode, nMaxInstances, nOutBufferSize, nInBufferSize,
+    nDefaultTimeOut, lpSecurityAttributes)
+}
+
+// The synchronous form: lpOverlapped is NULL.
+internal func system_ConnectNamedPipe(_ hNamedPipe: HANDLE) -> Bool {
+  ConnectNamedPipe(hNamedPipe, nil)
+}
+
+internal func system_DisconnectNamedPipe(_ hNamedPipe: HANDLE) -> Bool {
+  DisconnectNamedPipe(hNamedPipe)
+}
+
+// Only the count of bytes available: no buffer.
+internal func system_PeekNamedPipe(
+  _ hNamedPipe: HANDLE, _ lpTotalBytesAvail: UnsafeMutablePointer<DWORD>
+) -> Bool {
+  PeekNamedPipe(hNamedPipe, nil, 0, nil, lpTotalBytesAvail, nil)
+}
+
+// Only the mode: the collection count and time-out are a client's of a
+// remote pipe, and stay as they are.
+internal func system_SetNamedPipeHandleState(
+  _ hNamedPipe: HANDLE, _ lpMode: UnsafeMutablePointer<DWORD>
+) -> Bool {
+  SetNamedPipeHandleState(hNamedPipe, lpMode, nil, nil)
+}
+
+// MARK: - Job objects
+
+// Unnamed: lpName is always NULL.
+internal func system_CreateJobObjectW(
+  _ lpJobAttributes: UnsafeMutablePointer<SECURITY_ATTRIBUTES>?
+) -> HANDLE? {
+  CreateJobObjectW(lpJobAttributes, nil)
+}
+
+internal func system_AssignProcessToJobObject(_ hJob: HANDLE, _ hProcess: HANDLE) -> Bool {
+  AssignProcessToJobObject(hJob, hProcess)
+}
+
+internal func system_TerminateJobObject(_ hJob: HANDLE, _ uExitCode: UINT) -> Bool {
+  TerminateJobObject(hJob, uExitCode)
+}
+
+internal func system_SetInformationJobObject(
+  _ hJob: HANDLE,
+  _ JobObjectInformationClass: JOBOBJECTINFOCLASS,
+  _ lpJobObjectInformation: UnsafeMutableRawPointer,
+  _ cbJobObjectInformationLength: DWORD
+) -> Bool {
+  SetInformationJobObject(
+    hJob, JobObjectInformationClass, lpJobObjectInformation, cbJobObjectInformationLength)
+}
+
+internal func system_QueryInformationJobObject(
+  _ hJob: HANDLE,
+  _ JobObjectInformationClass: JOBOBJECTINFOCLASS,
+  _ lpJobObjectInformation: UnsafeMutableRawPointer,
+  _ cbJobObjectInformationLength: DWORD
+) -> Bool {
+  QueryInformationJobObject(
+    hJob, JobObjectInformationClass, lpJobObjectInformation, cbJobObjectInformationLength, nil)
+}
+
+internal func system_IsProcessInJob(
+  _ ProcessHandle: HANDLE, _ JobHandle: HANDLE?, _ Result: UnsafeMutablePointer<WindowsBool>
+) -> Bool {
+  IsProcessInJob(ProcessHandle, JobHandle, Result)
+}
+
+// MARK: - Access tokens, security identifiers and accounts
+
+internal func system_OpenProcessToken(
+  _ ProcessHandle: HANDLE, _ DesiredAccess: DWORD, _ TokenHandle: UnsafeMutablePointer<HANDLE?>
+) -> Bool {
+  OpenProcessToken(ProcessHandle, DesiredAccess, TokenHandle)
+}
+
+internal func system_GetTokenInformation(
+  _ TokenHandle: HANDLE,
+  _ TokenInformationClass: TOKEN_INFORMATION_CLASS,
+  _ TokenInformation: UnsafeMutableRawPointer?,
+  _ TokenInformationLength: DWORD,
+  _ ReturnLength: UnsafeMutablePointer<DWORD>
+) -> Bool {
+  GetTokenInformation(
+    TokenHandle, TokenInformationClass, TokenInformation, TokenInformationLength, ReturnLength)
+}
+
+internal func system_CheckTokenMembership(
+  _ TokenHandle: HANDLE?, _ SidToCheck: PSID, _ IsMember: UnsafeMutablePointer<WindowsBool>
+) -> Bool {
+  CheckTokenMembership(TokenHandle, SidToCheck, IsMember)
+}
+
+internal func system_GetUserNameW(
+  _ lpBuffer: UnsafeMutablePointer<WCHAR>?, _ pcbBuffer: UnsafeMutablePointer<DWORD>
+) -> Bool {
+  GetUserNameW(lpBuffer, pcbBuffer)
+}
+
+// In secur32.dll. Its BOOLEAN is nonzero on success.
+internal func system_GetUserNameExW(
+  _ NameFormat: CInt,
+  _ lpNameBuffer: UnsafeMutablePointer<WCHAR>?,
+  _ nSize: UnsafeMutablePointer<ULONG>
+) -> Bool {
+  GetUserNameExW(EXTENDED_NAME_FORMAT(rawValue: NameFormat), lpNameBuffer, nSize) != 0
+}
+
+// In userenv.dll.
+internal func system_GetUserProfileDirectoryW(
+  _ hToken: HANDLE,
+  _ lpProfileDir: UnsafeMutablePointer<WCHAR>?,
+  _ lpcchSize: UnsafeMutablePointer<DWORD>
+) -> Bool {
+  GetUserProfileDirectoryW(hToken, lpProfileDir, lpcchSize)
+}
+
+// The lookups on the local computer: lpSystemName is always NULL.
+internal func system_LookupAccountNameW(
+  _ lpAccountName: UnsafePointer<WCHAR>,
+  _ Sid: PSID?,
+  _ cbSid: UnsafeMutablePointer<DWORD>,
+  _ ReferencedDomainName: UnsafeMutablePointer<WCHAR>?,
+  _ cchReferencedDomainName: UnsafeMutablePointer<DWORD>,
+  _ peUse: UnsafeMutablePointer<SID_NAME_USE>
+) -> Bool {
+  LookupAccountNameW(
+    nil, lpAccountName, Sid, cbSid, ReferencedDomainName, cchReferencedDomainName, peUse)
+}
+
+internal func system_LookupAccountSidW(
+  _ Sid: PSID,
+  _ Name: UnsafeMutablePointer<WCHAR>?,
+  _ cchName: UnsafeMutablePointer<DWORD>,
+  _ ReferencedDomainName: UnsafeMutablePointer<WCHAR>?,
+  _ cchReferencedDomainName: UnsafeMutablePointer<DWORD>,
+  _ peUse: UnsafeMutablePointer<SID_NAME_USE>
+) -> Bool {
+  LookupAccountSidW(nil, Sid, Name, cchName, ReferencedDomainName, cchReferencedDomainName, peUse)
+}
+
+internal func system_ConvertStringSidToSidW(
+  _ StringSid: UnsafePointer<WCHAR>, _ Sid: UnsafeMutablePointer<PSID?>
+) -> Bool {
+  ConvertStringSidToSidW(StringSid, Sid)
+}
+
+internal func system_CreateWellKnownSid(
+  _ WellKnownSidType: CInt, _ DomainSid: PSID?, _ pSid: PSID?, _ cbSid: UnsafeMutablePointer<DWORD>
+) -> Bool {
+  CreateWellKnownSid(WELL_KNOWN_SID_TYPE(rawValue: WellKnownSidType), DomainSid, pSid, cbSid)
 }
 
 #endif // os(Windows)

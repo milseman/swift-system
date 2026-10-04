@@ -441,7 +441,7 @@ CONCEPTS = [
       "GetTokenInformation", "TOKEN_QUERY", "TokenElevation", "TOKEN_ELEVATION", "CheckTokenMembership",
       "AllocateAndInitializeSid", "FreeSid", "ConvertSidToStringSidW", "LookupAccountNameW",
       "SID_IDENTIFIER_AUTHORITY", "SID_NAME_USE", "SidTypeUnknown", "PSID", "DOMAIN_ALIAS_RID_ADMINS",
-      "SECURITY_BUILTIN_DOMAIN_RID", "PLACEHOLDER_TOKEN_USER"]),
+      "SECURITY_BUILTIN_DOMAIN_RID"]),
     ("gap", "Memory-mapped files", "MemoryMapping is POSIX-only",
      ["CreateFileMappingW", "MapViewOfFile", "UnmapViewOfFile", "FILE_MAP_READ", "PAGE_READONLY"]),
     ("gap", "Free space and volume paths", "SYS-0015's future directions",
@@ -461,7 +461,7 @@ CONCEPTS = [
       "in_port_t", "ip_mreq", "ipv6_mreq", "linger", "msghdr", "pollfd", "u_short",
       "re:^CNIOWindows_(CMSG_[A-Z_]+|getsockopt|setsockopt|recv|recvmmsg|send|mmsghdr)$"]),
     ("gap", "Network interfaces", "NetworkInterfaces is POSIX-only",
-     ["GetAdaptersAddresses", "IP_ADAPTER_ADDRESSES", "IP_ADAPTER_UNICAST_ADDRESS", "NETWORK_PREFIX"]),
+     ["GetAdaptersAddresses", "IP_ADAPTER_ADDRESSES", "IP_ADAPTER_UNICAST_ADDRESS"]),
 
     # ---- other: not System's
     ("other", "Shell and COM: known folders, file info, MIME types", "the Shell; not System's",
@@ -501,8 +501,9 @@ CONCEPTS = [
       "ChannelInitializerResult", "CommandResult", "CommandStatusKind", "ConditionTrait", "ConvertibleFromBytes",
       "CycleAction", "DateFormatter", "Deque", "DestinationType", "DiscoveredDependencyKind", "HTTPURLResponse",
       "In", "InputElement", "InputString", "re:^LanguageServerProtocol[A-Za-z]*$", "ManagedAtomic", "ObjCBool",
-      "Out", "RuleRunReason", "SIG_FIG", "SymbolGraph", "TX", "TargetEncoding", "TargetStream", "URLResponse",
-      "UnsafeAtomic", "ToolsProtocolsSwiftExtensions", "SKLogging"]),
+      "NETWORK_PREFIX", "Out", "PLACEHOLDER_TOKEN_USER", "RuleRunReason", "SIG_FIG", "SymbolGraph", "TX",
+      "TargetEncoding", "TargetStream", "URLResponse", "UnsafeAtomic", "ToolsProtocolsSwiftExtensions",
+      "SKLogging"]),
 ]
 
 

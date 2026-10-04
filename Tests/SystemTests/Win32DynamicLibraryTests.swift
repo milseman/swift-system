@@ -87,6 +87,27 @@ final class Win32DynamicLibraryTests: XCTestCase {
     try program.close()
   }
 
+  func testSearchDirectories() throws {
+    try withTemporaryFilePath(basename: "testSearchDirectories") { directory in
+      // A library that only the added directory has: a copy of one of the
+      // system's, under a name of its own.
+      let name = "system-tests-search.dll"
+      let system = try Win32.systemDirectory()
+      try Win32.copyFile(system.appending("version.dll"), to: directory.appending(name))
+      XCTAssertThrowsWin32Error(.moduleNotFound) {
+        try DynamicLibrary(FilePath(name), options: .searchUserDirectories)
+      }
+      let added = try DynamicLibrary.addSearchDirectory(directory)
+      let library = try DynamicLibrary(FilePath(name), options: .searchUserDirectories)
+      XCTAssertNotNil(library.address(of: "GetFileVersionInfoW"))
+      try library.close()
+      try DynamicLibrary.removeSearchDirectory(added)
+      XCTAssertThrowsWin32Error(.moduleNotFound) {
+        try DynamicLibrary(FilePath(name), options: .searchUserDirectories)
+      }
+    }
+  }
+
   func testTakingAndRelinquishing() throws {
     let raw = try XCTUnwrap("kernel32.dll".withCString(encodedAs: UTF16.self) { LoadLibraryW($0) })
     let library = DynamicLibrary(taking: raw)

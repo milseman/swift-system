@@ -5,12 +5,23 @@
 
 @_exported import ucrt
 @_exported import WinSDK // Clang module
-@_exported import ObjectiveC // For ObjCBool, which stands in for WindowsBool.
+// ObjCBool stands in for WindowsBool. Only it is re-exported: the whole
+// ObjectiveC module would bring macOS's C library, through Darwin, into
+// every file that imports this one.
+@_exported import struct ObjectiveC.ObjCBool
 
 // WinBase.h
 @inlinable
 public var HANDLE_FLAG_INHERIT: DWORD {
   0x00000001
+}
+
+// WinIoCtl.h. The SDK computes it with CTL_CODE, a function-like macro,
+// which doesn't import, and the adopters' uses of it mean the overlay
+// declares it.
+@inlinable
+public var FSCTL_GET_REPARSE_POINT: DWORD {
+  0x000900A8
 }
 
 // WinBase.h

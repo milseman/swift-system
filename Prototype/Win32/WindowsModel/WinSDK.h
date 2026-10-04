@@ -15,10 +15,12 @@
 // values match the SDK headers (checked against the Windows metadata that
 // Rust's standard library bindings are generated from).
 
+// Only the compiler's own headers: the macOS SDK's would bring its C
+// library's declarations, such as gmtime_r, into every file that imports
+// this module.
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stddef.h>
-#include <stdint.h>
 
 typedef bool BOOL;
 typedef unsigned char BYTE;
@@ -308,6 +310,11 @@ typedef struct _FILE_END_OF_FILE_INFO {
 #define PIPE_TYPE_BYTE 0x00000000
 #define PIPE_TYPE_MESSAGE 0x00000004
 #define PIPE_UNLIMITED_INSTANCES 255
+#define PIPE_ACCEPT_REMOTE_CLIENTS 0x00000000
+#define PIPE_REJECT_REMOTE_CLIENTS 0x00000008
+#define FILE_FLAG_FIRST_PIPE_INSTANCE 0x00080000
+#define ERROR_PIPE_CONNECTED 535
+#define ERROR_PIPE_LISTENING 536
 
 #define FORMAT_MESSAGE_ALLOCATE_BUFFER 0x00000100
 #define FORMAT_MESSAGE_IGNORE_INSERTS 0x00000200
@@ -375,6 +382,11 @@ HANDLE CreateNamedPipeW(LPCWSTR lpName, DWORD dwOpenMode, DWORD dwPipeMode,
                         DWORD nInBufferSize, DWORD nDefaultTimeOut,
                         LPSECURITY_ATTRIBUTES lpSecurityAttributes);
 BOOL ConnectNamedPipe(HANDLE hNamedPipe, LPOVERLAPPED lpOverlapped);
+BOOL DisconnectNamedPipe(HANDLE hNamedPipe);
+BOOL PeekNamedPipe(HANDLE hNamedPipe, LPVOID lpBuffer, DWORD nBufferSize, LPDWORD lpBytesRead,
+                   LPDWORD lpTotalBytesAvail, LPDWORD lpBytesLeftThisMessage);
+BOOL SetNamedPipeHandleState(HANDLE hNamedPipe, LPDWORD lpMode, LPDWORD lpMaxCollectionCount,
+                             LPDWORD lpCollectDataTimeout);
 DWORD GetCurrentProcessId(void);
 HLOCAL LocalFree(HLOCAL hMem);
 DWORD FormatMessageW(DWORD dwFlags, LPCVOID lpSource, DWORD dwMessageId,
@@ -654,6 +666,27 @@ BOOL SleepConditionVariableSRW(PCONDITION_VARIABLE ConditionVariable, PSRWLOCK S
 void WakeConditionVariable(PCONDITION_VARIABLE ConditionVariable);
 void WakeAllConditionVariable(PCONDITION_VARIABLE ConditionVariable);
 
+// minwinbase.h, synchapi.h, winnt.h: critical sections
+
+struct _RTL_CRITICAL_SECTION_DEBUG;
+typedef struct _RTL_CRITICAL_SECTION {
+  struct _RTL_CRITICAL_SECTION_DEBUG *DebugInfo;
+  LONG LockCount;
+  LONG RecursionCount;
+  HANDLE OwningThread;
+  HANDLE LockSemaphore;
+  ULONG_PTR SpinCount;
+} RTL_CRITICAL_SECTION, *PRTL_CRITICAL_SECTION;
+typedef RTL_CRITICAL_SECTION CRITICAL_SECTION, *PCRITICAL_SECTION, *LPCRITICAL_SECTION;
+
+void InitializeCriticalSection(LPCRITICAL_SECTION lpCriticalSection);
+void EnterCriticalSection(LPCRITICAL_SECTION lpCriticalSection);
+BOOL TryEnterCriticalSection(LPCRITICAL_SECTION lpCriticalSection);
+void LeaveCriticalSection(LPCRITICAL_SECTION lpCriticalSection);
+void DeleteCriticalSection(LPCRITICAL_SECTION lpCriticalSection);
+BOOL SleepConditionVariableCS(PCONDITION_VARIABLE ConditionVariable,
+                              PCRITICAL_SECTION CriticalSection, DWORD dwMilliseconds);
+
 // consoleapi.h, consoleapi2.h, wincon.h: consoles
 
 typedef short SHORT;
@@ -707,6 +740,13 @@ BOOL SetConsoleMode(HANDLE hConsoleHandle, DWORD dwMode);
 BOOL GetConsoleScreenBufferInfo(HANDLE hConsoleOutput,
                                 PCONSOLE_SCREEN_BUFFER_INFO lpConsoleScreenBufferInfo);
 BOOL SetConsoleCtrlHandler(PHANDLER_ROUTINE HandlerRoutine, BOOL Add);
+BOOL AttachConsole(DWORD dwProcessId);
+BOOL FreeConsole(void);
+BOOL AllocConsole(void);
+BOOL GenerateConsoleCtrlEvent(DWORD dwCtrlEvent, DWORD dwProcessGroupId);
+
+// As the SDK spells it.
+#define ATTACH_PARENT_PROCESS ((DWORD)-1)
 
 // libloaderapi.h, fileapi.h, sysinfoapi.h, processenv.h: well-known paths
 
@@ -729,6 +769,11 @@ HMODULE LoadLibraryW(LPCWSTR lpLibFileName);
 HMODULE LoadLibraryExW(LPCWSTR lpLibFileName, HANDLE hFile, DWORD dwFlags);
 BOOL FreeLibrary(HMODULE hLibModule);
 BOOL GetModuleHandleExW(DWORD dwFlags, LPCWSTR lpModuleName, HMODULE *phModule);
+
+typedef PVOID DLL_DIRECTORY_COOKIE, *PDLL_DIRECTORY_COOKIE;
+DLL_DIRECTORY_COOKIE AddDllDirectory(PCWSTR NewDirectory);
+BOOL RemoveDllDirectory(DLL_DIRECTORY_COOKIE Cookie);
+BOOL SetDefaultDllDirectories(DWORD DirectoryFlags);
 
 #define ERROR_ENVVAR_NOT_FOUND 203
 
@@ -1006,3 +1051,327 @@ BOOL GetLogicalProcessorInformation(PSYSTEM_LOGICAL_PROCESSOR_INFORMATION Buffer
                                     PDWORD ReturnedLength);
 BOOL GetPhysicallyInstalledSystemMemory(PULONGLONG TotalMemoryInKilobytes);
 BOOL GetComputerNameExW(COMPUTER_NAME_FORMAT NameType, LPWSTR lpBuffer, LPDWORD nSize);
+
+// shellapi.h: splitting a command line, as the C runtime does.
+LPWSTR *CommandLineToArgvW(LPCWSTR lpCmdLine, int *pNumArgs);
+
+// winnt.h, securitybaseapi.h, processthreadsapi.h, winbase.h, sddl.h,
+// secext.h, userenv.h and lmcons.h: access tokens, security identifiers and
+// accounts.
+#define TOKEN_ASSIGN_PRIMARY (0x0001)
+#define TOKEN_DUPLICATE (0x0002)
+#define TOKEN_IMPERSONATE (0x0004)
+#define TOKEN_QUERY (0x0008)
+#define TOKEN_QUERY_SOURCE (0x0010)
+#define TOKEN_ADJUST_PRIVILEGES (0x0020)
+#define TOKEN_ADJUST_GROUPS (0x0040)
+#define TOKEN_ADJUST_DEFAULT (0x0080)
+#define TOKEN_ADJUST_SESSIONID (0x0100)
+#define SID_MAX_SUB_AUTHORITIES (15)
+#define SID_REVISION (1)
+#define UNLEN 256
+#define ERROR_NO_TOKEN 1008
+#define ERROR_NONE_MAPPED 1332
+#define ERROR_INVALID_SID 1337
+#define ERROR_NO_SUCH_DOMAIN 1355
+
+typedef BOOL *PBOOL;
+
+typedef struct _SID_AND_ATTRIBUTES {
+  PSID Sid;
+  DWORD Attributes;
+} SID_AND_ATTRIBUTES, *PSID_AND_ATTRIBUTES;
+
+typedef struct _TOKEN_USER {
+  SID_AND_ATTRIBUTES User;
+} TOKEN_USER, *PTOKEN_USER;
+
+typedef struct _TOKEN_ELEVATION {
+  DWORD TokenIsElevated;
+} TOKEN_ELEVATION, *PTOKEN_ELEVATION;
+
+typedef enum _TOKEN_INFORMATION_CLASS : int {
+  TokenUser = 1,
+  TokenGroups,
+  TokenPrivileges,
+  TokenOwner,
+  TokenPrimaryGroup,
+  TokenDefaultDacl,
+  TokenSource,
+  TokenType,
+  TokenImpersonationLevel,
+  TokenStatistics,
+  TokenRestrictedSids,
+  TokenSessionId,
+  TokenGroupsAndPrivileges,
+  TokenSessionReference,
+  TokenSandBoxInert,
+  TokenAuditPolicy,
+  TokenOrigin,
+  TokenElevationType,
+  TokenLinkedToken,
+  TokenElevation,
+} TOKEN_INFORMATION_CLASS;
+
+typedef enum _SID_NAME_USE : int {
+  SidTypeUser = 1,
+  SidTypeGroup,
+  SidTypeDomain,
+  SidTypeAlias,
+  SidTypeWellKnownGroup,
+  SidTypeDeletedAccount,
+  SidTypeInvalid,
+  SidTypeUnknown,
+  SidTypeComputer,
+  SidTypeLabel,
+  SidTypeLogonSession
+} SID_NAME_USE, *PSID_NAME_USE;
+
+typedef enum WELL_KNOWN_SID_TYPE : int {
+  WinNullSid = 0,
+  WinWorldSid = 1,
+  WinLocalSid = 2,
+  WinCreatorOwnerSid = 3,
+  WinCreatorGroupSid = 4,
+  WinCreatorOwnerServerSid = 5,
+  WinCreatorGroupServerSid = 6,
+  WinNtAuthoritySid = 7,
+  WinDialupSid = 8,
+  WinNetworkSid = 9,
+  WinBatchSid = 10,
+  WinInteractiveSid = 11,
+  WinServiceSid = 12,
+  WinAnonymousSid = 13,
+  WinProxySid = 14,
+  WinEnterpriseControllersSid = 15,
+  WinSelfSid = 16,
+  WinAuthenticatedUserSid = 17,
+  WinRestrictedCodeSid = 18,
+  WinTerminalServerSid = 19,
+  WinRemoteLogonIdSid = 20,
+  WinLogonIdsSid = 21,
+  WinLocalSystemSid = 22,
+  WinLocalServiceSid = 23,
+  WinNetworkServiceSid = 24,
+  WinBuiltinDomainSid = 25,
+  WinBuiltinAdministratorsSid = 26,
+  WinBuiltinUsersSid = 27,
+  WinBuiltinGuestsSid = 28,
+  WinAccountAdministratorSid = 38,
+} WELL_KNOWN_SID_TYPE;
+
+typedef enum EXTENDED_NAME_FORMAT : int {
+  NameUnknown = 0,
+  NameFullyQualifiedDN = 1,
+  NameSamCompatible = 2,
+  NameDisplay = 3,
+  NameUniqueId = 6,
+  NameCanonical = 7,
+  NameUserPrincipal = 8,
+  NameCanonicalEx = 9,
+  NameServicePrincipal = 10,
+  NameDnsDomain = 12,
+  NameGivenName = 13,
+  NameSurname = 14
+} EXTENDED_NAME_FORMAT, *PEXTENDED_NAME_FORMAT;
+
+BOOL OpenProcessToken(HANDLE ProcessHandle, DWORD DesiredAccess, PHANDLE TokenHandle);
+BOOL GetTokenInformation(HANDLE TokenHandle, TOKEN_INFORMATION_CLASS TokenInformationClass,
+                         LPVOID TokenInformation, DWORD TokenInformationLength,
+                         PDWORD ReturnLength);
+BOOL CheckTokenMembership(HANDLE TokenHandle, PSID SidToCheck, PBOOL IsMember);
+BOOL GetUserNameW(LPWSTR lpBuffer, LPDWORD pcbBuffer);
+BOOLEAN GetUserNameExW(EXTENDED_NAME_FORMAT NameFormat, LPWSTR lpNameBuffer, PULONG nSize);
+BOOL GetUserProfileDirectoryW(HANDLE hToken, LPWSTR lpProfileDir, LPDWORD lpcchSize);
+BOOL LookupAccountNameW(LPCWSTR lpSystemName, LPCWSTR lpAccountName, PSID Sid, LPDWORD cbSid,
+                        LPWSTR ReferencedDomainName, LPDWORD cchReferencedDomainName,
+                        PSID_NAME_USE peUse);
+BOOL LookupAccountSidW(LPCWSTR lpSystemName, PSID Sid, LPWSTR Name, LPDWORD cchName,
+                       LPWSTR ReferencedDomainName, LPDWORD cchReferencedDomainName,
+                       PSID_NAME_USE peUse);
+BOOL ConvertSidToStringSidW(PSID Sid, LPWSTR *StringSid);
+BOOL ConvertStringSidToSidW(LPCWSTR StringSid, PSID *Sid);
+BOOL CreateWellKnownSid(WELL_KNOWN_SID_TYPE WellKnownSidType, PSID DomainSid, PSID pSid,
+                        DWORD *cbSid);
+
+// jobapi.h, jobapi2.h and winnt.h: job objects.
+#define JOB_OBJECT_LIMIT_DIE_ON_UNHANDLED_EXCEPTION 0x00000400
+#define JOB_OBJECT_LIMIT_BREAKAWAY_OK 0x00000800
+#define JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK 0x00001000
+#define JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE 0x00002000
+#define JOB_OBJECT_MSG_END_OF_JOB_TIME 1
+#define JOB_OBJECT_MSG_END_OF_PROCESS_TIME 2
+#define JOB_OBJECT_MSG_ACTIVE_PROCESS_LIMIT 3
+#define JOB_OBJECT_MSG_ACTIVE_PROCESS_ZERO 4
+#define JOB_OBJECT_MSG_NEW_PROCESS 6
+#define JOB_OBJECT_MSG_EXIT_PROCESS 7
+#define JOB_OBJECT_MSG_ABNORMAL_EXIT_PROCESS 8
+#define JOB_OBJECT_MSG_PROCESS_MEMORY_LIMIT 9
+#define JOB_OBJECT_MSG_JOB_MEMORY_LIMIT 10
+#define JOB_OBJECT_MSG_NOTIFICATION_LIMIT 11
+
+typedef enum _JOBOBJECTINFOCLASS : int {
+  JobObjectBasicAccountingInformation = 1,
+  JobObjectBasicLimitInformation,
+  JobObjectBasicProcessIdList,
+  JobObjectBasicUIRestrictions,
+  JobObjectSecurityLimitInformation,
+  JobObjectEndOfJobTimeInformation,
+  JobObjectAssociateCompletionPortInformation,
+  JobObjectBasicAndIoAccountingInformation,
+  JobObjectExtendedLimitInformation,
+} JOBOBJECTINFOCLASS;
+
+typedef struct _JOBOBJECT_BASIC_LIMIT_INFORMATION {
+  LARGE_INTEGER PerProcessUserTimeLimit;
+  LARGE_INTEGER PerJobUserTimeLimit;
+  DWORD LimitFlags;
+  SIZE_T MinimumWorkingSetSize;
+  SIZE_T MaximumWorkingSetSize;
+  DWORD ActiveProcessLimit;
+  ULONG_PTR Affinity;
+  DWORD PriorityClass;
+  DWORD SchedulingClass;
+} JOBOBJECT_BASIC_LIMIT_INFORMATION;
+
+typedef struct _IO_COUNTERS {
+  ULONGLONG ReadOperationCount;
+  ULONGLONG WriteOperationCount;
+  ULONGLONG OtherOperationCount;
+  ULONGLONG ReadTransferCount;
+  ULONGLONG WriteTransferCount;
+  ULONGLONG OtherTransferCount;
+} IO_COUNTERS;
+
+typedef struct _JOBOBJECT_EXTENDED_LIMIT_INFORMATION {
+  JOBOBJECT_BASIC_LIMIT_INFORMATION BasicLimitInformation;
+  IO_COUNTERS IoInfo;
+  SIZE_T ProcessMemoryLimit;
+  SIZE_T JobMemoryLimit;
+  SIZE_T PeakProcessMemoryUsed;
+  SIZE_T PeakJobMemoryUsed;
+} JOBOBJECT_EXTENDED_LIMIT_INFORMATION;
+
+typedef struct _JOBOBJECT_ASSOCIATE_COMPLETION_PORT {
+  PVOID CompletionKey;
+  HANDLE CompletionPort;
+} JOBOBJECT_ASSOCIATE_COMPLETION_PORT;
+
+HANDLE CreateJobObjectW(LPSECURITY_ATTRIBUTES lpJobAttributes, LPCWSTR lpName);
+BOOL AssignProcessToJobObject(HANDLE hJob, HANDLE hProcess);
+BOOL TerminateJobObject(HANDLE hJob, UINT uExitCode);
+BOOL SetInformationJobObject(HANDLE hJob, JOBOBJECTINFOCLASS JobObjectInformationClass,
+                             LPVOID lpJobObjectInformation, DWORD cbJobObjectInformationLength);
+BOOL QueryInformationJobObject(HANDLE hJob, JOBOBJECTINFOCLASS JobObjectInformationClass,
+                               LPVOID lpJobObjectInformation, DWORD cbJobObjectInformationLength,
+                               LPDWORD lpReturnLength);
+BOOL IsProcessInJob(HANDLE ProcessHandle, HANDLE JobHandle, PBOOL Result);
+
+// winioctl.h, winnt.h and ntifs.h: reparse points. FSCTL_GET_REPARSE_POINT
+// is CTL_CODE(FILE_DEVICE_FILE_SYSTEM, 42, METHOD_BUFFERED, FILE_ANY_ACCESS),
+// which doesn't import; WinSDK.swift declares it, as Swift's overlay does.
+// REPARSE_DATA_BUFFER is the Driver Kit's, in ntifs.h, not the SDK's.
+#define MAXIMUM_REPARSE_DATA_BUFFER_SIZE (16 * 1024)
+#define SYMLINK_FLAG_RELATIVE 0x00000001
+#define ERROR_NOT_A_REPARSE_POINT 4390
+#define ERROR_INVALID_REPARSE_DATA 4392
+
+BOOL DeviceIoControl(HANDLE hDevice, DWORD dwIoControlCode, LPVOID lpInBuffer,
+                     DWORD nInBufferSize, LPVOID lpOutBuffer, DWORD nOutBufferSize,
+                     LPDWORD lpBytesReturned, LPOVERLAPPED lpOverlapped);
+
+// synchapi.h and winnt.h: events, and waiting for several objects.
+// WAIT_ABANDONED_0 is ((STATUS_ABANDONED_WAIT_0) + 0), which doesn't import.
+#define MAXIMUM_WAIT_OBJECTS 64
+
+BOOL SetEvent(HANDLE hEvent);
+BOOL ResetEvent(HANDLE hEvent);
+DWORD WaitForMultipleObjects(DWORD nCount, const HANDLE *lpHandles, BOOL bWaitAll,
+                             DWORD dwMilliseconds);
+
+// ws2def.h, iptypes.h, ifdef.h, ipifcons.h and iphlpapi.h: network adapters.
+// The structures keep only the fields System reads, under the SDK's names,
+// with the anonymous unions that put IfIndex and the address's Length first.
+typedef int INT;
+typedef unsigned char UINT8;
+typedef unsigned short ADDRESS_FAMILY;
+#define AF_UNSPEC 0
+#define AF_INET 2
+#define AF_INET6 23
+#define MAX_ADAPTER_ADDRESS_LENGTH 8
+#define GAA_FLAG_SKIP_ANYCAST 0x0002
+#define GAA_FLAG_SKIP_MULTICAST 0x0004
+#define GAA_FLAG_SKIP_DNS_SERVER 0x0008
+#define IP_ADAPTER_NO_MULTICAST 0x0010
+#define IF_TYPE_OTHER 1
+#define IF_TYPE_ETHERNET_CSMACD 6
+#define IF_TYPE_ISO88025_TOKENRING 9
+#define IF_TYPE_PPP 23
+#define IF_TYPE_SOFTWARE_LOOPBACK 24
+#define IF_TYPE_ATM 37
+#define IF_TYPE_IEEE80211 71
+#define IF_TYPE_TUNNEL 131
+#define IF_TYPE_IEEE1394 144
+#define ERROR_BUFFER_OVERFLOW 111
+
+// The SDK's tag is sockaddr, which the macOS SDK's Darwin module, which
+// files that import this one see too, defines differently; Swift code
+// reaches it only through LPSOCKADDR.
+typedef struct _winsdk_model_sockaddr {
+  ADDRESS_FAMILY sa_family;
+  CHAR sa_data[14];
+} SOCKADDR, *PSOCKADDR, *LPSOCKADDR;
+
+typedef struct _SOCKET_ADDRESS {
+  LPSOCKADDR lpSockaddr;
+  INT iSockaddrLength;
+} SOCKET_ADDRESS;
+
+typedef enum _IF_OPER_STATUS : int {
+  IfOperStatusUp = 1,
+  IfOperStatusDown,
+  IfOperStatusTesting,
+  IfOperStatusUnknown,
+  IfOperStatusDormant,
+  IfOperStatusNotPresent,
+  IfOperStatusLowerLayerDown
+} IF_OPER_STATUS;
+
+typedef struct _IP_ADAPTER_UNICAST_ADDRESS_LH {
+  union {
+    ULONGLONG Alignment;
+    struct {
+      ULONG Length;
+      DWORD Flags;
+    };
+  };
+  struct _IP_ADAPTER_UNICAST_ADDRESS_LH *Next;
+  SOCKET_ADDRESS Address;
+  UINT8 OnLinkPrefixLength;
+} IP_ADAPTER_UNICAST_ADDRESS_LH, IP_ADAPTER_UNICAST_ADDRESS, *PIP_ADAPTER_UNICAST_ADDRESS;
+
+typedef struct _IP_ADAPTER_ADDRESSES_LH {
+  union {
+    ULONGLONG Alignment;
+    struct {
+      ULONG Length;
+      ULONG IfIndex;
+    };
+  };
+  struct _IP_ADAPTER_ADDRESSES_LH *Next;
+  CHAR *AdapterName;
+  PIP_ADAPTER_UNICAST_ADDRESS FirstUnicastAddress;
+  WCHAR *DnsSuffix;
+  WCHAR *Description;
+  WCHAR *FriendlyName;
+  BYTE PhysicalAddress[MAX_ADAPTER_ADDRESS_LENGTH];
+  ULONG PhysicalAddressLength;
+  ULONG Flags;
+  ULONG Mtu;
+  ULONG IfType;
+  IF_OPER_STATUS OperStatus;
+  ULONG Ipv6IfIndex;
+} IP_ADAPTER_ADDRESSES_LH, IP_ADAPTER_ADDRESSES, *PIP_ADAPTER_ADDRESSES;
+
+ULONG GetAdaptersAddresses(ULONG Family, ULONG Flags, PVOID Reserved,
+                           PIP_ADAPTER_ADDRESSES AdapterAddresses, PULONG SizePointer);

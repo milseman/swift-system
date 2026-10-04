@@ -15,24 +15,32 @@ adds API for the adopters' top Windows gaps of section 8, in its order, checked 
 (sections 23 on, base system-next at `bb950db`) continues that list, then the gaps the earlier sections left.
 
 **Resume here:** windows-api's parts are done (sections 1 to 10), and so are windows-2's (11 to 22: P1 and P2,
-then section 8's gaps from processes to file information). windows-3, in progress: long paths (section 23,
-`315f25b`), threads (24, `054e9e2`), `HRESULT` (25, `b89b78c`), path operations (26, `8326373`), overlapped I/O (27,
-`d479525`), system information (28, `c04d6b1`), and Winsock, as a design (29, the last commit). Section 8's
-list is done.
-- **Next, left within done gaps**: a Windows `BrokenDownTime` over the UCRT's time functions (14); a Windows
-  `ProcessID.exit(_:)` and `exitImmediately(_:)` (12); `CRITICAL_SECTION` (15); attaching, freeing and
-  generating console events, and `SetStdHandle` (16); `AddDllDirectory` (18); a quoting helper for command lines
-  (13); and packages-5's Windows gaps (`../adopters/PACKAGES-5-REPORT.md`, "Gaps, across platforms"):
-  `ProcessID.ExitCode`'s `success` and `failure`, and `FileStream.setBuffering`.
-- **For other lanes**: P3 (section 22) landed on system-next with coverage-4 (`8caa741`, merged here at
-  `bb225ab`). The CMake list still lacks this lane's files, so the Win32 block in the windows-3 patches section must
-  land with this branch's next merge, or CI's CMake job fails. P4 there brings `FileDescriptor`'s Windows
-  canonicalization to section 23's rule. The PlatformEnum samples' Windows arms differ from `Win32.ProcessHandle`
-  (section 21).
+then section 8's gaps from processes to file information). windows-3's first session (2026-10-02) did, one section
+and commit each: long paths (23, `315f25b`), threads (24, `054e9e2`), `HRESULT` (25, `b89b78c`), path operations
+(26, `8326373`), overlapped I/O (27, `d479525`), system information (28, `c04d6b1`), and Winsock as a design (29,
+`052ae8a`), which finish section 8's list of top gaps; then the gaps left within done ones: `BrokenDownTime` on
+Windows (30, `ada7eea`), ending the process and exit codes (31, `a7d4db9`), critical sections (32, `c353713`),
+console events and `SetStdHandle` (33, `3b9327e`), library search directories (34, `c5efe5d`), quoting a command
+line (35, `c536687`), and packages-5's `FileStream` (36, `3b9ace4`). The second session (2026-10-03) merged
+system-next at `ffaa7e4`, and did `FileStream`'s position and mock hooks (37, `6c34274`), with patch P6; then
+section 8's gaps after its top ten, in its order: users, access tokens and security identifiers (38, `32161bb`),
+pipes (39, `1bfd761`), job objects (40, `6d2ca5b`), reparse points (41, `5ad7c6c`), events (42, `b1bc663`), and
+network adapters (43, `d2c4f60`). It stopped there, at quota, with nothing in progress.
+- **Next**, none of it started: the rest of section 8's ranking, in its order: memory-mapped files; directory
+  enumeration; directory change notification; free space and volume paths. Then Winsock's implementation, once the
+  decisions triage's item 74 is applied (section 29), and one declaration each for `BrokenDownTime` and `FileStream`
+  across platforms (sections 30 and 36), and a Windows `NetworkInterface.Addresses` (section 43), which reshape
+  other lanes' files.
+- **For other lanes**, in the windows-3 patches section (the last): system-next merged this branch at `87c3fc6`
+  without its CMake list, so system-next's `Sources/System/CMakeLists.txt` lacks eight Win32 files, which CI's CMake
+  job's list check would fail on; the Win32 block there (P3, continued) must land with this branch's next merge. P4
+  brings `FileDescriptor`'s Windows canonicalization to section 23's rule, P5 names `EOVERFLOW` on Windows (section
+  30), and P6 gives `FileDescriptor` 64-bit offsets on Windows, where they're 32 bits (see the windows-3 findings). The PlatformEnum
+  samples' Windows arms differ from `Win32.ProcessHandle` (section 21).
 - **Tests**: no Windows test has run; each section lists what a Windows run must check. At each commit, Darwin
-  `swift build` and `swift test` pass, with the same tests skipped as before the lane (for counts, see
-  `Prototype/Status/STATUS.md`), and `check-windows.sh` compiles the Win32 files and the Windows test files. No
-  Linux build was run in these lanes.
+  `swift build` and `swift test` pass, with the same tests skipped as at the last merge of system-next (at
+  `ffaa7e4`: XCTest 575 tests, 5 skipped; swift-testing 504 tests in 82 suites), and `check-windows.sh` compiles the
+  Win32 files and the Windows test files. No Linux build was run in these lanes.
 
 ## How it was checked
 
@@ -48,8 +56,11 @@ list is done.
 
   It catches Swift errors: types, optionality, ownership, typed throws, `@_alwaysEmitIntoClient` visibility,
   MemberImportVisibility. It can't catch where the model differs from the SDK (a macro that doesn't import, a
-  pointer the SDK annotates), runtime behavior, or a name that collides with a Windows-only internal in a file it
-  doesn't compile; the new internal names were checked against all of `Sources/` and `Tests/` by grep. A
+  pointer the SDK annotates), runtime behavior, a name that collides with a Windows-only internal in a file it
+  doesn't compile, or, in a test file, a use of macOS's C library, which XCTest brings in through Foundation, so
+  the tests spell a name both have through `WinSDK` or `ucrt`. A source file sees none of it since section 43,
+  which has the model's overlay re-export `ObjCBool` alone; before, a file that imported `WinSDK` saw it through
+  `ObjectiveC` (section 31). The new internal names were checked against all of `Sources/` and `Tests/` by grep. A
   deliberate use after `close()` and a type error in a test file both fail it. It takes a few seconds.
 - **The constants** are spelled as values. Each one was checked against Rust's standard library bindings
   (`library/std/src/sys/pal/windows/c/windows_sys.rs`, generated from Microsoft's Windows metadata) where they
@@ -1637,7 +1648,7 @@ mask's bits equal to the count, the architecture matching the build's, the nativ
 with the host name); and `testOSVersion` (10.0, from build 10240). Not covered: more than one processor group,
 emulated processes, and clusters' virtual servers.
 
-## 29. windows-3: Winsock, a design: this commit
+## 29. windows-3: Winsock, a design: `052ae8a`
 
 The last gap of section 8: two packages, but 23 files, nearly all NIO's. Not implemented: its natural shape needs
 files outside this lane, and its module structure waits on a decision (`../Claude outputs/decisions-triage.md`, item
@@ -1700,7 +1711,651 @@ buffers `char *`), and replaces what Winsock lacks or renames: `close` with `clo
 **Outside this lane's files**: a target in `Package.swift` that links `ws2_32`, its CMake list, and SystemSockets'
 `#error` for other platforms (`Sources/SystemSockets`), which a Windows port replaces.
 
-## 30. windows-3: findings
+## 30. windows-3: BrokenDownTime on Windows: `ada7eea`
+
+Left within section 14, which named broken-down time the cross-platform candidate. swift-log's
+`StreamLogHandler.timestamp()` formats the local time with `_time64`, `_localtime64_s` and `strftime` on Windows,
+where its other platforms use System's `BrokenDownTime`, and Foundation's `Date.description` formats UTC with
+`_gmtime64_s` and `strftime`.
+
+What: `BrokenDownTimeWindows.swift`: `BrokenDownTime` on Windows, with the POSIX declaration's public API: the
+fields and their initializer, `Weekday`, `weekday`, `dayOfYear`, `Zone`, `init(secondsSinceEpoch:in:)`
+(`_gmtime64_s`, and `_localtime64_s` after `_tzset`), `secondsSinceEpoch(in:)` and `normalized(in:)`
+(`_mkgmtime64`, `_mktime64`), and `formatted(_:)` (`strftime`). The four conversions have mock hooks, as their
+POSIX counterparts do.
+
+Which API: **System's `BrokenDownTime`.** The UCRT's time functions are POSIX's under other names (`_gmtime64_s`
+for `gmtime_r`, `_mkgmtime64` for `timegm`), so the concept and its signatures carry over.
+
+Design calls, with the alternatives rejected:
+- **A second declaration of the type.** `BrokenDownTime.swift` is `#if !os(Windows)`, and isn't this lane's, so the
+  Windows file declares the type again, with the same public API, and copies the arithmetic, `formatted`'s
+  replacement of the zone conversions, and the docs, adapted. Proposed for later, without a patch, since it
+  reshapes another lane's file: a shared file for the platform-neutral half (the type, `Weekday`, `Zone`, the
+  arithmetic, the replacement), leaving each platform its conversions.
+- **The zone's fields come from the C runtime's globals**, since Windows' `struct tm` has no `tm_gmtoff` or
+  `tm_zone`: `utcOffset` from `_get_timezone`, and `_get_dstbias` in daylight saving time, and
+  `timeZoneAbbreviation` from `_get_tzname`, which is `TZ`'s abbreviation, or the system zone's name, such as
+  "Pacific Standard Time". UTC's is "UTC", as Darwin's is.
+- **UTC has POSIX's range.** The C runtime converts 1970 through 3000 only, and reports other times as `EINVAL`;
+  for UTC, System computes their fields with the arithmetic the type already uses for the weekday (Howard Hinnant's
+  algorithms), as the POSIX file does on Darwin before 1900. Local times outside the range throw `EOVERFLOW`.
+  Rejected: computing every UTC time in Swift, which would leave the C function unused, and throwing outside the
+  range for UTC too, which would make Windows' range a hazard for cross-platform code.
+- **`EOVERFLOW` has no name on Windows.** `Errno.overflow` is `#if !os(Windows)`, since the initial Windows port,
+  though the UCRT defines `EOVERFLOW` (132), so the file throws `Errno(rawValue: EOVERFLOW)`. Patch P5 gives Windows
+  the name.
+- **`formatted(_:)` can't end the process.** The UCRT's `strftime` reports a conversion it doesn't know, and a field
+  outside its range, to the invalid parameter handler, whose default ends the process. So System prints a
+  conversion the UCRT doesn't support (`%k`, `%-d`) as it's written, installs a handler that returns during the
+  call, and for fields outside their ranges formats the time they carry to, as UTC; a year before 0 or after
+  9999, which the UCRT can't print, gives an empty string. The doc says each. Rejected: formatting fields outside
+  their ranges in Swift, as POSIX prints them, which means writing strftime's numeric conversions again; and
+  trapping.
+- **`%z`, `%Z` and `%s` are the time's own**, as on POSIX; with a flag or a modifier, the UCRT's.
+
+Tests: `Win32BrokenDownTimeTests`, which set `TZ` to `PST8PDT` and restore it. The arithmetic and the format scanner
+also ran on macOS, copied into a scratch program: the UTC fields agree with Darwin's `gmtime_r` for 200,000 random
+times within 3,000 years of 1970 and the edge cases (−1, the years 1 and 3001, 9999-12-31, a leap day), and
+convert back to the same seconds.
+
+A Windows run must check:
+- `testInternalConstantsMatchTheSDK` (`EOVERFLOW`).
+- `testUTC`, `testUTCOutsideTheCRuntimesRange` (−1, 3001, the year 1, and `EOVERFLOW` for `Int.max`), and
+  `testNormalizing` (inside and outside the range).
+- `testLocalTimes`: `PDT` and `PST`, their offsets and abbreviations, the fields against the UTC fields of the
+  shifted time, the conversion back, and a week's arithmetic with `isDaylightSavingTime` `nil`. This relies on the
+  UCRT reading `TZ` from the environment that `ProcessEnvironment.set` changes, and applying US rules to `PST8PDT`.
+- `testLocalTimesOutsideTheCRuntimesRange`: `EOVERFLOW` both ways.
+- `testFormatting`: the conversions, the `#` flag and the `E` and `O` modifiers, unsupported conversions printed as
+  written, and a `%` in the abbreviation; `testFormattingFieldsOutsideTheirRanges`: the 32nd of January as
+  `2026-02-01`, an empty string for the year 12000, and that a conversion that doesn't read the year still works,
+  which assumes the UCRT validates fields per conversion.
+- `testTheCRuntimeCalls` (mock).
+- Not covered: zones without daylight saving time, zones east of UTC, a non-English system zone name (decoded as
+  UTF-8 from the C runtime's code page), and `setlocale`.
+
+## 31. windows-3: ending the process, and exit codes: `a7d4db9`
+
+Left within section 12, with the first of packages-5's Windows gaps. Adopters end their process on Windows with the
+UCRT's `exit` and `_exit`, or with `TerminateProcess(GetCurrentProcess(), code)`, which section 12's
+`current.terminate` covers but returns `Void`; sourcekit-lsp ends it with `ProcessID.exitImmediately` on Darwin.
+swift-argument-parser defines `exitCodeSuccess` and `exitCodeFailure` from `EXIT_SUCCESS` and `EXIT_FAILURE` on
+Windows, where its other platforms use `ProcessID.ExitCode` (`../adopters/PACKAGES-5-REPORT.md`).
+
+What: `ProcessExitWindows.swift`: `ProcessID.exit(_:)` (`exit`), `exitImmediately(_:)` (`TerminateProcess`),
+`addExitHandler(_:)` (`atexit`), `ProcessID.ExitCode` with `success`, `failure` and a `description`, and the
+`ExitCode` overloads of `exit` and `exitImmediately`.
+
+Which API: **System's `ProcessID`.** Ending the calling process, its exit handlers, and the C standard's two codes
+are the same concepts on Windows, where the UCRT has `exit` and `atexit` under POSIX's names, so the signatures
+carry over.
+
+Design calls, with the alternatives rejected:
+- **`exitImmediately` is `TerminateProcess` on the calling process**, as section 12 proposed. POSIX's `_exit` runs
+  no code in the process; the UCRT's `_exit` ends it with `ExitProcess`, which notifies each loaded DLL, and so
+  runs their detach code and the exit handlers that DLLs registered. Rejected: `_exit`, the same name. It follows
+  `TerminateProcess`, unreached, for the `Never`.
+- **`ExitCode` has the C standard's two codes, and none of `<sysexits.h>`'s**, which Windows doesn't have, as WASI
+  doesn't. Its description adds the bits of a code whose high bit is set, as a crash's `NTSTATUS` is.
+- **The raw value stays `CInt`**, the UCRT's `exit` parameter, though Windows' exit codes are `DWORD`s: the bits
+  pass unchanged, and a parent gets all 32, which the doc says. Still open, from section 12: `ProcessHandle`'s
+  `exitCode()` returns a `DWORD`, not an `ExitCode`.
+- **`addExitHandler`'s doc says where Windows differs**: the UCRT keeps a table of handlers for each DLL, so when
+  System is a DLL of its own, the handlers it registers run when it's unloaded, after the program's own handlers
+  and the flush of the C streams.
+- **The constants are values**, in `Win32Constants.swift`, since `Constants+ExitCodes.swift` is POSIX-only.
+
+Tests: `Win32ProcessExitTests`, swift-testing exit tests like POSIX's `ProcessExitTests` and `ExitCodeTests`, since
+an exit test's body ends a process of its own. The harness now passes swift-testing's macro plugin to the test
+compile, so a Windows test file can use swift-testing.
+
+A Windows run must check: `theConstantsAreTheCRuntimes`; `descriptions`; `exitEndsTheProcessWithTheStatus`;
+`theParentGetsTheWholeStatus` (0x105, and `0xC000013A` through `exitImmediately`), which relies on swift-testing
+reading the whole code on Windows; `exitRunsTheHandlersInReverseOrder`; `exitFlushesBufferedOutput` and
+`exitImmediatelySkipsTheHandlersAndBufferedOutput`, which rely on the UCRT buffering a standard output that's a
+pipe, where `print` writes; and `exitWithACode`. Not covered: handlers that a DLL registers, and other threads
+while the process exits.
+
+## 32. windows-3: critical sections: `c353713`
+
+Left within section 15. swift-subprocess's work queue is a `CRITICAL_SECTION` (`InitializeCriticalSection`,
+`EnterCriticalSection`, `LeaveCriticalSection`, `DeleteCriticalSection`) with a condition variable it waits on with
+`SleepConditionVariableCS`, where its other platforms use `PThread.Mutex` and `PThread.Condition`.
+
+What, in `Win32Synchronization.swift`: `Win32.CriticalSection`, with `init()` (`InitializeCriticalSection`), `lock()`,
+`tryLock()`, `unlock()` and `withLock(_:)` (`EnterCriticalSection`, `TryEnterCriticalSection`, `LeaveCriticalSection`),
+`unsafeAddress`, and a deinit that deletes it (`DeleteCriticalSection`); and `Win32.ConditionVariable`'s
+`wait(on:)` and `wait(on:timeout:)` for one (`SleepConditionVariableCS`).
+
+Which API: **Win32**, beside section 15's `SRWLock`, as the Windows side of a recursive `PThread.Mutex`.
+
+Design calls, with the alternatives rejected:
+- **Section 15's shape**: heap storage at a fixed address, nothing that throws but the waits, `withLock(_:)`
+  generic over the body's error, `noasync` on the bare calls. What differs is documented: it's recursive, and it
+  needs deleting, which the deinit does.
+- **The waits take it as `on:`**, overloading the SRW lock's, since the condition variable is the same type; the
+  doc says the critical section must be held once, as `SleepConditionVariableCS` requires.
+- **No spin count.** `InitializeCriticalSectionAndSpinCount` and `SetCriticalSectionSpinCount` tune the wait, and no
+  adopter calls them. Not wrapped: `InitializeCriticalSectionEx`'s flags.
+
+Tests, in `Win32SynchronizationTests`: `testCriticalSection` (recursion, held until released as many times, another
+thread can't take it), `testConditionVariableWithACriticalSection`, `testCriticalSectionWaitTimesOut`.
+
+A Windows run must check those three; that `TryEnterCriticalSection` succeeds for the holder, as Windows documents.
+
+## 33. windows-3: console events, and setting a standard handle: `3b9327e`
+
+Left within section 16. swift-subprocess ends a child gently by attaching to its console (`AttachConsole`), ignoring
+Ctrl+C itself while it generates one (`GenerateConsoleCtrlEvent(CTRL_C_EVENT, 0)`), freeing the console
+(`FreeConsole`), and then sending Ctrl+Break to the child's process group; section 16's tests and swift-subprocess's
+point a standard handle at a pipe with `SetStdHandle`.
+
+What, in `Win32Console.swift`: `Win32.attachConsole(of:)` and `attachParentConsole()` (`AttachConsole`, the second
+with `ATTACH_PARENT_PROCESS`), `freeConsole()` (`FreeConsole`), `allocateConsole()` (`AllocConsole`),
+`generateConsoleControlEvent(_:toProcessGroup:)` (`GenerateConsoleCtrlEvent`), and
+`Win32.FileHandle.setStandardHandle(_:to:)` (`SetStdHandle`).
+
+Design calls, with the alternatives rejected:
+- **`setStandardHandle` consumes the handle**, which the process keeps from then on, and doesn't close the one it
+  replaces, which something else can own: the C runtime's descriptor 0, 1 or 2, or the console. That settles section
+  16's open question of ownership. The doc says the C runtime's descriptors keep their handles, so `print` doesn't
+  follow. If the call throws, the handle is closed. Rejected: borrowing the handle, which leaves the process holding
+  one its owner will close; and returning the previous handle as an owner, which could close a descriptor's handle.
+- **Two attach functions**, for a process and for the parent, rather than an optional process ID whose `nil` would
+  mean the parent.
+- **`generateConsoleControlEvent` takes a `ConsoleControlEvent`**, section 16's type, and documents that only Ctrl+C
+  and Ctrl+Break can be generated, and that Ctrl+C doesn't reach a process group; the group is the ID of its first
+  process, a `ProcessID`, and `nil` means every process on the console.
+- **Not wrapped**: `GetConsoleWindow` (swift-subprocess's tests compare windows; it returns a user32 `HWND`),
+  `ReadConsoleW` and `WriteConsoleW`, and the console's buffers and fonts.
+
+Tests, in `Win32ConsoleTests`: `testSettingAStandardHandle`; `testAllocatingAndAttachingConsoles`, which with a console
+checks `accessDenied` for a second one and `invalidParameter` for generating `.close`, and without one allocates a
+console, opens `CONOUT$`, frees it, and puts the standard handles back; `testCtrlBreakEndsAProcessGroup`, with
+`sort.exe` waiting on console input in a new process group, skipped when standard input isn't a console.
+
+A Windows run must check those three, in a console and without one (as CI runs them), and in particular: that
+`attachParentConsole()` gives `accessDenied` for a process that has a console, as documented; that
+`GenerateConsoleCtrlEvent` checks the event before the console, for `.close`; and that `sort.exe` has no Ctrl+Break
+handler of its own.
+
+## 34. windows-3: library search directories: `c5efe5d`
+
+Left within section 18, whose `LoadOptions.searchUserDirectories` searches directories that nothing could add. No
+adopter calls `AddDllDirectory` yet; a program that loads libraries from directories of its own would, with the
+`search` options that leave the current directory and `PATH` out.
+
+What, in `DynamicLibraryWindows.swift`: `DynamicLibrary.SearchDirectory` (`DLL_DIRECTORY_COOKIE`),
+`addSearchDirectory(_:)` (`AddDllDirectory`), `removeSearchDirectory(_:)` (`RemoveDllDirectory`), and
+`setDefaultSearch(_:)` (`SetDefaultDllDirectories`).
+
+Design calls, with the alternatives rejected:
+- **On `DynamicLibrary`**, beside its Windows `LoadOptions`, since they're the loader's search; Windows-only, as those
+  options are.
+- **The registration is a copyable value**, as the C cookie is, not an owner whose deinit removes the directory: a
+  directory added for the program's life, the usual case, would otherwise need its owner kept in a global.
+- **A relative path is resolved** against the current directory, without the `\\?\` prefix, since
+  `AddDllDirectory` takes only an absolute path and doesn't document taking the prefix.
+- **`setDefaultSearch(_:)` takes `LoadOptions`**, whose doc says only the `search` options apply, and that the change
+  lasts for the process's life.
+- **Not wrapped**: `SetDllDirectoryW`, the older single directory, which Microsoft's guidance replaces with these.
+
+Tests, in `Win32DynamicLibraryTests`: `testSearchDirectories`, with a copy of the system's `version.dll` under a name
+of its own in a temporary directory: not found before the directory is added, loaded and looked up after, and not
+found once it's removed. `setDefaultSearch(_:)` isn't tested: it would change every later load in the test process.
+
+A Windows run must check `testSearchDirectories`, which relies on the loader not finding a library by a name that's
+loaded already once its last reference is freed.
+
+## 35. windows-3: quoting a command line: `c536687`
+
+Left within section 13, whose `ProcessHandle.create` takes one command line, unquoted, as `CreateProcessW` does.
+swift-subprocess (`quoteWindowsCommandLine`, "taken from SCF", swift-corelibs-foundation's `Process`) and
+swift-tools-support-core (`quote`) each carry the same quoting, from Daniel Colascione's "Everyone quotes command line
+arguments the wrong way", and both drop an empty argument, which they leave unquoted, and so as nothing. swift-subprocess adds cmd.exe's own
+escaping for batch files, after CVE-2024-24576's class of bugs.
+
+What: `Win32CommandLine.swift`: `Win32.commandLine(program:arguments:)`, which quotes the program name always, without
+escaping, and each argument that's empty or holds a space, a tab, a line feed, a vertical tab or a quotation mark,
+with the backslash rules the C runtime reads.
+
+Which API: **Win32**: the C runtime's rules for splitting a command line are Windows', which no other platform
+has, since a POSIX program receives its arguments split.
+
+Design calls, with the alternatives rejected:
+- **A function that returns the line**, for `create(commandLine:)` and any other `CreateProcessW` caller, rather than
+  an overload of `create` that takes arguments, which would tie the rules to System's one way of creating
+  processes. The program and the arguments are separate parameters, since the C runtime reads the program name by a
+  rule of its own: to the next quotation mark, with backslashes literal. That's Rust's `make_command_line`.
+- **The program name is always quoted**: `CreateProcessW` reads the program from an unquoted command line by trying
+  each prefix that ends at a space, so `C:\Program Files\tool.exe` would run `C:\Program.exe` if there were one.
+- **No cmd.exe quoting.** Escaping for cmd.exe, which batch files run in, is a different and harder set of rules,
+  for which Rust refuses some arguments; the doc says not to pass arguments someone else chose to a batch file.
+  Rejected for now: swift-subprocess's batch-file escaping, a candidate once its rules are reviewed.
+- **Not wrapped**: `CommandLineToArgvW`, the other direction, in shell32, which the tests use.
+
+Tests: `Win32CommandLineTests`: fixed quotings; a split back through `CommandLineToArgvW` for empty arguments,
+blanks, quotation marks with and without backslashes, trailing backslashes, and non-ASCII text; and a child created
+from a quoted program name. The quoting also ran on macOS, copied into a scratch program, against an implementation
+of the UCRT's `parse_command_line` rules (argv[0] to the next quotation mark; 2n and 2n + 1 backslashes; a doubled
+quotation mark inside quotes): 300,000 random command lines of up to four arguments from an alphabet of blanks,
+backslashes, quotation marks and letters split back to what was quoted.
+
+A Windows run must check `testQuoting`, `testCommandLineToArgvWSplitsItBack` (which relies on shell32 following the
+C runtime's rules for what this quoting produces), and `testAChildReceivesTheArguments`.
+
+## 36. windows-3: FileStream on Windows: `3b9ace4`
+
+packages-5's other Windows gap. swift-log's stream test buffers a stream with `setvbuf(_IOFBF)` on Windows, over
+`_fdopen`, `_lock_file`, `fwrite` and `fflush`, where its other platforms use System's provisional `FileStream`
+(`open(_:mode:)` on a descriptor, `setBuffering`, and the lock and writes), as swift-log's `StreamLogHandler` does.
+
+What: `FileStreamWindows.swift`: the provisional `FileStream`, with `CInterop.File`, on Windows, with
+`Provisional+Stdio.swift`'s API: the standard streams (`__acrt_iob_func`), `open` for a path (`_wfopen`), a wide C
+string, and a descriptor (`_fdopen`), `close()`, `fileDescriptor()` (`_fileno`), the four writes (`fwrite`, `fputs`,
+`fputc`), `read(into:)` (`fread`), `readLine(strippingNewline:)` (`fgetc`), `flush()` and `flushAll()`, `hasError`,
+`isAtEnd` and `clearError()`, `Buffering` and `setBuffering(_:buffer:)` (`setvbuf`), and `lock()`, `unlock()` and
+`withLock(_:)` (`_lock_file`, `_unlock_file`).
+
+Design calls, with the alternatives rejected:
+- **A second declaration**, as for `BrokenDownTime` (section 30): the POSIX file is `#if !os(Windows)` and another
+  lane's. Proposed for later: one declaration over a per-platform syscall layer, since the UCRT names nearly every
+  call as POSIX does.
+- **Every call runs with an invalid parameter handler that returns** (`_withReturningInvalidParameterHandler`, in
+  `Win32Syscalls.swift`): the UCRT reports an invalid mode, a bad descriptor, or a stream whose descriptor closed
+  to the handler, whose default ends the process, so the calls throw `invalidArgument` and `badFileDescriptor`
+  instead, as POSIX's doc promises. `setBuffering` checks the mode and the size first, and passes 4 KiB for a `nil`
+  buffer, which the UCRT, unlike POSIX's C libraries, would otherwise reject.
+- **What Windows lacks isn't faked**: no `tryLock()` (the UCRT has no `ftrylockfile`); `readLine` reads a byte at a
+  time with the stream locked, since the UCRT has no `getline`; and the docs say that `.line` buffers fully, that a
+  stream translates newlines unless its mode adds `"b"`, and that `"N"` is POSIX's `"e"`.
+- **Paths are wide**, as the other Windows path API's are: `_wfopen`, and a C string of `CInterop.PlatformChar`.
+- **No mock hooks yet**, unlike POSIX's, which mock every call that takes a stream with a placeholder one; section
+  37 adds them.
+
+Tests: `Win32FileStreamTests`: writing each way and reading lines back; text mode's `\r\n`; a full buffer that holds
+a write until `flush()`; rejected arguments (mode `"z"`, descriptor -1, an unknown mode, a 1-byte buffer) that throw
+rather than end the process; and the standard error's descriptor and a recursive lock.
+
+A Windows run must check those, and in particular that the UCRT reports `_fdopen(-1)` as `EBADF` and mode `"z"` as
+`EINVAL` through the returning handler, and that a stream of a process without a console reports descriptor -2.
+
+## 37. windows-3: FileStream's position, and its mock hooks: `6c34274`
+
+system-next gave the POSIX `FileStream` `seek(offset:from:)` and `offset()` (`fseeko`, `ftello`; `a6478fb`, merged
+here at `ffaa7e4`). Section 36's Windows declaration has the POSIX file's API, so it gets them too, and the mock hooks
+it left for later.
+
+What:
+- `FileStreamWindows.swift`: `seek(offset:from:)` (`_fseeki64`) and `offset()` (`_ftelli64`).
+- `Win32Syscalls.swift`: mock hooks for the stream calls that can fail, as `Syscalls+Provisional.swift` has them, with
+  the same kind of placeholder stream (`_mockStream`): `_wfopen`, `_fdopen`, `fclose`, `fflush`, `fwrite`, `fputs`,
+  `fputc`, `fread`, `_fileno`, `_fseeki64`, `_ftelli64` and `setvbuf`.
+- `Win32FileDescriptorBridge.swift`: `FileDescriptor._hasNoPosition()`, internal, for the first design call.
+
+Design calls, with the alternatives rejected:
+- **A pipe or a console has no position**, as POSIX's doc says: `seek` and `offset()` throw `illegalSeek` for a
+  stream over a pipe, a socket or a character device, by the type of its descriptor's handle (`GetFileType`). The C
+  runtime doesn't check: Microsoft documents the result of `_fseeki64` and `_ftelli64` on a device that can't seek
+  as undefined, and the C runtime drops what the stream read ahead before it moves the descriptor, so a seek on a
+  pipe's stream would lose input whatever it returned. Rejected: leaving it to the C runtime, with a doc that says
+  so; and pipes alone, which leaves consoles undefined. `NUL` is a character device, so it has no position either,
+  where POSIX's `/dev/null` has one; the doc names it.
+- **Positions are 64 bits**: `_fseeki64` and `_ftelli64`, not `fseek` and `ftell`, whose `long` is 32 bits on
+  Windows. The test seeks past 4 GiB.
+- **A text stream's positions are the file's bytes**, `\r\n` two of them, which the doc says.
+- **The mock test checks the trace call by call**, as `Win32BrokenDownTimeTests` does, since the harness has no
+  `MockTestCase`: each call's name and arguments, then a forced error for five of them, each of which throws it after
+  one call. Positioning records `_fileno` and `_get_osfhandle` before its call, for the check; a mocked descriptor
+  has no handle, so the check leaves it to the C runtime's call. Rejected: `MockTestCase`'s rounds of `EINTR`, which
+  would need `TestingInfrastructure.swift` and its dependencies in the harness.
+- **`fgetc` has no hook**: `readLine` locks the stream around it, which a placeholder can't be. `read(into:)` has one
+  but no mock test, as on POSIX, since its failure reads the placeholder's error indicator.
+
+Tests, in `Win32FileStreamTests`: `testSeekingAndTheOffset` (POSIX's, in binary mode, and past 4 GiB);
+`testTextModePositionsCountTheFilesBytes`; `testFilesWithNoPosition` (a pipe and `NUL`); `testTheCRuntimeCalls`
+(mock).
+
+A Windows run must check those, and in particular: that `_fseeki64` reports a negative position as `EINVAL` (the
+errno of `ERROR_NEGATIVE_SEEK`); that `_ftelli64` counts a text stream's buffered `\n` as two bytes, and its
+read-ahead back to the next character's byte; that `NUL` is `FILE_TYPE_CHAR`; and that a seek past 4 GiB in the
+temporary directory succeeds without growing the file.
+
+## 38. windows-3: users, access tokens and security identifiers: `32161bb`
+
+The first of section 8's gaps after its top ten: 3 packages in its ranking, but 2 in fact, since SwiftPM's file
+counts only for `PLACEHOLDER_TOKEN_USER`, a string constant of its own that the survey took for an SDK name (the
+script now classes it with the packages' own names). swift-foundation reads the process's user name (`GetUserNameW`)
+and display name (`GetUserNameExW` with `NameDisplay`), its home directory (`OpenProcessToken`,
+`GetUserProfileDirectoryW`), and whether its token is elevated (`GetTokenInformation` with `TokenElevation`, for
+`getEnvSecure`, its `secure_getenv`), and finds another user's home directory through the account's security
+identifier (`LookupAccountNameW`, `ConvertSidToStringSidW`, then the registry's `ProfileList`). swift-subprocess's
+tests read the user's name and check for the Administrators group (`AllocateAndInitializeSid`,
+`CheckTokenMembership`), and swift-build reads the user's name through SWBLibc, which the survey doesn't follow.
+
+What:
+- `Win32SecurityIdentifier.swift`: `Win32.SecurityIdentifier`, a value, with `init(authority:subauthorities:)`,
+  `authority`, `subauthorities`, its string form as `description`, `init(_:)` for a string
+  (`ConvertStringSidToSidW`), `init(_:domain:)` for a well-known one (`CreateWellKnownSid`) and `WellKnown`'s 18
+  names, `init?(accountName:)` (`LookupAccountNameW`), `init?(unsafeCopying:)` and `withUnsafeBytes(_:)`; and
+  `Win32.Account`, with `name`, `domain`, `kind` (`Kind`, `SID_NAME_USE`) and `init?(_:)` (`LookupAccountSidW`).
+- `Win32AccessToken.swift`: `Win32.TokenAccess`; `Win32.TokenHandle`, an owner, with `open(process:access:)`
+  (`OpenProcessToken`), `user()` (`TokenUser`), `isElevated()` (`TokenElevation`) and `profileDirectory()`
+  (`GetUserProfileDirectoryW`); `Win32.userName()` (`GetUserNameW`) and `userName(format:)`, with `UserNameFormat`
+  (`GetUserNameExW`); and `Win32.callingThreadIsMember(of:)` (`CheckTokenMembership`).
+- `Win32.Error.noneMapped`, `invalidSecurityIdentifier` and `noSuchDomain`.
+
+Which API: **Win32.** Windows names users and groups by security identifier, not by POSIX's numeric IDs, and a
+process's identity is its token, so `UserID`, `GroupID` and `UserEntry` don't carry over. What's shared is the
+questions (whose process this is, their name, their home directory), which the docs answer in Windows' terms.
+
+Design calls, with the alternatives rejected:
+- **A security identifier is a copyable value** that holds its bytes and compares and hashes by them, as an address
+  does: it's data, of at most 68 bytes, and every call that returns one fills a caller's buffer or allocates a copy.
+  Rejected: an owner of a `LocalAlloc`'d `PSID`, as `SecurityDescriptor` is, which would make comparing, hashing
+  and keeping identifiers awkward, for no resource.
+- **Its parts and string form are computed in Swift**: the binary form and the string form are documented
+  (MS-DTYP 2.4.2), so `init(authority:subauthorities:)`, `authority`, `subauthorities` and `description` call
+  nothing, and `description` can't fail. The test holds `description` to `ConvertSidToStringSidW`, including an
+  authority past 32 bits, which the string form writes as 12 hexadecimal digits. The encoding and the string form
+  also ran on macOS, copied into a scratch program: the Administrators group's bytes are the documented ones, and
+  200,000 random identifiers round-trip through their bytes and their string form. Parsing goes through
+  `ConvertStringSidToSidW`, which also reads SDDL's abbreviations (`BA`, `SY`).
+- **A lookup returns `nil` for no account** (`ERROR_NONE_MAPPED`) and throws for a failure, as `UserEntry(name:)`
+  does. A name or a string with a null character is rejected first: the C string would end early, at what might be
+  another account's name.
+- **Name to identifier, and identifier to account**: `SecurityIdentifier(accountName:)` and `Account(_:)` each wrap
+  one lookup, and `Account(SecurityIdentifier(accountName:))` gives an account by name, with its canonical names.
+  Rejected: an `Account(name:)`, which would need both lookups or give back the name as typed. Only the local
+  computer looks names up: `lpSystemName` is `NULL`.
+- **The token is an owner**, as `ProcessHandle` is, opened from a process handle; `Win32.ProcessHandle.current` is
+  the calling process's. Rejected for now: `GetCurrentProcessToken`'s pseudo handle, which Rust uses, but which
+  isn't a handle to close, so `TokenHandle` couldn't own it; and `OpenThreadToken`, which no adopter calls.
+- **Membership is the calling thread's**: `callingThreadIsMember(of:)` is `CheckTokenMembership` with a `NULL`
+  token, which checks the thread's impersonation token, or else its process's. On a `TokenHandle` it would need an
+  impersonation token, which a process's isn't. `AllocateAndInitializeSid` and `FreeSid`, which swift-subprocess
+  calls to make the group's identifier, aren't needed: `init(_:domain:)` or `init(authority:subauthorities:)` makes
+  it.
+- **`userName(format:)`'s formats but `samCompatible` need a domain**, which its doc says, with the errors.
+- **The libraries**: `GetUserNameExW` is secur32's and `GetUserProfileDirectoryW` userenv's. swift-foundation calls
+  both with `import WinSDK` alone, as System does, which the WinSDK module's link directives must cover.
+
+Tests: `Win32SecurityIdentifierTests`: the constants; parts and bytes; string forms against
+`ConvertSidToStringSidW`; parsing and what it rejects; the well-known identifiers' string forms, and a
+domain-relative one; built-in accounts, looked up both ways; the current user's account; unknown names and
+identifiers; copying a C identifier. `Win32AccessTokenTests`: the constants; the process's user and elevation
+against raw calls; `accessDenied` without `query`; the profile directory against `USERPROFILE`; user names against
+`USERNAME` and the account's SAM-compatible name; membership of `Everyone`, `ANONYMOUS LOGON` and the user, and of
+the Administrators group only when the token is elevated.
+
+A Windows run must check those, and in particular: that `ConvertSidToStringSidW` writes an authority past 32 bits
+as `0x` and 12 lowercase digits; that `LookupAccountSidW` gives `Everyone` an empty domain, and `SYSTEM` and
+`Everyone` `SidTypeWellKnownGroup`; that looking up an unknown domain's identifier gives `ERROR_NONE_MAPPED` without
+a long wait; that `GetUserNameExW` with `NameDisplay` fails with `ERROR_NONE_MAPPED` or `ERROR_NO_SUCH_DOMAIN` for a
+local account, such as CI's; that `CreateWellKnownSid` fails for `WinAccountAdministratorSid` without a domain; and
+that SystemPackage links secur32 and userenv. Not covered: domain accounts, Microsoft and Entra ID accounts (whose
+name from `GetUserNameW` may not be the account's), impersonation, and the names on a Windows not in English.
+
+## 39. windows-3: pipes: `1bfd761`
+
+The next gap of section 8: 2 packages, 4 files. swift-subprocess makes each standard handle's pipe a named pipe,
+since an anonymous pipe can't do overlapped I/O: `CreateNamedPipeW` with a unique name under `\\.\pipe\LOCAL\`,
+`FILE_FLAG_OVERLAPPED` and `FILE_FLAG_FIRST_PIPE_INSTANCE`, `PIPE_ACCESS_INBOUND` or `PIPE_ACCESS_OUTBOUND`, byte
+mode, `PIPE_REJECT_REMOTE_CLIENTS`, one instance and 64 KiB buffers, then `CreateFileW` for the child's end; it
+checks what a pipe holds with `PeekNamedPipe` before it reads one whose process it canceled, and its tests make
+anonymous pipes (`CreatePipe`). swift-log's test makes a pipe's read end nonblocking (`SetNamedPipeHandleState`
+with `PIPE_NOWAIT`), where its other platforms set `O_NONBLOCK`.
+
+What, in `Win32Pipes.swift`:
+- `Win32.FileHandle.pipe(bufferSize:)` (`CreatePipe`), which returns a `Win32.FileHandle.Pipe`, an owner of its two
+  ends, shaped like `OwnedFD.Pipe`.
+- `Win32.PipeDirection` and `Win32.PipeType`, and `createNamedPipe(_:direction:type:maximumInstances:firstInstance:
+  acceptsRemoteClients:bufferSize:inheritable:securityDescriptor:)` (`CreateNamedPipeW`) on `Win32.FileHandle` and,
+  with `FILE_FLAG_OVERLAPPED`, on `Win32.OverlappedFileHandle`, each returning the server's end.
+- On a `FileHandle`: `waitForClient()` (`ConnectNamedPipe`), `disconnectClient()` (`DisconnectNamedPipe`),
+  `bytesAvailable()` (`PeekNamedPipe`) and `setPipeMode(readMode:blocking:)` (`SetNamedPipeHandleState`); on an
+  `OverlappedFileHandle`, `bytesAvailable()`.
+
+Which API: **Win32**, as SYS-0011's future directions have it. `FileDescriptor.pipe()` makes the C runtime's pipes
+on Windows, which stay as they are; these are Windows' own handles, for `ProcessHandle.create` and overlapped I/O.
+
+Design calls, with the alternatives rejected:
+- **The creation's defaults are swift-subprocess's and Rust's**, the safe choices: one instance, the first one
+  (`FILE_FLAG_FIRST_PIPE_INSTANCE`, so a process that created the name first can't serve this server's clients),
+  no remote clients (`PIPE_REJECT_REMOTE_CLIENTS`), and 64 KiB each way. Each is a parameter of its own, so
+  changing one can't drop another, as it could in one option set: `acceptsRemoteClients: Bool = false` rather than
+  a `rejectRemoteClients` option to keep.
+- **The server's end reads as the pipe is written**: `type: .message` sets `PIPE_READMODE_MESSAGE` with
+  `PIPE_TYPE_MESSAGE`, and every pipe waits (`PIPE_WAIT`); `setPipeMode(readMode:blocking:)` changes a client's
+  end, or anyone's to nonblocking. Rejected: separate read-mode and type parameters, whose one invalid combination,
+  messages read from a byte pipe, `CreateNamedPipeW` would reject anyway.
+- **Two creations, one per handle type**, as `open` is, since an overlapped handle has its own type (section 27).
+  The overlapped one's doc says to give a child process a synchronous end: a program's reads and writes of an
+  overlapped handle without an `OVERLAPPED`, as the C runtime's are, can report that they finished before they
+  have, and swift-subprocess gives its children overlapped ends (see the windows-3 findings).
+- **`bytesAvailable()` throws `brokenPipe` at the end of the data**, as `PeekNamedPipe` reports it, where a read
+  returns 0: an empty pipe whose writer is alive, and one whose writer is gone, are different answers to a caller
+  deciding whether to read, as swift-subprocess's is.
+- **`waitForClient()` succeeds for a client that connected first** (`ERROR_PIPE_CONNECTED`), which Windows reports
+  as a failure; one that connected and left is `noData`, which its doc says needs `disconnectClient()`.
+- **Nonblocking mode is offered, and discouraged**: Microsoft keeps `PIPE_NOWAIT` for LAN Manager 2.0's programs,
+  but it's what swift-log's test needs, the counterpart of `O_NONBLOCK`. A write that doesn't fit writes nothing,
+  which `write` reports as `incompleteTransfer` (section 4's finding).
+- **Not wrapped**: an overlapped `ConnectNamedPipe`, `WaitNamedPipeW` and the default time-out, peeking at a pipe's
+  data and its messages' remaining bytes (`PeekNamedPipe`'s buffer), `GetNamedPipeInfo` and
+  `GetNamedPipeHandleStateW`, `TransactNamedPipe` and `CallNamedPipeW`, the server's view of its client
+  (`GetNamedPipeClientProcessId`, `ImpersonateNamedPipeClient`), and `NtCreateNamedPipeFile`, with which Rust makes
+  an anonymous pipe that can do overlapped I/O.
+
+Tests: `Win32PipesTests`: the constants; an anonymous pipe's data, availability, end, and buffer sizes; a named
+pipe's client, its first-instance guard and its limit; two instances with two clients; waiting for a client on
+another thread, disconnecting, a client that left before the wait; message pipes, read whole and in part, and a
+client switched to messages; nonblocking reads, as swift-log's test makes them; an overlapped server's
+availability; and rejected arguments.
+
+A Windows run must check those, and in particular: that `CreateNamedPipeW` gives `ERROR_ACCESS_DENIED` for a second
+first instance and `ERROR_PIPE_BUSY` past the limit; that a nonblocking read of an empty pipe fails with
+`ERROR_NO_DATA`; that `SetNamedPipeHandleState` works on `CreatePipe`'s read end, which swift-log's test relies on
+too; that a read of a message pipe into a short buffer gives `ERROR_MORE_DATA`, a short read; and what a disk file
+and a name outside `\\.\pipe\` give.
+
+## 40. windows-3: job objects: `6d2ca5b`
+
+The next gap of section 8: 2 packages, 3 files. swift-subprocess puts each child in a job of its own
+(`CreateJobObjectW`), created suspended and assigned before it runs (`AssignProcessToJobObject`), so that
+`terminate(toProcessGroup:)` can end it and everything it started (`TerminateJobObject`); it explains a failed
+assignment with `IsProcessInJob`, and its tests set `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`
+(`SetInformationJobObject` with `JobObjectExtendedLimitInformation`). swift-tools-support-core's `exec` runs a
+program in a job with `KILL_ON_JOB_CLOSE` and `SILENT_BREAKAWAY_OK`, and waits for the job to empty on a completion
+port (`JobObjectAssociateCompletionPortInformation`, then `GetQueuedCompletionStatus` until
+`JOB_OBJECT_MSG_ACTIVE_PROCESS_ZERO`).
+
+What, in `Win32Jobs.swift`:
+- `Win32.JobHandle`, an owner like `ProcessHandle`, with `create(inheritable:)` (`CreateJobObjectW`),
+  `assign(_:)` (`AssignProcessToJobObject`), `contains(_:)` (`IsProcessInJob`), `terminate(exitCode:)`
+  (`TerminateJobObject`), `options()` and `setOptions(_:)` (`QueryInformationJobObject` and
+  `SetInformationJobObject`, with `JobObjectExtendedLimitInformation`), and `associate(with:key:)`
+  (`JobObjectAssociateCompletionPortInformation`).
+- `Win32.JobOptions`: the limits that take no value, `killOnClose`, `silentBreakaway`, `breakawayAllowed` and
+  `dieOnUnhandledException`.
+- `Win32.JobNotification`, read from a section 27 `Win32.Completion`: its `Kind` (the `JOB_OBJECT_MSG_*`
+  message), its process's ID, and its key.
+- `Win32.ProcessHandle.isInJob()` (`IsProcessInJob` with no job).
+
+Which API: **Win32.** A job is Windows' own way to manage a group of processes. It covers what a POSIX process
+group is used for (ending a program and its children together), and more, since a process can't leave its job or
+start one of its children outside it unless the job allows, but it isn't a process group: the shared name stays
+POSIX's.
+
+Design calls, with the alternatives rejected:
+- **Options are the limits without values**, which the adopters set; `setOptions(_:)` reads the job's limits first
+  and changes only those four flags, since `SetInformationJobObject` sets every limit at once and would clear the
+  others. Rejected for now: the limits with values (active processes, memory, time, affinity, priority), which
+  take `JOBOBJECT_EXTENDED_LIMIT_INFORMATION`'s fields and no adopter sets.
+- **A notification is read from a completion packet** rather than dequeued by a method of its own: the port is
+  section 27's, and can carry the job's packets beside others, which the key tells apart. The packet's byte count
+  is the message and its `OVERLAPPED` pointer the process's ID, as Windows documents, so `Completion`'s fields
+  carry them unchanged and `JobNotification(_:)` names them. The doc says Windows doesn't promise to deliver every
+  packet, as Microsoft's does.
+- **`assign(_:)`'s doc says to create the process suspended**, assign it, and then resume it, as swift-subprocess
+  and swift-tools-support-core do, so that it can't start a process outside the job first; and that a job can't
+  always nest in the one a process is in already.
+- **`close()`'s and the type's docs say that `killOnClose` ends the processes when the last handle closes**, which
+  the deinit does too: an owner that a crash or a `return` drops ends its processes, which is the option's point.
+- **Not wrapped**: named jobs (`OpenJobObjectW`), the jobs' accounting and process lists
+  (`JobObjectBasicAccountingInformation`, `JobObjectBasicProcessIdList`), user interface restrictions, CPU rate and
+  network limits, notification limits, and silos.
+
+Tests: `Win32JobsTests`: the constants; a suspended child assigned, found in the job, and ended with the job's
+exit code; options set and replaced; a `killOnClose` job's close ending its process; the notifications for a child
+that joins and exits, with the last one's `noActiveProcesses`; and `accessDenied` for a process handle without the
+rights.
+
+A Windows run must check those, and in particular: that the test process's own job, if its runner made one, lets
+the tests' jobs nest; that `JOB_OBJECT_MSG_ACTIVE_PROCESS_ZERO` arrives after the child's exit, and whether a
+console host the child starts joins the job too; and that `AssignProcessToJobObject` reports a handle without the
+rights as `ERROR_ACCESS_DENIED`.
+
+## 41. windows-3: reparse points: `5ad7c6c`
+
+The next gap of section 8: 2 packages, 3 files, and SYS-0016's one future direction. swift-foundation's
+`destinationOfSymbolicLink(atPath:)` reads a symbolic link's or a junction's target with `DeviceIoControl` and
+`FSCTL_GET_REPARSE_POINT`, through C shims for `REPARSE_DATA_BUFFER`'s offsets, since that structure is the
+Driver Kit's, not the SDK's; its `attributesOfItem(atPath:)` tells a symbolic link by `FileAttributeTagInfo`. NIO
+checks that a path it's about to delete is a Unix domain socket's, by the `IO_REPARSE_TAG_AF_UNIX` tag of its
+reparse point, through a `REPARSE_DATA_BUFFER` of its own. Section 20 has the tag (`attributeTagInformation()`,
+`Win32.ReparseTag`); this is the data.
+
+What, in `Win32ReparsePoints.swift`: `Win32.ReparsePoint`, with the `tag`, the tag's `data`, and, for a symbolic
+link or a mount point, the `substituteName`, the `printName`, `isRelative` and the `target`; and `reparsePoint()`
+on `FileHandle` and `DirectoryHandle` (`DeviceIoControl` with `FSCTL_GET_REPARSE_POINT`). `Win32.Error` gains
+`notAReparsePoint` and `invalidReparseData`.
+
+Which API: **Win32**, as SYS-0016 proposed: a typed wrapper over one control code, not a general `DeviceIoControl`.
+Open, with section 26's shared names: `FilePath.readSymbolicLink()` on Windows, over this, with `target`'s rule.
+
+Design calls, with the alternatives rejected:
+- **The data is parsed in Swift**, from the documented layout, since the SDK doesn't declare `REPARSE_DATA_BUFFER`:
+  every offset and length is checked against what the call returned, and a name outside it throws
+  `invalidReparseData`. swift-foundation's check counts a name's end from the path buffer but compares it with the
+  bytes from the structure's start, so it can read past them (see the windows-3 findings). The parsing also ran on
+  macOS, copied into a scratch program, for links, junctions, a third party's tag with its GUID, and malformed data.
+- **`target` follows Rust's `read_link`**: a relative target as it's stored; an absolute one's `\??\` as `\\?\`,
+  removed from a drive's path, or a UNC path's `\\?\UNC\`, when the path is shorter than `MAX_PATH` and
+  `GetFullPathNameW` leaves it as it is, so a target with a trailing dot or a reserved name keeps its prefix.
+  Rejected: dropping `\??\`, as swift-foundation does, which turns a UNC target into a relative path
+  (`UNC\server\share`); and the substitute name alone, an NT path that Win32's functions don't take.
+- **Both names are kept, as strings**, and `target` as a path built from the code units, so an unpaired surrogate,
+  which NTFS allows, survives in the path though not in the names. The print name can be empty: some programs that
+  make junctions leave it so.
+- **The query needs no access rights**, which the doc says, with Rust's example of the junction
+  `C:\Documents and Settings`, whose security descriptor denies listing it.
+- **A third party's tag's data follows its GUID**, which `ReparsePoint` leaves out.
+- **Not wrapped**: setting and deleting reparse points (`FSCTL_SET_REPARSE_POINT`, `FSCTL_DELETE_REPARSE_POINT`),
+  so making a junction, which `mklink /J` does in the tests; the app execution alias's data; and the other
+  `FSCTL` codes SYS-0016 lists.
+
+Tests: `Win32ReparsePointsTests`: the constants; a junction made by `mklink /J`, read with no access rights, its
+print name and target the full path; symbolic links, relative, absolute, UNC, past `MAX_PATH`, with a trailing dot,
+and a directory's, where links can be made; files and directories that aren't reparse points; the parsing of
+synthetic data; and `target`'s rule, with a stand-in for `GetFullPathNameW` and the real one.
+
+A Windows run must check those, and in particular: that `CreateSymbolicLinkW` stores an absolute target as
+`\??\…` and a UNC one as `\??\UNC\…`, and keeps a verbatim target's trailing dot; whether `mklink /J` ends the
+substitute name with a backslash, which `FilePath` drops either way; and that `FSCTL_GET_REPARSE_POINT` works on a
+handle with no access rights.
+
+## 42. windows-3: events: `b1bc663`
+
+The next gap of section 8: 2 packages, 2 files. swift-subprocess makes a manual-reset event (`CreateEventW`) for an
+overlapped read it waits for itself, with the handle's low bit set in the `OVERLAPPED` so the completion stays off
+its port; swift-tools-support-core's directory watcher makes an auto-reset event for its `ReadDirectoryChangesW`
+and a manual-reset one to stop the watch, waits for either (`WaitForMultipleObjects`), and stops with `SetEvent`.
+
+What, in `Win32Events.swift`:
+- `Win32.EventHandle`, an owner, with `create(manualReset:initiallySignaled:inheritable:)` (`CreateEventW`),
+  `signal()` (`SetEvent`), `reset()` (`ResetEvent`), `wait(timeout:)` (`WaitForSingleObject`), and
+  `overlappedEvent(queuesCompletion:)`, the value for an `OVERLAPPED`'s `hEvent`.
+- `Win32.waitForAny(_:timeout:)` and `waitForAll(_:timeout:)` (`WaitForMultipleObjects`), over raw handles.
+
+Which API: **Win32.** POSIX has no event object; `PThread.Condition` and a mutex are its counterparts within a
+process, and an event is also what Windows' overlapped I/O signals.
+
+Design calls, with the alternatives rejected:
+- **`manualReset` has no default**: the two kinds wake different numbers of waiters, and a wrong guess is a bug
+  that shows only under load. `initiallySignaled` defaults to `false`.
+- **`overlappedEvent(queuesCompletion:)` names Windows' low-bit rule**, which `GetQueuedCompletionStatus`'s
+  documentation describes and swift-subprocess applies by hand; it's `@unsafe`, as section 27's `OVERLAPPED`
+  operations are, since the operation outlives no promise about the event.
+- **The multiple waits take raw handles and are `@unsafe`**: a wait can mix events, processes, threads and other
+  objects, which share no Swift type, and each handle must stay open while the wait lasts. Rejected: a protocol
+  that every owner adopts, for one function. They throw `invalidParameter` for no handles or more than 64, the
+  limit, before the call. `waitForAny` returns the signaled handle's index, the lowest if several are, as Windows
+  does, and `nil` at the time-out; an abandoned mutex, which no System type wraps, counts as signaled, as `_wait`
+  counts it. A time-out past `INFINITE` waits in parts, as the single waits do.
+- **`wait(timeout:)`'s result is discardable**, for a wait with no limit, which returns only `true`.
+- **Not wrapped**: named events (`OpenEventW`), `CreateEventExW`'s access, `PulseEvent`, which Microsoft calls
+  unreliable, alertable waits (`WaitForMultipleObjectsEx`) and `MsgWaitForMultipleObjects`, and
+  `SignalObjectAndWait`.
+
+Tests: `Win32EventsTests`: the constant; manual-reset and auto-reset events; a wait ended by another thread;
+`waitForAny` with events and a process, the lowest index, and its limits; `waitForAll`, which changes nothing until
+all are signaled, and its duplicates; and the low bit, which keeps an overlapped read's packet off the port of an
+overlapped named pipe while the event is signaled.
+
+A Windows run must check those, and in particular: that `waitForAll` leaves a signaled auto-reset event as it is
+while another isn't signaled; that `WaitForMultipleObjects` rejects a duplicated handle with
+`ERROR_INVALID_PARAMETER`; and that a low-bit event keeps the packet off the port.
+
+## 43. windows-3: network adapters: `d2c4f60`
+
+The next gap of section 8, which is 1 package, not 2: swift-foundation's file counts only for `NETWORK_PREFIX`, a
+constant of its own, which the survey took for an SDK name (the script now classes it with the packages' own
+names). NIO's `NIONetworkDevice.enumerateDevices()` reads the adapters with `GetAdaptersAddresses` (`AF_UNSPEC`, a
+15 KiB buffer, retried at `ERROR_BUFFER_OVERFLOW`), and makes a device of each unicast address: the adapter's
+`FriendlyName`, the address, a netmask from `OnLinkPrefixLength`, and `IfIndex` or `Ipv6IfIndex` by family. On
+Darwin, NIO reads System's `NetworkInterface.Addresses`.
+
+What, in `Win32NetworkAdapters.swift`: `Win32.networkAdapters()` (`GetAdaptersAddresses`), which returns
+`Win32.NetworkAdapter`s: `name`, `friendlyName`, `adapterDescription`, `index`, `ipv6Index`, `type`
+(`InterfaceType`), `operationalStatus` (`OperationalStatus`), `mtu`, `physicalAddress`, `supportsMulticast`, and
+`unicastAddresses`, each with its `bytes`, `family` and `prefixLength`.
+
+Which API: **Win32**, for now. System's `NetworkInterface` is POSIX's `getifaddrs`, and its shape doesn't carry
+over unchanged: its flags are the `IFF_*` bits, which `GetAdaptersAddresses` doesn't report; its names are the ones
+`if_nametoindex` takes, which on Windows are neither of an adapter's names here; and its entry has the
+`ifaddrs` node. Proposed for later, as for sections 30 and 36: `NetworkInterface.Addresses` on Windows over this,
+with an entry for each unicast address, flags derived from the type and the status, and a netmask from the prefix,
+which NIO's Windows code computes now, so that its Darwin path would serve Windows too.
+
+Design calls, with the alternatives rejected:
+- **Copies, not a view of the list**: the adapters and their addresses are values, with no lifetime to manage,
+  where `NetworkInterface.Addresses` lends its entries. Enumerating adapters is slow and rare, and the list is a
+  linked structure of variable records in a buffer that Windows can ask to grow. Rejected for now: an owner of the
+  buffer with nonescapable entries, as POSIX's is, which the shared declaration would need.
+- **The unicast addresses only**: anycast, multicast and DNS server addresses are skipped
+  (`GAA_FLAG_SKIP_ANYCAST` and the rest), which Microsoft recommends for speed, and no adopter reads.
+- **An address is its `sockaddr`'s bytes**, as `NetworkInterface`'s `RawSpan`s are, with its family and prefix
+  length beside them: no socket address type until Winsock's module is settled (section 29).
+- **`AF_INET6` is 23 on Windows**, which `family`'s doc says, where Darwin's is 30 and Linux's 10.
+- **Not wrapped**: the other addresses, gateways (`GAA_FLAG_INCLUDE_GATEWAYS`), DNS suffixes, the LUID, the
+  adapter's flags but multicast, the `IP_ADAPTER_UNICAST_ADDRESS` lifetimes and duplicate detection state, and
+  `if_nametoindex` and `if_indextoname`, which iphlpapi has on Windows.
+
+Tests: `Win32NetworkAdaptersTests`: the constants; the loopback adapter, up, with no physical address, and
+127.0.0.1/8 and ::1/128 as `sockaddr` bytes; and every adapter's addresses, families, prefix lengths and indexes.
+
+The harness: the new test needs `AF_INET6`, which Darwin defines too, as 30, so `WinSDK.AF_INET6` was ambiguous: the
+model's overlay re-exported all of `ObjectiveC`, and Darwin with it. It now re-exports `ObjCBool` alone, which
+`WindowsBool`'s stand-in needs, and every Win32 file and test still compiles, and a source file that imports
+`WinSDK` no longer sees macOS's C library (see *How it was checked*).
+
+A Windows run must check those, and in particular: that `GetAdaptersAddresses` lists the loopback adapter, as
+`IF_TYPE_SOFTWARE_LOOPBACK`, in a container too; that `AdapterName` is a GUID in braces for it; and that
+`ERROR_NO_DATA` is what it returns for no adapters, which isn't covered.
+
+## 44. windows-3: findings
 
 - **`FileDescriptor`'s Windows canonicalization doesn't cover `CreateDirectoryW`'s limit** (P4).
   `withCanonicalPathRepresentation` passes `PATHCCH_ALLOW_LONG_PATHS`, so the `mkdir` adapter, which
@@ -1710,14 +2365,70 @@ buffers `char *`), and replaces what Winsock lacks or renames: `close` with `clo
 - **Windows doesn't support the `\\?\` prefix for a current directory**, which Rust's `Command::current_dir` and
   Foundation's `FileManager` both work around: `ProcessHandle.create` gave one to a current directory past
   `MAX_PATH`, and no longer does (section 23).
+- **macOS's C library leaked into the harness's Windows modules.** The model's headers included the macOS SDK's
+  `<stdint.h>` and `<wchar.h>`, which belong to its Darwin modules, so every file that imported the model saw
+  Darwin's C library: a call to `gmtime_r`, or a read of `tm_gmtoff`, compiled as if Windows had them. The model now
+  includes only the compiler's own headers, so a file that imports only `ucrt` sees none of it; a file that
+  imported `WinSDK` still did, through the `ObjectiveC` module that `WindowsBool`'s stand-in needs, so for a name
+  both have, such as `tm` and `strftime`, the code spells `ucrt.tm`, which Windows accepts too. Since section 43,
+  the overlay's model re-exports `ObjCBool` alone, and a source file that imports `WinSDK` doesn't see macOS's C
+  library either: a probe's `gmtime_r` and `tm_gmtoff` fail to compile.
+- **The UCRT's `strftime` ends the process for a field outside its range**, or a conversion it doesn't know: it
+  reports them to the invalid parameter handler, whose default terminates. Code that passes it a `struct tm` it
+  didn't get from the C runtime, as cross-platform code does, should install a handler that returns (section 30).
+- **`Errno.overflow` is missing on Windows** (P5), though the UCRT defines `EOVERFLOW`.
 - **Swift can't spell `winerror.h`'s failures.** `E_FAIL` and the rest come through `_HRESULT_TYPEDEF_`, a
   function-like macro, so they don't import, and a negative `HRESULT` cast directly, `((HRESULT)0x80004005)`,
   imports as an overflowing literal, an error at each use; only `S_OK` and `S_FALSE` work. That's why no adopter
   uses one, and why `Win32.HResult` names them (section 25).
+- **`FileDescriptor`'s offsets are 32 bits on Windows** (P6). `_COffT` is the UCRT's `off_t`, a 32-bit `long`, so
+  `seek(offset:from:)`, `read(fromAbsoluteOffset:into:)`, `write(toAbsoluteOffset:_:)` and `resize(to:)` trap
+  converting an offset or a size beyond 2 GiB, and `seek` reaches the `off_t` adapter over `_lseek`, whose result is
+  a `long`, not the `Int64` one over `_lseeki64` beside it, which nothing calls. With 64-bit offsets, the `pread` and
+  `pwrite` adapters would trap at 4 GiB instead (`UInt32(offset)`), and for a negative offset. So a file past 2 GiB
+  can only be read and written where its descriptor's offset already is. main has the same code; the `off_t` adapter
+  came with `036f567` (#105, 2022).
+- **The C runtime's seeks are undefined on a pipe or a console**, as Microsoft documents them (section 37).
+  `FileDescriptor.seek` reaches them too, through `_lseek`; P6 leaves that alone.
+- **swift-foundation's `ProcessInfo.fullUserName` is empty on Windows whenever it works**:
+  `guard GetUserNameExW(NameDisplay, …) == 0 else { return "" }` returns `""` when the call succeeds, which is when
+  it returns nonzero, and otherwise returns the buffer it didn't fill. For a local account the call fails anyway,
+  since only a domain's accounts have a display name (section 38).
+- **swift-foundation's `homeDirectoryPath(forUser:)` leaks** the string `ConvertSidToStringSidW` allocates, which
+  needs `LocalFree`, and calls `fatalError` if the conversion fails.
+- **The survey counted SwiftPM for users and tokens** by its own `PLACEHOLDER_TOKEN_USER`, and swift-foundation for
+  network interfaces by its own `NETWORK_PREFIX`; the script now classes both names with the packages' own, so a
+  new run gives those concepts 2 packages and 5 files (4 in sources), and 1 package and 2 files. Section 8's table
+  is as surveyed.
+- **swift-subprocess gives its children overlapped pipe ends.** `CreatedPipe` opens the child's end with
+  `FILE_FLAG_OVERLAPPED`, and a program's `ReadFile` or `WriteFile` without an `OVERLAPPED` on an overlapped handle,
+  as the C runtime's `_read` and `_write` are, "can incorrectly report that the read operation is complete"
+  (`ReadFile`'s documentation); it works while one operation at a time uses the handle. Rust's standard library
+  opens the child's end synchronously (`FILE_SYNCHRONOUS_IO_NONALERT`, in `anon_pipe`), and only its own end
+  overlapped (section 39).
+- **swift-foundation's `destinationOfSymbolicLink(atPath:)` can read past a reparse point's data, and makes a UNC
+  target relative.** It checks `SubstituteNameOffset + SubstituteNameLength <= dwBytesWritten`, but the offset
+  counts from the path buffer, 20 bytes into a symbolic link's structure and 16 into a mount point's, while the
+  bytes written count from the start, so a name that ends within those last bytes is read past them, and past the
+  16 KiB buffer when the data fills it. It drops a target's `\??\`, which leaves `UNC\server\share\…` for a
+  link to a share (section 41).
+- **swift-foundation's `attributesOfItem(atPath:)` loses a file index's high half**: `UInt64(info.nFileIndexHigh
+  << 32)` shifts the 32-bit `DWORD` by 32, which Swift's smart shift makes 0, so `systemFileNumber` is the low 32
+  bits; `UInt64(info.nFileIndexHigh) << 32` was meant.
+- **NIO's `cleanupUnixDomainSocket(atPath:)` goes on only if `GetFileType` doesn't report `FILE_TYPE_DISK`** for the
+  socket's file, which it opens as itself with `FILE_FLAG_OPEN_REPARSE_POINT`. Windows reports `FILE_TYPE_DISK` for
+  a file on a disk's volume; if it does for a socket's file too, the cleanup always throws. A Windows run can tell,
+  by `fileType()` and `reparsePoint()` of a bound socket's path. Its `guard let` on `CreateFileW`'s result can't see
+  a failure, which is `INVALID_HANDLE_VALUE`, not `NULL`.
+- **swift-tools-support-core's directory watcher never delivers a change, and spins.** `RDCWatcher` walks the
+  `FILE_NOTIFY_INFORMATION` entries with `while var pNotify = pNotify { …; pNotify = … }`, whose condition binds the
+  outer constant again each time, so the loop never leaves the first entry; and it drops a name that
+  `AbsolutePath(validating:)` rejects with `continue`, which every name is, since the entries' names are relative to
+  the watched directory, so the loop spins without advancing either way (section 42).
 - **macOS's CoreFoundation declares `S_OK` and `S_FALSE` too**, so the harness's tests spell `WinSDK.S_OK`; on
   Windows, where XCTest's Foundation is swift-corelibs-foundation, the bare names would do.
 
-## 31. windows-3: patches for files outside the lane
+## 45. windows-3: patches for files outside the lane
 
 **P3, continued: `Sources/System/CMakeLists.txt`.** The Win32 `target_sources` block as it should read with this
 lane's files. P3 itself landed with coverage-4 (`8caa741`); this block replaces the one it left, and is kept current
@@ -1725,15 +2436,21 @@ with each commit.
 
 ```cmake
 target_sources(SystemPackage PRIVATE
+  Win32/BrokenDownTimeWindows.swift
   Win32/DynamicLibraryWindows.swift
   Win32/FilePathResolutionWindows.swift
+  Win32/FileStreamWindows.swift
   Win32/PathsWindows.swift
   Win32/ProcessEnvironmentWindows.swift
+  Win32/ProcessExitWindows.swift
   Win32/ProcessIDWindows.swift
   Win32/Win32.swift
+  Win32/Win32AccessToken.swift
+  Win32/Win32CommandLine.swift
   Win32/Win32Console.swift
   Win32/Win32Constants.swift
   Win32/Win32Error.swift
+  Win32/Win32Events.swift
   Win32/Win32FiberLocal.swift
   Win32/Win32FileDescriptorBridge.swift
   Win32/Win32FileHandle.swift
@@ -1743,14 +2460,19 @@ target_sources(SystemPackage PRIVATE
   Win32/Win32FinalPath.swift
   Win32/Win32HResult.swift
   Win32/Win32HandleOperations.swift
+  Win32/Win32Jobs.swift
   Win32/Win32Locking.swift
   Win32/Win32LongPaths.swift
+  Win32/Win32NetworkAdapters.swift
   Win32/Win32Open.swift
   Win32/Win32OverlappedIO.swift
   Win32/Win32PathOperations.swift
+  Win32/Win32Pipes.swift
   Win32/Win32Process.swift
   Win32/Win32ProcessCreation.swift
+  Win32/Win32ReparsePoints.swift
   Win32/Win32SecurityDescriptor.swift
+  Win32/Win32SecurityIdentifier.swift
   Win32/Win32Synchronization.swift
   Win32/Win32Syscalls.swift
   Win32/Win32SystemInformation.swift
@@ -1790,3 +2512,202 @@ and the overlay's `ERROR_SUCCESS`. It applies to this branch with `git apply`.
 
 A Windows run with P4 must check that `FileDescriptor.open` and `withTemporaryFilePath` work for paths of 248 to
 259 characters, and that `Win32OverlongPathTests` still throws.
+
+**P5, `Sources/System/Errno.swift` and `Sources/System/Internals/Constants.swift`: name `EOVERFLOW` on Windows.**
+The UCRT defines it, 132, and `BrokenDownTime` throws it there (section 30), where cross-platform code catches
+`Errno.overflow`. Not compiled here (the files are outside the harness); it removes two `#if !os(Windows)`. It applies
+to this branch with `git apply`. With it, `BrokenDownTime._overflow` in `BrokenDownTimeWindows.swift` can become
+`.overflow`.
+
+```diff
+--- a/Sources/System/Errno.swift
++++ b/Sources/System/Errno.swift
+@@ -1134,7 +1134,6 @@
+   public static var EDEVERR: Errno { deviceError }
+ #endif
+ 
+-#if !os(Windows)
+   /// Value too large to be stored in data type.
+   ///
+   /// A numerical result of the function
+@@ -1147,7 +1146,6 @@
+   @_alwaysEmitIntoClient
+   @available(*, unavailable, renamed: "overflow")
+   public static var EOVERFLOW: Errno { overflow }
+-#endif
+ 
+ #if SYSTEM_PACKAGE_DARWIN
+   /// Bad executable or shared library.
+--- a/Sources/System/Internals/Constants.swift
++++ b/Sources/System/Internals/Constants.swift
+@@ -376,10 +376,8 @@
+ internal var _EDEVERR: CInt { EDEVERR }
+ #endif
+ 
+-#if !os(Windows)
+ @_alwaysEmitIntoClient
+ internal var _EOVERFLOW: CInt { EOVERFLOW }
+-#endif
+ 
+ #if SYSTEM_PACKAGE_DARWIN
+ @_alwaysEmitIntoClient
+```
+
+**P6, `Sources/System/Internals/Exports.swift`, `Syscalls.swift` and `WindowsSyscallAdapters.swift`: 64-bit offsets
+on Windows.** `_COffT` becomes `Int64` there, the four descriptor calls take `_COffT` rather than `off_t` (no change
+elsewhere, where they're the same type), the `off_t` adapter over `_lseek` goes, so `system_lseek` reaches
+`_lseeki64`, and the `pread` and `pwrite` adapters split the offset without trapping and reject a negative one with
+`EINVAL`, as POSIX's do; `WriteFile` would read an offset of −1 as the end of the file. Not compiled by the harness
+(the files are outside `Win32/`): the patched functions, the four callers as `FileOperations.swift` writes them,
+and the mock hooks compiled in a scratch copy against `WindowsModel`, with the UCRT's `off_t` as a 32-bit `int`, its
+`_lseek`, `_lseeki64` and POSIX-named `lseek`, and `FILE_BEGIN` and `FILE_CURRENT` as `DWORD`s, as the unchanged
+`ftruncate` adapter needs. It applies to this branch with `git apply`. The mock tests' integer arguments still match:
+`AnyHashable` compares integers of different types by value.
+
+```diff
+--- a/Sources/System/Internals/Exports.swift
++++ b/Sources/System/Internals/Exports.swift
+@@ -37,7 +37,13 @@
+ #error("Unsupported Platform")
+ #endif
+ 
++// A file offset. The UCRT's off_t is a 32-bit long, so on Windows the
++// descriptor calls take the 64-bit offsets that _lseeki64 does.
++#if os(Windows)
++internal typealias _COffT = Int64
++#else
+ internal typealias _COffT = off_t
++#endif
+ 
+ // MARK: syscalls and variables
+ 
+--- a/Sources/System/Internals/Syscalls.swift
++++ b/Sources/System/Internals/Syscalls.swift
+@@ -71,7 +71,7 @@
+ 
+ // pread
+ internal func system_pread(
+-  _ fd: Int32, _ buf: UnsafeMutableRawPointer?, _ nbyte: Int, _ offset: off_t
++  _ fd: Int32, _ buf: UnsafeMutableRawPointer?, _ nbyte: Int, _ offset: _COffT
+ ) -> Int {
+ #if ENABLE_MOCKING
+   if mockingEnabled { return _mockInt(fd, buf, nbyte, offset) }
+@@ -89,8 +89,8 @@
+ 
+ // lseek
+ internal func system_lseek(
+-  _ fd: Int32, _ off: off_t, _ whence: Int32
+-) -> off_t {
++  _ fd: Int32, _ off: _COffT, _ whence: Int32
++) -> _COffT {
+ #if ENABLE_MOCKING
+   if mockingEnabled { return _mockOffT(fd, off, whence) }
+ #endif
+@@ -109,7 +109,7 @@
+ 
+ // pwrite
+ internal func system_pwrite(
+-  _ fd: Int32, _ buf: UnsafeRawPointer?, _ nbyte: Int, _ offset: off_t
++  _ fd: Int32, _ buf: UnsafeRawPointer?, _ nbyte: Int, _ offset: _COffT
+ ) -> Int {
+ #if ENABLE_MOCKING
+   if mockingEnabled { return _mockInt(fd, buf, nbyte, offset) }
+@@ -166,7 +166,7 @@
+ }
+ #endif // !os(WASI)
+ 
+-internal func system_ftruncate(_ fd: Int32, _ length: off_t) -> Int32 {
++internal func system_ftruncate(_ fd: Int32, _ length: _COffT) -> Int32 {
+ #if ENABLE_MOCKING
+   if mockingEnabled { return _mock(fd, length) }
+ #endif
+--- a/Sources/System/Internals/WindowsSyscallAdapters.swift
++++ b/Sources/System/Internals/WindowsSyscallAdapters.swift
+@@ -121,13 +121,6 @@
+ }
+ 
+ @inline(__always)
+-internal func lseek(
+-  _ fd: Int32, _ off: off_t, _ whence: Int32
+-) -> off_t {
+-  _lseek(fd, off, whence)
+-}
+-
+-@inline(__always)
+ internal func dup(_ fd: Int32) -> Int32 {
+   _dup(fd)
+ }
+@@ -143,7 +136,7 @@
+ 
+ @inline(__always)
+ internal func pread(
+-  _ fd: Int32, _ buf: UnsafeMutableRawPointer!, _ nbyte: Int, _ offset: off_t
++  _ fd: Int32, _ buf: UnsafeMutableRawPointer!, _ nbyte: Int, _ offset: Int64
+ ) -> Int {
+   let handle: intptr_t = _get_osfhandle(fd)
+   if handle == /* INVALID_HANDLE_VALUE */ -1 { ucrt._set_errno(EBADF); return -1 }
+@@ -154,12 +147,18 @@
+     return -1
+   }
+ 
++  // A negative offset is EINVAL, as POSIX's pread reports it.
++  if offset < 0 {
++    ucrt._set_errno(EINVAL)
++    return -1
++  }
++
+   // NOTE: this is a non-owning handle, do *not* call CloseHandle on it
+   let hFile: HANDLE = HANDLE(bitPattern: handle)!
+ 
+   var ovlOverlapped: OVERLAPPED = OVERLAPPED()
+-  ovlOverlapped.OffsetHigh = DWORD(UInt32(offset >> 32) & 0xffffffff)
+-  ovlOverlapped.Offset = DWORD(UInt32(offset >> 0) & 0xffffffff)
++  ovlOverlapped.OffsetHigh = DWORD(truncatingIfNeeded: offset >> 32)
++  ovlOverlapped.Offset = DWORD(truncatingIfNeeded: offset)
+ 
+   var nNumberOfBytesRead: DWORD = 0
+   if !ReadFile(hFile, buf, DWORD(nbyte), &nNumberOfBytesRead, &ovlOverlapped) {
+@@ -171,7 +170,7 @@
+ 
+ @inline(__always)
+ internal func pwrite(
+-  _ fd: Int32, _ buf: UnsafeRawPointer!, _ nbyte: Int, _ offset: off_t
++  _ fd: Int32, _ buf: UnsafeRawPointer!, _ nbyte: Int, _ offset: Int64
+ ) -> Int {
+   let handle: intptr_t = _get_osfhandle(fd)
+   if handle == /* INVALID_HANDLE_VALUE */ -1 { ucrt._set_errno(EBADF); return -1 }
+@@ -182,12 +181,19 @@
+     return -1
+   }
+ 
++  // A negative offset is EINVAL, as POSIX's pwrite reports it. WriteFile
++  // would read an offset of -1 as the end of the file.
++  if offset < 0 {
++    ucrt._set_errno(EINVAL)
++    return -1
++  }
++
+   // NOTE: this is a non-owning handle, do *not* call CloseHandle on it
+   let hFile: HANDLE = HANDLE(bitPattern: handle)!
+ 
+   var ovlOverlapped: OVERLAPPED = OVERLAPPED()
+-  ovlOverlapped.OffsetHigh = DWORD(UInt32(offset >> 32) & 0xffffffff)
+-  ovlOverlapped.Offset = DWORD(UInt32(offset >> 0) & 0xffffffff)
++  ovlOverlapped.OffsetHigh = DWORD(truncatingIfNeeded: offset >> 32)
++  ovlOverlapped.Offset = DWORD(truncatingIfNeeded: offset)
+ 
+   var nNumberOfBytesWritten: DWORD = 0
+   if !WriteFile(hFile, buf, DWORD(nbyte), &nNumberOfBytesWritten,
+@@ -213,7 +219,7 @@
+ }
+ 
+ @inline(__always)
+-internal func ftruncate(_ fd: Int32, _ length: off_t) -> Int32 {
++internal func ftruncate(_ fd: Int32, _ length: Int64) -> Int32 {
+   let handle: intptr_t = _get_osfhandle(fd)
+   if handle == /* INVALID_HANDLE_VALUE */ -1 { ucrt._set_errno(EBADF); return -1 }
+ 
+```
+
+A Windows run with P6 must check that `FileOperationsTest`'s mock and real tests pass, and that a file can be resized
+past 4 GiB, read and written at an offset past 4 GiB, and its position read back there, from `.current`.

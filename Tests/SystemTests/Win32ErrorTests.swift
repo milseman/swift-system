@@ -62,7 +62,12 @@ final class Win32ErrorTests: XCTestCase {
       (.ioPending, DWORD(WinSDK.ERROR_IO_PENDING)),
       (.userMappedFile, DWORD(WinSDK.ERROR_USER_MAPPED_FILE)),
       (.privilegeNotHeld, DWORD(WinSDK.ERROR_PRIVILEGE_NOT_HELD)),
+      (.noneMapped, DWORD(WinSDK.ERROR_NONE_MAPPED)),
+      (.invalidSecurityIdentifier, DWORD(WinSDK.ERROR_INVALID_SID)),
+      (.noSuchDomain, DWORD(WinSDK.ERROR_NO_SUCH_DOMAIN)),
       (.cannotResolveFileName, DWORD(WinSDK.ERROR_CANT_RESOLVE_FILENAME)),
+      (.notAReparsePoint, DWORD(WinSDK.ERROR_NOT_A_REPARSE_POINT)),
+      (.invalidReparseData, DWORD(WinSDK.ERROR_INVALID_REPARSE_DATA)),
     ]
     for (error, code) in codes {
       XCTAssertEqual(error.rawValue, code, error.debugDescription)
