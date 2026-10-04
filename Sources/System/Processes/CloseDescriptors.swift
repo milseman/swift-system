@@ -79,7 +79,9 @@ extension FileDescriptor {
   ///
   /// On macOS, this method lists the process's descriptors and changes each,
   /// so a descriptor that another thread opens meanwhile can be missed.
-  /// On Linux before 5.11, it throws ``Errno/invalidArgument``.
+  /// So does Linux before 5.11, which has no `CLOSE_RANGE_CLOEXEC`,
+  /// with the list in `/proc/self/fd`;
+  /// without `/proc` mounted there, it throws the error that opening it did.
   ///
   /// The corresponding C function is `close_range`,
   /// with `CLOSE_RANGE_CLOEXEC`, on Linux, Android, and FreeBSD.
@@ -103,10 +105,20 @@ extension FileDescriptor {
     #if os(Linux) || os(Android) || os(FreeBSD)
     let flags = markingCloseOnExec ? _CLOSE_RANGE_CLOEXEC : 0
     // With no last descriptor, ~0U, as close_range's documentation writes it.
-    return nothingOrErrno(retryOnInterrupt: false) {
+    let result = nothingOrErrno(retryOnInterrupt: false) {
       system_close_range(
         CUnsignedInt(first.rawValue), last.map { CUnsignedInt($0.rawValue) } ?? .max, flags)
     }
+    #if os(Linux) || os(Android)
+    // close_range is Linux 5.9's, and CLOSE_RANGE_CLOEXEC 5.11's, which an
+    // older kernel rejects as invalid (the range is valid here). Without
+    // them, mark what /proc/self/fd lists, as glibc's closefrom closes it.
+    if markingCloseOnExec, case .failure(let error) = result,
+       error == .noFunction || error == .invalidArgument {
+      return _markListedDescriptorsCloseOnExec(first, last)
+    }
+    #endif
+    return result
     #elseif os(OpenBSD)
     guard let last else {
       return nothingOrErrno(retryOnInterrupt: false) { system_closefrom(first.rawValue) }
@@ -135,6 +147,34 @@ extension FileDescriptor {
     }
     #endif
   }
+
+  #if os(Linux) || os(Android)
+  // Sets close-on-exec on each descriptor in the range that /proc/self/fd
+  // lists, which includes the listing's own descriptor: marking it is
+  // harmless, since the stream closes it anyway.
+  internal static func _markListedDescriptorsCloseOnExec(
+    _ first: FileDescriptor, _ last: FileDescriptor?
+  ) -> Result<(), Errno> {
+    do throws(Errno) {
+      var listing = try DirectoryStream.open("/proc/self/fd")
+      while let entry = try listing.next() {
+        guard let fd = CInt(entry.name.string),
+              fd >= first.rawValue, fd <= (last?.rawValue ?? .max)
+        else { continue }
+        let descriptor = FileDescriptor(rawValue: fd)
+        // A descriptor that another thread closed meanwhile is fine.
+        if case .failure(let error) = descriptor._descriptorFlags().flatMap({
+          descriptor._setDescriptorFlags($0.union(.closeOnExec))
+        }), error != .badFileDescriptor {
+          return .failure(error)
+        }
+      }
+      return .success(())
+    } catch {
+      return .failure(error)
+    }
+  }
+  #endif
 
   #if os(macOS)
   // The calling process's open descriptors, from libproc.
