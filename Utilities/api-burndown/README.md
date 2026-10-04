@@ -94,6 +94,54 @@ Measured on an M1 Max with Swift 6.2, on 2026-10-02, with other builds keeping t
 
 `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s Utilities/api-burndown/scripts -p 'test_*.py'` tests the logic on its own: signatures, the enum-case marking, the set difference, merges, `states.json`, areas, days, module maps and header lookup on a small fake SDK, and the page's encoding.
 
+## Verify
+
+`verify.sh` checks the page against its inputs, as a reviewer would by hand, so that nobody has to after each run. `regenerate.sh` runs it at its end and fails if it fails; `regenerate.sh --no-verify` skips it, and `--check` doesn't run it. On its own:
+
+```sh
+Utilities/api-burndown/verify.sh                 # the last run's burndown.json and page
+Utilities/api-burndown/verify.sh --sample all    # every site and declaration, not 25 of each
+Utilities/api-burndown/verify.sh --seed 12345    # the sample a report names, again
+```
+
+It takes the variables `regenerate.sh` does (`API_BURNDOWN_OUT`, `_PAGE`, `_DELTA`, `_SNAPSHOTS`, `_COVERAGE_RESULTS`, `_VOCAB`, `_UPSTREAM`), and `--max-misses` and `--fetch-age` (`scripts/verify.py --help`). It reads `burndown.json`, the data the page embeds, `api-delta.json`, the graph `burndown.json` names (or the store's copy of that commit), the SDK's headers, the vocabulary, and git: this repository and the adopters' clones the graph names. It doesn't import `burndown.py`, fetches nothing, and writes only `.build/api-burndown/verify.md`: its lines, each check's details (every miss; for a sample of 50 or fewer, everything checked), and the known causes. It exits 1 if any line fails. It takes about 2 seconds, or 15 with `--sample all`.
+
+Each check prints pass, warn or fail lines:
+
+1. **Freshness** (warns only). The commits `burndown.json` records for the head ref, the base ref, api-delta and the graph, against those refs now. Each migration branch the graph's `usedBy` came from (a `package` node's `adopted` branch and commit, in the clone at its path), against its head now. How far the base ref is behind `API_BURNDOWN_UPSTREAM` (`origin/main`), and when that was last fetched: its reflog's last move, or `FETCH_HEAD`'s time if that names the branch. Over `--fetch-age` days (7) warns, and so does an upstream that moved after the page flagged what it has.
+   - *Catches:* a page older than system-next or main; api-delta or a graph of other commits; an adopter branch that moved after the graph read it; a stale `origin/main`.
+   - *Can't:* see GitHub. A ref that has moved there looks current until someone fetches.
+2. **Sums** (fails). The page embeds `burndown.json`'s digest, and the digest is its content's. The totals by state add up to the main and outside counts, and those to the declarations and the merged ones. The page's rows by state are the totals. In each grouping the page shows (header, and each header's C names; area; pitch; platform; kind; reach), the groups add up to the main count, and to everything with the declarations outside the count, by state too; and every row is under a platform.
+   - *Catches:* a page from another run, a `burndown.json` edited after it was written, totals that aren't the rows', a row in no group or with no state.
+   - *Can't:* run `page.js`. It decodes the page's data and groups it as `page.js` does, so a change to `page.py`'s rows or `page.js`'s keys needs the same change here. A wrong value that's still counted, such as a declaration under the wrong header, adds up.
+3. **Recount** (fails). api-delta's added entries and hidden declarations, counted without `burndown.py`: in all, by module, by kind, and by kind name, against `burndown.json` and the page's Kind grouping. A hidden declaration's kind comes from its keyword, scope and modifiers in `api-delta.json`, as the symbol graphs would give it.
+   - *Catches:* declarations lost or doubled between api-delta and the page, and kinds the page groups wrongly.
+   - *Can't:* see what api-delta doesn't (Limitations: enum cases compiled only off Darwin).
+4. **Sites** (fails on a miss). A seeded sample of `usedBy` sites, 25 by default. Each line, read with `git -C <clone> show <branch>:<file>`, has the declaration's name on it: its base name as a word; for an initializer, its type's name or `.init`; for a subscript, `[`; for an operator, the operator.
+   - *Catches:* a site with the wrong file, line or declaration, and a package read from the wrong clone or branch.
+   - *Can't:* tell which declaration the name on the line is: an overload, or the same name on another type, passes. It doesn't check the column.
+5. **C names** (fails on a miss). Two seeded samples of 25.
+   - Headers: of declarations the page puts under a header. The header (in the SDK's `usr/include`, or a framework's `Headers`) names the C name as an identifier outside comments, a field's struct and field both; and the vocabulary has the name in the module the page shows.
+   - Code: of declarations with a C name from the code. The graph has a `wraps` link to each of the declaration's C names, from the code alone exactly when the page marks it "code", and each code name is in the code the declaration reaches. That's its own lines and the new internal code its `reaches` links record (for a fix-it stub, also those of what it renames), then four levels of the internal code those name, as System spells it: `_x` and `system_x` functions and properties, and the initializers of types it doesn't make public. The code is read with git at the graph's commit, without comments, strings or `#if ENABLE_MOCKING` lines.
+   - *Catches:* a header that doesn't declare its C name, a module the vocabulary disagrees with, a C name from code that no code reaches (one only a mock hook calls), and a "code" mark that isn't the graph's.
+   - *Can't:* tell a declaration in a header from a use. The code walk is lexical: a C name from another declaration's code passes about 1% of the time (measured on 2026-10-04), and it doesn't follow calls through public API or through internal names spelled otherwise.
+
+**Misses.** Each is listed in `verify.md`. A miss that a known cause explains doesn't fail; `KNOWN` in `scripts/verify.py` defines them, and `verify.md` lists them with each run.
+
+- A *method* cause is the check's own blind spot, not an error in the page, and passes: `branch-moved`, `init-through-alias`, `vocab-forward-declaration`, `vocab-parent-module`, `header-in-no-module`, `macro-not-indexed`.
+- A *known error* is a real error in the page, recorded in `Prototype/Burndown/VERIFY-REPORT.md` until it's fixed, and warns: `hidden-operator-kind`, `module-header-fallback`, `field-spelling`. Once fixed, its rule matches nothing; then delete it.
+- Any other miss fails; `--max-misses K` makes up to K of them warn.
+
+**Design calls**, each with the alternative it rejected:
+
+1. **It lives with the tool it checks**, as `verify.sh` and `scripts/verify.py`, with `scripts/test_verify.py`. *Rejected:* a tool of its own under `Utilities`, though it reads only this one's output; more of `burndown.py --check`, though the recount mustn't share `burndown.py`'s code.
+2. **`regenerate.sh` runs it last and fails if it fails**; `--check` stays as it was. *Rejected:* a separate step to remember.
+3. **Any unexplained miss fails** checks 4 and 5. *Rejected:* a miss rate, which lets a systematic error through a small sample.
+4. **A known error warns rather than fails.** *Rejected:* failing until someone fixes it outside this tool, which stops every run on an error already recorded, and teaches everyone `--no-verify`.
+5. **25 of each sample, seeded from `burndown.json`'s digest**, so a rerun on the same output checks the same sample, and each new output another one. *Rejected:* a fixed seed, which checks the same sites until the data shifts. `--sample all` checks everything in about 15 seconds; the hook could run that instead.
+6. **The page's data, not its rendering.** *Rejected:* rendering the page in a headless browser, which can't run in the sandbox here.
+7. **The code walk follows only System's internal spellings.** *Rejected:* following every internal name, which reaches nearly all of System (47% of wrong C names passed, on 2026-10-04); and the graph's recorded code alone (0.2%, but it missed the 56 of 2,281 names reached through older internal code).
+
 ## How this was generated
 
 ### Pipeline
