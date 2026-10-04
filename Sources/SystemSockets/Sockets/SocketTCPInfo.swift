@@ -467,14 +467,18 @@ extension SocketDescriptor {
 
 #endif // SYSTEM_PACKAGE_DARWIN
 
-// MARK: - Linux: tcp_info
+// MARK: - Linux and FreeBSD: tcp_info
 
-#if os(Linux) || os(Android)
+#if os(Linux) || os(Android) || os(FreeBSD)
 
 @available(System 199, *)
 extension CInterop {
-  /// The C library's declaration of `struct tcp_info`,
-  /// which can be older, and shorter, than the kernel's.
+  /// The C library's declaration of `struct tcp_info`.
+  ///
+  /// On Linux it can be older, and shorter, than the kernel's.
+  /// FreeBSD's has Linux's names and order for the fields it shares,
+  /// padding for the ones it doesn't fill in, and fields of its own,
+  /// in a layout that its header calls unstable.
   ///
   /// The corresponding C type is `struct tcp_info`.
   public typealias TCPInfo = tcp_info
@@ -484,12 +488,18 @@ extension CInterop {
 extension SocketDescriptor.TCPOption {
   /// The state and statistics of a TCP connection, read-only.
   ///
+  /// On FreeBSD, read it into a ``CInterop/TCPInfo``.
+  ///
   /// The corresponding C constant is `TCP_INFO`.
   ///
-  /// - Note: Only available on Linux and Android.
+  /// - Note: Only available on Linux, Android and FreeBSD.
   @_alwaysEmitIntoClient
   public static var info: Self { Self(rawValue: TCP_INFO) }
 }
+
+#endif // os(Linux) || os(Android) || os(FreeBSD)
+
+#if os(Linux) || os(Android)
 
 // The kernel's struct tcp_info, which only grows. glibc declares its first
 // 104 bytes; System reads those through glibc's declaration, and the rest
