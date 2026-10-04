@@ -149,4 +149,22 @@ internal func system_strncasecmp_l(
 #endif
 }
 
+#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(FreeBSD)
+// nl_langinfo_l. Darwin's and FreeBSD's take LC_GLOBAL_LOCALE, and a null
+// locale as the POSIX locale; glibc's and Musl's take neither, so on Linux
+// the global locale's is nl_langinfo, and the POSIX locale's _posixLocale.
+internal func system_nl_langinfo_l(
+  _ item: nl_item, _ locale: locale_t?
+) -> UnsafeMutablePointer<CChar>? {
+#if SYSTEM_PACKAGE_DARWIN
+  nl_langinfo_l(item, locale)
+#elseif os(FreeBSD)
+  csystem_nl_langinfo_l(item, UnsafeMutableRawPointer(locale))
+#else
+  if _isGlobalLocale(locale) { return nl_langinfo(item) }
+  return nl_langinfo_l(item, locale ?? _posixLocale)
+#endif
+}
+#endif
+
 #endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD) || os(WASI)

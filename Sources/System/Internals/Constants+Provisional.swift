@@ -127,4 +127,61 @@ internal var _LC_ALL_MASK: CInt { _system_get_LC_ALL_MASK() }
 @_alwaysEmitIntoClient
 internal var _LC_ALL_MASK: CInt { LC_ALL_MASK }
 #endif
+
+// The items that CLocale.information(_:) returns. glibc declares them in an
+// anonymous enum, which imports as Int, and the others as macros.
+#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(FreeBSD)
+@_alwaysEmitIntoClient
+internal var _CODESET: nl_item { nl_item(CODESET) }
+
+@_alwaysEmitIntoClient
+internal var _D_T_FMT: nl_item { nl_item(D_T_FMT) }
+
+@_alwaysEmitIntoClient
+internal var _D_FMT: nl_item { nl_item(D_FMT) }
+
+@_alwaysEmitIntoClient
+internal var _T_FMT: nl_item { nl_item(T_FMT) }
+
+@_alwaysEmitIntoClient
+internal var _T_FMT_AMPM: nl_item { nl_item(T_FMT_AMPM) }
+
+@_alwaysEmitIntoClient
+internal var _AM_STR: nl_item { nl_item(AM_STR) }
+
+@_alwaysEmitIntoClient
+internal var _PM_STR: nl_item { nl_item(PM_STR) }
+
+@_alwaysEmitIntoClient
+internal var _DAY_1: nl_item { nl_item(DAY_1) }
+
+@_alwaysEmitIntoClient
+internal var _ABDAY_1: nl_item { nl_item(ABDAY_1) }
+
+@_alwaysEmitIntoClient
+internal var _MON_1: nl_item { nl_item(MON_1) }
+
+@_alwaysEmitIntoClient
+internal var _ABMON_1: nl_item { nl_item(ABMON_1) }
+
+@_alwaysEmitIntoClient
+internal var _RADIXCHAR: nl_item { nl_item(RADIXCHAR) }
+
+@_alwaysEmitIntoClient
+internal var _THOUSEP: nl_item { nl_item(THOUSEP) }
+
+@_alwaysEmitIntoClient
+internal var _YESEXPR: nl_item { nl_item(YESEXPR) }
+
+@_alwaysEmitIntoClient
+internal var _NOEXPR: nl_item { nl_item(NOEXPR) }
+
+@_alwaysEmitIntoClient
+internal var _CRNCYSTR: nl_item { nl_item(CRNCYSTR) }
+
+#if SYSTEM_PACKAGE_DARWIN || os(FreeBSD)
+@_alwaysEmitIntoClient
+internal var _D_MD_ORDER: nl_item { nl_item(D_MD_ORDER) }
+#endif
+#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(FreeBSD)
 #endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD) || os(WASI)

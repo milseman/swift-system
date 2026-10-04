@@ -413,4 +413,194 @@ extension CLocale {
   }
 }
 
+// MARK: - Information
+
+// Not on Android, whose nl_langinfo is from API level 26, OpenBSD, whose
+// null locale isn't the POSIX locale, or WASI, yet.
+#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(FreeBSD)
+@available(System 199, *)
+extension CInterop {
+  /// An item of a C library locale's information, such as its date format.
+  ///
+  /// The corresponding C type is `nl_item`.
+  ///
+  /// - Note: Provisional: C locales may move to the Swift standard library.
+  /// - Note: Only available on Darwin, Linux, and FreeBSD.
+  public typealias LocaleItem = nl_item
+}
+
+@available(System 199, *)
+extension CLocale {
+  /// An item of a locale's information, such as its date format
+  /// or a month's name, that ``CLocale/information(_:)`` returns.
+  ///
+  /// - Note: Provisional: C locales may move to the Swift standard library.
+  /// - Note: Only available on Darwin, Linux, and FreeBSD.
+  @frozen
+  public struct Item: RawRepresentable, Hashable, Sendable {
+    /// The raw C item.
+    @_alwaysEmitIntoClient
+    public var rawValue: CInterop.LocaleItem
+
+    /// Creates an item from its raw C value.
+    @_alwaysEmitIntoClient
+    public init(rawValue: CInterop.LocaleItem) { self.rawValue = rawValue }
+
+    /// The name of the locale's character encoding, such as `"UTF-8"`.
+    ///
+    /// The corresponding C constant is `CODESET`.
+    @_alwaysEmitIntoClient
+    public static var characterEncoding: Item { Item(rawValue: _CODESET) }
+
+    /// The `strftime` format of a date and time.
+    ///
+    /// The corresponding C constant is `D_T_FMT`.
+    @_alwaysEmitIntoClient
+    public static var dateAndTimeFormat: Item { Item(rawValue: _D_T_FMT) }
+
+    /// The `strftime` format of a date.
+    ///
+    /// The corresponding C constant is `D_FMT`.
+    @_alwaysEmitIntoClient
+    public static var dateFormat: Item { Item(rawValue: _D_FMT) }
+
+    /// The `strftime` format of a time.
+    ///
+    /// The corresponding C constant is `T_FMT`.
+    @_alwaysEmitIntoClient
+    public static var timeFormat: Item { Item(rawValue: _T_FMT) }
+
+    /// The `strftime` format of a time on a 12-hour clock.
+    ///
+    /// The corresponding C constant is `T_FMT_AMPM`.
+    @_alwaysEmitIntoClient
+    public static var twelveHourTimeFormat: Item { Item(rawValue: _T_FMT_AMPM) }
+
+    /// What marks a time before noon, such as `"AM"`.
+    ///
+    /// The corresponding C constant is `AM_STR`.
+    @_alwaysEmitIntoClient
+    public static var amSymbol: Item { Item(rawValue: _AM_STR) }
+
+    /// What marks a time after noon, such as `"PM"`.
+    ///
+    /// The corresponding C constant is `PM_STR`.
+    @_alwaysEmitIntoClient
+    public static var pmSymbol: Item { Item(rawValue: _PM_STR) }
+
+    /// The full name of a day of the week.
+    ///
+    /// - Parameter weekday: The day, from 1, Sunday, through 7, Saturday.
+    ///
+    /// The corresponding C constants are `DAY_1` through `DAY_7`.
+    @_alwaysEmitIntoClient
+    public static func dayName(_ weekday: Int) -> Item {
+      precondition((1...7).contains(weekday), "A weekday is from 1 through 7")
+      return Item(rawValue: _DAY_1 + CInterop.LocaleItem(weekday - 1))
+    }
+
+    /// The abbreviated name of a day of the week.
+    ///
+    /// - Parameter weekday: The day, from 1, Sunday, through 7, Saturday.
+    ///
+    /// The corresponding C constants are `ABDAY_1` through `ABDAY_7`.
+    @_alwaysEmitIntoClient
+    public static func abbreviatedDayName(_ weekday: Int) -> Item {
+      precondition((1...7).contains(weekday), "A weekday is from 1 through 7")
+      return Item(rawValue: _ABDAY_1 + CInterop.LocaleItem(weekday - 1))
+    }
+
+    /// The full name of a month.
+    ///
+    /// - Parameter month: The month, from 1, January, through 12.
+    ///
+    /// The corresponding C constants are `MON_1` through `MON_12`.
+    @_alwaysEmitIntoClient
+    public static func monthName(_ month: Int) -> Item {
+      precondition((1...12).contains(month), "A month is from 1 through 12")
+      return Item(rawValue: _MON_1 + CInterop.LocaleItem(month - 1))
+    }
+
+    /// The abbreviated name of a month.
+    ///
+    /// - Parameter month: The month, from 1, January, through 12.
+    ///
+    /// The corresponding C constants are `ABMON_1` through `ABMON_12`.
+    @_alwaysEmitIntoClient
+    public static func abbreviatedMonthName(_ month: Int) -> Item {
+      precondition((1...12).contains(month), "A month is from 1 through 12")
+      return Item(rawValue: _ABMON_1 + CInterop.LocaleItem(month - 1))
+    }
+
+    /// The separator between a number's whole part and its fraction.
+    ///
+    /// The corresponding C constant is `RADIXCHAR`.
+    @_alwaysEmitIntoClient
+    public static var decimalSeparator: Item { Item(rawValue: _RADIXCHAR) }
+
+    /// The separator between groups of digits, such as thousands,
+    /// or an empty string for none.
+    ///
+    /// The corresponding C constant is `THOUSEP`.
+    @_alwaysEmitIntoClient
+    public static var thousandsSeparator: Item { Item(rawValue: _THOUSEP) }
+
+    /// A regular expression that matches a yes answer, such as `"^[yY]"`.
+    ///
+    /// The corresponding C constant is `YESEXPR`.
+    @_alwaysEmitIntoClient
+    public static var yesPattern: Item { Item(rawValue: _YESEXPR) }
+
+    /// A regular expression that matches a no answer, such as `"^[nN]"`.
+    ///
+    /// The corresponding C constant is `NOEXPR`.
+    @_alwaysEmitIntoClient
+    public static var noPattern: Item { Item(rawValue: _NOEXPR) }
+
+    /// The currency symbol, after a character that says where it goes:
+    /// `-` before the value, `+` after it,
+    /// or `.` in place of the decimal separator.
+    ///
+    /// The corresponding C constant is `CRNCYSTR`.
+    @_alwaysEmitIntoClient
+    public static var currencySymbol: Item { Item(rawValue: _CRNCYSTR) }
+
+    #if SYSTEM_PACKAGE_DARWIN || os(FreeBSD)
+    /// The order of the month and the day in a short date:
+    /// `"md"` for the month first, or `"dm"` for the day first.
+    ///
+    /// The corresponding C constant is `D_MD_ORDER`.
+    ///
+    /// - Note: Only available on Darwin and FreeBSD.
+    @_alwaysEmitIntoClient
+    public static var monthDayOrder: Item { Item(rawValue: _D_MD_ORDER) }
+    #endif
+  }
+
+  /// Returns an item of this locale's information.
+  ///
+  /// `ls -l`, for example, writes the day before the month
+  /// in a locale whose dates do:
+  ///
+  ///     let dayFirst = CLocale.global.information(.monthDayOrder).hasPrefix("d")
+  ///
+  /// - Returns: The item's value,
+  ///   or an empty string for an item the C library doesn't have.
+  ///
+  /// The corresponding C function is `nl_langinfo_l`,
+  /// or on Linux, for the global locale, `nl_langinfo`.
+  /// - Note: Provisional: C locales may move to the Swift standard library.
+  /// - Note: Only available on Darwin, Linux, and FreeBSD.
+  @_alwaysEmitIntoClient
+  public func information(_ item: Item) -> String {
+    _information(item)
+  }
+
+  @usableFromInline
+  internal func _information(_ item: Item) -> String {
+    system_nl_langinfo_l(item.rawValue, rawValue).map { String(cString: $0) } ?? ""
+  }
+}
+#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(FreeBSD)
+
 #endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD) || os(WASI)

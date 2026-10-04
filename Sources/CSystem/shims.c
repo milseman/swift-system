@@ -900,6 +900,7 @@ extern size_t csystem_malloc_usable_size(const void *pointer) {
   return malloc_usable_size(pointer);
 }
 
+#include <langinfo.h>
 #include <stdlib.h>
 #include <strings.h>
 #include <xlocale.h>
@@ -914,6 +915,10 @@ extern float csystem_strtof_l(const char *string, char **end, void *locale) {
 
 extern int csystem_strncasecmp_l(const char *a, const char *b, size_t count, void *locale) {
   return strncasecmp_l(a, b, count, (locale_t)locale);
+}
+
+extern char *csystem_nl_langinfo_l(int item, void *locale) {
+  return nl_langinfo_l((nl_item)item, (locale_t)locale);
 }
 #endif // defined(__FreeBSD__)
 

@@ -121,6 +121,24 @@ final class ProvisionalLocaleLinuxTest: XCTestCase {
     #endif
   }
 
+  #if os(Linux)
+  /// The POSIX locale's information, which glibc and Musl share but for its
+  /// character encoding's name, and the global locale's, through
+  /// nl_langinfo.
+  func testInformation() {
+    let posix = CLocale.posix
+    XCTAssertFalse(posix.information(.characterEncoding).isEmpty)
+    XCTAssertEqual(posix.information(.dateFormat), "%m/%d/%y")
+    XCTAssertEqual(posix.information(.timeFormat), "%H:%M:%S")
+    XCTAssertEqual(posix.information(.dayName(1)), "Sunday")
+    XCTAssertEqual(posix.information(.abbreviatedDayName(7)), "Sat")
+    XCTAssertEqual(posix.information(.monthName(1)), "January")
+    XCTAssertEqual(posix.information(.abbreviatedMonthName(12)), "Dec")
+    XCTAssertEqual(posix.information(.decimalSeparator), ".")
+    XCTAssertFalse(CLocale.global.information(.dateFormat).isEmpty)
+  }
+  #endif
+
   /// The global locale's calls follow the thread's locale, which is the
   /// global one here.
   func testTheGlobalLocale() throws {
