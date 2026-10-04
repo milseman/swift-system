@@ -7,6 +7,8 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
+#if !os(WASI)
+
 import SystemPackage
 
 #if SYSTEM_PACKAGE_DARWIN
@@ -352,3 +354,5 @@ extension Optional where Wrapped == String {
     }
   }
 }
+
+#endif // !os(WASI)

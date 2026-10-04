@@ -7,7 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-#if !os(Windows)
+#if !os(Windows) && !os(WASI)
 
 import Testing
 
@@ -183,4 +183,4 @@ private func withTemporaryFile<R>(_ body: (FileDescriptor) throws -> R) throws -
   return try body(file)
 }
 
-#endif
+#endif // !os(Windows) && !os(WASI)

@@ -17,6 +17,8 @@ import Glibc
 import Musl
 #elseif canImport(Android)
 import Android
+#elseif canImport(WASILibc)
+import WASILibc
 #else
 #error("Unsupported Platform")
 #endif
@@ -210,10 +212,12 @@ extension SocketAddress: CustomStringConvertible {
       if let ipv6 = self.ipv6 {
         return "SocketAddress(\(ipv6))"
       }
+    #if !os(WASI)
     case .local:
       if let unix = self.unix {
         return "SocketAddress(\(unix))"
       }
+    #endif
     default:
       break
     }

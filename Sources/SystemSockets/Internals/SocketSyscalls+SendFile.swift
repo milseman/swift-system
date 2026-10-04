@@ -9,6 +9,8 @@
 
 // System call wrappers for sendfile, whose Darwin and Linux forms differ.
 
+#if !os(WASI)
+
 #if SYSTEM_PACKAGE_DARWIN
 import Darwin
 #elseif canImport(Glibc)
@@ -60,3 +62,5 @@ internal func system_sendfile(
   return sendfile(outFD, inFD, offset, count)
 }
 #endif
+
+#endif // !os(WASI)

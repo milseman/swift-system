@@ -32,11 +32,17 @@ import Musl
 #elseif canImport(Android)
 @_implementationOnly import CSystem
 import Android
+#elseif canImport(WASILibc)
+import WASILibc
 #else
 #error("Unsupported Platform")
 #endif
 
 import SystemPackage
+
+// Not on WASI: msghdr's flags are SocketDescriptor.MessageFlags, which WASI
+// lacks, and wasi-libc has no cmsghdr.
+#if !os(WASI)
 
 // MARK: - msghdr
 
@@ -182,6 +188,8 @@ extension CInterop.CMsgHdr {
     set { cmsg_type = newValue.rawValue }
   }
 }
+
+#endif // !os(WASI)
 
 // MARK: - sockaddr
 
@@ -373,6 +381,8 @@ extension CInterop.SockAddrIn6 {
 
 @available(System 199, *)
 extension CInterop.SockAddrUn {
+  // wasi-libc's sockaddr_un has a family and no path.
+  #if !os(WASI)
   /// Creates a Unix-domain socket address from its fields,
   /// by default all zero.
   ///
@@ -396,6 +406,16 @@ extension CInterop.SockAddrUn {
   public static var pathCapacity: Int {
     MemoryLayout.size(ofValue: CInterop.SockAddrUn().sun_path) - 1
   }
+  #else
+  /// Creates a Unix-domain socket address from its family, by default zero.
+  ///
+  /// The corresponding C field is `sun_family`.
+  @_alwaysEmitIntoClient
+  public init(family: SocketDescriptor.Domain = SocketDescriptor.Domain(rawValue: 0)) {
+    self = CInterop.SockAddrUn()
+    self.family = family
+  }
+  #endif
 
   #if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
   /// The address's length in bytes.
@@ -419,6 +439,7 @@ extension CInterop.SockAddrUn {
     set { sun_family = .init(newValue.rawValue) }
   }
 
+  #if !os(WASI)
   /// The socket's path, up to the first null character.
   ///
   /// Setting a path longer than ``pathCapacity`` bytes is a precondition
@@ -446,6 +467,7 @@ extension CInterop.SockAddrUn {
       }
     }
   }
+  #endif
 }
 
 // MARK: - sockaddr_storage

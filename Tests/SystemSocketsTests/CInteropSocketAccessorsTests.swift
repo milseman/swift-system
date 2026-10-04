@@ -11,7 +11,7 @@
 // fields they name. This file imports the C library, as a client that uses
 // both would, and so also checks that the two sets of names don't collide.
 
-#if !os(Windows)
+#if !os(Windows) && !os(WASI)
 
 import Testing
 
@@ -182,4 +182,4 @@ private struct CInteropSocketAccessorsTests {
   }
 }
 
-#endif // !os(Windows)
+#endif // !os(Windows) && !os(WASI)

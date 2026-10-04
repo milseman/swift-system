@@ -7,6 +7,8 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
+#if !os(WASI)
+
 import SystemPackage
 
 #if SYSTEM_PACKAGE_DARWIN
@@ -217,3 +219,5 @@ extension SocketDescriptor {
     try _setFlag(OptionLevel.socket.rawValue, SocketOption.timestamp.rawValue, enabled).get()
   }
 }
+
+#endif // !os(WASI)

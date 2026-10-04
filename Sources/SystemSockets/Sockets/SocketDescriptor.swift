@@ -17,6 +17,8 @@ import Glibc
 import Musl
 #elseif canImport(Android)
 import Android
+#elseif canImport(WASILibc)
+import WASILibc
 #else
 #error("Unsupported Platform")
 #endif
@@ -113,13 +115,20 @@ extension SocketDescriptor {
 
     /// Local (Unix domain) communication.
     ///
-    /// The corresponding C constant is `PF_LOCAL` (also known as `PF_UNIX`).
+    /// The corresponding C constant is `PF_LOCAL` (also known as `PF_UNIX`),
+    /// or `AF_UNIX` on WASI, whose C library has neither.
     @_alwaysEmitIntoClient
-    public static var local: Domain { Domain(PF_LOCAL) }
+    public static var local: Domain {
+      #if os(WASI)
+      Domain(AF_UNIX)
+      #else
+      Domain(PF_LOCAL)
+      #endif
+    }
 
     @_alwaysEmitIntoClient
     @available(*, unavailable, renamed: "local")
-    public static var unix: Domain { Domain(PF_UNIX) }
+    public static var unix: Domain { local }
 
     /// Internet Protocol version 4.
     ///
@@ -133,17 +142,23 @@ extension SocketDescriptor {
     @_alwaysEmitIntoClient
     public static var ipv6: Domain { Domain(PF_INET6) }
 
+    #if !os(WASI)
     /// Internal routing protocol.
     ///
     /// The corresponding C constant is `PF_ROUTE`.
+    ///
+    /// - Note: Not available on WASI.
     @_alwaysEmitIntoClient
     public static var routing: Domain { Domain(PF_ROUTE) }
 
     /// Internal key-management function.
     ///
     /// The corresponding C constant is `PF_KEY`.
+    ///
+    /// - Note: Not available on WASI.
     @_alwaysEmitIntoClient
     public static var keyManagement: Domain { Domain(PF_KEY) }
+    #endif
 
     #if SYSTEM_PACKAGE_DARWIN
     /// System domain.
@@ -165,8 +180,10 @@ extension SocketDescriptor {
       case .local: return "local"
       case .ipv4: return "ipv4"
       case .ipv6: return "ipv6"
+      #if !os(WASI)
       case .routing: return "routing"
       case .keyManagement: return "keyManagement"
+      #endif
       #if SYSTEM_PACKAGE_DARWIN
       case .system: return "system"
       case .networkDevice: return "networkDevice"
@@ -179,6 +196,11 @@ extension SocketDescriptor {
 }
 
 // MARK: - Connection Type (Socket Type)
+
+// Not on WASI, whose SOCK_STREAM and SOCK_DGRAM are wasi/api.h's UINT8_C()
+// constants, which Swift can't import; a _getConst_ function in
+// CSystemWASI.h would serve, as for O_CREAT.
+#if !os(WASI)
 
 @available(System 199, *)
 extension SocketDescriptor {
@@ -251,6 +273,8 @@ extension SocketDescriptor {
   }
 }
 
+#endif // !os(WASI)
+
 // MARK: - Protocol ID
 
 @available(System 199, *)
@@ -292,10 +316,13 @@ extension SocketDescriptor {
     @_alwaysEmitIntoClient
     public static var udp: ProtocolID { Self(CInt(IPPROTO_UDP)) }
 
+    #if !os(WASI)
     /// IPv4 encapsulation.
     ///
     /// The corresponding C constant is `IPPROTO_IPV4`,
     /// or `IPPROTO_IPIP` on Linux.
+    ///
+    /// - Note: Not available on WASI.
     @_alwaysEmitIntoClient
     public static var ipv4: ProtocolID {
       #if os(Linux) || os(Android)
@@ -304,6 +331,7 @@ extension SocketDescriptor {
       Self(IPPROTO_IPV4)
       #endif
     }
+    #endif
 
     /// IPv6 header.
     ///
@@ -324,6 +352,11 @@ extension SocketDescriptor {
 }
 
 // MARK: - Message Flags
+
+// Not on WASI yet: these are for calls that System doesn't wrap there, and
+// wasip1 has few of their constants (MSG_PEEK, MSG_WAITALL, MSG_TRUNC, the
+// SHUT_ kinds, and no SCM_RIGHTS).
+#if !os(WASI)
 
 @available(System 199, *)
 extension SocketDescriptor {
@@ -492,3 +525,5 @@ extension SocketDescriptor {
     public var description: String { "Option(\(rawValue))" }
   }
 }
+
+#endif // !os(WASI)

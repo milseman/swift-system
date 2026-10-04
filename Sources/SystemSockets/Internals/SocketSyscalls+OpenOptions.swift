@@ -10,6 +10,8 @@
 // System call wrappers for the options of a new socket: accept4, and on
 // Darwin, which has neither accept4 nor the SOCK_* flags, fcntl.
 
+#if !os(WASI)
+
 #if SYSTEM_PACKAGE_DARWIN
 import Darwin
 #elseif canImport(Glibc)
@@ -56,3 +58,5 @@ internal func system_fcntl(_ fd: CInt, _ cmd: CInt, _ value: CInt) -> CInt {
   return fcntl(fd, cmd, value)
 }
 #endif
+
+#endif // !os(WASI)

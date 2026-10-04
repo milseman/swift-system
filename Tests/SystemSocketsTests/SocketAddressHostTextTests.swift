@@ -7,7 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-#if !os(Windows)
+#if !os(Windows) && !os(WASI)
 
 import Testing
 
@@ -90,4 +90,4 @@ import Musl
 import Android
 #endif
 
-#endif // !os(Windows)
+#endif // !os(Windows) && !os(WASI)

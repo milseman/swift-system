@@ -7,7 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-#if !os(Windows)
+#if !os(Windows) && !os(WASI)
 
 import Testing
 
@@ -69,4 +69,4 @@ private let socketBindingIsPermitted: Bool = {
   return result == 0 || (errno != EPERM && errno != EACCES)
 }()
 
-#endif
+#endif // !os(Windows) && !os(WASI)
