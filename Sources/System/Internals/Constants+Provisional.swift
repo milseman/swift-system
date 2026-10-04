@@ -76,7 +76,7 @@ internal var _stderr: _CFilePointer {
 #endif // !os(Windows)
 
 // The locale categories and their masks, for Provisional+Locale.swift.
-#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD)
+#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD) || os(WASI)
 @_alwaysEmitIntoClient
 internal var _LC_ALL: CInt { LC_ALL }
 
@@ -121,5 +121,8 @@ internal var _LC_TIME_MASK: CInt { LC_TIME_MASK }
 // Swift can't import; see shims.c.
 @_alwaysEmitIntoClient
 internal var _LC_ALL_MASK: CInt { _system_get_LC_ALL_MASK() }
+#elseif os(WASI)
+@_alwaysEmitIntoClient
+internal var _LC_ALL_MASK: CInt { LC_ALL_MASK }
 #endif
-#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD)
+#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD) || os(WASI)

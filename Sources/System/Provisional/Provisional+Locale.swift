@@ -17,13 +17,13 @@
 // number parsing does, or that sets the process's C locale, as its tests
 // do, can do so without importing the C library.
 //
-// On Darwin, Linux (glibc and Musl), Android, FreeBSD and OpenBSD, which
-// have these calls, though Linux declares strtod_l and strtof_l only with
-// _GNU_SOURCE, and has no LC_C_LOCALE, Bionic's *_l calls ignore the locale,
-// and OpenBSD has no strtod_l or strtof_l (see
+// On Darwin, Linux (glibc and Musl), Android, FreeBSD, OpenBSD and WASI,
+// which have these calls, though Linux declares strtod_l and strtof_l only
+// with _GNU_SOURCE, and has no LC_C_LOCALE, Bionic's and wasi-libc's *_l
+// calls ignore the locale, and OpenBSD has no strtod_l or strtof_l (see
 // Syscalls+ProvisionalLocale.swift).
 
-#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD)
+#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD) || os(WASI)
 import CSystem
 #if SYSTEM_PACKAGE_DARWIN
 import Darwin
@@ -33,6 +33,8 @@ import Glibc
 import Musl
 #elseif canImport(Android)
 import Android
+#elseif canImport(WASILibc)
+import WASILibc
 #endif
 
 @available(System 199, *)
@@ -42,7 +44,7 @@ extension CInterop {
   /// The corresponding C type is `locale_t`.
   ///
   /// - Note: Provisional: C locales may move to the Swift standard library.
-  /// - Note: Only available on Darwin, Linux, Android, FreeBSD and OpenBSD.
+  /// - Note: Only available on Darwin, Linux, Android, FreeBSD, OpenBSD and WASI.
   public typealias Locale = locale_t
 }
 
@@ -69,9 +71,12 @@ extension CInterop {
 /// and its calls that take a locale ignore it.
 /// OpenBSD's locales differ only in their character types,
 /// so its numbers and case are the POSIX locale's in every locale.
+/// WASI's C library, Musl's, has no locales but the POSIX locale
+/// and `"C.UTF-8"`, though it accepts any name,
+/// and its calls that take a locale ignore it.
 ///
 /// - Note: Provisional: C locales may move to the Swift standard library.
-/// - Note: Only available on Darwin, Linux, Android, FreeBSD and OpenBSD.
+/// - Note: Only available on Darwin, Linux, Android, FreeBSD, OpenBSD and WASI.
 @frozen
 @available(System 199, *)
 public struct CLocale: RawRepresentable, Hashable, @unchecked Sendable {
@@ -408,4 +413,4 @@ extension CLocale {
   }
 }
 
-#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD)
+#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD) || os(WASI)
