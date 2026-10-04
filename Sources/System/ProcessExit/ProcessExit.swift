@@ -81,6 +81,36 @@ extension ProcessID {
     system__exit(status)
   }
 
+  /// Ends the calling process abnormally, with the abort signal.
+  ///
+  /// The process raises ``Signal/abort`` (`SIGABRT`),
+  /// and ends as that signal's default action ends it,
+  /// even if the signal is blocked or ignored,
+  /// or a handler for it returns.
+  /// A parent that waits for the process sees that the signal ended it,
+  /// and the system can record a crash report or a core file.
+  /// On WASI, which has no signals, the process traps.
+  ///
+  /// The handlers that ``addExitHandler(_:)`` registered don't run.
+  /// Whether the C library flushes its streams first,
+  /// such as the standard output that Swift's `print` writes to,
+  /// is up to the C library.
+  ///
+  /// A failed precondition or `fatalError` traps instead,
+  /// which ends the process with another signal,
+  /// such as `SIGTRAP` or `SIGILL`, depending on the processor.
+  ///
+  /// The corresponding C function is `abort`.
+  @_alwaysEmitIntoClient
+  public static func abort() -> Never {
+    _abort()
+  }
+
+  @usableFromInline
+  internal static func _abort() -> Never {
+    system_abort()
+  }
+
   /// Registers a function to run when the calling process exits.
   ///
   /// - Parameter handler: The function to run.
