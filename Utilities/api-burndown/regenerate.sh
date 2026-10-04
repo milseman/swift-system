@@ -6,6 +6,7 @@
 #
 #   Utilities/api-burndown/regenerate.sh            # main vs system-next
 #   Utilities/api-burndown/regenerate.sh --check    # reconcile the last run with api-delta
+#   Utilities/api-burndown/regenerate.sh --no-verify  # without verify.sh at the end
 #   BASE_REF=main HEAD_REF=HEAD Utilities/api-burndown/regenerate.sh
 #
 # Environment:
@@ -106,9 +107,11 @@ check_dir() {
 }
 
 CHECK_ONLY=""
+NO_VERIFY=""
 for arg in "$@"; do
   case "$arg" in
     --check) CHECK_ONLY=1 ;;
+    --no-verify) NO_VERIFY=1 ;;
     -h|--help) awk 'NR > 1 && !/^#/ { exit } NR > 1 { sub(/^# ?/, ""); print }' "$0"; exit 0 ;;
     *) fail "unknown argument $arg (see --help)" ;;
   esac
@@ -253,4 +256,11 @@ log "check"
 python3 "$S/burndown.py" --check --out-json "$OUT/burndown.json" --delta "$DELTA" --page "$PAGE"
 
 rm -rf "${WORK:?}"
+# 4. verify.sh: the checks a reviewer would do by hand (README.md, "Verify").
+if [ -z "$NO_VERIFY" ]; then
+  log "verify (report in $OUT/verify.md)"
+  API_BURNDOWN_OUT="$OUT" API_BURNDOWN_PAGE="$PAGE" API_BURNDOWN_DELTA="$DELTA" API_BURNDOWN_SNAPSHOTS="$STORE" \
+    API_BURNDOWN_COVERAGE_RESULTS="$COVERAGE" API_BURNDOWN_UPSTREAM="$UPSTREAM" "$TOOL/verify.sh" \
+    || fail "verify.sh failed: see $OUT/verify.md (--no-verify skips it)"
+fi
 log "done in $((SECONDS - START)) s: $PAGE and $OUT/burndown.json"
