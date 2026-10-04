@@ -32,8 +32,9 @@ import Android
 #endif
 
 // A pointer to a C stream. wasi-libc's FILE is an incomplete type, which
-// Swift imports only as a pointer, OpaquePointer.
-#if os(WASI)
+// Swift imports only as a pointer, OpaquePointer; so are OpenBSD's, and
+// Bionic's from API level 24 (below it, <bits/struct_file.h> defines it).
+#if os(WASI) || os(Android) || os(OpenBSD)
 @usableFromInline internal typealias _CFilePointer = OpaquePointer
 #else
 @usableFromInline internal typealias _CFilePointer = UnsafeMutablePointer<FILE>

@@ -45,10 +45,12 @@ internal var __IOLBF: CInt { _IOLBF }
 @_alwaysEmitIntoClient
 internal var __IONBF: CInt { _IONBF }
 
-// The standard streams, which only Darwin declares as non-optional.
+// The standard streams, which only Darwin declares as non-optional. On
+// OpenBSD, whose streams nothing here has built, they convert implicitly
+// either way.
 @_alwaysEmitIntoClient
 internal var _stdin: _CFilePointer {
-#if SYSTEM_PACKAGE_DARWIN
+#if SYSTEM_PACKAGE_DARWIN || os(OpenBSD)
   stdin
 #else
   stdin!
@@ -57,7 +59,7 @@ internal var _stdin: _CFilePointer {
 
 @_alwaysEmitIntoClient
 internal var _stdout: _CFilePointer {
-#if SYSTEM_PACKAGE_DARWIN
+#if SYSTEM_PACKAGE_DARWIN || os(OpenBSD)
   stdout
 #else
   stdout!
@@ -66,7 +68,7 @@ internal var _stdout: _CFilePointer {
 
 @_alwaysEmitIntoClient
 internal var _stderr: _CFilePointer {
-#if SYSTEM_PACKAGE_DARWIN
+#if SYSTEM_PACKAGE_DARWIN || os(OpenBSD)
   stderr
 #else
   stderr!
