@@ -241,6 +241,7 @@ target_sources(SystemPackage PRIVATE
   Processes/ProcessGroups.swift
   Processes/ProcessWait.swift
   Processes/ResourceLimits.swift
+  Processes/ResourceUsage.swift
   Processes/Signal.swift
   Processes/SignalAction.swift
   Processes/SignalDescriptor.swift

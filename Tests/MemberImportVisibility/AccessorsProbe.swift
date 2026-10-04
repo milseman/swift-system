@@ -99,6 +99,14 @@ func _accessorProbe() {
     _ = (entry.fileName, entry.fileType, entry.inode)
   }
   _ = directoryEntry
+
+  // rusage
+  if let usage = try? ProcessID.resourceUsage(of: .current) {
+    _ = (usage.userTime.seconds, usage.systemTime.microseconds, usage.maxResidentSetSize)
+    _ = (usage.minorPageFaults, usage.majorPageFaults, usage.swaps)
+    _ = (usage.blockInputs, usage.blockOutputs, usage.messagesSent, usage.messagesReceived)
+    _ = (usage.signalsReceived, usage.voluntaryContextSwitches, usage.involuntaryContextSwitches)
+  }
   _ = (time, interval, vector, status)
 }
 

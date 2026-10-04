@@ -293,6 +293,24 @@ internal var _POSIX_SPAWN_SETSID: CShort { 0x80 }
 #endif
 #endif // !os(watchOS) && !os(tvOS)
 
+// MARK: - Resource usage
+
+#if os(Linux) || os(Android)
+// glibc declares these in a named enum, as it does the RLIMIT_ values, so
+// they're spelled out, as the kernel's values.
+@_alwaysEmitIntoClient
+internal var _RUSAGE_SELF: CInt { 0 }
+
+@_alwaysEmitIntoClient
+internal var _RUSAGE_CHILDREN: CInt { -1 }
+#else
+@_alwaysEmitIntoClient
+internal var _RUSAGE_SELF: CInt { RUSAGE_SELF }
+
+@_alwaysEmitIntoClient
+internal var _RUSAGE_CHILDREN: CInt { RUSAGE_CHILDREN }
+#endif
+
 // MARK: - Resource limits
 
 #if os(Linux) || os(Android)
