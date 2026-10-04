@@ -134,6 +134,20 @@ int _system_ioctl_TIOCSWINSZ(int fd, const void *ws) {
 // 32 on both: FreeBSD's is a literal, OpenBSD's its SYMLOOP_MAX.
 int _system_get_MAXSYMLINKS(void) { return MAXSYMLINKS; }
 
+#include <readpassphrase.h>
+
+// TerminalDescriptor.PassphraseOptions spells the flags as these values,
+// which Darwin's, the BSDs' and libbsd's headers share.
+_Static_assert(RPP_ECHO_ON == 0x01 && RPP_REQUIRE_TTY == 0x02 &&
+                   RPP_FORCELOWER == 0x04 && RPP_FORCEUPPER == 0x08 &&
+                   RPP_SEVENBIT == 0x10 && RPP_STDIN == 0x20,
+               "TerminalDescriptor.PassphraseOptions");
+
+char *csystem_readpassphrase(const char *prompt, char *buffer,
+                             unsigned long size, int flags) {
+  return readpassphrase(prompt, buffer, size, flags);
+}
+
 #endif
 
 #if defined(_WIN32)

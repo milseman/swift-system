@@ -14,7 +14,7 @@
 
 #if !os(Windows) && !os(WASI)
 
-#if os(Linux) || os(Android)
+#if os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD)
 import CSystem
 #endif
 #if SYSTEM_PACKAGE_DARWIN
@@ -71,9 +71,12 @@ internal func system_mktemp(_ template: UnsafeMutablePointer<CChar>) -> UnsafeMu
 #endif
   return csystem_mktemp(template)
 }
+#endif
 
+#if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD)
 // readpassphrase, whose prompt is recorded by value. A mocked call that
-// succeeds reads an empty passphrase.
+// succeeds reads an empty passphrase. On the BSDs it's CSystem's shim,
+// since their Swift modules may not include <readpassphrase.h>.
 internal func system_readpassphrase(
   _ prompt: UnsafePointer<CChar>, _ buffer: UnsafeMutablePointer<CChar>, _ size: Int, _ flags: CInt
 ) -> UnsafeMutablePointer<CChar>? {
@@ -84,7 +87,11 @@ internal func system_readpassphrase(
     return buffer
   }
 #endif
+#if SYSTEM_PACKAGE_DARWIN
   return readpassphrase(prompt, buffer, size, flags)
+#else
+  return csystem_readpassphrase(prompt, buffer, UInt(size), flags)
+#endif
 }
 #endif
 
