@@ -27,6 +27,10 @@ extern int _system_get_MAXSYMLINKS(void);
 // may not include; shims.c does. The size is a size_t.
 extern char *csystem_readpassphrase(const char *prompt, char *buffer,
                                     unsigned long size, int flags);
+
+// <ar.h>, the archive format's header, which the BSDs' Swift modules don't
+// include, as CSystemLinux.h includes it for glibc.
+#include <ar.h>
 #endif
 
 #if !defined(_WIN32) && !defined(__wasi__) && !defined(__ANDROID__)

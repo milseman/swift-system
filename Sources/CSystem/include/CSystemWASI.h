@@ -21,6 +21,9 @@
 // surface it. Re-export them through CSystem here.
 #include <sys/statvfs.h>
 
+// The same for <ar.h>, the archive format's header (Provisional+Ar.swift).
+#include <ar.h>
+
 // wasi-libc defines the following constants in a way that Clang Importer can't
 // understand, so we need to expose them manually.
 static inline int32_t _getConst_O_ACCMODE(void) { return O_ACCMODE; }
