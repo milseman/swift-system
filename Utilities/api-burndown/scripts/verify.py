@@ -84,14 +84,6 @@ KNOWN = {
                                          "module, has no entry for the page's module"),
     "macro-not-indexed": (5, "method", "a macro the index didn't record, so the vocabulary hasn't got it; the "
                                        "page's header defines it"),
-    "hidden-operator-kind": (3, "error", "an operator only the source scan sees is counted as a method: "
-                                         "history.scan_kind has no rule for operators (VERIFY-REPORT.md, F1)"),
-    "module-header-fallback": (5, "error", "the header came from the vocabulary's module alone (\"vocabulary "
-                                           "(module's header)\"), and doesn't declare the name "
-                                           "(VERIFY-REPORT.md, F2)"),
-    "field-spelling": (5, "error", "the field isn't in its struct's Darwin header, which spells it as another of "
-                                   "the declaration's C names (st_atim, st_atimespec): the primary C name is "
-                                   "another platform's (VERIFY-REPORT.md, F3)"),
 }
 
 COMMENT_RE = re.compile(r"/\*.*?\*/|//[^\n]*", re.S)
@@ -532,7 +524,8 @@ def symbol_kind(x):
     kw, scoped = x["kw"], bool(x.get("scopes"))
     mods = set(x.get("modifiers") or [])
     static = bool(mods & {"static", "class"})
-    base = x["name"].split("(", 1)[0]
+    # The scanner names `static func < (lhs:rhs:)` `< ()`.
+    base = x["name"].split("(", 1)[0].strip()
     if kw in ("var", "let"):
         return ("swift.type.property" if static else "swift.property") if scoped else "swift.var"
     if kw == "func":
@@ -557,7 +550,7 @@ KIND_FALLBACK = {"swift.var": "Global Variable", "swift.func": "Function", "swif
 
 def recount(delta):
     """api-delta's added declarations: [{origin, module, path, file, line,
-    kind, kindName, operator}], graph entries then hidden ones."""
+    kind, kindName}], graph entries then hidden ones."""
     names = {}
     for e in delta["entries"]:
         if e.get("kindName"):
@@ -567,21 +560,13 @@ def recount(delta):
         if e["status"] == "added":
             out.append({"origin": "graph", "module": e["module"], "path": e["path"], "file": e.get("file"),
                         "line": e.get("line"), "kind": e["kind"],
-                        "kindName": e.get("kindName") or names.get(e["kind"]) or KIND_FALLBACK.get(e["kind"]),
-                        "operator": False})
+                        "kindName": e.get("kindName") or names.get(e["kind"]) or KIND_FALLBACK.get(e["kind"])})
     for x in delta["hiddenFromGraphs"]["added"]:
         k = symbol_kind(x)
         out.append({"origin": "scan", "module": x["module"], "path": ".".join(x["scopes"] + [x["name"]]),
                     "file": x["file"], "line": x["line"], "kind": k,
-                    "kindName": names.get(k) or KIND_FALLBACK.get(k, k), "operator": k == "swift.func.op"})
+                    "kindName": names.get(k) or KIND_FALLBACK.get(k, k)})
     return out
-
-
-def classify_kind(mine, theirs):
-    """The known cause of a kind mismatch, or None."""
-    if mine["origin"] == "scan" and mine["operator"] and theirs.get("kind") in ("swift.method", "swift.type.method"):
-        return "hidden-operator-kind"
-    return None
 
 
 def counter_diff(a, b):
@@ -621,41 +606,25 @@ def check_recount(rep, data, delta, pd):
     theirs_at = collections.defaultdict(list)
     for u in decls:
         theirs_at[key(u)].append(u)
-    explained, unexplained = [], []
+    differ = []
     for x in mine:
         cands = theirs_at.get(key(x)) or []
         if cands and all(c["kind"] != x["kind"] for c in cands):
-            c = cands[0]
-            cause = classify_kind(x, c)
-            (explained if cause else unexplained).append((x, c, cause))
+            differ.append(x)
+            rep.detail(3, f"- `{x['path']}` ({x['file']}:{x['line']}): api-delta's record makes it `{x['kind']}`, "
+                          f"burndown.json `{cands[0]['kind']}`")
     kinds_mine = collections.Counter(u["kind"] for u in mine)
-    kinds_theirs = collections.Counter(u["kind"] for u in decls)
-    diff = counter_diff(kinds_mine, kinds_theirs)
-    for x, c, cause in explained + unexplained:
-        rep.detail(3, f"- `{x['path']}` ({x['file']}:{x['line']}): api-delta's record makes it `{x['kind']}`, "
-                      f"burndown.json `{c['kind']}`" + (f"; known: {cause}" if cause else ""))
-
-    def explains(theirs, key):
-        """Whether the known causes account for the whole difference."""
-        fixed = collections.Counter(theirs)
-        for x, c, _ in explained:
-            fixed[c[key]] -= 1
-            fixed[x[key]] += 1
-        return not unexplained and +fixed == +collections.Counter(u[key] for u in mine)
-    level = "pass" if not diff else ("warn" if explained and explains(kinds_theirs, "kind") else "fail")
-    rep.add(3, level, "kinds: " + (f"{len(kinds_mine)} kinds, each with api-delta's count" if not diff else
-            "; ".join(diff) + " (recounted vs burndown.json)"
-            + (f"; {len(explained)} known ({', '.join(sorted({c for _, _, c in explained}))})" if explained else "")
-            + (f"; {len(unexplained)} unexplained" if unexplained else "")))
+    diff = counter_diff(kinds_mine, collections.Counter(u["kind"] for u in decls))
+    rep.add(3, "fail" if diff else "pass", "kinds: " + (
+        f"{len(kinds_mine)} kinds, each with api-delta's count" if not diff else "; ".join(diff)
+        + " (recounted vs burndown.json)"
+        + (f"; {fmt(len(differ))} declaration{'s' * (len(differ) != 1)} of another kind, listed in the report"
+           if differ else "")))
     if rows is not None:
-        names_mine = collections.Counter(u["kindName"] for u in mine)
-        names_page = collections.Counter(r["kind"] for r in rows)
-        diff = counter_diff(names_mine, names_page)
-        known = bool(explained) and explains(names_page, "kindName")
-        level = "pass" if not diff else ("warn" if known else "fail")
-        rep.add(3, level, "kind names (the page's Kind grouping): " + (
-            "each is api-delta's count" if not diff else "; ".join(diff) + " (recounted vs the page)"
-            + (f"; known ({', '.join(sorted({c for _, _, c in explained}))})" if known else "")))
+        diff = counter_diff(collections.Counter(u["kindName"] for u in mine),
+                            collections.Counter(r["kind"] for r in rows))
+        rep.add(3, "fail" if diff else "pass", "kind names (the page's Kind grouping): " + (
+            "each is api-delta's count" if not diff else "; ".join(diff) + " (recounted vs the page)"))
 
 
 # ------------------------------------------------------------------ 4 sites
@@ -865,12 +834,6 @@ def classify_header(u, sdk):
         return False, None, f"{header} isn't a header in the SDK"
     lead = name.split(".", 1)[0]
     if not declares(text, name):
-        if u.get("headerHow") == "vocabulary (module's header)":
-            return False, "module-header-fallback", f"{header} doesn't declare {name}"
-        if "." in name and declares(text, lead) and any(
-                c["name"] != name and c["name"].split(".", 1)[0] == lead and declares(text, c["name"])
-                for c in u.get("cNames") or []):
-            return False, "field-spelling", f"{header} declares {lead} but not {name}"
         return False, None, f"{header} doesn't declare {name}"
     mods = sdk.where.get(lead, {})
     if sub in mods:

@@ -194,29 +194,51 @@ class ModuleMapTests(unittest.TestCase):
     def setUp(self):
         self.sdk = tempfile.mkdtemp(prefix="api-burndown-sdk-")
         inc = os.path.join(self.sdk, "usr", "include")
-        os.makedirs(os.path.join(inc, "sys"))
-        os.makedirs(os.path.join(inc, "apache2"))
+        for d in ("sys", "apache2", "netinet", "netinet6"):
+            os.makedirs(os.path.join(inc, d))
+        fw = os.path.join(self.sdk, "System", "Library", "Frameworks", "CoreFoo.framework", "Headers")
+        os.makedirs(fw)
         files = {
             "module.modulemap": 'extern module Darwin "Darwin.modulemap"\n',
             "Darwin.modulemap": 'module Darwin [system] {\n  extern module POSIX "Darwin_POSIX.modulemap"\n'
-                                '  explicit module sys {\n    module event { header "sys/event.h" export * }\n  }\n}\n',
+                                '  module ar { header "ar.h" export * }\n'
+                                '  explicit module sys {\n    module event { header "sys/event.h" export * }\n'
+                                '    module stat { header "sys/stat.h" export * }\n  }\n}\n',
             "Darwin_POSIX.modulemap": 'module Darwin.POSIX {\n  module fcntl {\n    requires !swift, objc\n'
-                                      '    header "fcntl.h"\n    header "sys/fcntl.h"\n    export *\n  }\n}\n',
+                                      '    header "fcntl.h"\n    header "sys/fcntl.h"\n    export *\n  }\n'
+                                      '  module netinet {\n    module in { header "netinet/in.h" export * }\n  }\n}\n',
             "fcntl.h": "#include <sys/fcntl.h>\nint open(const char *, int, ...);\n",
             "sys/fcntl.h": "#define O_RDONLY 0x0000\n#include <sys/_o_sync.h>\n",
             "sys/_o_sync.h": "#define O_SYNC 0x0080\n",
-            "sys/event.h": "struct kevent {\n int x;\n};\nint kevent(int kq);\nenum { EV_A = 1, EV_B };\n",
+            "sys/event.h": "struct kevent {\n uintptr_t ident;\n int x;\n};\nint kevent(int kq);\n"
+                           "enum { EV_A = 1, EV_B };\n",
             "apache2/junk.h": "#define environ junk\n",
+            # The archive format's header, the first of Darwin's by name.
+            "ar.h": "#define ARFMAG 0\nstruct ar_hdr {\n char ar_name[16];\n};\n",
+            # Darwin's struct stat has st_atimespec; st_atim is Linux's.
+            "sys/stat.h": "struct stat {\n dev_t st_dev;\n struct timespec st_atimespec; /* Linux: st_atim */\n"
+                          " off_t st_size;\n};\n#define st_atime st_atimespec.tv_sec\n",
+            # A header in no module, which a module's header includes.
+            "netinet/in.h": "struct sockaddr_in {\n int sin_port;\n};\n#include <netinet6/in6.h>\n",
+            "netinet6/in6.h": "extern const struct in6_addr in6addr_any;\nstruct in6_pktinfo {\n"
+                              " struct in6_addr ipi6_addr;\n unsigned int ipi6_ifindex;\n};\n",
         }
         for rel, text in files.items():
             with open(os.path.join(inc, rel), "w") as f:
                 f.write(text)
+        with open(os.path.join(fw, "CoreFoo.h"), "w") as f:
+            f.write("struct CFThing {\n long cf_size;\n};\n")
         self.vocab = os.path.join(self.sdk, "vocab.json.gz")
         with gzip.open(self.vocab, "wt") as f:
             json.dump({"note": "test", "modules": 2, "vocab": {
                 "Darwin.POSIX.fcntl": {"open": [1 << hdr.K_FUNCTION, 1]},
                 "Darwin.sys.event": {"kevent": [1 << hdr.K_FUNCTION, 1]},
                 "Darwin.bsm.audit_record": {"kevent": [1 << hdr.K_STRUCT, 1]},
+                # What the index files under the top module: names from a
+                # header in no module, and one no header names.
+                "Darwin": {"in6addr_any": [1 << hdr.K_VARIABLE, 1], "ipi6_addr": [1 << hdr.K_FIELD, 1],
+                           "in6addr_nowhere": [1 << hdr.K_VARIABLE, 1]},
+                "CoreFoo": {"CFThing": [1 << hdr.K_STRUCT, 1]},
             }}, f)
 
     def tearDown(self):
@@ -260,6 +282,112 @@ class ModuleMapTests(unittest.TestCase):
         self.assertEqual(bd.primary_header([], ["Darwin"], h, True)[1]["header"], bd.NO_CNAME)
         self.assertEqual(bd.primary_header([], ["Darwin"], h, None)[1]["header"], bd.NO_CNAME)
         self.assertEqual(bd.primary_header([], ["Linux"], h, False)[1]["header"], bd.NOT_DARWIN)
+
+    def test_a_header_in_no_module_that_a_module_includes(self):
+        # The vocabulary has these in Darwin, none of whose modules' headers
+        # names them; netinet6/in6.h, which netinet/in.h includes, does.
+        h = hdr.Headers(self.vocab, self.sdk, None)
+        for name, kinds in (("in6addr_any", ["variable"]), ("in6addr_any", ["constant"]), ("ipi6_addr", ["field"])):
+            r = h.locate(name, kinds)
+            self.assertEqual((r["header"], r["module"], r["sdkModule"], r["how"]),
+                             ("netinet6/in6.h", "Darwin.POSIX.netinet.in", "Darwin", "vocabulary (included header)"),
+                             (name, kinds))
+        # A name no header names gets no header, not the module's first (ar.h).
+        r = h.locate("in6addr_nowhere", ["variable"])
+        self.assertEqual((r["header"], r["how"]), (None, "not in the macOS SDK"))
+
+    def stat_names(self, *names):
+        """C names as c_names gives them: stated fields, subject then alternatives."""
+        return [{"name": n, "role": "subject" if i == 0 else "alternative", "cKinds": ["field"], "restricted": False,
+                 "code": False, "pos": i} for i, n in enumerate(names)]
+
+    def test_a_field_is_in_its_structs_header_only_if_the_header_names_it(self):
+        h = hdr.Headers(self.vocab, self.sdk, None)
+        # Linux's spelling first, as the doc sentence names it: "The
+        # corresponding C field is `st_atim`, or on Darwin `st_atimespec`."
+        self.assertIsNone(bd.locate(h, self.stat_names("stat.st_atim")[0])["header"])
+        name, r = bd.primary_header(self.stat_names("stat.st_atim", "stat.st_atimespec"), ["Darwin", "Linux"], h)
+        self.assertEqual((name, r["header"], r["module"]), ("stat.st_atimespec", "sys/stat.h", "Darwin.sys.stat"))
+        # A macro that spells a field (`#define st_atime st_atimespec.tv_sec`) is Darwin's.
+        self.assertEqual(bd.locate(h, self.stat_names("stat.st_atime")[0])["header"], "sys/stat.h")
+        # Only another platform's spelling: not in the macOS SDK.
+        name, r = bd.primary_header(self.stat_names("stat.st_atim"), ["Darwin", "Linux"], h)
+        self.assertEqual((name, r["header"]), ("stat.st_atim", bd.NOT_IN_SDK))
+        # A framework's struct: its field is in the framework's header.
+        r = bd.locate(h, {"name": "CFThing.cf_size", "cKinds": ["field"]})
+        self.assertEqual((r["header"], r["module"]), ("CoreFoo/CoreFoo.h", "CoreFoo"))
+        self.assertIsNone(bd.locate(h, {"name": "CFThing.cf_length", "cKinds": ["field"]})["header"])
+
+
+class ScanKindTests(unittest.TestCase):
+    """The kinds of scanned declarations, which only the scan sees when they
+    compile only off Darwin, against the symbol graphs' kinds for the same
+    declarations (swiftc -emit-symbol-graph, Swift 6.2)."""
+
+    SOURCE = "\n".join([
+        "public struct Moment: Comparable {",
+        "  public var ticks: Int",
+        "  public static func < (lhs: Moment, rhs: Moment) -> Bool { lhs.ticks < rhs.ticks }",
+        "  public static func ==(lhs: Moment, rhs: Moment) -> Bool { lhs.ticks == rhs.ticks }",
+        "  public static func ~= (pattern: Moment, value: Moment) -> Bool { pattern == value }",
+        "  public static func now() -> Moment { Moment(ticks: 0) }",
+        "  public static subscript(ticks: Int) -> Moment { Moment(ticks: ticks) }",
+        "  public subscript(scale: Int) -> Int { ticks * scale }",
+        "}",
+        "public final class Clock {",
+        "  public class func shared() -> Clock { Clock() }",
+        "  public class var name: String { \"c\" }",
+        "}",
+        "public func ==(lhs: Clock, rhs: Clock) -> Bool { lhs === rhs }",
+        "public func tick() {}",
+        "",
+    ])
+    SYMBOL_GRAPH_KINDS = [
+        ("Moment", "swift.struct"), ("Moment.ticks", "swift.property"), ("Moment.<", "swift.func.op"),
+        ("Moment.==", "swift.func.op"), ("Moment.~=", "swift.func.op"), ("Moment.now", "swift.type.method"),
+        ("Moment.subscript", "swift.type.subscript"), ("Moment.subscript", "swift.subscript"),
+        ("Clock", "swift.class"), ("Clock.shared", "swift.type.method"), ("Clock.name", "swift.type.property"),
+        ("==", "swift.func.op"), ("tick", "swift.func"),
+    ]
+
+    def setUp(self):
+        self.root = tempfile.mkdtemp(prefix="api-burndown-scan-")
+        os.makedirs(os.path.join(self.root, "Sources", "System"))
+        with open(os.path.join(self.root, "Sources", "System", "Moment.swift"), "w") as f:
+            f.write(self.SOURCE)
+        found, _, _ = hist.ss.scan_file(self.root, "Sources/System/Moment.swift", "SystemPackage")
+        self.scan = hist.reduce_scan({"declarations": found})
+
+    def tearDown(self):
+        shutil.rmtree(self.root)
+
+    def test_kinds_are_the_symbol_graphs(self):
+        got = [(d["path"].split("(", 1)[0].strip(), d["kind"]) for d in self.scan["declarations"]]
+        self.assertEqual(got, self.SYMBOL_GRAPH_KINDS)
+
+    def test_a_hidden_operator_is_an_operator_on_the_page(self):
+        # `<` as the scanner names it, `< ()`, as Win32.FileTime's was.
+        ops = [d for d in self.scan["declarations"] if d["path"].startswith(("Moment.<", "Moment.=="))]
+        delta = {"entries": [], "hiddenFromGraphs": {"added": [
+            {"module": "SystemPackage", "name": d["title"], "scopes": ["Moment"], "file": d["file"], "line": d["line"],
+             "hiddenClass": "platform", "availability": [], "scopeAvailability": [], "signature": d["decl"],
+             "platforms": ["Windows"]} for d in ops]}}
+        units = bd.delta_units(delta, self.scan)
+        self.assertEqual([(u["path"], u["kind"], u["kindName"]) for u in units],
+                         [("Moment.< ()", "swift.func.op", "Operator"), ("Moment.==(lhs:rhs:)", "swift.func.op",
+                                                                         "Operator")])
+
+    def test_names(self):
+        k = lambda name, mods=("public", "static"), scopes=("T",): hist.scan_kind(  # noqa: E731
+            {"kw": "func", "name": name, "scopes": list(scopes), "modifiers": list(mods)})
+        self.assertEqual(k("< ()"), "swift.func.op")
+        self.assertEqual(k("..<(_:_:)"), "swift.func.op")
+        self.assertEqual(k("√(_:)", ("public", "prefix"), ()), "swift.func.op")
+        self.assertEqual(k("`default`()"), "swift.type.method")
+        self.assertEqual(k("_unsafe()", ("public",)), "swift.method")
+        # A top-level var stays a property: the scanner can lose a scope.
+        self.assertEqual(hist.scan_kind({"kw": "var", "name": "x", "scopes": [], "modifiers": ["public"]}),
+                         "swift.property")
 
 
 class PageTests(unittest.TestCase):

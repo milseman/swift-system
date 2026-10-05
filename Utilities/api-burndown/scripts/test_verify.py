@@ -191,13 +191,17 @@ class RecountTests(unittest.TestCase):
                              delta_entry("A.x", "swift.type.property", "Type Property", 2),
                              delta_entry("A.==(_:_:)", "swift.func.op", "Operator", 3)],
                  "hiddenFromGraphs": {"added": [hidden("w", ["W"], "var", 1, ("public", "static")),
-                                                hidden("==(_:_:)", ["W"], "func", 2, ("public", "static"))]}}
+                                                hidden("==(_:_:)", ["W"], "func", 2, ("public", "static")),
+                                                # As the scanner names `static func < (lhs:rhs:)`.
+                                                hidden("< ()", ["W"], "func", 3, ("public", "static"))]}}
         decls = [decl("A.f()", line=1),
                  decl("A.x", kind="swift.type.property", kind_name="Type Property", line=2),
                  decl("A.==(_:_:)", kind="swift.func.op", kind_name="Operator", line=3),
                  decl("W.w", origin="scan", kind="swift.type.property", kind_name="Type Property", line=1,
                       file="Sources/System/W.swift"),
                  decl("W.==(_:_:)", origin="scan", kind="swift.func.op", kind_name="Operator", line=2,
+                      file="Sources/System/W.swift"),
+                 decl("W.< ()", origin="scan", kind="swift.func.op", kind_name="Operator", line=3,
                       file="Sources/System/W.swift")]
         return delta, burndown(decls)
 
@@ -235,14 +239,17 @@ class RecountTests(unittest.TestCase):
                                "kind names (the page's Kind grouping)": "pass"})
         self.assertIn("api-delta's `A.f()`", "\n".join(rep.details[3]))
 
-    def test_a_hidden_operator_typed_as_a_method_is_a_known_error(self):
-        delta, data = self.fixture()
-        data["declarations"][4].update(kind="swift.type.method", kindName="Type Method")
-        rep = self.run_recount(delta, redigest(data))
-        got = dict((t.split(":", 1)[0], (lv, t)) for lv, t in levels(rep, 3))
-        self.assertEqual(got["kinds"][0], "warn")
-        self.assertIn("hidden-operator-kind", got["kinds"][1])
-        self.assertEqual(got["kind names (the page's Kind grouping)"][0], "warn")
+    def test_a_hidden_operator_typed_as_a_method_fails(self):
+        # Once F1, a known error; history.scan_kind gives operators their kind now.
+        for i in (4, 5):
+            delta, data = self.fixture()
+            data["declarations"][i].update(kind="swift.type.method", kindName="Type Method")
+            rep = self.run_recount(delta, redigest(data))
+            got = dict((t.split(":", 1)[0], (lv, t)) for lv, t in levels(rep, 3))
+            self.assertEqual(got["kinds"][0], "fail", got["kinds"])
+            self.assertIn("1 declaration of another kind", got["kinds"][1])
+            self.assertEqual(got["kind names (the page's Kind grouping)"][0], "fail")
+            self.assertIn(f"`{data['declarations'][i]['path']}`", "\n".join(rep.details[3]))
 
     def test_symbol_kinds_of_hidden_declarations(self):
         k = vf.symbol_kind
@@ -252,6 +259,7 @@ class RecountTests(unittest.TestCase):
         self.assertEqual(k(hidden("f(_:)", [], "func", 1)), "swift.func")
         self.assertEqual(k(hidden("f(_:)", ["T"], "func", 1, ("public", "class"))), "swift.type.method")
         self.assertEqual(k(hidden("~=(_:_:)", ["T"], "func", 1, ("public", "static"))), "swift.func.op")
+        self.assertEqual(k(hidden("< ()", ["T"], "func", 1, ("public", "static"))), "swift.func.op")
         self.assertEqual(k(hidden("init(_:)", ["T"], "init?", 1)), "swift.init")
         self.assertEqual(k(hidden("T", [], "struct", 1)), "swift.struct")
 
@@ -404,10 +412,19 @@ class CNamesTests(unittest.TestCase):
         self.assertIn("vocab-forward-declaration 1", text)
         self.assertIn("macro-not-indexed 1", text)
 
-    def test_the_modules_header_fallback_is_a_known_error(self):
-        (lv, text), _ = self.run_headers([self.header_decl("foo_open", "bar.h", how="vocabulary (module's header)")])
-        self.assertEqual(lv, "warn", text)
-        self.assertIn("module-header-fallback 1", text)
+    def test_a_modules_first_header_fails(self):
+        # Once F2, a known error; headers.py no longer gives a name its module's first header.
+        (lv, text), rep = self.run_headers([self.header_decl("foo_open", "bar.h", how="vocabulary (module's header)")])
+        self.assertEqual(lv, "fail", text)
+        self.assertIn("bar.h doesn't declare foo_open", "\n".join(rep.details[5]))
+
+    def test_another_platforms_field_spelling_fails(self):
+        # Once F3, a known error: foo.h declares foo_s and f_x, which another of the C names spells.
+        u = decl("A.x", c_name="foo_s.f_y", header="foo.h", sub="F.fwd", how="definition",
+                 c_names=[{"name": "foo_s.f_y", "code": False}, {"name": "foo_s.f_x", "code": False}])
+        (lv, text), rep = self.run_headers([u])
+        self.assertEqual(lv, "fail", text)
+        self.assertIn("foo.h doesn't declare foo_s.f_y", "\n".join(rep.details[5]))
 
     def graph(self, sources):
         """A declaration `FileDescriptor.frob()` at lines 2-4, linked to C names with these sources."""

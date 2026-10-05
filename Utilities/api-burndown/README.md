@@ -92,7 +92,7 @@ Measured on an M1 Max with Swift 6.2, on 2026-10-02, with other builds keeping t
 - the last day's scope is the main count, and each day's codes sum to its scope;
 - the page embeds this `burndown.json`'s digest, is under 5 MB, and loads nothing from the network.
 
-`PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s Utilities/api-burndown/scripts -p 'test_*.py'` tests the logic on its own: signatures, the enum-case marking, the set difference, merges, `states.json`, areas, days, module maps and header lookup on a small fake SDK, and the page's encoding.
+`PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s Utilities/api-burndown/scripts -p 'test_*.py'` tests the logic on its own: signatures, the enum-case marking, the scan's kinds against the symbol graphs', the set difference, merges, `states.json`, areas, days, module maps and header lookup on a small fake SDK (headers in no module, and fields Darwin's structs spell otherwise), and the page's encoding.
 
 ## Verify
 
@@ -129,7 +129,7 @@ Each check prints pass, warn or fail lines:
 **Misses.** Each is listed in `verify.md`. A miss that a known cause explains doesn't fail; `KNOWN` in `scripts/verify.py` defines them, and `verify.md` lists them with each run.
 
 - A *method* cause is the check's own blind spot, not an error in the page, and passes: `branch-moved`, `init-through-alias`, `vocab-forward-declaration`, `vocab-parent-module`, `header-in-no-module`, `macro-not-indexed`.
-- A *known error* is a real error in the page, recorded in `Prototype/Burndown/VERIFY-REPORT.md` until it's fixed, and warns: `hidden-operator-kind`, `module-header-fallback`, `field-spelling`. Once fixed, its rule matches nothing; then delete it.
+- A *known error* is a real error in the page, recorded in `Prototype/Burndown/VERIFY-REPORT.md` until it's fixed, and warns. There's none now: the three it recorded, F1 to F3, were fixed on 2026-10-05 and their rules deleted (`Prototype/Burndown/BURNDOWN-FIX-REPORT.md`). Once fixed, a rule matches nothing; then delete it.
 - Any other miss fails; `--max-misses K` makes up to K of them warn.
 
 **Design calls**, each with the alternative it rejected:
@@ -196,15 +196,18 @@ Each is listed with the alternative it rejected.
     *Rejected:* the most advanced state among its pitches, which counts the declaration's progress twice.
 12. **Each C name's header comes from the vocabulary and the SDK together.**
     - A macro or constant is found by its `#define`, and a struct, union or enum by its definition, in the SDK's headers.
-    - Anything else, functions above all, comes from the vocabulary's module, confirmed against that module's headers in the SDK's module maps.
+    - Anything else, functions above all, comes from the vocabulary's module, confirmed against that module's headers in the SDK's module maps, then against the headers in no module that they include: `in6addr_any`, which the vocabulary has in `Darwin`, is in `netinet6/in6.h`. A module none of whose headers names the name is passed over.
     - A header in no module, but included by one of a module's headers, is in that module: `netinet6/in6.h` from `netinet/in.h`.
     - A header outside Darwin's directories and in no module isn't Darwin's, so a name it defines (`environ`, in `apache2/`) is "not in the macOS SDK".
+    - A field named for its struct (`stat.st_size`, as api-graph names one when it can) is in its struct's header, if that header names the field. Darwin's `struct stat` has `st_atimespec`, not Linux's `st_atim`, so `stat.st_atim` isn't in the macOS SDK.
 
     *Rejected:*
     - The vocabulary alone. A name gets the module of the first declaration the index saw: `sockaddr_in` lands in `bsm/audit_record.h` from a forward declaration. It also lacks macros the index didn't record, such as `O_SYNC`.
     - The headers alone, which can't tell a function's prototype from a use.
-    - A field named for its struct (`stat.st_size`, as api-graph names one when it can) is in its struct's header.
-13. **The C name a declaration is grouped by** is the first of its C names the macOS SDK declares: the stated ones (a doc sentence's or a typealias's) first, in role order (subject, alternative, argument), then in the order the sentence names them; then the ones only its code reaches, functions first, since they're what a wrapper calls and the constants are what it passes them. Only declarations that compile on Darwin get one; the rest are "not on Darwin". `int` and the other built-in types don't count.
+    - The module's first header when none of its headers names the name, which put four `netinet6/in6.h` declarations under `ar.h` until 2026-10-05.
+    - The struct's header for any field of the struct, which grouped four `stat` accessors by Linux's field names until 2026-10-05.
+    - A field only in the struct's braces. Darwin's `struct stat` is `struct stat __DARWIN_STRUCT_STAT64;`, a macro, and the braces that `struct stat {` opens are the 32-bit-inode variant's, which has no `st_birthtimespec`.
+13. **The C name a declaration is grouped by** is the first of its C names the macOS SDK declares: the stated ones (a doc sentence's or a typealias's) first, in role order (subject, alternative, argument), then in the order the sentence names them; then the ones only its code reaches, functions first, since they're what a wrapper calls and the constants are what it passes them. Only declarations that compile on Darwin get one; the rest are "not on Darwin". `int` and the other built-in types don't count, and a field counts only where its struct's header names it (design call 12): "The corresponding C field is `st_atim`, or on Darwin `st_atimespec`" groups `stat.accessTime` by `stat.st_atimespec`.
     *Rejected:* looking up every declaration's C name. A Windows-only declaration's `TRUE` would land in `curses.h`.
     *Rejected:* ordering a code-only declaration's C names by name, which put `SignalSet.update(with:)` under `NSIG`'s header rather than `sigaddset`'s.
 14. **The System area** is the directory under `Sources/System` or `Sources/SystemSockets`. A file at the top goes in its file group: the shortest top-level file stem or directory name its own stem starts with. So `FileControlCommand.swift` is in `FileControl`, `ErrnoWindows.swift` in `Errno`, and `Util+StringArray.swift` in `Util`.
@@ -218,6 +221,10 @@ Each is listed with the alternative it rejected.
     *Rejected:* the stacked columns by state, one per day, with the scope line over them, which the page had until then.
 19. **A declaration with no C name is Swift-only when its code reaches no C at all**: no C function, macro, constant, variable or field, and no CSystem shim, through the internal code it calls (api-graph's `reachesC`; for a type, through any of its members). One whose code reaches C but has no C name is "(no C name)": on 2026-10-03 those were types whose members reach C and no doc sentence names a C type for, and a few declarations that reach C only through a shim.
     *Rejected:* "(no C name)" for both, which hid the `rawValue`, `==`, `hash(into:)` and `description` declarations, which wrap nothing, among those that need a doc sentence.
+20. **A declaration only the source scan sees gets the kind the symbol graphs would give it** (`history.scan_kind`): an operator is an Operator, a type's static member or global; a `class` member is static, as a `static` one is; a static subscript is a Type Subscript. Each rule matches Swift 6.2's `-emit-symbol-graph` (checked on 2026-10-05). That's the kind of each hidden declaration on the page (one compiled only off Darwin, a stub, an underscored one), and of each day's declarations but the head's.
+    *Rejected:*
+    - The kinds api-graph gives scan-only declarations (`build_graph.py`) as they were, which made four operators Type Methods until 2026-10-05.
+    - The symbol graphs' Global Variable for a `var` the scan finds at the top level. The scanner loses some declarations' scopes (three instance properties in `IORing/IORing.swift`, which main already has), and no top-level public `var` is new.
 
 ### Limitations
 
@@ -231,7 +238,7 @@ Each is listed with the alternative it rejected.
 - **Pitches on days the store has no graph for** are resolved against the newest graph, so a declaration that graph no longer has counts as in no pitch that day.
 - **The SPI flag** sees `@_spi` on a declaration, not on its enclosing extension. There's no SPI in either module today.
 - **A declaration renamed as it lands** counts as removed, and its new name, being in main, is in no state.
-- **A field the graph couldn't name for its struct** (`si_pid`, which System reads through a CSystem shim) gets the first header the vocabulary gives, since field names aren't unique.
+- **A field the graph couldn't name for its struct** (`si_pid`, which System reads through a CSystem shim) gets the first header that names it in the vocabulary's modules for the name, since field names aren't unique: `ipi6_addr`'s is `netinet6/in6.h`.
 - **A code-only C name is what the Darwin build's code reaches**: a declaration whose implementation combines calls is under its first function's header (`DirectoryWalk.skipDescendants()` under `close`'s).
 - **States follow the pitch files in the working tree**, as api-graph's do. The page warns when they have uncommitted changes.
 - **The header index covers the macOS SDK's `usr/include`.** A framework's name maps to the framework's header of the same name.
