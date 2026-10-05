@@ -385,7 +385,6 @@ def main():
             cluster_of_atom[x] = cid
         clusters.append({"key": cid, "atoms": sorted(xs, key=lambda k: (atoms[k]["file"] or "", atoms[k]["start"]))})
     by_key = {c["key"]: c for c in clusters}
-    root_cluster = {r: cluster_of_atom[r] for r in members}
 
     # Prerequisites between clusters, from cut edges.
     for c in clusters:
@@ -862,8 +861,10 @@ def main():
         cu["sharedAliases"] = []
         for L in c["atoms"]:
             if L in loose:
-                others = [units[root_cluster[k]]["id"] for k in loose_users.get(L, {})
-                          if root_cluster.get(k) != c["key"]]
+                # A vote's component can have merged into another since it
+                # voted, so it's placed by its atom's cluster, not its root's.
+                others = list(dict.fromkeys(units[cluster_of_atom[k]]["id"] for k in loose_users.get(L, {})
+                                            if k in cluster_of_atom and cluster_of_atom[k] != c["key"]))
                 if others:
                     cu["sharedAliases"].append({"alias": nodes[atoms[L]["nodes"][0]]["path"], "alsoUsedBy": others})
         cu["vocabulary"] = dict(sum((atom_vocab[x] for x in c["atoms"]), collections.Counter()).most_common(12))

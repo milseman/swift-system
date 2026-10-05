@@ -24,6 +24,8 @@ the report's last section.
 import sys
 
 sys.dont_write_bytecode = True
+# ledger.py imports this module as `status`; run as a script, it's this one.
+sys.modules.setdefault("status", sys.modules[__name__])
 
 import argparse  # noqa: E402
 import collections  # noqa: E402
@@ -451,12 +453,24 @@ GENERIC = {"cases", "case", "values", "value", "fields", "field", "members", "me
            "option", "socket", "constants", "constant", "types", "type", "structs", "struct", "family", "functions",
            "function", "names", "name"}
 MEMBER_WORDS = {"fields", "field", "members", "member"}
+# Words after a name that say where or when it's missing, not what it is:
+# `isatty on WASI`, `pipe2 before macOS 27`; after a header's name, how too:
+# `dlfcn.h dlsym with RTLD_DEFAULT`. (A bare name with `with` is prose: a
+# list after a colon can explain, `dlopen with RTLD_NOLOAD | RTLD_FIRST`.)
+QUALIFYING = {"on", "before", "after", "in", "until"}
+HEADER_QUALIFYING = QUALIFYING | {"with", "without", "for"}
+PLATFORM_WORDS = {"Darwin", "Linux", "Musl", "Android", "Bionic", "WASI", "FreeBSD", "OpenBSD", "Windows", "macOS",
+                  "iOS"}
 # Words that read as lowercase C names in a list's position but aren't.
 ENGLISH = set("""its their the a an this that these those zero and or of for with to in on by as is are be not no all
     any some each every other raw same own it them they its we our see also e.g i.e""".split())
 # Modules and Swift types that markers mention in their explanations.
 SWIFT_NAMES = {"System", "SystemSockets", "SystemPackage", "NIO", "NIOPosix", "NIOCore", "Foundation", "Swift",
                "Darwin", "Glibc", "CInterop", "Errno", "XCTest", "FileDescriptor", "FilePath", "DynamicLibrary"}
+# Platforms, which markers name for where a gap is (`remove on Windows and
+# WASI`), not as C interfaces.
+SWIFT_NAMES |= {"Linux", "Musl", "Android", "Bionic", "WASI", "FreeBSD", "OpenBSD", "Windows", "macOS", "iOS",
+                "Embedded"}
 
 
 def depths(s):
@@ -602,8 +616,12 @@ def parse_item(item, members=False):
         if not (one[0].isupper() and re.search(r"[a-z]", one) and "_" not in one):
             names += from_groups()
         return names, None, "name", False
-    # possessives: iovec's iov_len, libmalloc's malloc_good_size, POSIXErrorCode's cases
+    # possessives: iovec's iov_len, libmalloc's malloc_good_size, POSIXErrorCode's cases;
+    # a platform's names its own: FreeBSD's copy_file_range
     m = re.match(r"^([^\s']+)'s(?:\s+(.*))?$", core)
+    if m and clean_word(m.group(1)) in PLATFORM_WORDS and m.group(2) and len(m.group(2).split()) == 1 \
+            and is_c(m.group(2)):
+        return [(clean_word(m.group(2)) + suffix, None)], None, "name", False
     if m and is_c(m.group(1)):
         owner, owned = clean_word(m.group(1)), (m.group(2) or "").split()
         if members:
@@ -619,9 +637,15 @@ def parse_item(item, members=False):
             return [(owner, None), (clean_word(owned[0]), None)], None, "name", False
         got = from_groups()
         return with_phrase(got, core), core, "phrase" if got else "prose", False
-    # string.h memcmp, sysexits.h EX_USAGE, MacTypes OSStatus
-    if len(words) == 2 and (re.match(r"^[\w/]+\.h$", words[0]) or words[0] in QUALIFIERS) and is_c(words[1]):
+    # string.h memcmp, sysexits.h EX_USAGE, MacTypes OSStatus; and with a
+    # qualifier after them: `unistd.h isatty on WASI`, `dlfcn.h dlsym with
+    # RTLD_DEFAULT or a handle the caller owns`
+    if len(words) >= 2 and (re.match(r"^[\w/.+-]+\.h$", words[0]) or words[0] in QUALIFIERS) and is_c(words[1]) \
+            and (len(words) == 2 or words[2] in HEADER_QUALIFYING):
         return [(clean_word(words[1]) + suffix, words[0])], None, "name", False
+    # statfs on Linux, pipe2 before macOS 27: a name, and where it's missing
+    if len(words) > 2 and words[1] in QUALIFYING and is_c(one) and not grps:
+        return [(clean_word(one) + suffix, None)], None, "name", False
     # timespec members, IPV6_* socket options, copyfile(3) flags, the sockaddr family
     if is_c(one) and len(words) > 1 and all(w in GENERIC for w in words[1:]):
         member = any(w in MEMBER_WORDS for w in words[1:])
@@ -904,15 +928,17 @@ class Snapshot:
 # ---------------------------------------------------------------- platform imports
 
 # The platform C modules that no library of the toolchain should import, on
-# any platform, in any form; ecosystem.py's import pattern, widened to them.
-PLATFORM_MODULES = ("Darwin", "Glibc", "Musl", "Bionic", "Android", "WASILibc", "ucrt", "WinSDK", "CRT", "visualc")
-IMPORT_PLATFORM = ecosystem.import_of(PLATFORM_MODULES)
+# any platform, in any form: modules.ini's [count] group (read through
+# ledger.Modules), with ecosystem.py's import pattern widened to them.
 IMPORT_KINDS = ("library", "tests", "other", "nested package")
 # The platform families whose builds are evaluated (platforms.py's names),
 # in the tables' order, with their names there and their own C modules, which
 # the lexical count of a platform's imports looks for. FreeBSD and OpenBSD
-# import the libc overlay named Glibc.
-IMPORT_PLATFORMS = (("Darwin", "Darwin", ("Darwin",)), ("Linux", "Linux (glibc)", ("Glibc",)),
+# import the libc overlay named Glibc. The C standard library's split modules
+# (unistd, stdlib_h), which Darwin's SDK and Android both have, are no one
+# platform's own.
+IMPORT_PLATFORMS = (("Darwin", "Darwin", ("Darwin", "MachO", "libkern", "kcdata")),
+                    ("Linux", "Linux (glibc)", ("Glibc",)),
                     ("Musl", "Musl", ("Musl",)), ("Android", "Android", ("Android", "Bionic")),
                     ("WASI", "WASI", ("WASILibc",)), ("FreeBSD", "FreeBSD", ("Glibc",)),
                     ("OpenBSD", "OpenBSD", ("Glibc",)), ("Windows", "Windows", ("ucrt", "WinSDK", "CRT", "visualc")))
@@ -925,10 +951,10 @@ NOT_TRACKED = {"swift-system": "System itself, whose imports are what it wraps",
                "swift": "the compiler, the runtime, and the platform modules' own overlays"}
 # The adopters' checkouts, by the scheme's name where theirs differs.
 ADOPTER_DIRS = {"wasmkit": "WasmKit", "llbuild": "swift-llbuild", "swiftpm": "swift-package-manager"}
-# Where library code lives: SwiftPM's default target directories, and
-# llbuild's lib and products. Anything else at the top is other code:
-# benchmarks, examples, tools, plugins, docs, utilities.
-LIBRARY_ROOTS = {"Sources", "Source", "src", "srcs", "lib", "products"}
+# Where library code lives: SwiftPM's default target directories, llbuild's
+# lib and products, and the swift repository's stdlib. Anything else at the
+# top is other code: benchmarks, examples, tools, plugins, docs, utilities.
+LIBRARY_ROOTS = {"Sources", "Source", "src", "srcs", "lib", "products", "stdlib"}
 TEST_DIR = re.compile(r"^(tests?|unittests|perftests|integrationtests|fixtures|testinputs|testsupport|inputs)$", re.I)
 
 
@@ -946,22 +972,25 @@ def import_kind(path, nested):
     return "other"
 
 
-def platform_imports(repo, commit):
+def platform_imports(repo, commit, modules):
     """{path: (kind, {modules}, {platform: T or M})} for the Swift files at
-    `commit` that import a platform C module, read with comments and strings
-    blanked: the modules its imports name in any `#if` branch, and the
-    platforms whose build compiles one of those imports, by platforms.py's
-    evaluation with FOUNDATION_FRAMEWORK false. M is "maybe": a flag the scan
-    can't read decides, or a condition it can't parse."""
+    `commit` that import a platform C module (modules.ini's [count], from
+    `modules`, a ledger.Modules), read with comments and strings blanked:
+    the modules its imports name in any `#if` branch, and the platforms
+    whose build compiles one of those imports, by platforms.py's evaluation
+    with FOUNDATION_FRAMEWORK false. M is "maybe": a flag the scan can't
+    read decides, or a condition it can't parse."""
+    alternatives = modules.alternatives(("count",))
+    pattern = ecosystem.import_of(alternatives)
     files = tree_files(repo, commit)
     nested = {os.path.dirname(f) for f in files if MANIFEST.match(os.path.basename(f)) and "/" in f}
-    candidates = grep_files(repo, commit, "|".join(PLATFORM_MODULES), ["*.swift"], fixed=False)
+    candidates = grep_files(repo, commit, "|".join(alternatives), ["*.swift"], fixed=False)
     blobs = read_blobs(repo, [f"{commit}:{f}" for f in candidates])
     out = {}
     for f in candidates:
         code, _ = strip_comments_and_strings(blobs.get(f"{commit}:{f}", ""))
         lines = code.split("\n")
-        found = [(i, im.group(1)) for i, line in enumerate(lines) for im in [IMPORT_PLATFORM.match(line)] if im]
+        found = [(i, im.group(1)) for i, line in enumerate(lines) for im in [pattern.match(line)] if im]
         if not found:
             continue
         try:
@@ -1276,10 +1305,11 @@ def abi_section(w, a, head, api_dir, meta):
         w("")
 
 
-def platform_section(w, a, branches, branches_for):
+def platform_section(w, a, branches, branches_for, modules):
     """Section 4, the platform imports of the main scheme's repositories,
     each adopter read at the first of `branches` (or of its own list in
-    `branches_for`) that its checkout has; returns how many were read."""
+    `branches_for`) that its checkout has, with `modules`' [count] as the
+    platform modules; returns how many were read."""
     w("# 4. Platform imports")
     w("")
     repos = scheme_repos(a.ecosystem) if a.ecosystem else None
@@ -1299,11 +1329,11 @@ def platform_section(w, a, branches, branches_for):
         clone = os.path.join(a.ecosystem, r)
         if tip:
             where = f"`{os.path.relpath(path, a.repo)}` `{branch}` @ `{short(tip)}`"
-            read[r] = platform_imports(path, tip)
+            read[r] = platform_imports(path, tip, modules)
         elif os.path.exists(os.path.join(clone, ".git")) and commit_of(clone, "HEAD"):
             commit = commit_of(clone, "HEAD")
             where = f"`{os.path.relpath(clone, a.repo)}` @ `{short(commit)}`"
-            read[r] = platform_imports(clone, commit)
+            read[r] = platform_imports(clone, commit, modules)
         else:
             where = None
         rows.append((r, where))
@@ -1313,7 +1343,9 @@ def platform_section(w, a, branches, branches_for):
 
     others = "; ".join(f"{n}: {own_list(bs)}" for n, bs in sorted(branches_for.items()))
     w("The goal: no library of the repositories that swift's update-checkout clones for the main scheme imports a "
-      "platform C module (" + ", ".join(PLATFORM_MODULES) + ") in any form, on any platform. Each repository is "
+      "platform C module (the modules `modules.ini` counts: " + ", ".join(modules.counted()) +
+      (", and any module named " + " or ".join(f"`{p}`" for p in modules.patterns["count"])
+       if modules.patterns["count"] else "") + ") in any form, on any platform. Each repository is "
       f"read at its migrated clone in `{os.path.relpath(a.adopters, a.repo)}`, on its newest migration branch "
       f"(the first of {', '.join(branches)} that it has" + (f"; {others}" if others else "") + "), else at its "
       f"clone in `{eco}` as it is, else it's *not cloned*. Left out: " +
@@ -1371,17 +1403,36 @@ def platform_section(w, a, branches, branches_for):
       (f" {len(dead)} more import one in library code only in branches that no platform compiles: "
        + ", ".join(dead) + "." if dead else ""))
     w("")
-    w("All repositories, files by module and kind, lexically:")
+    w("All repositories, files by module and kind, lexically (the counted modules any file imports):")
     w("")
     w("| Module | Library | Tests | Other | Nested packages | All |")
     w("|---|---:|---:|---:|---:|---:|")
-    for m in PLATFORM_MODULES:
+    seen = {m for k in IMPORT_KINDS for m in totals[k]}
+    named = modules.counted()
+    for m in [m for m in named if m in seen] + sorted(seen - set(named)):
         counts = [totals[k][m] for k in IMPORT_KINDS]
         w(f"| {m} | " + " | ".join(str(c) for c in counts) + f" | {sum(counts)} |")
     counts = [any_files[k] for k in IMPORT_KINDS]
     w("| **Any** | " + " | ".join(str(c) for c in counts) + f" | {sum(counts)} |")
     w("")
     return len(read)
+
+
+def marker_snapshots(adopters, packages, mode, branches, branches_for, cache):
+    """[(name, branch, commit, Snapshot)] whose markers section 3 reads:
+    with mode `newest`, every checkout in `adopters` at the first of
+    `branches` (or of its own list in `branches_for`) that it has, the
+    commit section 4 reads; with `branch`, the packages at their --branch."""
+    if mode == "branch":
+        return [(p["name"], p["branch"], p["tip"], p["now"]) for p in packages]
+    snaps = {(p["name"], p["tip"]): p["now"] for p in packages}
+    out = []
+    for d in sorted(os.listdir(adopters)):
+        path = os.path.join(adopters, d)
+        b, tip = newest_branch(path, branches_for.get(d, branches))
+        if tip:
+            out.append((d, b, tip, snaps.get((d, tip)) or Snapshot(path, tip, cache, d)))
+    return out
 
 
 def main():
@@ -1406,7 +1457,16 @@ def main():
     ap.add_argument("--abi-work", required=True, help="the release builds' scratch and results, for the ABI count")
     ap.add_argument("--date", default=datetime.date.today().isoformat())
     ap.add_argument("--dump-markers", action="store_true", help="print each marker's interfaces and stop")
+    ap.add_argument("--markers", choices=("newest", "branch"), default="newest",
+                    help="section 3's markers: at each adopter's newest migration branch (the first of "
+                         "--platform-branches it has), or at --branch, as before")
+    ap.add_argument("--ledger-work", help="the ledger's scratch: System's scan, by commit (default: beside --cache)")
+    ap.add_argument("--ledger-json", help="where to write the ledger, as JSON")
     a = ap.parse_args()
+    # Every git command reads commits only; a partial clone's missing blob
+    # is an error, never a fetch.
+    os.environ["GIT_NO_LAZY_FETCH"] = "1"
+    import ledger
 
     vocab = load_vocab(a.vocab)
     branch_for = dict(x.split("=", 1) for x in a.branch_for)
@@ -1444,10 +1504,19 @@ def main():
         p["migration"] = docs.get(f"{p['tip']}:MIGRATION.md")
         p["report"] = docs.get(f"{p['tip']}:REPORT.md")
 
+    marked = marker_snapshots(a.adopters, packages, a.markers, platform_branches, platform_branches_for, a.cache)
+
+    modules_spec = f"{head}:{ledger.MODULES_FILE}"
+    modules_text = read_blobs(a.repo, [modules_spec]).get(modules_spec)
+    if modules_text is None:
+        raise SystemExit(f"status: {ledger.MODULES_FILE} isn't in HEAD's commit")
+    modules = ledger.Modules(modules_text)
+    dirty_lists = git(a.repo, "status", "--porcelain", "--", ledger.MODULES_FILE, ledger.EXCEPTIONS_FILE).strip()
+
     if a.dump_markers:
-        for p in packages:
-            for f, line, body, imported, _ in p["now"].markers:
-                print(f"{p['name']}:{f}:{line}: {body[:150]}")
+        for name, _, _, snap in marked:
+            for f, line, body, imported, _ in snap.markers:
+                print(f"{name}:{f}:{line}: {body[:150]}")
                 for iface, phrase, names in marker_interfaces(body, imported):
                     print(f"    -> {iface!r} [{family_of(iface, phrase, vocab)}]" +
                           (f" via {len(names)} imports" if names != [iface] else ""))
@@ -1472,6 +1541,8 @@ def main():
         w("  Uncommitted changes to System's sources aren't counted.")
     if dirty_mapping:
         w("  Uncommitted changes to mapping.ini aren't counted.")
+    if dirty_lists:
+        w("  Uncommitted changes to modules.ini or exceptions.ini aren't counted.")
     w(f"- **API delta**: `{meta['baseRef']}` @ `{short(meta['baseCommit'])}` → `{meta['headRef']}` @ "
       f"`{short(meta['headCommit'])}`" + (" (api-delta's last run; nothing it reads has changed since)"
                                          if meta["headCommit"] != head else "") + ".")
@@ -1542,10 +1613,11 @@ def main():
         w(f"- {n}")
     if notes:
         w("")
-    outside = [(p["name"], m) for p in packages for m in p["now"].markers if not m[4]]
-    if outside:
-        w(f"{len(outside)} more marker(s) are in files outside the targets (they're in the gaps below): " +
-          ", ".join(sorted({f'{n}: `{m[0].split("/")[0]}/`' for n, m in outside})) + ".")
+    outside_here = [(p["name"], m) for p in packages for m in p["now"].markers if not m[4]]
+    if outside_here:
+        where = "they're in the gaps below" if a.markers == "branch" else f"at `{a.branch}`"
+        w(f"{len(outside_here)} more marker(s) are in files outside the targets ({where}): " +
+          ", ".join(sorted({f'{n}: `{m[0].split("/")[0]}/`' for n, m in outside_here})) + ".")
         w("")
     left = [(p["name"], f, k) for p in packages for k in ("whole", "submodule") for f in sorted(p["now"].imports[k])]
     if left:
@@ -1584,8 +1656,10 @@ def main():
     # ---- 3. Gaps
     gaps = collections.OrderedDict()   # interface -> dict
     unread = []
-    for p in packages:
-        for f, line, body, imported, in_targets in p["now"].markers:
+    outside = [(name, m) for name, _, _, snap in marked for m in snap.markers if not m[4]]
+    for name, _, _, snap in marked:
+        p = {"name": name}
+        for f, line, body, imported, in_targets in snap.markers:
             for iface, phrase, names in marker_interfaces(body, imported):
                 g = gaps.setdefault(iface, {"names": set(), "phrase": phrase, "files": set(), "where": []})
                 g["names"].update(names)
@@ -1641,9 +1715,14 @@ def main():
 
     w("# 3. Gaps")
     w("")
-    n_markers = sum(len(p["now"].markers) for p in packages)
-    n_files = len({(p["name"], m[0]) for p in packages for m in p["now"].markers})
-    w(f"Every `SYSTEM-GAP:` marker in the packages' sources at the commits above: {n_markers} markers in "
+    n_markers = sum(len(snap.markers) for _, _, _, snap in marked)
+    n_files = len({(name, m[0]) for name, _, _, snap in marked for m in snap.markers})
+    if a.markers == "branch":
+        at = "at the commits above"
+    else:
+        at = ("at each adopter's newest migration branch, the commit section 4 reads (" +
+              ", ".join(f"{name} `{b}` @ `{short(tip)}`" for name, b, tip, _ in marked) + ")")
+    w(f"Every `SYSTEM-GAP:` marker in the packages' sources {at}: {n_markers} markers in "
       f"{n_files} files, of which {len(outside)} are outside the packages' targets. Each marker's text is read "
       "for the C interfaces it names (see [How this is computed](#how-this-is-computed)); a marker that names "
       "none is counted under its phrase, with the Darwin names imported under it deciding its status. "
@@ -1721,11 +1800,22 @@ def main():
     w("")
 
     # ---- 4. Platform imports
-    tracked = platform_section(w, a, platform_branches, platform_branches_for)
+    tracked = platform_section(w, a, platform_branches, platform_branches_for, modules)
+
+    # ---- 5. Sites left
+    led = ledger.build(a, head, nxt, platform_branches, platform_branches_for,
+                       a.ledger_work or os.path.join(os.path.dirname(a.cache), "ledger"), a.vocab, sys_next)
+    ledger.section(w, a, led)
+    if a.ledger_json:
+        os.makedirs(os.path.dirname(os.path.abspath(a.ledger_json)), exist_ok=True)
+        with open(a.ledger_json, "w") as f:
+            json.dump(ledger.as_json(led, {"date": a.date, "head": head, "systemNext": nxt}), f, indent=1,
+                      default=lambda o: sorted(o) if isinstance(o, set) else str(o))
 
     w("# How this is computed")
     w("")
     w(METHOD.strip())
+    w(ledger.METHOD.strip())
     w("")
 
     os.makedirs(os.path.dirname(a.out), exist_ok=True)
