@@ -131,7 +131,7 @@ extension CInterop.ArchiveHeader {
   ///
   /// The corresponding C field is `ar_date`.
   @_alwaysEmitIntoClient
-  public var modificationTime: Int? { _archiveNumber(ar_date, radix: 10) }
+  public var modificationTime: Int64? { _archiveNumber(ar_date, radix: 10) }
 
   /// The member's owner, or `nil` if the field isn't a decimal number.
   ///
@@ -168,7 +168,7 @@ extension CInterop.ArchiveHeader {
   ///
   /// The corresponding C field is `ar_size`.
   @_alwaysEmitIntoClient
-  public var size: Int? { _archiveNumber(ar_size, radix: 10) }
+  public var size: Int64? { _archiveNumber(ar_size, radix: 10) }
 
   /// The two bytes that end the header,
   /// which are ``ArchiveFile/headerTrailer`` in a well-formed archive.
@@ -191,9 +191,10 @@ internal func _archiveText<Field>(_ field: Field) -> String {
 }
 
 /// An archive header's numeric field: digits in `radix`, with spaces before
-/// or after them, or `nil` if it's anything else or doesn't fit in an `Int`.
+/// or after them, or `nil` if it's anything else. The widest field, the
+/// time's 12 decimal digits, fits in an `Int64`, whatever the word size.
 @_alwaysEmitIntoClient
-internal func _archiveNumber<Field>(_ field: Field, radix: Int) -> Int? {
+internal func _archiveNumber<Field>(_ field: Field, radix: Int64) -> Int64? {
   withUnsafeBytes(of: field) { bytes in
     let space = UInt8(ascii: " ")
     var start = 0
@@ -201,9 +202,9 @@ internal func _archiveNumber<Field>(_ field: Field, radix: Int) -> Int? {
     while start < end && bytes[start] == space { start += 1 }
     while end > start && bytes[end - 1] == space { end -= 1 }
     guard start < end else { return nil }
-    var value = 0
+    var value: Int64 = 0
     for byte in bytes[start..<end] {
-      let digit = Int(byte) - Int(UInt8(ascii: "0"))
+      let digit = Int64(byte) - Int64(UInt8(ascii: "0"))
       guard digit >= 0 && digit < radix else { return nil }
       let (shifted, overflow) = value.multipliedReportingOverflow(by: radix)
       let (sum, carry) = shifted.addingReportingOverflow(digit)

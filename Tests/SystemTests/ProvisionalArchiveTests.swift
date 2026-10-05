@@ -72,7 +72,7 @@ private struct ProvisionalArchiveTests {
         fromByteOffset: ArchiveFile.magicSize, as: CInterop.ArchiveHeader.self)
       let start = ArchiveFile.magicSize + MemoryLayout<CInterop.ArchiveHeader>.size
       let size = try #require(header.size)
-      return (header, Array(raw[start..<(start + size)]))
+      return (header, Array(raw[start..<(start + Int(size))]))
     }
     #expect(member.name == "hello.txt/")
     #expect(member.modificationTime == 1_700_000_000)
@@ -81,7 +81,7 @@ private struct ProvisionalArchiveTests {
     #expect(member.mode == FileMode(rawValue: 0o100644))
     #expect(member.mode?.type == .regular)
     #expect(member.mode?.permissions == [.ownerReadWrite, .groupRead, .otherRead])
-    #expect(member.size == contents.count)
+    #expect(member.size == Int64(contents.count))
     #expect(member.trailer == ArchiveFile.headerTrailer)
     #expect(data == contents)
   }
@@ -113,7 +113,7 @@ private struct ProvisionalArchiveTests {
     #expect(header.name.hasPrefix(ArchiveFile.extendedNamePrefix))
     let length = try #require(Int(header.name.dropFirst(ArchiveFile.extendedNamePrefix.count)))
     #expect(length == name.count)
-    #expect(header.size.map { $0 - length } == 100)
+    #expect(header.size.map { $0 - Int64(length) } == 100)
   }
   #endif
 
@@ -128,7 +128,8 @@ private struct ProvisionalArchiveTests {
     #expect(odd.groupID == nil)
     #expect(odd.mode == nil)  // 9 isn't an octal digit
     #expect(odd.size == 42)
-    // The widest fields fit: 12 decimal digits of time, 10 of size.
+    // The widest fields fit, whatever the word size: 12 decimal digits of
+    // time, 10 of size.
     let wide = archiveHeader(header(name: "x", date: "999999999999", size: "9999999999"))
     #expect(wide.modificationTime == 999_999_999_999)
     #expect(wide.size == 9_999_999_999)
