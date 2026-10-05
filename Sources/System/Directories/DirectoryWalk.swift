@@ -80,7 +80,9 @@ public struct DirectoryWalk: ~Copyable {
 
   // With `.whenEntered`, a directory in the current one that `next()`
   // returned in preorder without opening it, which the next call opens and
-  // descends into, unless `skipDescendants()` forgets it first.
+  // descends into, unless `skipDescendants()` forgets it first. With
+  // `.sameDevice`, also a directory on another device that a
+  // `.preorderAndPostorder` walk visits again next, unless skipped.
   internal var _entered: _Entered?
 
   // With `.includesRoot`, where the walk is in the root's visits.
@@ -95,6 +97,10 @@ public struct DirectoryWalk: ~Copyable {
 
   internal let _options: Options
 
+  // With `.sameDevice`, the root's device, which the first call to `next()`
+  // gets.
+  internal var _rootDevice: UInt64?
+
   internal init(
     _root dir: system_DIRPtr, path: FilePath, order: Order, opening: DirectoryOpening,
     options: Options
@@ -107,6 +113,7 @@ public struct DirectoryWalk: ~Copyable {
     self._order = order
     self._opening = opening
     self._options = options
+    self._rootDevice = nil
   }
 
   deinit {
@@ -356,14 +363,41 @@ extension DirectoryWalk {
     /// doesn't record an entry's type.
     @_alwaysEmitIntoClient
     public static var includesStatus: Options { Options(rawValue: 1 << 2) }
+
+    /// Doesn't go into a directory on another device than the root's,
+    /// as `fts`'s `FTS_XDEV` doesn't.
+    ///
+    /// Such a directory is usually where another file system is mounted
+    /// in the root's.
+    /// The walk visits it as it visits an empty directory:
+    /// before its contents, after them, or both, as the walk's order says,
+    /// with nothing between, as `fts` visits it (`FTS_D` and `FTS_DP`).
+    ///
+    /// Before the walk opens a directory,
+    /// it compares the directory's device with the root's,
+    /// so it never opens one on another device.
+    /// It takes the device from the directory's status:
+    /// the entry's ``Entry/status``, with ``includesStatus``,
+    /// or one it gets as that option does, without following a link.
+    /// If getting the status fails, the walk doesn't go into the directory,
+    /// and the error is the entry's ``Entry/error``,
+    /// as if opening the directory had failed.
+    ///
+    /// This costs an `fstatat` for each directory the walk opens,
+    /// unless it has ``includesStatus``, and an `fstat` of the root.
+    @_alwaysEmitIntoClient
+    public static var sameDevice: Options { Options(rawValue: 1 << 3) }
   }
 
   // A directory that `next()` returned without opening it, with
-  // `.whenEntered`.
+  // `.whenEntered`; or with `.sameDevice`, a directory on another device,
+  // whose second visit the next call makes in a `.preorderAndPostorder`
+  // walk.
   internal struct _Entered {
     var name: FilePath.Component
     var status: Stat?
     var statusError: Errno?
+    var onAnotherDevice: Bool = false
   }
 
   // Where a walk with `.includesRoot` is in the root's visits.
@@ -493,6 +527,8 @@ extension DirectoryWalk {
     /// and the walk doesn't visit its contents;
     /// a walk that opens directories ``DirectoryOpening/whenEntered``
     /// reports it on the directory's second visit.
+    /// With ``Options/sameDevice``, it can be the error
+    /// from getting the directory's status before opening it.
     /// It can be ``Errno/permissionDenied``,
     /// or ``Errno/tooManyOpenFiles`` when the tree is too deep
     /// for a walk without ``Options/boundedDescriptors``,
@@ -585,7 +621,8 @@ extension DirectoryWalk {
   /// The corresponding C functions are `readdir`, and for each directory,
   /// `openat` and `fdopendir`;
   /// with ``Options/boundedDescriptors``, `fstat` too,
-  /// and `openat` and `fstat` again to reopen one.
+  /// and `openat` and `fstat` again to reopen one;
+  /// and with ``Options/sameDevice``, `fstatat` before opening one.
   @_alwaysEmitIntoClient
   public mutating func next(retryOnInterrupt: Bool = true) throws(Errno) -> Entry? {
     try _next(retryOnInterrupt: retryOnInterrupt).get()
@@ -624,17 +661,46 @@ extension DirectoryWalk {
     case .off, .inside:
       break
     }
+    if _options.contains(.sameDevice), _rootDevice == nil, !_levels.isEmpty {
+      switch _identity(of: _levels[0].fileDescriptor, retryOnInterrupt: retryOnInterrupt) {
+      case .success(let identity):
+        _rootDevice = identity.device
+      case .failure(let error):
+        // Without the root's device, the walk can't tell which directories
+        // it may go into: it ends, as when reading the root fails.
+        _ = _closeAll()
+        _pending = nil
+        _entered = nil
+        _levels = []
+        _rootVisits = .off
+        return .failure(error)
+      }
+    }
     // Descend into the directory the last entry opened, in preorder.
     if let pending = _pending.take() {
       _descend(into: pending)
     } else if let entered = _entered.take(), let parent = _levels.last {
       // Or open the one it named, with `.whenEntered`. If that fails, the
       // directory's second visit has the error, in place of its contents.
-      switch _openChild(entered.name, in: parent, retryOnInterrupt: retryOnInterrupt) {
-      case .success(var child):
+      let opened = entered.onAnotherDevice
+        ? .success(nil)
+        : _openChild(
+          entered.name, in: parent, status: entered.status, retryOnInterrupt: retryOnInterrupt)
+      switch opened {
+      case .success(var child?):
         child.status = entered.status
         child.statusError = entered.statusError
         _descend(into: child)
+      case .success(nil):
+        // On another device, with `.sameDevice`: it has no contents to
+        // visit, and in a preorder-and-postorder walk, its second visit is
+        // now.
+        if _order == .preorderAndPostorder {
+          return .success(Entry(
+            name: entered.name, type: .directory, depth: _levels.count,
+            error: nil, parentPath: parent.path, isPostorderVisit: true,
+            status: entered.status, statusError: entered.statusError))
+        }
       case .failure(let error):
         return .success(Entry(
           name: entered.name, type: .directory, depth: _levels.count,
@@ -781,13 +847,16 @@ extension DirectoryWalk {
   ) -> Entry? {
     let depth = _levels.count
     var error = found.error
+    var isPostorderVisit = false
     if found.type == .directory {
       if _opening == .whenEntered && _order != .postorder {
         _entered = _Entered(
           name: name, status: found.status, statusError: found.statusError)
       } else {
-        switch _openChild(name, in: level, retryOnInterrupt: retryOnInterrupt) {
-        case .success(var child):
+        switch _openChild(
+          name, in: level, status: found.status, retryOnInterrupt: retryOnInterrupt
+        ) {
+        case .success(var child?):
           child.status = found.status
           child.statusError = found.statusError
           if _order == .postorder {
@@ -795,6 +864,18 @@ extension DirectoryWalk {
             return nil
           }
           _pending = child
+        case .success(nil):
+          // On another device, with `.sameDevice`: visited as an empty
+          // directory is, as fts visits one with FTS_XDEV. A postorder
+          // walk's only visit is its visit after its contents; a
+          // preorder-and-postorder walk makes the second next.
+          if _order == .postorder {
+            isPostorderVisit = true
+          } else if _order == .preorderAndPostorder {
+            _entered = _Entered(
+              name: name, status: found.status, statusError: found.statusError,
+              onAnotherDevice: true)
+          }
         case .failure(let failure):
           error = failure
         }
@@ -802,7 +883,7 @@ extension DirectoryWalk {
     }
     return Entry(
       name: name, type: found.type, depth: depth, error: error, parentPath: level.path,
-      status: found.status, statusError: found.statusError)
+      isPostorderVisit: isPostorderVisit, status: found.status, statusError: found.statusError)
   }
 
   /// With `.includesRoot`, when the root's entries are done: the root's
@@ -824,10 +905,33 @@ extension DirectoryWalk {
       status: _levels[0].status, statusError: _levels[0].statusError)
   }
 
-  /// Opens a directory in `level` for the walk to read.
+  /// Opens a directory in `level` for the walk to read; or with
+  /// `.sameDevice`, returns `nil` for a directory on another device than
+  /// the root's, without opening it. `status` is the directory's, if the
+  /// walk has it.
   internal func _openChild(
-    _ name: FilePath.Component, in level: _Level, retryOnInterrupt: Bool
-  ) -> Result<_Level, Errno> {
+    _ name: FilePath.Component, in level: _Level, status: Stat?, retryOnInterrupt: Bool
+  ) -> Result<_Level?, Errno> {
+    if let rootDevice = _rootDevice {
+      // The device from the directory's status, as fts's FTS_XDEV compares
+      // it, so that the walk doesn't open a directory on another device,
+      // which could trigger an automount.
+      let device: Result<UInt64, Errno>
+      if let status {
+        device = .success(UInt64(truncatingIfNeeded: status.rawValue.st_dev))
+      } else {
+        device = name._withPlatformStringInPlace {
+          Stat._fstatat(
+            $0, relativeTo: level.fileDescriptor, flags: .symlinkNoFollow,
+            retryOnInterrupt: retryOnInterrupt)
+        }.map { UInt64(truncatingIfNeeded: $0.st_dev) }
+      }
+      switch device {
+      case .success(let device) where device != rootDevice: return .success(nil)
+      case .success: break
+      case .failure(let error): return .failure(error)
+      }
+    }
     // Open the directory relative to its parent, without following a
     // symbolic link, so that a directory replaced by a link since readdir
     // fails to open rather than leading out of the tree.
