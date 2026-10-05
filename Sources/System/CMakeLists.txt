@@ -249,6 +249,7 @@ target_sources(SystemPackage PRIVATE
   Processes/SignalSet.swift
   Processes/Spawn.swift)
 target_sources(SystemPackage PRIVATE
+  Internals/Constants+MachO.swift
   Internals/Constants+Provisional.swift
   Internals/Syscalls+Provisional.swift
   Internals/Syscalls+ProvisionalLocale.swift
@@ -256,6 +257,7 @@ target_sources(SystemPackage PRIVATE
   Provisional/Provisional+CType.swift
   Provisional/Provisional+Execinfo.swift
   Provisional/Provisional+Locale.swift
+  Provisional/Provisional+MachO.swift
   Provisional/Provisional+Math.swift
   Provisional/Provisional+POSIXErrorCode.swift
   Provisional/Provisional+Stdio.swift
