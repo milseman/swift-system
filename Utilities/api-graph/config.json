@@ -9,13 +9,16 @@
     "promote / demote: type paths to promote regardless, or never.",
     "partsForClustersOver: parts of clusters with more declarations than",
     "  this are ranked as carve-outs of their own.",
-    "weights: the ranking's penalties; see method.md."
+    "weights: the ranking's penalties; see method.md.",
+    "valueSize: the high-value carve-outs' size range, in declarations",
+    "  (scripts/value.py): meaningful, but not enormous."
   ],
   "namespaces": ["CInterop"],
   "promoteMinPlaces": 2,
   "promote": [],
   "demote": [],
   "partsForClustersOver": 30,
+  "valueSize": [3, 60],
   "weights": {
     "declaration": 1.0,
     "type": 1.0,

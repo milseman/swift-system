@@ -887,8 +887,8 @@ def categorize(site, entries, coverage, modules, vocab=None):
     for kind in ("System gap", "queued", "not System's", "standard library"):
         hs = [h for h in site["holders"] if h["category"] == kind]
         if hs:
-            shown = "; ".join(f"{h['holder']} ({', '.join(h['names'][:4])}"
-                              f"{'…' if len(h['names']) > 4 else ''}: {plats(h['platforms'])})" for h in hs[:6])
+            shown = "; ".join(f"{h['holder']} ({', '.join(h['names'][:3])}"
+                              f"{'…' if len(h['names']) > 3 else ''}: {plats(h['platforms'])})" for h in hs[:6])
             site.update(category=kind, holder=[h["holder"] for h in hs],
                         reason=shown + (f"; and {len(hs) - 6} more" if len(hs) > 6 else ""))
             return site
@@ -1231,11 +1231,15 @@ def section(w, a, led):
 
     w("## Every site")
     w("")
-    w("<details><summary>By repository: file:line, what it imports, platforms, category, holder and reason</summary>")
+    w("<details><summary>By repository: file, lines and what they import, platforms, category, holder and "
+      "reason; the unexplained sites are in the table above</summary>")
     w("")
     for r in led["read"]:
-        ss = [s for s in sites if s["repository"] == r["repository"]]
-        w(f"**{r['repository']}**, at {r['where']}: " + (f"{len(ss)} sites." if ss else "no sites."))
+        everyone = [s for s in sites if s["repository"] == r["repository"]]
+        ss = [s for s in everyone if s["category"] != "unexplained"]
+        n_un = len(everyone) - len(ss)
+        w(f"**{r['repository']}**, at {r['where']}: " + (f"{len(everyone)} sites" if everyone else "no sites")
+          + (f", {n_un} of them unexplained (above)" if n_un else "") + ".")
         w("")
         for g in grouped(ss):
             s = g[0]

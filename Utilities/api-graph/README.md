@@ -59,7 +59,7 @@ In `API_GRAPH_OUT`:
   - `PITCHES.md` and `pitches.json`: every pitch file resolved and checked;
   - `pitches/<id>/`, a bundle per pitch file: `bundle.md` (the brief, including the pitch file's rules and what they matched, open questions, prerequisites, declarations, source ranges, tests, samples, adopter examples with the hunks that introduced them, related API by domain, prior text and commit messages), `bundle.json`, `sources.md`, `tests.md`, `samples.md` and `adopters.md`.
 - **The suggestions**:
-  - `SUGGESTIONS.md` and `suggestions.json`: the clustering's carve-outs (clusters, parts, batches), their open questions, a suggested order, how much of each the pitch files already cover, candidate pitches, adopter reach, and "How this was generated" (`scripts/method.md`, every design decision with the alternative it rejected, and where the tool is wrong);
+  - `SUGGESTIONS.md` and `suggestions.json`: first the high-value carve-outs (`scripts/value.py`: those with a potential adopter in the update-checkout cluster, no open question or new shared vocabulary type, and 3 to 60 declarations, ranked by the cluster's sites; `highValue` in the JSON), then the clustering's carve-outs (clusters, parts, batches), their open questions, a suggested order, how much of each the pitch files already cover, candidate pitches, adopter reach, and "How this was generated" (`scripts/method.md`, every design decision with the alternative it rejected, and where the tool is wrong);
   - `suggestions/<id>/`, a bundle per suggested carve-out, and `suggestions/drafts/<id>.json`, a draft pitch file for every suggestion no pitch covers yet;
   - `clusters.dot` and `atoms.dot`, for Graphviz.
 - `adopters.json`: the packages, their builds, and every adopted and would-benefit site; `api-delta/`, the api-delta report this run used; `logs/`.
@@ -94,7 +94,7 @@ For each declaration, and so for each pitch and suggestion:
 
 **To add a package, clone it into `../ecosystem`, or, with a migration branch, into `../adopters`.** The next run picks it up. A clone's identity is its origin URL, so a package cloned in both is one package. A migration is built as the coverage tools' package file for it says (`Utilities/adopter-coverage/packages/`), or with a plain `swift build` when there's none. Its C interfaces are the coverage tools' extraction of its commit when their store has one, and a lexical scan of its library sources until then; `Utilities/adopter-coverage/ecosystem.sh survey` and `run` produce the extraction.
 
-`scripts/reach.py` ranks or filters the suggestions by reach: `--package swift-nio`, `--min 3`, `--kind part`, `--sort using|benefit|sites|rank`, `--json`.
+`scripts/reach.py` ranks or filters the suggestions by reach: `--package swift-nio`, `--min 3`, `--kind part`, `--sort using|benefit|sites|rank`, `--json`. `scripts/value.py` lists the high-value carve-outs from a run's `suggestions.json` (`--all` shows every carve-out with each test, `--scheme` another cluster list, `--json`); the update-checkout cluster is `$API_GRAPH_ECOSYSTEM/scheme-main.tsv`, and the size range is `config.json`'s `valueSize`.
 
 ## How the graph changes as lanes merge
 

@@ -364,6 +364,7 @@ report=(--graph "$WORK/graph.json" --clusters "$WORK/clusters.json" --meta "$WOR
 if [ -f "$WORK/previous.json" ]; then report+=(--previous "$WORK/previous.json"); fi
 if [ -f "$WORK/adopters.json" ]; then report+=(--adopters "$WORK/adopters.json"); fi
 report+=(--pitches "$STAGE/pitches.json")
+if [ -n "$ECOSYSTEM" ] && [ -f "$ECOSYSTEM/scheme-main.tsv" ]; then report+=(--scheme "$ECOSYSTEM/scheme-main.tsv"); fi
 python3 "$S/report.py" "${report[@]}"
 
 if [ -f "$WORK/adopters.json" ]; then cp "$WORK/adopters.json" "$STAGE/"; fi
