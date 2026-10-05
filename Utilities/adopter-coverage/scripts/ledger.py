@@ -927,7 +927,8 @@ def rank_gaps(sites):
     is unblocked when none of its gaps is left), ties going to more
     platforms, then to more sites held. When no gap would unblock a site on
     its own, the one holding the most sites goes next. Returns [(unit,
-    {unblocks, holds, platforms, names, repositories, how})]."""
+    {unblocks, files (those the unblocked sites are in), holds, platforms,
+    names, repositories, how})]."""
     left = {}
     info = collections.defaultdict(lambda: {"holds": 0, "platforms": set(), "names": set(), "repositories": set(),
                                             "how": collections.Counter()})
@@ -961,7 +962,8 @@ def rank_gaps(sites):
             if not left[k]:
                 del left[k]
         i = info[pick]
-        order.append((pick, {"unblocks": len(freed), "holds": i["holds"],
+        files = {(sites[k]["repository"], sites[k]["file"]) for k in freed}
+        order.append((pick, {"unblocks": len(freed), "files": len(files), "holds": i["holds"],
                              "platforms": [p for p in PLATFORMS if p in i["platforms"]],
                              "names": sorted(i["names"]), "repositories": sorted(i["repositories"]),
                              "how": [h for h, _ in i["how"].most_common(2)]}))
@@ -1128,8 +1130,9 @@ def section(w, a, led):
     w("")
     w("Each row is a gap in System at `system-next`: a mapping.ini entry (or a C name in none) that System lacks on "
       "the platforms given, or a gap `exceptions.ini` keeps by hand. *Unblocks*: the sites that leave this "
-      "category once it's filled, given the rows above are; the order is greedy, ties going to more platforms. "
-      "*Holds*: every site it's one of the gaps of.")
+      "category once it's filled, given the rows above are, and the files they're in (a scoped import is a site "
+      "of its own, so a file that imports declaration by declaration has many); the order is greedy, ties going "
+      "to more platforms. *Holds*: every site it's one of the gaps of.")
     w("")
     if led["gaps"]:
         w("| # | Gap | Lacks | Unblocks | Holds | Repositories | C names | System |")
@@ -1140,7 +1143,8 @@ def section(w, a, led):
             names = ", ".join(f"`{n}`" for n in g["names"][:6]) + ("…" if len(g["names"]) > 6 else "")
             how = "kept by hand (`exceptions.ini`)" if unit in entry else (g["how"] or [""])[0]
             how = how if len(how) <= 110 else how[:110].rsplit(" ", 1)[0] + " …"
-            w(f"| {k} | {st.cell(label)} | {', '.join(g['platforms'])} | {g['unblocks']} | {g['holds']} | "
+            w(f"| {k} | {st.cell(label)} | {', '.join(g['platforms'])} | {g['unblocks']} ({g['files']} "
+              f"file{'s' if g['files'] != 1 else ''}) | {g['holds']} | "
               f"{', '.join(g['repositories'])} | {names} | {st.cell(how)} |")
     else:
         w("None.")
@@ -1350,7 +1354,8 @@ METHOD = """
   System covers every name it serves there, the scan found none, or it's a marker that names no C interface.
 - **Ranking**: System gaps in the order to fill them, greedily: next is the gap that unblocks the most sites, given the
   ones above are filled (a site is unblocked when none of its gaps is left), ties going to more platforms, then to more
-  sites held. Entries by the sites they hold. **The floor** holds on a platform when no site compiled there (maybe
+  sites held. A scoped import is a site of its own, so a file that imports declaration by declaration (swift-build's
+  MachO.swift) weighs more than one whole-module import; each row gives the files too. Entries by the sites they hold. **The floor** holds on a platform when no site compiled there (maybe
   included) is left but exceptions, excluded ones and [report] modules'. Rejected: counting each C name on each line as
   a site (inventory.py's unit), which made a whole-module import of WinSDK hundreds of sites; and ranking gaps by the
   sites they hold, which counts a site once per gap and ranks gaps that free nothing alone above ones that do.

@@ -397,8 +397,8 @@ class MarkerParserTests(unittest.TestCase):
 
 class RankTests(unittest.TestCase):
     @staticmethod
-    def gap_site(*units, platforms=("Linux",)):
-        return {"category": "System gap", "repository": "pkg",
+    def gap_site(*units, platforms=("Linux",), file="a.swift"):
+        return {"category": "System gap", "repository": "pkg", "file": file,
                 "holders": [{"category": "System gap", "holder": u, "names": [u], "platforms": list(platforms)}
                             for u in units]}
 
@@ -407,6 +407,10 @@ class RankTests(unittest.TestCase):
                  self.gap_site("C")]
         order = [(u, g["unblocks"], g["holds"]) for u, g in ledger.rank_gaps(sites)]
         self.assertEqual(order, [("A", 2, 2), ("B", 1, 2), ("C", 2, 2)])
+
+    def test_files_unblocked(self):
+        sites = [self.gap_site("A"), self.gap_site("A"), self.gap_site("A", file="b.swift")]
+        self.assertEqual([(u, g["unblocks"], g["files"]) for u, g in ledger.rank_gaps(sites)], [("A", 3, 2)])
 
     def test_nothing_unblocked_alone(self):
         order = [(u, g["unblocks"]) for u, g in ledger.rank_gaps([self.gap_site("A", "B"), self.gap_site("A", "B")])]
