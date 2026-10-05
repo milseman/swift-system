@@ -7,8 +7,11 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-// Dynamic loading: dlopen, dlsym, dlclose and dlerror. These report
-// failure through dlerror rather than errno, so they have no mock hooks.
+// Dynamic loading: dlsym, dlclose and dlerror. These report failure through
+// dlerror rather than errno, so they have no mock hooks. dlopen has no
+// wrapper here: DynamicLibrary._open calls it in code emitted into the
+// client, since the dynamic linker resolves paths against the caller's
+// image.
 
 #if !os(Windows) && !os(WASI)
 
@@ -24,13 +27,6 @@ import Android
 #else
 #error("Unsupported Platform")
 #endif
-
-// A null path opens the program itself.
-internal func system_dlopen(
-  _ path: UnsafePointer<CChar>?, _ mode: CInt
-) -> UnsafeMutableRawPointer? {
-  dlopen(path, mode)
-}
 
 internal func system_dlsym(
   _ handle: UnsafeMutableRawPointer, _ symbol: UnsafePointer<CChar>

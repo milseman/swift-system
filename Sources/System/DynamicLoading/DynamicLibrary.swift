@@ -13,6 +13,19 @@
 
 #if !os(Windows) && !os(WASI)
 
+// Must import here to call dlopen in @_alwaysEmitIntoClient code.
+#if SYSTEM_PACKAGE_DARWIN
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif canImport(Musl)
+import Musl
+#elseif canImport(Android)
+import Android
+#else
+#error("Unsupported Platform")
+#endif
+
 /// A library that the dynamic linker has loaded into the process,
 /// or the program itself, whose symbols you can look up.
 ///
@@ -169,6 +182,17 @@ extension DynamicLibrary {
   ///     a symbol that's missing, and keeps its symbols to this handle,
   ///     on every platform.
   ///
+  /// The dynamic linker resolves some paths against the image
+  /// that calls `dlopen`:
+  /// on Darwin, `@loader_path` is that image's directory,
+  /// and `@rpath`, as a name without a `/` does, searches its run paths
+  /// and then the program's;
+  /// with glibc, `$ORIGIN` is that image's directory,
+  /// and a name without a `/` searches its run paths.
+  /// This initializer is emitted into your code, call and all,
+  /// so the image is the program or library that calls it,
+  /// even when System is a library of its own.
+  ///
   /// The corresponding C function is `dlopen`.
   @_alwaysEmitIntoClient
   public init(_ path: FilePath, options: OpenOptions = [.now, .local]) throws(LoaderError) {
@@ -186,6 +210,11 @@ extension DynamicLibrary {
   ///     The default, `[.now, .local]`, fails if the library needs
   ///     a symbol that's missing, and keeps its symbols to this handle,
   ///     on every platform.
+  ///
+  /// As with ``init(_:options:)-(FilePath,_)``, the call to `dlopen`
+  /// is emitted into your code, so the dynamic linker resolves
+  /// `@loader_path`, `@rpath`, and `$ORIGIN` against the image
+  /// that calls this initializer.
   ///
   /// The corresponding C function is `dlopen`.
   @_alwaysEmitIntoClient
@@ -208,11 +237,16 @@ extension DynamicLibrary {
     DynamicLibrary(taking: try _open(nil, options: options).get())
   }
 
-  @usableFromInline
+  // Emitted into the client, and calling dlopen itself, which has no
+  // system_ wrapper, so that dlopen runs in the caller's image, which the
+  // dynamic linker resolves @loader_path, @rpath and $ORIGIN against. The
+  // error comes from System's image, which is fine: dlerror's is the
+  // calling thread's.
+  @_alwaysEmitIntoClient
   internal static func _open(
     _ path: UnsafePointer<CChar>?, options: OpenOptions
   ) -> Result<UnsafeMutableRawPointer, LoaderError> {
-    guard let handle = system_dlopen(path, options.rawValue) else {
+    guard let handle = dlopen(path, options.rawValue) else {
       return .failure(_loaderError())
     }
     return .success(handle)
@@ -408,6 +442,7 @@ extension DynamicLibrary {
 
 /// The calling thread's last dynamic linking error.
 @available(System 199, *)
+@usableFromInline
 internal func _loaderError() -> DynamicLibrary.LoaderError {
   DynamicLibrary.LoaderError(
     message: system_dlerror().map { String(platformString: $0) } ?? "unknown dynamic linker error")

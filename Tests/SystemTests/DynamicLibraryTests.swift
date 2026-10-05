@@ -113,6 +113,24 @@ private struct DynamicLibraryTests {
     #expect(found != nil)
     try adopted.close()
   }
+
+  #if SYSTEM_PACKAGE_DARWIN
+  /// `@loader_path` is the directory of the image that calls the
+  /// initializer, this test's, where the test's image finds itself by name.
+  /// With `.noLoad`, that opens another handle to the loaded test image.
+  ///
+  /// SwiftPM links System into the test image, so this passes even if the
+  /// call to dlopen is System's; it tells the two apart only where System is
+  /// a library of its own.
+  @available(System 199, *)
+  @Test func loaderPathIsTheCallersImage() throws {
+    let image = try #require(DynamicLibrary.symbolInfo(containing: #dsohandle))
+    let name = try #require(image.libraryPath.lastComponent)
+    let again = try DynamicLibrary(
+      FilePath("@loader_path").appending(name), options: [.now, .noLoad])
+    try again.close()
+  }
+  #endif
 }
 
 #endif // !os(Windows) && !os(WASI)
