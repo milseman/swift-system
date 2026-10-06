@@ -89,10 +89,10 @@ On an M1 Max with Swift 6.2. These are the full runs on the three packages the t
 
 | Package | macOS | Linux (container) |
 |---|---|---|
-| swift-log `migrate-all` | 1 s (nothing to build) | 2 s (nothing to build) |
+| swift-log `migrate-all` | 2 s (nothing to build) | 1 s (nothing to build) |
 | swift-log `main` (upstream) | 17 s | |
-| swift-tools-support-core `migrate-unix` | 58 s | 54 s |
-| swift-nio `migrate-unix` | 8 s (nothing to build) | 109 s, 75 of them the baseline |
+| swift-tools-support-core `migrate-unix` | 58 s | 53 s |
+| swift-nio `migrate-unix` | 8 s (nothing to build) | 116 s, 82 of them the baseline |
 
 swift-nio's scratch directory reaches about 1.2 GB on Linux. It's deleted when the package is done.
 
