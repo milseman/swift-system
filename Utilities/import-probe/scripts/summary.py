@@ -117,8 +117,10 @@ def ledger_compare(result, led):
     out["inactiveForProbe"] = [{"file": s["file"], "line": s["line"], "module": s.get("module"),
                                 "ledger": s["platforms"][plat]} for s in inactive]
     out["notRemovedByProbe"] = [{"file": s["file"], "line": s["line"], "text": s.get("text")} for s in unseen]
+    shims = set(meta.get("shims") or [])
     out["probeOnlyImports"] = [{"file": r["file"], "line": r["line"], "text": r["text"], "target": r["target"],
-                                "names": sorted(serves.get((r["file"], r["line"]), ()))} for r in probe_only]
+                                "shim": r["module"] in shims, "names": sorted(serves.get((r["file"], r["line"]), ()))}
+                               for r in probe_only]
     out["unexplained"] = unexplained
     sites_out = []
     for s, r in matched:
@@ -132,8 +134,9 @@ def ledger_compare(result, led):
         pnames = serves.get((r["file"], r["line"]), set())
         built = r["target"] in probed
         disagree = sorted(n for n in lnames & pnames if answers.get(n) and answers[n] != class_of.get(n))
+        others = sorted(p for p in (s.get("platforms") or {}) if p != plat)
         sites_out.append({"file": s["file"], "line": s["line"], "target": r["target"], "built": built,
-                          "exported": r["exported"], "both": sorted(lnames & pnames),
+                          "exported": r["exported"], "otherPlatforms": others, "both": sorted(lnames & pnames),
                           "ledgerOnly": sorted(lnames - pnames), "probeOnly": sorted(pnames - lnames),
                           "classDisagrees": disagree, "through": through.get(r["target"], []),
                           "removable": built and not pnames and not through.get(r["target"])})
@@ -267,14 +270,25 @@ def ledger_section(w, result, cmp):
     if cmp["notRemovedByProbe"]:
         w(f"- **In a target, but the probe didn't remove them** ({len(cmp['notRemovedByProbe'])}): "
           + ", ".join(f"`{s['file']}:{s['line']}` ({s['text']})" for s in cmp["notRemovedByProbe"]))
-    if cmp["probeOnlyImports"]:
-        w(f"- **Removed by the probe, no ledger site** ({len(cmp['probeOnlyImports'])}): "
-          + ", ".join(f"`{s['file']}:{s['line']}`" for s in cmp["probeOnlyImports"]))
+    plain = [s for s in cmp["probeOnlyImports"] if not s["shim"]]
+    shim = [s for s in cmp["probeOnlyImports"] if s["shim"]]
+    if plain:
+        w(f"- **Removed by the probe, no ledger site** ({len(plain)}): "
+          + ", ".join(f"`{s['file']}:{s['line']}`" for s in plain))
+    if shim:
+        needed = sorted({n for s in shim for n in s["names"]})
+        w(f"- **Shim imports** ({len(shim)}, of {', '.join(sorted({code(s['text'].split()[-1]) for s in shim}))}): "
+          "the ledger counts a shim's re-export, not the imports of it, so these have no site. "
+          + (f"The compiler needed {', '.join(code(n) for n in needed[:10])} from them."
+             if needed else f"The compiler needed nothing from them on {plat}: on this platform they can go."))
     removable = [f for f in cmp["files"] if f["removable"]]
     if removable:
-        w(f"- **Builds without them** ({len(removable)}): the compiler needed nothing these imports gave, and the "
-          "target reaches no C module through another target's re-export, so they can go now: "
-          + ", ".join(f"`{f['file']}:{f['line']}`" for f in removable) + ".")
+        w(f"- **Builds without them** ({len(removable)}): the compiler needed nothing these imports gave on {plat}, "
+          "and the target reaches no C module through another target's re-export: "
+          + ", ".join(f"`{f['file']}:{f['line']}`"
+                      + (f" (the ledger has it compiled on {', '.join(f['otherPlatforms'])} too, which this run "
+                         "didn't build)" if f["otherPlatforms"] else " (only here: it can go)")
+                      for f in removable) + ".")
     through = [f for f in cmp["files"] if f["built"] and not f["both"] and not f["probeOnly"] and f["through"]]
     if through:
         w(f"- **Builds without them, but only through a re-export** ({len(through)}): "

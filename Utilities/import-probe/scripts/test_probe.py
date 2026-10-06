@@ -388,8 +388,10 @@ class LedgerComparisonTests(unittest.TestCase):
         self.assertEqual(a["classDisagrees"], ["TCP_INFO"])
         b = next(f for f in cmp["files"] if f["file"] == "Sources/A/b.swift")
         self.assertTrue(b["removable"])
+        self.assertEqual(b["otherPlatforms"], [])
         self.assertFalse(a["removable"])
         self.assertEqual(cmp["unexplained"], {})
+        self.assertFalse(cmp["probeOnlyImports"][0]["shim"])
 
     def test_a_reexport_serves_its_module(self):
         r = result_fixture()
