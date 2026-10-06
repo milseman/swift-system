@@ -11,8 +11,8 @@
 
 import WinSDK
 
-// Ending the calling process on Windows: ProcessID's exit, exitImmediately
-// and addExitHandler, and ProcessID.ExitCode's C-standard codes.
+// Ending the calling process on Windows: ProcessID's exit, exitImmediately,
+// abort and addExitHandler, and ProcessID.ExitCode's C-standard codes.
 // ProcessExit.swift and ExitCode.swift declare them for the other platforms.
 
 @available(System 199, *)
@@ -84,6 +84,37 @@ extension ProcessID {
     _ = system_TerminateProcess(system_GetCurrentProcess(), UINT(bitPattern: status))
     // TerminateProcess doesn't return when it ends the calling process.
     system__exit(status)
+  }
+
+  /// Ends the calling process abnormally, as a crash.
+  ///
+  /// On Windows, the C runtime first raises `SIGABRT`
+  /// if a handler for it was installed with `signal`.
+  /// If none was, or the handler returns,
+  /// the process ends at once with a fast-fail exception,
+  /// which no exception handler sees,
+  /// and which Windows Error Reporting can record as a crash.
+  /// The exit code that the process's parent reads is then
+  /// `STATUS_STACK_BUFFER_OVERRUN` (`0xC0000409`), whatever the cause.
+  /// With the debug C runtime, or once `_set_abort_behavior`
+  /// turns off `_CALL_REPORTFAULT`,
+  /// the process exits with code 3 instead.
+  ///
+  /// The handlers that ``addExitHandler(_:)`` registered don't run,
+  /// and the C streams aren't flushed.
+  ///
+  /// A failed precondition or `fatalError` traps instead,
+  /// which ends the process with the processor's exception for a trap.
+  ///
+  /// The corresponding C function is `abort`.
+  @_alwaysEmitIntoClient
+  public static func abort() -> Never {
+    _abort()
+  }
+
+  @usableFromInline
+  internal static func _abort() -> Never {
+    system_abort()
   }
 
   /// Registers a function to run when the calling process exits.

@@ -21,7 +21,7 @@ import Testing
 
 import ucrt
 
-// ProcessID's exit, exitImmediately and addExitHandler, and
+// ProcessID's exit, exitImmediately, abort and addExitHandler, and
 // ProcessID.ExitCode, on Windows.
 @Suite("Process exit on Windows")
 private struct Win32ProcessExitTests {
@@ -104,6 +104,23 @@ private struct Win32ProcessExitTests {
     let output = String(decoding: result.standardOutputContent, as: UTF8.self)
     #expect(!output.contains("buffered"))
     #expect(!output.contains("handler"))
+  }
+
+  /// With the release C runtime, which Swift programs link, and no
+  /// `SIGABRT` handler, the process ends with a fast fail. The child is
+  /// swift-testing's, and swift-testing turns off Windows Error Reporting's
+  /// dialog in it.
+  @available(System 199, *)
+  @Test func abortEndsTheProcessWithAFastFailAndNoHandlers() async throws {
+    let result = try await #require(
+      processExitsWith: .exitCode(CInt(bitPattern: 0xC000_0409)), observing: [\.standardOutputContent]
+    ) {
+      try ProcessID.addExitHandler {
+        _ = "handler".withCString { ucrt._write(1, $0, 7) }
+      }
+      ProcessID.abort()
+    }
+    #expect(!String(decoding: result.standardOutputContent, as: UTF8.self).contains("handler"))
   }
 
   @available(System 199, *)
