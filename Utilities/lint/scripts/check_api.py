@@ -304,6 +304,22 @@ def added_declarations(delta, scan, source):
     return out
 
 
+def sentence_at(text, i, limit=160):
+    """The sentence from i to the first period outside backticks that ends
+    one, as derive.py's sentences() reads them, shortened past limit."""
+    tick = False
+    for j in range(i, len(text)):
+        ch = text[j]
+        if ch == "`":
+            tick = not tick
+        elif ch == "." and not tick and (j + 1 == len(text) or text[j + 1].isspace()):
+            out = text[i:j + 1]
+            break
+    else:
+        out = text[i:]
+    return out if len(out) <= limit else out[:limit - 1].rstrip() + "…"
+
+
 def skipped(d):
     """Declarations that aren't API to judge: fix-it stubs, underscored and
     deprecated ones, public members of non-public types."""
@@ -402,12 +418,13 @@ def check(delta, scan, source, graphs, allow):
             if not names:
                 report(d, "api/doc-sentence", "error", f"derive.py reads no C name from “{text}”")
         for m in CORRESPONDING.finditer(joined):
-            if derive.HEAD.match(joined, max(0, m.start() - 4)):
+            start = max(0, m.start() - 4)
+            if derive.HEAD.match(joined, start):
                 continue
-            tail = joined[m.start():m.start() + 70].split(". ")[0]
             report(d, "api/doc-sentence", "error",
-                   f"“{tail}…” isn't a form the coverage tools read (“The corresponding C function is `x`.”, "
-                   "or constant, type, field, macro, variable)")
+                   f"“{sentence_at(joined, start if joined[start:m.start()].lower() == 'the ' else m.start())}” "
+                   "isn't a form the coverage tools read (“The corresponding C function is `x`.”, or constant, "
+                   "type, field, macro, variable)")
         body = source.body(d.file, d.line) if d.kw in ("func", "init", "var", "let", "subscript") or \
             d.kind in ("swift.func", "swift.method", "swift.type.method", "swift.init", "swift.property",
                        "swift.type.property", "swift.subscript", "swift.func.op") else ""
