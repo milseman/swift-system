@@ -436,4 +436,43 @@ private struct ProvisionalMachOTests {
   }
 }
 
+@Suite("Provisional Mach-O architecture names")
+private struct ProvisionalMachOArchitectureNameTests {
+  /// Names for types and subtypes, and back. The subtypes are
+  /// <mach/machine.h>'s CPU_SUBTYPE_ARM64_ALL, CPU_SUBTYPE_ARM64E and
+  /// CPU_SUBTYPE_X86_64_ALL.
+  @available(System 199, *)
+  @available(macOS 13.0, iOS 16.0, watchOS 8.0, tvOS 16.0, *)
+  @Test func namesForTypesAndSubtypes() throws {
+    let known: [(name: String, type: Mach.CPUType, subtype: Int32)] = [
+      ("arm64", .arm64, 0), ("arm64e", .arm64, 2), ("x86_64", .x86_64, 3),
+    ]
+    for (name, type, subtype) in known {
+      let subtype = Mach.CPUSubtype(rawValue: subtype)
+      #expect(MachOFile.architectureName(cpuType: type, cpuSubtype: subtype) == name)
+      let found = try #require(MachOFile.cpuType(forArchitectureName: name))
+      #expect(found.cpuType == type)
+      #expect(found.cpuSubtype.withoutFeatureFlags == subtype)
+    }
+    #expect(MachOFile.cpuType(forArchitectureName: "not-an-architecture") == nil)
+    #expect(MachOFile.cpuType(forArchitectureName: "") == nil)
+    #expect(MachOFile.architectureName(
+      cpuType: Mach.CPUType(rawValue: 0x7eee_0000), cpuSubtype: Mach.CPUSubtype(rawValue: 0)) == nil)
+  }
+
+  /// The test image's header names its own architecture, and the program's
+  /// is the host's processor type.
+  @available(System 199, *)
+  @available(macOS 13.0, iOS 16.0, watchOS 8.0, tvOS 16.0, *)
+  @Test func namesForHeaders() throws {
+    let header = #dsohandle.loadUnaligned(as: CInterop.MachHeader64.self)
+    let name = try #require(MachOFile.architectureName(ofHeaderAt: #dsohandle))
+    #expect(name == MachOFile.architectureName(
+      cpuType: Mach.CPUType(rawValue: header.cpuType),
+      cpuSubtype: Mach.CPUSubtype(rawValue: header.cpuSubtype)))
+    let program = try #require(MachOFile.programArchitectureName)
+    #expect(MachOFile.cpuType(forArchitectureName: program)?.cpuType == ProvisionalMachOTests.hostCPUType)
+  }
+}
+
 #endif // SYSTEM_PACKAGE_DARWIN

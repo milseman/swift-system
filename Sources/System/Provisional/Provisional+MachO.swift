@@ -8,8 +8,9 @@
 */
 
 // Provisional: the Mach-O file format's structures and constants, from
-// <mach-o/loader.h>, <mach-o/fat.h> and <mach-o/ranlib.h>, and the virtual
-// memory protections of its segments, from <mach/vm_prot.h>.
+// <mach-o/loader.h>, <mach-o/fat.h> and <mach-o/ranlib.h>, the virtual
+// memory protections of its segments, from <mach/vm_prot.h>, and the
+// dynamic loader's names for its architectures, from <mach-o/utils.h>.
 //
 // System wraps the Mach-O format provisionally. It's a file format, not an
 // operating-system interface: its lasting home is a library that reads
@@ -1099,6 +1100,124 @@ extension CInterop.FatArch64 {
   /// The corresponding C field is `align`.
   @_alwaysEmitIntoClient
   public var alignmentExponent: UInt32 { align }
+}
+
+// MARK: - Architecture names
+
+// The dynamic loader's names for architectures, from mach-o/utils.h. The
+// header declares them from macOS 13, iOS 16, tvOS 16 and watchOS 8, so
+// the extension carries those floors as well as System 199's.
+@available(System 199, *)
+@available(macOS 13.0, iOS 16.0, watchOS 8.0, tvOS 16.0, *)
+extension MachOFile {
+  /// Returns the name of the architecture that a processor type
+  /// and subtype identify, such as `arm64e` or `x86_64`.
+  ///
+  /// - Parameters:
+  ///   - cpuType: The processor type.
+  ///   - cpuSubtype: The processor subtype, with its feature flags, if any.
+  /// - Returns: The architecture's name,
+  ///   or `nil` if the dynamic loader doesn't know the type and subtype.
+  ///
+  /// A Mach-O header's `cpuType` and `cpuSubtype` are in the file's
+  /// byte order, and a fat file's architectures' are big-endian:
+  /// swap them first where that isn't the host's.
+  ///
+  /// The corresponding C function is `macho_arch_name_for_cpu_type`.
+  ///
+  /// - Note: Provisional: Mach-O's architecture names may move to a library for object files.
+  /// - Note: Only available on Darwin.
+  @_alwaysEmitIntoClient
+  public static func architectureName(
+    cpuType: Mach.CPUType, cpuSubtype: Mach.CPUSubtype
+  ) -> String? {
+    _architectureName(cpuType: cpuType, cpuSubtype: cpuSubtype)
+  }
+
+  @usableFromInline
+  internal static func _architectureName(
+    cpuType: Mach.CPUType, cpuSubtype: Mach.CPUSubtype
+  ) -> String? {
+    system_macho_arch_name_for_cpu_type(cpuType.rawValue, cpuSubtype.rawValue)
+      .map { String(cString: $0) }
+  }
+
+  /// Returns the name of the architecture that a Mach-O header's
+  /// processor type and subtype identify.
+  ///
+  /// - Parameter header: The address of a 32-bit or a 64-bit Mach-O header
+  ///   in the host's byte order, such as a loaded image's:
+  ///   `#dsohandle`, or what
+  ///   ``DynamicLibrary/loadedImageHeader(at:)`` returns.
+  ///   The two headers' processor types and subtypes are in the same place.
+  /// - Returns: The architecture's name,
+  ///   or `nil` if the dynamic loader doesn't know it.
+  ///
+  /// The corresponding C function is `macho_arch_name_for_mach_header`.
+  ///
+  /// - Note: Provisional: Mach-O's architecture names may move to a library for object files.
+  /// - Note: Only available on Darwin.
+  @_alwaysEmitIntoClient
+  public static func architectureName(ofHeaderAt header: UnsafeRawPointer) -> String? {
+    _architectureName(ofHeaderAt: header)
+  }
+
+  @usableFromInline
+  internal static func _architectureName(ofHeaderAt header: UnsafeRawPointer) -> String? {
+    system_macho_arch_name_for_mach_header(header.assumingMemoryBound(to: mach_header.self))
+      .map { String(cString: $0) }
+  }
+
+  /// The name of the program's architecture: its main executable's,
+  /// such as `arm64e`, or `x86_64` for a program that Rosetta translates.
+  ///
+  /// It's `nil` if the dynamic loader doesn't know it.
+  ///
+  /// The corresponding C function is `macho_arch_name_for_mach_header`,
+  /// called without a header.
+  ///
+  /// - Note: Provisional: Mach-O's architecture names may move to a library for object files.
+  /// - Note: Only available on Darwin.
+  @_alwaysEmitIntoClient
+  public static var programArchitectureName: String? { _programArchitectureName }
+
+  @usableFromInline
+  internal static var _programArchitectureName: String? {
+    system_macho_arch_name_for_mach_header(nil).map { String(cString: $0) }
+  }
+
+  /// Returns the processor type and subtype that an architecture's name
+  /// identifies.
+  ///
+  /// - Parameter name: An architecture's name, such as `arm64e` or `x86_64`.
+  /// - Returns: The processor type and subtype,
+  ///   or `nil` if the dynamic loader doesn't know the name.
+  ///
+  ///       let arm64e = MachOFile.cpuType(forArchitectureName: "arm64e")
+  ///       // arm64e?.cpuType == .arm64
+  ///
+  /// The corresponding C function is `macho_cpu_type_for_arch_name`.
+  ///
+  /// - Note: Provisional: Mach-O's architecture names may move to a library for object files.
+  /// - Note: Only available on Darwin.
+  @_alwaysEmitIntoClient
+  public static func cpuType(
+    forArchitectureName name: String
+  ) -> (cpuType: Mach.CPUType, cpuSubtype: Mach.CPUSubtype)? {
+    _cpuType(forArchitectureName: name)
+  }
+
+  @usableFromInline
+  internal static func _cpuType(
+    forArchitectureName name: String
+  ) -> (cpuType: Mach.CPUType, cpuSubtype: Mach.CPUSubtype)? {
+    var type: cpu_type_t = 0
+    var subtype: cpu_subtype_t = 0
+    guard name.withCString({ system_macho_cpu_type_for_arch_name($0, &type, &subtype) }) else {
+      return nil
+    }
+    return (Mach.CPUType(rawValue: type), Mach.CPUSubtype(rawValue: subtype))
+  }
 }
 
 /// A segment or section name: its 16 bytes up to the first NUL, if any.
