@@ -17,10 +17,13 @@ import XCTest
 @testable import System
 #endif
 
+// The mock tests' OS floors would be more available than the class's
+// System 199 scope in the ABI-stable build, where System 199 is a future
+// OS, so each is in an extension that carries both.
+#if ENABLE_MOCKING
 @available(System 199, *)
-final class VectoredIOMockTests: XCTestCase {
-  #if ENABLE_MOCKING
-  @available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+@available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+extension VectoredIOMockTests {
   func testSyscalls() throws {
     let fd = FileDescriptor(rawValue: 3)
     let storage = UnsafeMutableBufferPointer<CInterop.IOVec>.allocate(capacity: 2)
@@ -57,10 +60,13 @@ final class VectoredIOMockTests: XCTestCase {
       XCTAssertTrue(mocking.trace.isEmpty)
     }
   }
+}
 
+@available(System 199, *)
+@available(macOS 15, iOS 18, watchOS 11, tvOS 18, visionOS 2, *)
+extension VectoredIOMockTests {
   /// A write that stops partway through a vector resumes inside it,
   /// and one that ends on a vector's boundary resumes at the next one.
-  @available(macOS 15, iOS 18, watchOS 11, tvOS 18, visionOS 2, *)
   func testWriteAllResumesAcrossVectors() throws {
     let fd = FileDescriptor(rawValue: 3)
     let a: [UInt8] = [1, 2, 3, 4], b: [UInt8] = [5, 6, 7, 8], c: [UInt8] = [9, 10, 11, 12]
@@ -89,8 +95,11 @@ final class VectoredIOMockTests: XCTestCase {
       XCTAssertEqual(calls[2].start - calls[0].start, 2)
     }
   }
-  #endif // ENABLE_MOCKING
+}
+#endif // ENABLE_MOCKING
 
+@available(System 199, *)
+final class VectoredIOMockTests: XCTestCase {
   func testAdvanceVectors() {
     var bytes = [UInt8](repeating: 0, count: 12)
     bytes.withUnsafeMutableBytes { bytes in

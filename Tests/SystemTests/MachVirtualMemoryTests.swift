@@ -24,6 +24,7 @@ import Darwin
 // thread can be given those addresses as soon as they're free.
 @Suite("Mach virtual memory")
 private struct MachVirtualMemoryTests {
+  @available(System 199, *)
   typealias VM = Mach.VirtualMemory
 
   var pageSize: Int { Int(getpagesize()) }

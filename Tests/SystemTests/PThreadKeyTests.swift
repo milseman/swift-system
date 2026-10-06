@@ -24,6 +24,7 @@ import Testing
 @Suite("PThread.Key")
 private struct PThreadKeyTests {
   // A value that reports its destruction.
+  @available(System 199, *)
   fileprivate final class Tracked: @unchecked Sendable {
     let name: String
     let destroyed: Locked<[String]>

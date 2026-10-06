@@ -18,6 +18,7 @@ import Testing
 @testable import System
 #endif
 
+@available(System 199, *)
 private let pageSize = (try? SystemConfig.value(.pageSize)).flatMap { $0 } ?? 4096
 
 // Each test creates zones of its own, and these tests run one at a time:

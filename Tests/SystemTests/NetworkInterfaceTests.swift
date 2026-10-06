@@ -28,6 +28,7 @@ import Android
 #endif
 
 /// What an entry says, copied out of the list.
+@available(System 199, *)
 private struct Summary {
   var name: String
   var flags: NetworkInterface.Flags
