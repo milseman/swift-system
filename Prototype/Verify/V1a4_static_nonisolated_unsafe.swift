@@ -1,4 +1,4 @@
-// V1a4: public non-Sendable noncopyable type in static storage with nonisolated(unsafe).
+// V1a4: public non-Sendable noncopyable type in static storage with nonisolated(unsafe). Expected to compile, with no warning.
 public struct NC: ~Copyable {
   public var raw: Int32
   public init(raw: Int32) { self.raw = raw }

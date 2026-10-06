@@ -1,4 +1,4 @@
-// V7g: storing a `borrowing` noncopyable parameter into an Optional global or class property.
+// V7g: storing a `borrowing` noncopyable parameter into an Optional global or class property. Expected to fail at both: "implicit conversion to 'Owned?' is consuming", with a fix-it to add `consume`, which leads to V7c's error.
 struct Owned: ~Copyable {
   var raw: Int32
   deinit {}

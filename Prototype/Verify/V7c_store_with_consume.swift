@@ -1,4 +1,4 @@
-// V7c: follow the fix-it: explicit `consume` of a borrowing parameter to store it.
+// V7c: follow the fix-it: explicit `consume` of a borrowing parameter to store it. Expected to fail: "'fd' is borrowed and cannot be consumed". So V7g's fix-it leads to a second error.
 struct Owned: ~Copyable {
   var raw: Int32
   deinit {}

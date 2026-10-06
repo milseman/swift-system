@@ -1,4 +1,4 @@
-// V1a3: @frozen public noncopyable type in static storage, Swift 6 mode, library evolution.
+// V1a3: @frozen public noncopyable type in static storage, Swift 6 mode, library evolution. Expected to compile, with or without library evolution: unlike V1a2's, a @frozen public struct of Sendable fields is implicitly Sendable.
 @frozen public struct NC: ~Copyable {
   public var raw: Int32
   public init(raw: Int32) { self.raw = raw }

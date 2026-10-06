@@ -1,4 +1,4 @@
-// V1d library: public noncopyable type with a static let, built with library evolution.
+// V1d library: public noncopyable type with a static let, built with library evolution. Expected to compile, as a dylib with a module interface that verifies (check.sh builds it and links Client.swift against it).
 public struct NC: ~Copyable, Sendable {
   public var raw: Int32
   public init(raw: Int32) { self.raw = raw }

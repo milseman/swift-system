@@ -1,4 +1,4 @@
-// V7f: read through a borrowed Optional of a noncopyable type via `switch`.
+// V7f: read through a borrowed Optional of a noncopyable type via `switch`. Expected to compile: this is the fix for V7e's u4.
 struct Owned: ~Copyable {
   var raw: Int32
   deinit {}

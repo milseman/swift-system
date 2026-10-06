@@ -1,4 +1,4 @@
-// V2b: attempts to consume a static `let` of a noncopyable type (move checker).
+// V2b: attempts to consume a static `let` of a noncopyable type (move checker). Expected to fail at attempt1, attempt2, and attempt3: "'unknown' is borrowed and cannot be consumed" in Swift 6.2, and "'standardInput' is borrowed and cannot be consumed" with the snapshot. attempt4, `_ =`, compiles and destroys nothing (V2d).
 struct NC: ~Copyable, Sendable {
   var raw: Int32
   init(raw: Int32) { self.raw = raw }

@@ -1,4 +1,4 @@
-// V2d: `_ = static let` at runtime, and reassigning a `static var` (runs deinit on the old value).
+// V2d: `_ = static let` at runtime, and reassigning a `static var` (runs deinit on the old value). Expected to compile and to print: after `_ = Holder.standardInput`, deinit 100, after reassigning static var, end of main. `_ =` destroys nothing, and the replacement is never destroyed.
 struct NC: ~Copyable, Sendable {
   var raw: Int32
   init(raw: Int32) { self.raw = raw }

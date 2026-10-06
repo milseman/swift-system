@@ -1,4 +1,4 @@
-// V7a: misuse of a `borrowing` noncopyable parameter (move-checker diagnostics).
+// V7a: misuse of a `borrowing` noncopyable parameter (move-checker diagnostics). Expected to fail at m1, m2, m3, and m9 with "'fd' is borrowed and cannot be consumed", and at m6 (a non-escaping closure) and m8 (`defer`) with "noncopyable 'fd' cannot be consumed when captured by an escaping closure or borrowed by a non-Escapable type", each with a "consumed here" note. m7 compiles.
 struct CloseError: Error {}
 struct Owned: ~Copyable {
   var raw: Int32
