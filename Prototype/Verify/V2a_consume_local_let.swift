@@ -1,4 +1,4 @@
-// V2a: a local `let` of a noncopyable type can be consumed.
+// V2a: a local `let` of a noncopyable type can be consumed. Expected to compile and to print: took 1, deinit 1, finish 2, deinit 2, deinit 3, end of main. A consuming parameter, a consuming method, and `_ = consume` each destroy the value before main ends.
 struct NC: ~Copyable, Sendable {
   var raw: Int32
   init(raw: Int32) { self.raw = raw }

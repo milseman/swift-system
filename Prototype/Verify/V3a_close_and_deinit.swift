@@ -1,4 +1,4 @@
-// V3a: `consuming func close() throws(E)` alongside `deinit`, with `discard self` before the throwing call.
+// V3a: `consuming func close() throws(E)` alongside `deinit`, with `discard self` before the throwing call. Expected to compile and to print: closed 3, error -1, end of main. The deinit runs on neither path, and the failure reaches the caller as a CloseError.
 struct CloseError: Error { var code: Int32 }
 
 func rawClose(_ fd: Int32) -> Int32 { fd < 0 ? -1 : 0 } // stand-in for close(2)

@@ -1,4 +1,4 @@
-// V7d: type-checker diagnostics around noncopyable owners.
+// V7d: type-checker diagnostics around noncopyable owners. Expected to fail at all four: "parameter of noncopyable type 'Owned' must specify ownership", with fix-its for `borrowing`, `inout`, and `consuming`; "global function 'generic' requires that 'Owned' conform to 'Copyable'", with a note "'where T: Copyable' is implicit here"; and "type 'Owned' does not conform to protocol 'Copyable'" for the Array and the Dictionary.
 struct Owned: ~Copyable {
   var raw: Int32
   deinit {}

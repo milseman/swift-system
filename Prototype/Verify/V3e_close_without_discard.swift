@@ -1,4 +1,4 @@
-// V3e: consuming close that never uses `discard self` -> deinit also runs (second close). No diagnostic expected.
+// V3e: consuming close that never uses `discard self` -> deinit also runs (second close). Expected to compile with no diagnostic, and to print: rawClose(3), deinit, rawClose(3).
 struct CloseError: Error {}
 func rawClose(_ fd: Int32) -> Int32 { print("rawClose(\(fd))"); return 0 }
 

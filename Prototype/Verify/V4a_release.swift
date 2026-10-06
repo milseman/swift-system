@@ -1,4 +1,4 @@
-// V4a: `consuming func release() -> Int32` via `discard self`: returns the raw value, deinit does not run.
+// V4a: `consuming func release() -> Int32` via `discard self`: returns the raw value, deinit does not run. Expected to compile and to print: released 5, end of main, deinit 6. `_ = y` doesn't consume y, which lives to the end of main.
 struct NC: ~Copyable {
   var raw: Int32
   init(raw: Int32) { self.raw = raw }

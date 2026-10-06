@@ -1,4 +1,4 @@
-// V4c client: call inlinable release() methods that contain `discard self`.
+// V4c client: call inlinable release() methods that contain `discard self`. Expected to compile and to print: 1, 2, 3.
 import V4c
 @main struct Main {
   static func main() {

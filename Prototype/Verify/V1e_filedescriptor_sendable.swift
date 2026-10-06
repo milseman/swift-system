@@ -1,4 +1,4 @@
-// V1e: is FileDescriptor Sendable (implicitly or explicitly), and can a Sendable noncopyable type wrap it?
+// V1e: is FileDescriptor Sendable (implicitly or explicitly), and can a Sendable noncopyable type wrap it? Expected to compile: FileDescriptor is Sendable, implicitly as a @frozen struct of a CInt, and explicitly since b631444, so a Sendable owner can store one.
 import SystemPackage
 func needsSendable(_: some Sendable) {}
 func probe() { needsSendable(FileDescriptor.standardInput) }

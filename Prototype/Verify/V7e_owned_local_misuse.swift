@@ -1,4 +1,4 @@
-// V7e: owned local misuse: use after close, close in a loop, optional binding.
+// V7e: owned local misuse: use after close, close in a loop, optional binding. Expected to fail at u1, "'fd' used after consume", with "consumed here" and "used here" notes; at u2, "'fd' consumed in a loop"; and at u4, "'maybe' is borrowed and cannot be consumed", whose "consumed here" note points at the `if`. u3, binding a consuming Optional, compiles.
 struct CloseError: Error {}
 struct Owned: ~Copyable {
   var raw: Int32

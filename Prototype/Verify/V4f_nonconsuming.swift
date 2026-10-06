@@ -1,4 +1,4 @@
-// V4f: `discard self` in a borrowing method.
+// V4f: `discard self` in a borrowing method. Expected to fail: "'discard' statement can only appear in consuming instance method".
 struct NC: ~Copyable {
   var raw: Int32
   deinit {}

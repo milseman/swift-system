@@ -1,4 +1,4 @@
-// V1b: noncopyable + Sendable in static storage; borrow it; check deinit at exit.
+// V1b: noncopyable + Sendable in static storage; borrow it; check deinit at exit. Expected to compile and to print: peek: 0, borrowing param: 0, global let: 2, local: 9, end of main, deinit 9. The static and the global are never destroyed.
 struct NC: ~Copyable, Sendable {
   var raw: Int32
   init(raw: Int32) { self.raw = raw }
