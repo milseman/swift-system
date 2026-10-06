@@ -77,6 +77,7 @@ With a ledger.json (`STATUS_OUT=... STATUS_LEDGER_JSON=... Utilities/adopter-cov
 - **Only the platform built.** Code under `#if` for a platform not built isn't compiled, so it isn't seen: Windows, WASI, the BSDs and Android here. **Musl and WASI** need `Utilities/linux/cross.sh`, which builds only its own package (no `--root`/`--dir` as build.sh has), so they aren't run; that's recorded as a need.
 - **Cross-file follow-ons**, such as a call whose callee's signature failed in another file (`'nil' requires a contextual type`), aren't recognized. They're listed as other errors.
 - **Targets come from macOS's `describe`**, for Linux too. A manifest whose targets differ by platform would need the container's.
+- **Local path dependencies** other than System aren't exported: a manifest that takes one (swift-package-manager's `../swift-tools-support-core`, say) stops at `describe`. One in a branch the manifest doesn't take (swift-nio's `SWIFTCI_USE_LOCAL_DEPS`) is harmless.
 - MemberImportVisibility errors appear only in packages that enable it (swift-log and swift-nio do; swift-tools-support-core doesn't). Without it, a C field reached through a System type's value resolves anyway.
 
 ## Per-package settings
