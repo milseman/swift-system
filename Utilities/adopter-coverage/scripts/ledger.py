@@ -1193,17 +1193,19 @@ def section(w, a, led):
     # mapping.ini's verdicts.
     w("## Not System's: mapping.ini's lane verdicts, unreviewed")
     w("")
-    w("mapping.ini's 14 `wrap = no` entries were written by lanes and never reviewed by Michael: lane proposals, not "
-      "decisions. Each is listed with the sites it holds; the Mach-O and ar.h ones are System gaps now "
-      "(`exceptions.ini` E3).")
+    verdicts = [e for e in led["mapping"] if e["wrap"] == "no"]
+    # A gap that exceptions.ini keeps by hand, by its mapping rule, overrides a verdict.
+    gap_mapping = {m: e.id for e in led["entries"] if e.kind == "gap" for m in e.rules.get("mapping", [])}
+    w(f"mapping.ini's {len(verdicts)} `wrap = no` entries were written by lanes and never reviewed by Michael: lane "
+      "proposals, not decisions. Each is listed with the sites it holds" +
+      ("; a System gap that `exceptions.ini` keeps holds the ones it names."
+       if any(e["id"] in gap_mapping for e in verdicts) else "."))
     w("")
-    gap_mapping = {m for e in led["entries"] if e.kind == "gap" for m in e.rules.get("mapping", [])}
     w("| mapping.ini entry | Category | Sites | Symbols |")
     w("|---|---|---:|---|")
-    for e in led["mapping"]:
-        if e["wrap"] != "no":
-            continue
-        now = "System gap (E3)" if e["id"] in gap_mapping else "not System's (lane verdict, unreviewed)"
+    for e in verdicts:
+        now = (f"System gap ({gap_mapping[e['id']]})" if e["id"] in gap_mapping
+               else "not System's (lane verdict, unreviewed)")
         w(f"| [{st.cell(e['id'])}] | {now} | {led['mappingSites'].get(e['id'], 0)} | " +
           ", ".join(f"`{x}`" for x in e["symbols"][:6]) + ("…" if len(e["symbols"]) > 6 else "") + " |")
     w("")
