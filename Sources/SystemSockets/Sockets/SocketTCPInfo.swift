@@ -41,13 +41,11 @@ extension SocketDescriptor {
     @_alwaysEmitIntoClient
     public init(rawValue: UInt8) { self.rawValue = rawValue }
 
-    #if SYSTEM_PACKAGE_DARWIN
+    // The C states' own type: CInt where they're macros (Darwin's TSI_S_
+    // states, Musl's TCP_ ones), and Int where they're an enum's (glibc's
+    // and Bionic's).
     @_alwaysEmitIntoClient
-    internal init(_ value: CInt) { self.init(rawValue: UInt8(value)) }
-    #else
-    @_alwaysEmitIntoClient
-    internal init(_ value: Int) { self.init(rawValue: UInt8(value)) }
-    #endif
+    internal init<T: BinaryInteger>(_ value: T) { self.init(rawValue: UInt8(value)) }
 
     /// No connection.
     ///
