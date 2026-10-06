@@ -355,9 +355,15 @@ final class FileLockTest: XCTestCase {
       XCTAssertFalse(try a.lock(.read))
     }
   }
+}
 
-  #if SYSTEM_PACKAGE_DARWIN
-  @available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *)
+// testLockTimeout's OS floor would be more available than the class's
+// System 199 scope in the ABI-stable build, where System 199 is a future
+// OS, so it's in an extension that carries both.
+#if SYSTEM_PACKAGE_DARWIN
+@available(System 199, *)
+@available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *)
+extension FileLockTest {
   func testLockTimeout() throws {
     try withTemporaryFilePath(basename: "testLockTimeout") { path in
       let file = path.appending("file.txt")
@@ -381,8 +387,11 @@ final class FileLockTest: XCTestCase {
       XCTAssertTrue(try b.lock(.write, timeout: .seconds(hangGuardSeconds)))
     }
   }
-  #endif // SYSTEM_PACKAGE_DARWIN
+}
+#endif // SYSTEM_PACKAGE_DARWIN
 
+@available(System 199, *)
+extension FileLockTest {
   func testWholeFileLocksAreDistinct() throws {
     try withTemporaryFilePath(basename: "testWholeFileLocksAreDistinct") { path in
       let file = path.appending("file.txt")

@@ -51,6 +51,7 @@ private struct UnfairLockTests {
   }
 
   /// A lock and the count it protects, which threads share.
+  @available(System 199, *)
   private final class Counter: @unchecked Sendable {
     let lock = UnfairLock()
     var count = 0

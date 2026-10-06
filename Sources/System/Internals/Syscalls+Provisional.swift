@@ -82,15 +82,8 @@ internal func system_strndup(
   return strndup(string, maxLength)
 }
 
-internal func system_strcmp(_ string: UnsafePointer<CChar>, _ other: UnsafePointer<CChar>) -> CInt {
-  strcmp(string, other)
-}
-
-internal func system_strncmp(
-  _ string: UnsafePointer<CChar>, _ other: UnsafePointer<CChar>, _ maxLength: Int
-) -> CInt {
-  strncmp(string, other, maxLength)
-}
+// strcmp and strncmp have no wrappers here: CString's comparisons call them
+// in code emitted into the client, whose optimizer can then fold them.
 
 // glibc has strlcpy only from 2.38, and WASI's libc may not declare it, so
 // there it's strlen and a copy.

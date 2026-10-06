@@ -373,9 +373,9 @@ internal func system_WaitForSingleObject(_ hHandle: HANDLE, _ dwMilliseconds: DW
 
 // MARK: - Ending the process
 
-// exit and _exit never return, so they have no mock hook. macOS's C library
-// declares all three too, which the qualified names keep the harness from
-// calling.
+// exit, _exit and abort never return, so they have no mock hook. macOS's C
+// library declares them all too, and atexit, which the qualified names keep
+// the harness from calling.
 
 internal func system_exit(_ status: CInt) -> Never {
   ucrt.exit(status)
@@ -383,6 +383,10 @@ internal func system_exit(_ status: CInt) -> Never {
 
 internal func system__exit(_ status: CInt) -> Never {
   ucrt._exit(status)
+}
+
+internal func system_abort() -> Never {
+  ucrt.abort()
 }
 
 // atexit returns a nonzero value, not necessarily -1, when it fails.

@@ -9,7 +9,8 @@
 
 // Small widenings to FreeBSD and OpenBSD, where nothing here builds: O_SYNC
 // and O_DSYNC (FreeBSD's O_DSYNC, from 13.0, is a flag of its own, and
-// OpenBSD's is O_SYNC), dladdr, and FreeBSD's pthread_suspend_all_np. SmallGapsTests, SmallDarwinGapsTests and
+// OpenBSD's is O_SYNC), OpenBSD's O_RSYNC (O_SYNC too), dladdr, and
+// FreeBSD's pthread_suspend_all_np. SmallGapsTests, SmallDarwinGapsTests and
 // SmallLinuxGapsTests have the other platforms'.
 
 #if os(FreeBSD) || os(OpenBSD)
@@ -27,6 +28,8 @@ final class SmallBSDGapsTests: XCTestCase {
   func testSynchronizedIO() throws {
     #if os(OpenBSD)
     XCTAssertEqual(FileDescriptor.OpenOptions.dataSync, .sync)
+    XCTAssertEqual(FileDescriptor.OpenOptions.readSync, .sync)
+    XCTAssertEqual(FileDescriptor.StatusFlags.readSync, .sync)
     #else
     XCTAssertNotEqual(FileDescriptor.OpenOptions.dataSync, .sync)
     #endif

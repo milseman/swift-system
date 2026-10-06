@@ -9,8 +9,8 @@
 
 // The Linux side of SmallGapsTest, SmallDarwinGapsTest and PThreadMutexTests'
 // static initializers: unique files with a suffix (mkostemps), dladdr,
-// glibc's RTLD_DEEPBIND, O_SYNC and O_DSYNC, and the default pthread
-// initializers.
+// glibc's RTLD_DEEPBIND, O_SYNC, O_DSYNC and O_RSYNC, and the default
+// pthread initializers.
 
 #if os(Linux) || os(Android)
 
@@ -88,11 +88,14 @@ final class SmallLinuxGapsTest: XCTestCase {
   }
 
   /// O_SYNC includes O_DSYNC on Linux, and F_SETFL can't change either.
+  /// O_RSYNC is O_SYNC.
   func testSynchronizedIO() throws {
     #if arch(x86_64) || arch(arm64)
     XCTAssertEqual(FileDescriptor.OpenOptions.sync.rawValue, 0o4010000)
     XCTAssertEqual(FileDescriptor.OpenOptions.dataSync.rawValue, 0o10000)
     #endif
+    XCTAssertEqual(FileDescriptor.OpenOptions.readSync, .sync)
+    XCTAssertEqual(FileDescriptor.StatusFlags.readSync, .sync)
     try withTemporaryFilePath(basename: "testSynchronizedIO") { dir in
       let path = dir.appending("file")
       let sync = try FileDescriptor.open(
@@ -108,6 +111,12 @@ final class SmallLinuxGapsTest: XCTestCase {
       try dataSync.setStatusFlags(try dataSync.statusFlags().union(.sync))
       XCTAssertFalse(try dataSync.statusFlags().contains(.sync))
       try dataSync.writeAll("synchronized".utf8)
+      let readSync = try FileDescriptor.open(path, .readOnly, options: .readSync)
+      defer { try? readSync.close() }
+      XCTAssertTrue(try readSync.statusFlags().contains(.readSync))
+      var bytes = [UInt8](repeating: 0, count: 12)
+      XCTAssertEqual(try bytes.withUnsafeMutableBytes { try readSync.read(into: $0) }, 12)
+      XCTAssertEqual(String(decoding: bytes, as: UTF8.self), "synchronized")
     }
   }
 

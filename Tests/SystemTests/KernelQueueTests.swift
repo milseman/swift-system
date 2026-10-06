@@ -403,6 +403,7 @@ internal func registerAndPoll(
 #if SYSTEM_PACKAGE_DARWIN
 /// Spawns `arguments`, with `standardInput` as the child's standard input,
 /// and returns its process ID. The child inherits no other descriptors.
+@available(System 199, *)
 internal func spawn(
   _ arguments: [String], standardInput: borrowing OwnedFD
 ) throws -> ProcessID {

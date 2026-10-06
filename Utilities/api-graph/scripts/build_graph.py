@@ -56,6 +56,9 @@ SCAN_KIND = {"struct": "swift.struct", "enum": "swift.enum", "class": "swift.cla
              "actor": "swift.actor", "typealias": "swift.typealias", "func": "swift.method", "init": "swift.init",
              "init?": "swift.init", "init!": "swift.init", "var": "swift.property", "let": "swift.property",
              "subscript": "swift.subscript", "case": "swift.enum.case", "macro": "swift.macro"}
+# A function named by an operator, not an identifier: `==(lhs:rhs:)`, and
+# `< ()`, as api-delta's scanner names `static func < (lhs:rhs:)`.
+OPERATOR_NAME_RE = re.compile(r"\s*[^\w\s`(]")
 # "The corresponding C function is `fsync`." and its variants.
 C_NAME_RE = re.compile(r"[Tt]he corresponding C (?:[a-z]+ )?(function|functions|constant|constants|type|types|"
                        r"macro|macros|call|calls|struct|structure|field|fields|property|properties|value|values|"
@@ -69,6 +72,25 @@ C_RECORD_RE = re.compile(r"@(?:S|SA|U|UA)@([A-Za-z_]\w*)")
 
 def load(path):
     return json.load(open(path))
+
+
+def scan_kind(x):
+    """A scan-only declaration's kind, as the symbol graphs give it (Swift
+    6.2), by api-burndown's rules (history.scan_kind): an operator is
+    `swift.func.op`, a type's static member or global; a `class` member is
+    static, like a `static` one; a static subscript is a type subscript. A
+    top-level `var` stays a property, not the symbol graphs' `swift.var`:
+    the scanner loses some declarations' scopes."""
+    kw = x["kw"]
+    if kw == "func" and OPERATOR_NAME_RE.match(x["name"]):
+        return "swift.func.op"
+    kind = SCAN_KIND.get(kw, "swift." + kw)
+    if kw == "func" and not x["scopes"]:
+        kind = "swift.func"
+    if kw in ("var", "let", "func", "subscript") and {"static", "class"} & set(x["modifiers"]):
+        kind = {"swift.method": "swift.type.method", "swift.property": "swift.type.property",
+                "swift.subscript": "swift.type.subscript"}.get(kind, kind)
+    return kind
 
 
 CALLABLE_KINDS = {"swift.func", "swift.method", "swift.type.method", "swift.init", "swift.subscript",
@@ -404,11 +426,7 @@ def main():
             n.setdefault("sites", [[n["file"], n["line"]]]).append([x["file"], x["line"]])
             n["variants"] = n.get("variants", 1) + 1
             continue
-        kind = SCAN_KIND.get(x["kw"], "swift." + x["kw"])
-        if x["kw"] == "func" and not x["scopes"]:
-            kind = "swift.func"
-        if x["kw"] in ("var", "let", "func") and "static" in x["modifiers"]:
-            kind = {"swift.method": "swift.type.method", "swift.property": "swift.type.property"}.get(kind, kind)
+        kind = scan_kind(x)
         ren = re.search(r'renamed:\s*"([^"]*)"', " ".join(x["unavailable"]))
         avail_text = x["availability"] + x["scopeAvailability"]
         sysm = None

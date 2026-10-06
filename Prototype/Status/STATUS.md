@@ -1,9 +1,9 @@
 # Status: System's API and its adopters
 
-Generated 2026-10-05 by `Utilities/adopter-coverage/status.sh`, from commits only; rerun it rather than editing this file. How each figure is made, and what it can't see, is in [How this is computed](#how-this-is-computed).
+Generated 2026-10-06 by `Utilities/adopter-coverage/status.sh`, from commits only; rerun it rather than editing this file. How each figure is made, and what it can't see, is in [How this is computed](#how-this-is-computed).
 
-- **System**: `ledger` @ `6fe0d806` (Utilities/adopter-coverage: the ledger's gap ranking gives the files each gap's unblocked sites are in), which contains `system-next` @ `a3dbd4ec` (Merge branch 'verify' into system-next); 3 commit(s) of `ledger` aren't in `system-next`.
-- **API delta**: `main` @ `1b452c29` → `HEAD` @ `d3aac7dc` (api-delta's last run; nothing it reads has changed since).
+- **System**: `coverage-7` @ `020aa903` (.gitignore: __pycache__/), which contains `coverage-7` @ `020aa903` (.gitignore: __pycache__/); 0 commit(s) of `coverage-7` aren't in `coverage-7`.
+- **API delta**: `main` @ `1b452c29` → `HEAD` @ `020aa903`.
 - **Adopters** (`../adopters`, branch `migrate-darwin`, against its merge base with `main`):
   - WasmKit @ `4917e060`, base `1e9c513d`
   - indexstore-db @ `53bf43b6`, base `441ead77`
@@ -32,25 +32,25 @@ Copied verbatim from `Utilities/api-delta/regenerate.sh` (`BASE_REF=main`, `HEAD
 
 ## Summary
 
-- **3239 added, 0 removed, 1 changed** declarations in the macOS symbol graphs.
-  - SystemPackage: +2655, 1 changed (448 → 3103 public symbols).
+- **3410 added, 0 removed, 1 changed** declarations in the macOS symbol graphs.
+  - SystemPackage: +2826, 1 changed (448 → 3274 public symbols).
   - SystemSockets: +584 (0 → 584 public symbols). SystemSockets is a new module; it doesn't exist on `main`.
 - Availability of the additions:
-  - System 199: 3201
+  - System 199: 3372
   - System 199 + explicit OS floor: 26
   - System 0.0.1 + explicit OS floor: 8
   - System 0.0.1: 2
   - System 1.7.0: 2
 - The source scan finds these new public declarations, which the macOS graphs can't show:
-  - 1539 compiled only on other platforms;
-  - 244 new `@available(*, unavailable, renamed:)` stubs;
+  - 1542 compiled only on other platforms;
+  - 246 new `@available(*, unavailable, renamed:)` stubs;
   - 1 new underscored public declaration(s).
   - 5 declarations the scan couldn't classify; see the list below.
   - 29 added, removed or changed graph symbols the scan didn't find (enum case: 28, no source location: 1). Enum cases have no `public` keyword, and synthesized members have no location; any others are scanner misses. Their platforms show as `?`.
 - 0 public declarations hidden from the graphs were removed.
 - No public declaration is conditional on `ENABLE_MOCKING` or `DEBUG`, so a release build has the same public API as the debug graphs.
 - Cross-check with `swift-api-digester`, which dumps every declaration, implicit ones included:
-  - SystemPackage: +2976 / -1 declarations, which is the graphs' +2655 plus 315 implicit ones; explicit declarations it has that the graphs don't: `FileDescriptor.close()`, `_opaque_pthread_cond_t.initializer`, `_opaque_pthread_mutex_t.errorCheckingInitializer`, `_opaque_pthread_mutex_t.initializer`, `_opaque_pthread_mutex_t.recursiveInitializer`, `_opaque_pthread_rwlock_t.initializer`; it has every graph addition; `-diagnose-sdk` reports no breaking changes.
+  - SystemPackage: +3150 / -1 declarations, which is the graphs' +2826 plus 318 implicit ones; explicit declarations it has that the graphs don't: `FileDescriptor.close()`, `_opaque_pthread_cond_t.initializer`, `_opaque_pthread_mutex_t.errorCheckingInitializer`, `_opaque_pthread_mutex_t.initializer`, `_opaque_pthread_mutex_t.recursiveInitializer`, `_opaque_pthread_rwlock_t.initializer`; it has every graph addition; `-diagnose-sdk` reports no breaking changes.
   - SystemSockets: +657 / -0 declarations, which is the graphs' +584 plus 72 implicit ones; explicit declarations it has that the graphs don't: `SocketAddress._withUnsafeMutablePointer(_:)`; it has every graph addition.
 - 0 removed and 1 changed in the graphs, and 0 removed among the declarations the graphs can't see. The full list below gives the first kind, and section 5 the second. The *changed* check compares declaration text (including default arguments), availability, conformances, generic and extension constraints, and access level, and pairs symbols by path when a signature change alters the USR.
 
@@ -60,9 +60,10 @@ Each row is a top-level type, and nested types count toward it: `FilePath.Resolu
 
 | Module | Area | Added | Removed | Changed | Availability of additions |
 |---|---|---:|---:|---:|---|
+| SystemPackage | [`ArchiveFile`](#systempackage-archivefile) | 5 | 0 | 0 | S199 ×5 |
 | SystemPackage | [`BaudRate`](#systempackage-baudrate) | 26 | 0 | 0 | S199 ×26 |
 | SystemPackage | [`BrokenDownTime`](#systempackage-brokendowntime) | 29 | 0 | 0 | S199 ×29 |
-| SystemPackage | [`CInterop`](#systempackage-cinterop) | 48 | 0 | 0 | S199 ×48 |
+| SystemPackage | [`CInterop`](#systempackage-cinterop) | 65 | 0 | 0 | S199 ×65 |
 | SystemPackage | [`CLocale`](#systempackage-clocale) | 53 | 0 | 0 | S199 ×53 |
 | SystemPackage | [`CString`](#systempackage-cstring) | 8 | 0 | 0 | S199 ×8 |
 | SystemPackage | [`CType`](#systempackage-ctype) | 15 | 0 | 0 | S199 ×15 |
@@ -73,9 +74,9 @@ Each row is a top-level type, and nested types count toward it: `FilePath.Resolu
 | SystemPackage | [`ControlCharacters`](#systempackage-controlcharacters) | 8 | 0 | 0 | S199 ×8 |
 | SystemPackage | [`ControlFlags`](#systempackage-controlflags) | 20 | 0 | 0 | S199 ×20 |
 | SystemPackage | [`DirectoryStream`](#systempackage-directorystream) | 15 | 0 | 0 | S199 ×15 |
-| SystemPackage | [`DirectoryWalk`](#systempackage-directorywalk) | 29 | 0 | 0 | S199 ×29 |
+| SystemPackage | [`DirectoryWalk`](#systempackage-directorywalk) | 30 | 0 | 0 | S199 ×30 |
 | SystemPackage | [`DiskQuota`](#systempackage-diskquota) | 17 | 0 | 0 | S199 ×17 |
-| SystemPackage | [`DynamicLibrary`](#systempackage-dynamiclibrary) | 33 | 0 | 0 | S199 ×33 |
+| SystemPackage | [`DynamicLibrary`](#systempackage-dynamiclibrary) | 35 | 0 | 0 | S199 ×35 |
 | SystemPackage | [`Entropy`](#systempackage-entropy) | 7 | 0 | 0 | S199 ×7 |
 | SystemPackage | [`Errno`](#systempackage-errno) | 5 | 0 | 0 | S199 ×3, S0.0.1 ×2 |
 | SystemPackage | [`ExitStatus`](#systempackage-exitstatus) | 6 | 0 | 0 | S199 ×6 |
@@ -96,7 +97,8 @@ Each row is a top-level type, and nested types count toward it: `FilePath.Resolu
 | SystemPackage | [`KernelEvent`](#systempackage-kernelevent) | 82 | 0 | 0 | S199 ×82 |
 | SystemPackage | [`KernelQueue`](#systempackage-kernelqueue) | 10 | 0 | 0 | S199 ×10 |
 | SystemPackage | [`LocalFlags`](#systempackage-localflags) | 20 | 0 | 0 | S199 ×20 |
-| SystemPackage | [`Mach`](#systempackage-mach) | 70 | 0 | 0 | S199 ×70 |
+| SystemPackage | [`Mach`](#systempackage-mach) | 78 | 0 | 0 | S199 ×78 |
+| SystemPackage | [`MachOFile`](#systempackage-machofile) | 40 | 0 | 0 | S199 ×40 |
 | SystemPackage | [`Math`](#systempackage-math) | 55 | 0 | 0 | S199 ×55 |
 | SystemPackage | [`Memory`](#systempackage-memory) | 91 | 0 | 0 | S199 ×91 |
 | SystemPackage | [`MemoryMapping`](#systempackage-memorymapping) | 36 | 0 | 0 | S199 ×36 |
@@ -129,14 +131,31 @@ Each row is a top-level type, and nested types count toward it: `FilePath.Resolu
 | SystemPackage | [`UnfairLock`](#systempackage-unfairlock) | 14 | 0 | 0 | S199 ×14 |
 | SystemPackage | [`UserEntry`](#systempackage-userentry) | 9 | 0 | 0 | S199 ×9 |
 | SystemPackage | [`UserID`](#systempackage-userid) | 5 | 0 | 0 | S199 ×5 |
+| SystemPackage | [`ar_hdr (extends Darwin)`](#systempackage-ar-hdr-extends-darwin) | 7 | 0 | 0 | S199 ×7 |
+| SystemPackage | [`build_version_command (extends MachO)`](#systempackage-build-version-command-extends-macho) | 6 | 0 | 0 | S199 ×6 |
 | SystemPackage | [`dirent (extends Darwin)`](#systempackage-dirent-extends-darwin) | 3 | 0 | 0 | S199 ×3 |
+| SystemPackage | [`dylib (extends MachO)`](#systempackage-dylib-extends-macho) | 4 | 0 | 0 | S199 ×4 |
+| SystemPackage | [`dylib_command (extends MachO)`](#systempackage-dylib-command-extends-macho) | 3 | 0 | 0 | S199 ×3 |
+| SystemPackage | [`fat_arch (extends MachO)`](#systempackage-fat-arch-extends-macho) | 5 | 0 | 0 | S199 ×5 |
+| SystemPackage | [`fat_arch_64 (extends MachO)`](#systempackage-fat-arch-64-extends-macho) | 5 | 0 | 0 | S199 ×5 |
+| SystemPackage | [`fat_header (extends MachO)`](#systempackage-fat-header-extends-macho) | 2 | 0 | 0 | S199 ×2 |
 | SystemPackage | [`iovec (extends Darwin)`](#systempackage-iovec-extends-darwin) | 4 | 0 | 0 | S199 ×4 |
 | SystemPackage | [`kevent (extends Darwin)`](#systempackage-kevent-extends-darwin) | 7 | 0 | 0 | S199 ×7 |
 | SystemPackage | [`kinfo_proc (extends Darwin)`](#systempackage-kinfo-proc-extends-darwin) | 10 | 0 | 0 | S199 ×10 |
+| SystemPackage | [`load_command (extends MachO)`](#systempackage-load-command-extends-macho) | 2 | 0 | 0 | S199 ×2 |
+| SystemPackage | [`mach_header (extends MachO)`](#systempackage-mach-header-extends-macho) | 7 | 0 | 0 | S199 ×7 |
+| SystemPackage | [`mach_header_64 (extends MachO)`](#systempackage-mach-header-64-extends-macho) | 7 | 0 | 0 | S199 ×7 |
+| SystemPackage | [`rpath_command (extends MachO)`](#systempackage-rpath-command-extends-macho) | 3 | 0 | 0 | S199 ×3 |
 | SystemPackage | [`rusage (extends _DarwinFoundation3)`](#systempackage-rusage-extends-darwinfoundation3) | 13 | 0 | 0 | S199 ×13 |
+| SystemPackage | [`section (extends MachO)`](#systempackage-section-extends-macho) | 9 | 0 | 0 | S199 ×9 |
+| SystemPackage | [`section_64 (extends MachO)`](#systempackage-section-64-extends-macho) | 9 | 0 | 0 | S199 ×9 |
+| SystemPackage | [`segment_command (extends MachO)`](#systempackage-segment-command-extends-macho) | 11 | 0 | 0 | S199 ×11 |
+| SystemPackage | [`segment_command_64 (extends MachO)`](#systempackage-segment-command-64-extends-macho) | 11 | 0 | 0 | S199 ×11 |
 | SystemPackage | [`stat (extends Darwin)`](#systempackage-stat-extends-darwin) | 17 | 0 | 0 | S199 ×17 |
 | SystemPackage | [`timespec (extends _DarwinFoundation2)`](#systempackage-timespec-extends-darwinfoundation2) | 7 | 0 | 0 | S199 ×7 |
 | SystemPackage | [`timeval (extends _DarwinFoundation2)`](#systempackage-timeval-extends-darwinfoundation2) | 5 | 0 | 0 | S199 ×5 |
+| SystemPackage | [`uuid_command (extends MachO)`](#systempackage-uuid-command-extends-macho) | 3 | 0 | 0 | S199 ×3 |
+| SystemPackage | [`version_min_command (extends MachO)`](#systempackage-version-min-command-extends-macho) | 4 | 0 | 0 | S199 ×4 |
 | SystemSockets | [`AddressResolutionError`](#systemsockets-addressresolutionerror) | 5 | 0 | 0 | S199 ×5 |
 | SystemSockets | [`CInterop`](#systemsockets-cinterop) | 3 | 0 | 0 | S199 ×3 |
 | SystemSockets | [`CInterop (extends SystemPackage)`](#systemsockets-cinterop-extends-systempackage) | 19 | 0 | 0 | S199 ×19 |
@@ -157,15 +176,15 @@ Each row is a top-level type, and nested types count toward it: `FilePath.Resolu
 | SystemSockets | [`sockaddr_storage (extends Darwin)`](#systemsockets-sockaddr-storage-extends-darwin) | 3 | 0 | 0 | S199 ×3 |
 | SystemSockets | [`sockaddr_un (extends Darwin)`](#systemsockets-sockaddr-un-extends-darwin) | 5 | 0 | 0 | S199 ×5 |
 | SystemSockets | [`sockaddr_vm (extends Darwin)`](#systemsockets-sockaddr-vm-extends-darwin) | 5 | 0 | 0 | S199 ×5 |
-| **Total** | | **3239** | **0** | **1** | |
+| **Total** | | **3410** | **0** | **1** | |
 
 ## ABI: exported symbols
 
-What each module's release build exports, at `main` (`1b452c29`) → HEAD (`6fe0d806`), beside the API points above: `nm`'s external symbols in the objects of `swift build -c release`, built from an export of the commit. Every public property exports a property descriptor, `@_alwaysEmitIntoClient` or not (the SDK's System does too), so the descriptors grow with the API. *Code* is functions and accessors, what `@_alwaysEmitIntoClient` leaves to the client: of *public* declarations, in the symbol graphs, and *other*, which the graphs don't show (`@usableFromInline` internals, synthesized Equatable and Hashable members, deinitializers, stored properties' initial values).
+What each module's release build exports, at `main` (`1b452c29`) → HEAD (`020aa903`), beside the API points above: `nm`'s external symbols in the objects of `swift build -c release`, built from an export of the commit. Every public property exports a property descriptor, `@_alwaysEmitIntoClient` or not (the SDK's System does too), so the descriptors grow with the API. *Code* is functions and accessors, what `@_alwaysEmitIntoClient` leaves to the client: of *public* declarations, in the symbol graphs, and *other*, which the graphs don't show (`@usableFromInline` internals, synthesized Equatable and Hashable members, deinitializers, stored properties' initial values).
 
 | Module | Exported | Property descriptors | Conformances | Types | Code, public | Code, other |
 |---|---:|---:|---:|---:|---:|---:|
-| SystemPackage | 830 → 4901 | 406 → 2156 | 167 → 809 | 90 → 646 | 118 → 508 | 49 → 782 |
+| SystemPackage | 830 → 5074 | 406 → 2298 | 167 → 815 | 90 → 667 | 118 → 508 | 49 → 786 |
 | SystemSockets | — → 901 | — → 336 | — → 139 | — → 132 | — → 188 | — → 106 |
 
 ### Candidates for `@_alwaysEmitIntoClient`
@@ -190,29 +209,29 @@ Of the 342 declarations added since `main` that export code, 39 only forward a C
 | SystemSockets | `SocketAddress.ReverseResolutionFlags.nameRequired` | constant `NI_NAMEREQD` | getter | `Sources/SystemSockets/Sockets/SocketAddress+Resolution.swift:293` |
 | SystemSockets | `SocketDescriptor.AncillaryMessageBuffer.Message.level` | accessor `cmsg_level` | getter | `Sources/SystemSockets/Sockets/SocketMessages.swift:528` |
 | SystemSockets | `SocketDescriptor.AncillaryMessageBuffer.Message.type` | accessor `cmsg_type` | getter | `Sources/SystemSockets/Sockets/SocketMessages.swift:535` |
-| SystemSockets | `SocketDescriptor.TCPConnectionInfo.state` | accessor `tcpi_state` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:324` |
-| SystemSockets | `SocketDescriptor.TCPConnectionInfo.options` | accessor `tcpi_options` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:329` |
-| SystemSockets | `SocketDescriptor.TCPConnectionInfo.sendWindowScale` | accessor `tcpi_snd_wscale` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:336` |
-| SystemSockets | `SocketDescriptor.TCPConnectionInfo.receiveWindowScale` | accessor `tcpi_rcv_wscale` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:341` |
-| SystemSockets | `SocketDescriptor.TCPConnectionInfo.isRecoveringFromLoss` | accessor `tcpi_flags`, `TCPCI_FLAG_LOSSRECOVERY` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:346` |
-| SystemSockets | `SocketDescriptor.TCPConnectionInfo.hasDetectedReordering` | accessor `tcpi_flags`, `TCPCI_FLAG_REORDERING_DETECTED` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:353` |
-| SystemSockets | `SocketDescriptor.TCPConnectionInfo.maximumSegmentSize` | accessor `tcpi_maxseg` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:360` |
-| SystemSockets | `SocketDescriptor.TCPConnectionInfo.sendSlowStartThreshold` | accessor `tcpi_snd_ssthresh` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:365` |
-| SystemSockets | `SocketDescriptor.TCPConnectionInfo.sendCongestionWindow` | accessor `tcpi_snd_cwnd` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:370` |
-| SystemSockets | `SocketDescriptor.TCPConnectionInfo.sendWindow` | accessor `tcpi_snd_wnd` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:375` |
-| SystemSockets | `SocketDescriptor.TCPConnectionInfo.sendBufferedBytes` | accessor `tcpi_snd_sbbytes` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:381` |
-| SystemSockets | `SocketDescriptor.TCPConnectionInfo.receiveWindow` | accessor `tcpi_rcv_wnd` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:386` |
-| SystemSockets | `SocketDescriptor.TCPConnectionInfo.packetsSent` | accessor `tcpi_txpackets` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:391` |
-| SystemSockets | `SocketDescriptor.TCPConnectionInfo.bytesSent` | accessor `tcpi_txbytes` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:396` |
-| SystemSockets | `SocketDescriptor.TCPConnectionInfo.packetsRetransmitted` | accessor `tcpi_txretransmitpackets` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:401` |
-| SystemSockets | `SocketDescriptor.TCPConnectionInfo.bytesRetransmitted` | accessor `tcpi_txretransmitbytes` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:406` |
-| SystemSockets | `SocketDescriptor.TCPConnectionInfo.packetsReceived` | accessor `tcpi_rxpackets` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:411` |
-| SystemSockets | `SocketDescriptor.TCPConnectionInfo.bytesReceived` | accessor `tcpi_rxbytes` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:416` |
-| SystemSockets | `SocketDescriptor.TCPConnectionInfo.bytesReceivedOutOfOrder` | accessor `tcpi_rxoutoforderbytes` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:421` |
-| SystemSockets | `SocketDescriptor.TCPConnectionInfo.retransmitTimeout` | accessor `tcpi_rto` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:433` |
-| SystemSockets | `SocketDescriptor.TCPConnectionInfo.roundTripTime` | accessor `tcpi_rttcur` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:438` |
-| SystemSockets | `SocketDescriptor.TCPConnectionInfo.smoothedRoundTripTime` | accessor `tcpi_srtt` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:443` |
-| SystemSockets | `SocketDescriptor.TCPConnectionInfo.roundTripTimeVariance` | accessor `tcpi_rttvar` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:448` |
+| SystemSockets | `SocketDescriptor.TCPConnectionInfo.state` | accessor `tcpi_state` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:322` |
+| SystemSockets | `SocketDescriptor.TCPConnectionInfo.options` | accessor `tcpi_options` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:327` |
+| SystemSockets | `SocketDescriptor.TCPConnectionInfo.sendWindowScale` | accessor `tcpi_snd_wscale` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:334` |
+| SystemSockets | `SocketDescriptor.TCPConnectionInfo.receiveWindowScale` | accessor `tcpi_rcv_wscale` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:339` |
+| SystemSockets | `SocketDescriptor.TCPConnectionInfo.isRecoveringFromLoss` | accessor `tcpi_flags`, `TCPCI_FLAG_LOSSRECOVERY` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:344` |
+| SystemSockets | `SocketDescriptor.TCPConnectionInfo.hasDetectedReordering` | accessor `tcpi_flags`, `TCPCI_FLAG_REORDERING_DETECTED` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:351` |
+| SystemSockets | `SocketDescriptor.TCPConnectionInfo.maximumSegmentSize` | accessor `tcpi_maxseg` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:358` |
+| SystemSockets | `SocketDescriptor.TCPConnectionInfo.sendSlowStartThreshold` | accessor `tcpi_snd_ssthresh` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:363` |
+| SystemSockets | `SocketDescriptor.TCPConnectionInfo.sendCongestionWindow` | accessor `tcpi_snd_cwnd` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:368` |
+| SystemSockets | `SocketDescriptor.TCPConnectionInfo.sendWindow` | accessor `tcpi_snd_wnd` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:373` |
+| SystemSockets | `SocketDescriptor.TCPConnectionInfo.sendBufferedBytes` | accessor `tcpi_snd_sbbytes` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:379` |
+| SystemSockets | `SocketDescriptor.TCPConnectionInfo.receiveWindow` | accessor `tcpi_rcv_wnd` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:384` |
+| SystemSockets | `SocketDescriptor.TCPConnectionInfo.packetsSent` | accessor `tcpi_txpackets` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:389` |
+| SystemSockets | `SocketDescriptor.TCPConnectionInfo.bytesSent` | accessor `tcpi_txbytes` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:394` |
+| SystemSockets | `SocketDescriptor.TCPConnectionInfo.packetsRetransmitted` | accessor `tcpi_txretransmitpackets` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:399` |
+| SystemSockets | `SocketDescriptor.TCPConnectionInfo.bytesRetransmitted` | accessor `tcpi_txretransmitbytes` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:404` |
+| SystemSockets | `SocketDescriptor.TCPConnectionInfo.packetsReceived` | accessor `tcpi_rxpackets` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:409` |
+| SystemSockets | `SocketDescriptor.TCPConnectionInfo.bytesReceived` | accessor `tcpi_rxbytes` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:414` |
+| SystemSockets | `SocketDescriptor.TCPConnectionInfo.bytesReceivedOutOfOrder` | accessor `tcpi_rxoutoforderbytes` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:419` |
+| SystemSockets | `SocketDescriptor.TCPConnectionInfo.retransmitTimeout` | accessor `tcpi_rto` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:431` |
+| SystemSockets | `SocketDescriptor.TCPConnectionInfo.roundTripTime` | accessor `tcpi_rttcur` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:436` |
+| SystemSockets | `SocketDescriptor.TCPConnectionInfo.smoothedRoundTripTime` | accessor `tcpi_srtt` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:441` |
+| SystemSockets | `SocketDescriptor.TCPConnectionInfo.roundTripTimeVariance` | accessor `tcpi_rttvar` | getter | `Sources/SystemSockets/Sockets/SocketTCPInfo.swift:446` |
 
 # 2. Adoption
 
@@ -489,10 +508,10 @@ Verbatim, not rerun: each package's own test totals (at the start, and the lates
 
 # 3. Gaps
 
-Every `SYSTEM-GAP:` marker in the packages' sources at each adopter's newest migration branch, the commit section 4 reads (WasmKit `migrate-unix` @ `fd06e2a3`, indexstore-db `migrate-all` @ `96d2a952`, sourcekit-lsp `migrate-all` @ `79583cc1`, swift-argument-parser `migrate-all` @ `22831ad7`, swift-async-algorithms `migrate-all` @ `d4ad19b0`, swift-build `migrate-all` @ `1dce162d`, swift-certificates `migrate-all` @ `c310582c`, swift-corelibs-xctest `migrate-darwin` @ `80a3f954`, swift-crypto `migrate-all` @ `ef1e59aa`, swift-docc `migrate-all` @ `4e6a5cea`, swift-driver `migrate-unix` @ `e7850bd0`, swift-foundation `migrate-unix` @ `d7589041`, swift-llbuild `migrate-unix` @ `314f1127`, swift-log `migrate-all` @ `7e49107b`, swift-nio `migrate-unix` @ `56deee84`, swift-package-manager `migrate-unix` @ `efff7333`, swift-sdk-generator `migrate-unix` @ `bc251e13`, swift-stress-tester `migrate-all` @ `e1702563`, swift-subprocess `migrate-unix` @ `661de35c`, swift-syntax `migrate-all` @ `e6918103`, swift-testing `migrate-all` @ `e2f8d449`, swift-tools-protocols `migrate-unix` @ `2b2c75dc`, swift-tools-support-core `migrate-unix` @ `5f85e38e`): 83 markers in 47 files, of which 1 are outside the packages' targets. Each marker's text is read for the C interfaces it names (see [How this is computed](#how-this-is-computed)); a marker that names none is counted under its phrase, with the Darwin names imported under it deciding its status. Status is against System at `6fe0d806`:
+Every `SYSTEM-GAP:` marker in the packages' sources at each adopter's newest migration branch, the commit section 4 reads (WasmKit `migrate-unix` @ `0c557c40`, indexstore-db `migrate-all` @ `96d2a952`, sourcekit-lsp `migrate-all` @ `79583cc1`, swift-argument-parser `migrate-all` @ `22831ad7`, swift-async-algorithms `migrate-all` @ `d4ad19b0`, swift-build `migrate-all` @ `dad65aee`, swift-certificates `migrate-all` @ `c310582c`, swift-corelibs-xctest `migrate-darwin` @ `80a3f954`, swift-crypto `migrate-all` @ `ef1e59aa`, swift-docc `migrate-all` @ `4e6a5cea`, swift-driver `migrate-unix` @ `e7850bd0`, swift-foundation `migrate-unix` @ `b948c6ee`, swift-llbuild `migrate-unix` @ `314f1127`, swift-log `migrate-all` @ `7e49107b`, swift-nio `migrate-unix` @ `6f4e78e4`, swift-package-manager `migrate-unix` @ `efff7333`, swift-sdk-generator `migrate-unix` @ `bc251e13`, swift-stress-tester `migrate-all` @ `e1702563`, swift-subprocess `migrate-unix` @ `661de35c`, swift-syntax `migrate-all` @ `e6918103`, swift-testing `migrate-all` @ `e2f8d449`, swift-tools-protocols `migrate-unix` @ `2b2c75dc`, swift-tools-support-core `migrate-unix` @ `5f85e38e`): 361 markers in 115 files, of which 1 are outside the packages' targets. Each marker's text is read for the C interfaces it names (see [How this is computed](#how-this-is-computed)); a marker that names none is counted under its phrase, with the Darwin names imported under it deciding its status. Status is against System at `020aa903`:
 
 - **missing**: System documents none of it (or only some: *k of n*), and `mapping.ini` has no answer outside System for it.
-- **covered**: a System declaration's doc comment names it as the corresponding C interface, a CInterop alias names it, or, for `X members`, System gives `CInterop` alias of `X` Swift-named accessors. The marker is stale, or the package hasn't adopted the API yet. *Not yet in `system-next`* means only this branch has it.
+- **covered**: a System declaration's doc comment names it as the corresponding C interface, a CInterop alias names it, or, for `X members`, System gives `CInterop` alias of `X` Swift-named accessors. The marker is stale, or the package hasn't adopted the API yet.
 - **unread**: the marker names no C interface, nothing is imported under it, and no `ANSWERED` entry speaks for it; read the marker.
 - **standard library**: System doesn't name it, and its entry in `mapping.ini` gives the standard library's answer (`swift`), shown with the entry's name.
 - **not System's**: System doesn't name it, and its entry in `mapping.ini` is marked `wrap = no`: another module's or library's interface, such as the MachO module's file format, which System doesn't wrap.
@@ -501,127 +520,153 @@ The last two are answers outside System, read from `mapping.ini` at System's com
 
 A family marked *(provisional)* is a C-library layer above the OS (math, stdio, locales, string.h and ctype.h) that System wraps provisionally, in `Sources/System/Provisional/`, since it may move to the standard library; it counts like everything else.
 
-Interfaces: 38 missing, 48 covered, 1 unread, 5 standard library, 25 not System's, 117 in all.
+Interfaces: 45 missing, 68 covered, 29 unread, 1 standard library, 143 in all.
 
 | # | Interface | Status | Files | Packages | Family |
 |---:|---|---|---:|---|---|
-| 1 | `remove` | covered (doc comment) | 4 | swift-testing | stdio.h |
-| 2 | `free` | covered (doc comment) | 3 | swift-crypto, swift-testing | the C heap |
-| 3 | `load_command` | not System's ([Mach-O file format]) | 3 | swift-build | Mach-O |
-| 4 | `abort` | covered (doc comment) | 2 | swift-build, swift-testing | stdlib.h |
-| 5 | `openpty` | covered (doc comment) | 2 | swift-build, swift-testing | TerminalDescriptor.openPseudoterminal on OpenBSD |
-| 6 | `EXIT_SUCCESS` | covered (doc comment) | 2 | swift-testing | stdlib.h |
-| 7 | `memset_s` | covered (doc comment) | 2 | swift-crypto | string.h |
-| 8 | `segment_command` | not System's ([Mach-O file format]) | 2 | swift-build | Mach-O file structures |
-| 9 | `strlen` | covered (doc comment) | 2 | swift-testing | string.h |
-| 10 | `wasip1` | missing | 2 | swift-async-algorithms | PThread.Mutex on WASI without threads |
-| 11 | `which` | missing | 2 | swift-testing | which |
-| 12 | `_dyld_image_count` | covered (doc comment) | 1 | swift-foundation | _dyld_image_count |
-| 13 | `_NSGetExecutablePath` | covered (doc comment) | 1 | swift-testing | executable's path |
-| 14 | adding a file action to C file actions | covered (doc comment) | 1 | swift-subprocess | posix_spawn |
-| 15 | `addr` | missing | 1 | swift-build | their members |
-| 16 | `AR_EFMT1` | standard library ([ar archive header]: the header's fields, read from the archive's bytes: ar_hdr is 60 bytes of text (ar_name …) | 1 | swift-build | ar.h archive headers |
-| 17 | `ar_hdr` | standard library ([ar archive header]: the header's fields, read from the archive's bytes: ar_hdr is 60 bytes of text (ar_name …) | 1 | swift-build | ar.h archive headers |
-| 18 | `ar_size` | standard library ([ar archive header]: the header's fields, read from the archive's bytes: ar_hdr is 60 bytes of text (ar_name …) | 1 | swift-build | ar.h archive headers |
-| 19 | `backtrace` | covered (doc comment) | 1 | swift-testing | execinfo.h |
-| 20 | `backtrace_async` | missing | 1 | swift-testing | backtrace_async |
-| 21 | `build_version_command` | not System's ([Mach-O file format]) | 1 | swift-build | build_version_command |
-| 22 | C-string arguments for the C-values spawns | covered (by ProcessID.spawn's C-array forms with C values) | 1 | swift-subprocess | C-string arguments for the C-values spawns |
-| 23 | `calloc` | covered (doc comment) | 1 | swift-testing | the C heap |
-| 24 | `cmd` | missing | 1 | swift-build | their members |
-| 25 | `cmdsize` | missing | 1 | swift-build | their members |
-| 26 | `copy_file_range` | missing | 1 | swift-testing | file cloning |
-| 27 | `cpusubtype` | missing | 1 | swift-build | their members |
-| 28 | `cputype` | missing | 1 | swift-build | their members |
-| 29 | `dlopen` | covered (doc comment) | 1 | swift-build | dynamic loader |
-| 30 | `dlsym` | covered (doc comment) | 1 | swift-testing | dynamic loader |
-| 31 | `dylib` | not System's ([Mach-O file format]) | 1 | swift-build | dylib |
-| 32 | `dylib_command` | not System's ([Mach-O file format]) | 1 | swift-build | dylib_command |
-| 33 | `DynamicLibrary` | covered (by DynamicLibrary) | 1 | swift-foundation | DynamicLibrary |
-| 34 | `EX_UNAVAILABLE` | covered (doc comment) | 1 | swift-testing | sysexits |
-| 35 | `EXIT_FAILURE` | covered (doc comment) | 1 | swift-testing | stdlib.h |
-| 36 | `F_SETFD` | covered (doc comment) | 1 | swift-build | TerminalDescriptor.openPseudoterminal on OpenBSD |
-| 37 | `fat_arch` | not System's ([Mach-O file format]) | 1 | swift-build | fat_arch |
-| 38 | `fat_arch_64` | not System's ([Mach-O file format]) | 1 | swift-build | fat_arch_64 |
-| 39 | `FAT_CIGAM` | not System's ([Mach-O file format]) | 1 | swift-build | constants |
-| 40 | `FAT_CIGAM_64` | not System's ([Mach-O file format]) | 1 | swift-build | constants |
-| 41 | `fat_header` | not System's ([Mach-O file format]) | 1 | swift-build | fat_header |
-| 42 | `fclonefileat` | covered (doc comment) | 1 | swift-testing | sys/clonefile.h |
-| 43 | `fcntl` | covered (doc comment) | 1 | swift-build | TerminalDescriptor.openPseudoterminal on OpenBSD |
-| 44 | `FD_CLOEXEC` | covered (doc comment) | 1 | swift-build | TerminalDescriptor.openPseudoterminal on OpenBSD |
-| 45 | `fflush` | covered (doc comment) | 1 | swift-log | fflush |
-| 46 | `FICLONE` | covered (doc comment) | 1 | swift-testing | linux/fs.h |
-| 47 | `fileoff` | missing | 1 | swift-build | their members |
-| 48 | `filesize` | missing | 1 | swift-build | their members |
-| 49 | `filetype` | missing | 1 | swift-build | their members |
-| 50 | `fmemopen` | missing | 1 | swift-testing | C stdio (provisional) |
-| 51 | `fopencookie` | missing | 1 | swift-testing | fopencookie |
-| 52 | `funopen` | missing | 1 | swift-testing | C stdio (provisional) |
-| 53 | `fwrite` | covered (doc comment) | 1 | swift-log | fwrite |
-| 54 | `getc_unlocked` | missing | 1 | swift-testing | C stdio (provisional) |
-| 55 | `getsectiondata` | missing | 1 | swift-testing | mach-o/getsect.h |
-| 56 | `gnu_get_libc_version` | missing | 1 | swift-testing | gnu/libc-version.h |
-| 57 | `images` | missing | 1 | swift-testing | Mach-O |
-| 58 | `isatty` | covered (doc comment) | 1 | swift-testing | unistd.h |
-| 59 | `KERN_PROC_PATHNAME` | missing | 1 | swift-testing | executable's path |
-| 60 | `LC_MAIN` | not System's ([Mach-O file format]) | 1 | swift-build | constants |
-| 61 | `LC_SEGMENT` | not System's ([Mach-O file format]) | 1 | swift-build | constants |
-| 62 | `LC_SEGMENT_64` | not System's ([Mach-O file format]) | 1 | swift-build | constants |
-| 63 | `LC_SYMTAB` | not System's ([Mach-O file format]) | 1 | swift-build | constants |
-| 64 | `mach_header` | not System's ([Mach-O file format]) | 1 | swift-build | mach_header |
-| 65 | `mach_header_64` | not System's ([Mach-O file format]) | 1 | swift-build | mach_header_64 |
-| 66 | `macho_arch_name_for_cpu_type` | not System's ([Mach-O architecture names]) | 1 | swift-build | mach-o/utils.h |
-| 67 | `macho_arch_name_for_mach_header` | not System's ([Mach-O architecture names]) | 1 | swift-build | mach-o/utils.h |
-| 68 | `macho_cpu_type_for_arch_name` | not System's ([Mach-O architecture names]) | 1 | swift-build | mach-o/utils.h |
-| 69 | `magic` | missing | 1 | swift-build | their members |
-| 70 | `malloc` | covered (doc comment) | 1 | swift-crypto | the C heap |
-| 71 | `memcmp` | covered (doc comment) | 1 | swift-crypto | string.h |
-| 72 | `memmem` | missing | 1 | swift-testing | string.h and ctype.h (provisional) |
-| 73 | `minos` | missing | 1 | swift-build | their members |
-| 74 | `name` | covered (doc comment) | 1 | swift-build | their members |
-| 75 | `NAME_MAX` | covered (doc comment) | 1 | swift-testing | compile-time limits |
-| 76 | `nfat_arch` | missing | 1 | swift-build | their members |
-| 77 | `offset` | covered (doc comment) | 1 | swift-build | their members |
-| 78 | `path` | missing | 1 | swift-build | their members |
-| 79 | `pipe2` | covered (doc comment) | 1 | swift-testing | unistd.h |
-| 80 | `platform` | missing | 1 | swift-build | their members |
-| 81 | `posix_spawn_file_actions_addclosefrom_np` | covered (doc comment) | 1 | swift-testing | posix_spawn |
-| 82 | `POSIXErrorCode` | covered (doc comment) | 1 | swift-foundation | POSIXErrorCode |
-| 83 | `pthread_create` | covered (doc comment) | 1 | swift-async-algorithms | pthread_create |
-| 84 | `pthread_join` | covered (doc comment) | 1 | swift-async-algorithms | pthread_join |
-| 85 | `pthread_mutex_t` | covered (doc comment) | 1 | swift-certificates | for `LockPrimitive`'s storage |
-| 86 | `pthread_set_name_np` | missing | 1 | swift-testing | pthread.h |
-| 87 | `pthread_t` | covered (doc comment) | 1 | swift-async-algorithms | pthread_t |
-| 88 | `raise` | covered (doc comment) | 1 | swift-testing | signal.h |
-| 89 | readlinkat into a caller's buffer (System's readSymbolicLink returns a FilePath, which dro | covered (doc comment) | 1 | WasmKit | readlinkat into a caller's buffer (System's readSymbolicLink returns a FilePath, which dro |
-| 90 | `realpath` | covered (doc comment) | 1 | swift-testing | stdlib.h |
-| 91 | `rpath_command` | not System's ([Mach-O file format]) | 1 | swift-build | rpath_command |
-| 92 | `SARMAG` | standard library ([ar archive header]: the header's fields, read from the archive's bytes: ar_hdr is 60 bytes of text (ar_name …) | 1 | swift-build | ar.h archive headers |
-| 93 | `sdk` | missing | 1 | swift-build | their members |
-| 94 | `section` | not System's ([Mach-O file format]) | 1 | swift-build | section |
-| 95 | `section_64` | not System's ([Mach-O file format]) | 1 | swift-build | section_64 |
-| 96 | `segment_command_64` | not System's ([Mach-O file format]) | 1 | swift-build | segment_command_64 |
-| 97 | `sigabbrev_np` | missing | 1 | swift-testing | string.h |
-| 98 | `SIGABRT` | covered (doc comment) | 1 | swift-testing | signal.h |
-| 99 | `SIGSEGV` | covered (doc comment) | 1 | swift-testing | SIGSEGV |
-| 100 | `size` | missing | 1 | swift-build | their members |
-| 101 | stdlib.h and sysexits.h exit codes' C names | unread | 1 | swift-testing | stdlib.h and sysexits.h exit codes' C names |
-| 102 | `strchr` | missing | 1 | swift-testing | string.h and ctype.h (provisional) |
-| 103 | `strerror_r` | missing | 1 | swift-testing | string.h and ctype.h (provisional) |
-| 104 | `strncmp` | covered (doc comment) | 1 | swift-testing | strncmp |
-| 105 | `sys_signame` | missing | 1 | swift-testing | signal.h |
-| 106 | `sysctl` | covered (doc comment) | 1 | swift-testing | executable's path |
-| 107 | `task_set_exception_ports` | missing | 1 | swift-testing | mach/task.h |
-| 108 | `timespec_get` | covered (doc comment) | 1 | swift-testing | time.h |
-| 109 | `tmpfile` | missing | 1 | swift-testing | C stdio (provisional) |
-| 110 | `usleep` | covered (as `nanosleep`) | 1 | swift-stress-tester | sleep |
-| 111 | `uuid` | missing | 1 | swift-build | their members |
-| 112 | `uuid_command` | not System's ([Mach-O file format]) | 1 | swift-build | uuid_command |
-| 113 | `version` | covered (doc comment) | 1 | swift-build | their members |
-| 114 | `version_min_command` | not System's ([Mach-O file format]) | 1 | swift-build | version_min_command |
-| 115 | `vm_prot_t` | standard library ([C scalar types]: Int, UInt, Int64, UInt8 ... and Swift's C type aliases (CInt, CChar, CLong ...), and …) | 1 | swift-build | Mach virtual memory |
-| 116 | `vmaddr` | missing | 1 | swift-build | their members |
-| 117 | `vmsize` | missing | 1 | swift-build | their members |
+| 1 | C library | unread | 29 | swift-foundation, swift-nio | C library |
+| 2 | SystemSockets on FreeBSD and Windows | unread | 17 | swift-nio | SystemSockets on FreeBSD and Windows |
+| 3 | SystemSockets on FreeBSD | unread | 15 | swift-nio | SystemSockets on FreeBSD |
+| 4 | `extattr_*` | missing | 4 | swift-foundation | FilePath.extendedAttribute on FreeBSD |
+| 5 | `remove` | covered (doc comment) | 4 | swift-testing | stdio.h |
+| 6 | `free` | covered (doc comment) | 3 | swift-crypto, swift-testing | the C heap |
+| 7 | `pthread_set_name_np` | missing | 3 | swift-nio, swift-testing | PThread.ID.name on OpenBSD |
+| 8 | `abort` | covered (doc comment) | 2 | swift-build, swift-testing | stdlib.h |
+| 9 | `openpty` | covered (doc comment) | 2 | swift-build, swift-testing | TerminalDescriptor.openPseudoterminal on OpenBSD |
+| 10 | `byteCount` | missing | 2 | swift-foundation | byteCount |
+| 11 | `EXIT_SUCCESS` | covered (doc comment) | 2 | swift-testing | stdlib.h |
+| 12 | family on Windows (Windows later) | unread | 2 | swift-nio | family on Windows (Windows later) |
+| 13 | fts off Darwin (see _FTSSequence) | unread | 2 | swift-foundation | fts off Darwin (see _FTSSequence) |
+| 14 | `MemoryMapping` | missing | 2 | swift-foundation | MemoryMapping |
+| 15 | `memset_s` | covered (doc comment) | 2 | swift-crypto | string.h |
+| 16 | `NetworkInterface` | missing | 2 | swift-nio | NetworkInterface |
+| 17 | `pthread_get_name_np` | missing | 2 | swift-nio | PThread.ID.name on OpenBSD |
+| 18 | `strlen` | covered (doc comment) | 2 | swift-testing | string.h |
+| 19 | `wasip1` | missing | 2 | swift-async-algorithms | PThread.Mutex on WASI without threads |
+| 20 | `which` | missing | 2 | swift-testing | which |
+| 21 | `_dyld_image_count` | covered (doc comment) | 1 | swift-foundation | _dyld_image_count |
+| 22 | `_NSGetExecutablePath` | covered (doc comment) | 1 | swift-testing | executable's path |
+| 23 | adding a file action to C file actions | covered (doc comment) | 1 | swift-subprocess | posix_spawn |
+| 24 | `address` | missing | 1 | swift-nio | address |
+| 25 | `backtrace` | covered (doc comment) | 1 | swift-testing | execinfo.h |
+| 26 | `backtrace_async` | missing | 1 | swift-testing | backtrace_async |
+| 27 | `BSDs` | missing | 1 | swift-nio | BSDs |
+| 28 | `bytes` | missing | 1 | swift-nio | bytes |
+| 29 | C library's type and errno names that NIOPosix's files and its clients reach | unread | 1 | swift-nio | C library's type and errno names that NIOPosix's files and its clients reach |
+| 30 | C-string arguments for the C-values spawns | covered (by ProcessID.spawn's C-array forms with C values) | 1 | swift-subprocess | C-string arguments for the C-values spawns |
+| 31 | `calloc` | covered (doc comment) | 1 | swift-testing | the C heap |
+| 32 | CInterop.POSIXErrorCode on Windows | unread | 1 | swift-foundation | CInterop.POSIXErrorCode on Windows |
+| 33 | `CLocale` | missing | 1 | swift-foundation | CLocale |
+| 34 | ClockID.monotonicRaw on FreeBSD and OpenBSD | unread | 1 | WasmKit | ClockID.monotonicRaw on FreeBSD and OpenBSD |
+| 35 | `CNIOLinux` | missing | 1 | swift-nio | CNIOLinux |
+| 36 | `copy_file_range` | missing | 1 | swift-testing | file cloning |
+| 37 | CString.copy on Windows (string_h's platforms) | unread | 1 | swift-foundation | CString.copy on Windows (string_h's platforms) |
+| 38 | `dlsym` | covered (doc comment) | 1 | swift-testing | dynamic loader |
+| 39 | `DynamicLibrary` | covered (by DynamicLibrary) | 1 | swift-foundation | DynamicLibrary |
+| 40 | `EMULTIHOP` | covered (doc comment) | 1 | WasmKit | .noLink on OpenBSD |
+| 41 | `ENOLINK` | covered (doc comment) | 1 | WasmKit | .noLink on OpenBSD |
+| 42 | Errno.multiHop and .noLink on OpenBSD (the arm Windows shares maps the C values) | unread | 1 | WasmKit | Errno.multiHop and .noLink on OpenBSD (the arm Windows shares maps the C values) |
+| 43 | `EX_UNAVAILABLE` | covered (doc comment) | 1 | swift-testing | sysexits |
+| 44 | `EXIT_FAILURE` | covered (doc comment) | 1 | swift-testing | stdlib.h |
+| 45 | extended attributes on OpenBSD | unread | 1 | swift-foundation | extended attributes on OpenBSD |
+| 46 | `F_SETFD` | covered (doc comment) | 1 | swift-build | TerminalDescriptor.openPseudoterminal on OpenBSD |
+| 47 | `family` | missing | 1 | swift-nio | family |
+| 48 | `fclonefileat` | covered (doc comment) | 1 | swift-testing | sys/clonefile.h |
+| 49 | `fcntl` | covered (doc comment) | 1 | swift-build | TerminalDescriptor.openPseudoterminal on OpenBSD |
+| 50 | `FD_CLOEXEC` | covered (doc comment) | 1 | swift-build | TerminalDescriptor.openPseudoterminal on OpenBSD |
+| 51 | `fflush` | covered (doc comment) | 1 | swift-log | fflush |
+| 52 | `FICLONE` | covered (doc comment) | 1 | swift-testing | linux/fs.h |
+| 53 | `file` | missing | 1 | swift-foundation | file |
+| 54 | FilePath.makeUniqueFile(options:permissions:) on FreeBSD and OpenBSD | unread | 1 | swift-foundation | FilePath.makeUniqueFile(options:permissions:) on FreeBSD and OpenBSD |
+| 55 | `fileSize` | missing | 1 | swift-foundation | fileSize |
+| 56 | `fmemopen` | missing | 1 | swift-testing | C stdio (provisional) |
+| 57 | `fopencookie` | missing | 1 | swift-testing | fopencookie |
+| 58 | `FTS_*` | missing | 1 | swift-foundation | fts off Darwin |
+| 59 | `fts_close` | covered (by DirectoryWalk) | 1 | swift-foundation | fts |
+| 60 | `fts_open` | covered (by DirectoryWalk) | 1 | swift-foundation | fts |
+| 61 | `fts_read` | covered (by DirectoryWalk) | 1 | swift-foundation | fts |
+| 62 | `fts_set` | covered (by DirectoryWalk) | 1 | swift-foundation | fts |
+| 63 | `FTSENT` | covered (by DirectoryWalk) | 1 | swift-foundation | fts |
+| 64 | `funopen` | missing | 1 | swift-testing | C stdio (provisional) |
+| 65 | `fwrite` | covered (doc comment) | 1 | swift-log | fwrite |
+| 66 | `generation` | missing | 1 | swift-nio | generation |
+| 67 | `getc_unlocked` | missing | 1 | swift-testing | C stdio (provisional) |
+| 68 | `getsectiondata` | covered (doc comment) | 1 | swift-testing | mach-o/getsect.h |
+| 69 | `gnu_get_libc_version` | missing | 1 | swift-testing | gnu/libc-version.h |
+| 70 | `images` | missing | 1 | swift-testing | Mach-O |
+| 71 | `in6_pktinfo` | covered (doc comment) | 1 | swift-nio | IP-level socket options |
+| 72 | `IP_TOS` | covered (doc comment) | 1 | swift-nio | IP-level socket options |
+| 73 | `IPTOS_ECN_*` | covered (5 names) | 1 | swift-nio | IPTOS_ECN_* |
+| 74 | `isatty` | covered (doc comment) | 1 | swift-testing | unistd.h |
+| 75 | `itimerspec` | covered (doc comment) | 1 | swift-nio | selector's C timer structs over System's IntervalTimer |
+| 76 | `KERN_PROC_PATHNAME` | missing | 1 | swift-testing | executable's path |
+| 77 | `kinds` | missing | 1 | swift-foundation | fts off Darwin |
+| 78 | `LC_MAIN` | missing | 1 | swift-build | mach-o/loader.h |
+| 79 | `LC_SYMTAB` | missing | 1 | swift-build | LC_SYMTAB |
+| 80 | `macho_arch_name_for_cpu_type` | covered (doc comment) | 1 | swift-build | mach-o/utils.h |
+| 81 | `macho_arch_name_for_mach_header` | covered (doc comment) | 1 | swift-build | mach-o/utils.h |
+| 82 | `macho_cpu_type_for_arch_name` | covered (doc comment) | 1 | swift-build | mach-o/utils.h |
+| 83 | `malloc` | covered (doc comment) | 1 | swift-crypto | the C heap |
+| 84 | `maxSymbolicLinks` | missing | 1 | swift-foundation | maxSymbolicLinks |
+| 85 | `memcmp` | covered (doc comment) | 1 | swift-crypto | string.h |
+| 86 | `memmem` | missing | 1 | swift-testing | string.h and ctype.h (provisional) |
+| 87 | `memmove` | standard library ([memory copies]: UnsafeMutableRawPointer's copyMemory(from:byteCount:) and …) | 1 | swift-foundation | memmove |
+| 88 | Memory.reallocate on Windows | unread | 1 | swift-foundation | Memory.reallocate on Windows |
+| 89 | `mptcp_info` | missing | 1 | swift-nio | mptcp_info |
+| 90 | `MPTCP_INFO` | missing | 1 | swift-nio | MPTCP_INFO |
+| 91 | `NAME_MAX` | covered (doc comment) | 1 | swift-testing | compile-time limits |
+| 92 | `none` | missing | 1 | swift-foundation | WASI |
+| 93 | `O_RSYNC` | covered (doc comment) | 1 | WasmKit | OpenOptions.readSync on Linux |
+| 94 | `pipe2` | covered (doc comment) | 1 | swift-testing | unistd.h |
+| 95 | `posix_spawn_file_actions_addclosefrom_np` | covered (doc comment) | 1 | swift-testing | posix_spawn |
+| 96 | POSIXError's API from an Errno off Darwin | unread | 1 | swift-foundation | POSIXError's API from an Errno off Darwin |
+| 97 | POSIXError's API off Darwin | unread | 1 | swift-foundation | POSIXError's API off Darwin |
+| 98 | POSIXError's static properties off Darwin | unread | 1 | swift-foundation | POSIXError's static properties off Darwin |
+| 99 | `POSIXErrorCode` | covered (doc comment) | 1 | swift-foundation | POSIXErrorCode |
+| 100 | PThread.Key on WASI without threads (coverage-5 N2) | unread | 1 | swift-foundation | PThread.Key on WASI without threads (coverage-5 N2) |
+| 101 | PThread.Key on Windows | unread | 1 | swift-nio | PThread.Key on Windows |
+| 102 | PThread.setCurrentName and PThread.ID.name() on OpenBSD | unread | 1 | swift-nio | PThread.setCurrentName and PThread.ID.name() on OpenBSD |
+| 103 | PThread.yield on WASI without threads (coverage-5 N2) | unread | 1 | swift-nio | PThread.yield on WASI without threads (coverage-5 N2) |
+| 104 | PThread.yield on WASI without threads (wasip1 has sched_yield) | unread | 1 | WasmKit | PThread.yield on WASI without threads (wasip1 has sched_yield) |
+| 105 | `pthread_create` | covered (doc comment) | 1 | swift-async-algorithms | pthread_create |
+| 106 | `pthread_join` | covered (doc comment) | 1 | swift-async-algorithms | pthread_join |
+| 107 | `pthread_mutex_t` | covered (doc comment) | 1 | swift-certificates | for `LockPrimitive`'s storage |
+| 108 | `pthread_t` | covered (doc comment) | 1 | swift-async-algorithms | pthread_t |
+| 109 | `raise` | covered (doc comment) | 1 | swift-testing | signal.h |
+| 110 | `real` | missing | 1 | swift-foundation | real |
+| 111 | `realpath` | covered (doc comment) | 1 | swift-testing | stdlib.h |
+| 112 | `release` | covered (doc comment) | 1 | swift-foundation | release |
+| 113 | `S_IFWHT` | covered (doc comment) | 1 | swift-nio | FileType.whiteout on OpenBSD |
+| 114 | `secureValue` | missing | 1 | swift-foundation | secureValue |
+| 115 | `sendmmsg` | covered (doc comment) | 1 | swift-nio | sendmmsg |
+| 116 | `sigabbrev_np` | missing | 1 | swift-testing | string.h |
+| 117 | `SIGABRT` | covered (doc comment) | 1 | swift-testing | signal.h |
+| 118 | `SIGSEGV` | covered (doc comment) | 1 | swift-testing | SIGSEGV |
+| 119 | `SO_REUSEPORT` | covered (doc comment) | 1 | swift-nio | socket options |
+| 120 | SocketDescriptor.SocketOption.reusePort on Android and OpenBSD | unread | 1 | swift-nio | SocketDescriptor.SocketOption.reusePort on Android and OpenBSD |
+| 121 | Stat on Windows (Windows later) | unread | 1 | swift-nio | Stat on Windows (Windows later) |
+| 122 | StatFS.FileSystemID as a number on every platform | unread | 1 | swift-foundation | StatFS.FileSystemID as a number on every platform |
+| 123 | stdlib.h and sysexits.h exit codes' C names | unread | 1 | swift-testing | stdlib.h and sysexits.h exit codes' C names |
+| 124 | `strchr` | missing | 1 | swift-testing | string.h and ctype.h (provisional) |
+| 125 | `strerror_r` | missing | 1 | swift-testing | string.h and ctype.h (provisional) |
+| 126 | `strncmp` | covered (doc comment) | 1 | swift-testing | strncmp |
+| 127 | `sync` | covered (doc comment) | 1 | WasmKit | sync |
+| 128 | `sys_signame` | missing | 1 | swift-testing | signal.h |
+| 129 | `sysctl` | covered (doc comment) | 1 | swift-testing | executable's path |
+| 130 | SystemConfig.maxIOVectors on FreeBSD and OpenBSD | unread | 1 | swift-nio | SystemConfig.maxIOVectors on FreeBSD and OpenBSD |
+| 131 | `SystemIdentity` | missing | 1 | swift-foundation | SystemIdentity |
+| 132 | SystemSockets on FreeBSD (PackageDescription can't name .freebsd) | unread | 1 | WasmKit | SystemSockets on FreeBSD (PackageDescription can't name .freebsd) |
+| 133 | SystemSockets on OpenBSD | unread | 1 | swift-nio | SystemSockets on OpenBSD |
+| 134 | `task_set_exception_ports` | missing | 1 | swift-testing | mach/task.h |
+| 135 | `TCP_INFO` | covered (doc comment) | 1 | swift-nio | socket options |
+| 136 | `tcp_info` | covered (doc comment) | 1 | swift-nio | SystemSockets on FreeBSD |
+| 137 | test's own C-shaped helpers on FreeBSD and OpenBSD (the Darwin round's design call 19) | unread | 1 | swift-nio | test's own C-shaped helpers on FreeBSD and OpenBSD (the Darwin round's design call 19) |
+| 138 | `timespec` | covered (doc comment) | 1 | swift-nio | selector's C timer structs over System's IntervalTimer |
+| 139 | `timespec_get` | covered (doc comment) | 1 | swift-testing | time.h |
+| 140 | `tmpfile` | missing | 1 | swift-testing | C stdio (provisional) |
+| 141 | `unmap` | missing | 1 | swift-foundation | unmap |
+| 142 | `usleep` | covered (as `nanosleep`) | 1 | swift-stress-tester | sleep |
+| 143 | `version` | covered (doc comment) | 1 | swift-foundation | version |
 
 ## Missing, by family
 
@@ -629,26 +674,293 @@ The missing interfaces above, grouped, largest first: the order to fill them in.
 
 | # | Family | Files | Packages | Interfaces |
 |---:|---|---:|---|---|
-| 1 | string.h and ctype.h (provisional) | 3 | swift-testing | `memmem`, `strchr`, `strerror_r` |
-| 2 | C stdio (provisional) | 2 | swift-testing | `fmemopen`, `funopen`, `getc_unlocked`, `tmpfile` |
-| 3 | PThread.Mutex on WASI without threads | 2 | swift-async-algorithms | `wasip1` |
-| 4 | which | 2 | swift-testing | `which` |
-| 5 | backtrace_async | 1 | swift-testing | `backtrace_async` |
-| 6 | executable's path | 1 | swift-testing | `KERN_PROC_PATHNAME` |
-| 7 | file cloning | 1 | swift-testing | `copy_file_range` |
-| 8 | fopencookie | 1 | swift-testing | `fopencookie` |
-| 9 | gnu/libc-version.h | 1 | swift-testing | `gnu_get_libc_version` |
-| 10 | Mach-O | 1 | swift-testing | `images` |
-| 11 | mach-o/getsect.h | 1 | swift-testing | `getsectiondata` |
-| 12 | mach/task.h | 1 | swift-testing | `task_set_exception_ports` |
-| 13 | pthread.h | 1 | swift-testing | `pthread_set_name_np` |
-| 14 | signal.h | 1 | swift-testing | `sys_signame` |
-| 15 | string.h | 1 | swift-testing | `sigabbrev_np` |
-| 16 | their members | 1 | swift-build | `addr`, `cmd`, `cmdsize`, `cpusubtype`, `cputype`, `fileoff`, `filesize`, `filetype`, `magic`, `minos`, `nfat_arch`, `path`, `platform`, `sdk`, `size`, `uuid`, `vmaddr`, `vmsize` |
+| 1 | FilePath.extendedAttribute on FreeBSD | 4 | swift-foundation | `extattr_*` |
+| 2 | PThread.ID.name on OpenBSD | 3 | swift-nio, swift-testing | `pthread_set_name_np`, `pthread_get_name_np` |
+| 3 | string.h and ctype.h (provisional) | 3 | swift-testing | `memmem`, `strchr`, `strerror_r` |
+| 4 | byteCount | 2 | swift-foundation | `byteCount` |
+| 5 | C stdio (provisional) | 2 | swift-testing | `fmemopen`, `funopen`, `getc_unlocked`, `tmpfile` |
+| 6 | MemoryMapping | 2 | swift-foundation | `MemoryMapping` |
+| 7 | NetworkInterface | 2 | swift-nio | `NetworkInterface` |
+| 8 | PThread.Mutex on WASI without threads | 2 | swift-async-algorithms | `wasip1` |
+| 9 | which | 2 | swift-testing | `which` |
+| 10 | address | 1 | swift-nio | `address` |
+| 11 | backtrace_async | 1 | swift-testing | `backtrace_async` |
+| 12 | BSDs | 1 | swift-nio | `BSDs` |
+| 13 | bytes | 1 | swift-nio | `bytes` |
+| 14 | CLocale | 1 | swift-foundation | `CLocale` |
+| 15 | CNIOLinux | 1 | swift-nio | `CNIOLinux` |
+| 16 | executable's path | 1 | swift-testing | `KERN_PROC_PATHNAME` |
+| 17 | family | 1 | swift-nio | `family` |
+| 18 | file | 1 | swift-foundation | `file` |
+| 19 | file cloning | 1 | swift-testing | `copy_file_range` |
+| 20 | fileSize | 1 | swift-foundation | `fileSize` |
+| 21 | fopencookie | 1 | swift-testing | `fopencookie` |
+| 22 | fts off Darwin | 1 | swift-foundation | `FTS_*`, `kinds` |
+| 23 | generation | 1 | swift-nio | `generation` |
+| 24 | gnu/libc-version.h | 1 | swift-testing | `gnu_get_libc_version` |
+| 25 | LC_SYMTAB | 1 | swift-build | `LC_SYMTAB` |
+| 26 | Mach-O | 1 | swift-testing | `images` |
+| 27 | mach-o/loader.h | 1 | swift-build | `LC_MAIN` |
+| 28 | mach/task.h | 1 | swift-testing | `task_set_exception_ports` |
+| 29 | maxSymbolicLinks | 1 | swift-foundation | `maxSymbolicLinks` |
+| 30 | mptcp_info | 1 | swift-nio | `mptcp_info` |
+| 31 | MPTCP_INFO | 1 | swift-nio | `MPTCP_INFO` |
+| 32 | real | 1 | swift-foundation | `real` |
+| 33 | secureValue | 1 | swift-foundation | `secureValue` |
+| 34 | signal.h | 1 | swift-testing | `sys_signame` |
+| 35 | string.h | 1 | swift-testing | `sigabbrev_np` |
+| 36 | SystemIdentity | 1 | swift-foundation | `SystemIdentity` |
+| 37 | unmap | 1 | swift-foundation | `unmap` |
+| 38 | WASI | 1 | swift-foundation | `none` |
 
 ## Markers that name no C interface
 
+- WasmKit: `Sources/CLICommands/TCPListener.swift:104`: SystemSockets on FreeBSD (PackageDescription can't name .freebsd)
+- WasmKit: `Sources/WASI/Platform/PAL/PALClock.swift:55`: ClockID.monotonicRaw on FreeBSD and OpenBSD, which have no raw monotonic clock
+- WasmKit: `Sources/WASI/Platform/PAL/PALErrnoMapping.swift:122`: Errno.multiHop and .noLink on OpenBSD (the arm Windows shares maps the C values)
+- WasmKit: `Sources/WASI/Platform/PAL/PALFileDescriptor.swift:560`: PThread.yield on WASI without threads (wasip1 has sched_yield)
 - swift-foundation: `Sources/FoundationEssentials/AttributedString/AttributeScope.swift:68`: DynamicLibrary, in the framework build (not built here): dlopen with RTLD_NOLOAD \| RTLD_FIRST, dlsym and dlclose are system-next's DynamicLibrary(_:options: [.noLoad, .first]), address(of:), close() a
+- swift-foundation: `Sources/FoundationEssentials/Data/Data+Writing.swift:28`: the C library, for this file's C arms
+- swift-foundation: `Sources/FoundationEssentials/Data/Data+Writing.swift:32`: the C library, for this file's C arms
+- swift-foundation: `Sources/FoundationEssentials/Data/Data+Writing.swift:40`: the C library, for this file's C arms
+- swift-foundation: `Sources/FoundationEssentials/Data/Data+Writing.swift:294`: FilePath.makeUniqueFile(options:permissions:) on FreeBSD and OpenBSD; Windows shares
+- swift-foundation: `Sources/FoundationEssentials/Data/Data+Writing.swift:853`: extended attributes on OpenBSD, which has none
+- swift-foundation: `Sources/FoundationEssentials/Data/Representations/DataStorage.swift:90`: Memory.reallocate on Windows, which shares this arm
+- swift-foundation: `Sources/FoundationEssentials/Error/CocoaError+FilePath.swift:22`: the C library, for this file's C arms
+- swift-foundation: `Sources/FoundationEssentials/Error/CocoaError+FilePath.swift:28`: the C library, for this file's C arms
+- swift-foundation: `Sources/FoundationEssentials/Error/CocoaError+FilePath.swift:104`: POSIXError's API from an Errno off Darwin, Linux and Android: each platform's errno set (platforms-2 8.4)
+- swift-foundation: `Sources/FoundationEssentials/Error/ErrorCodes+POSIX.swift:26`: the C library, for this file's C arms
+- swift-foundation: `Sources/FoundationEssentials/Error/ErrorCodes+POSIX.swift:32`: the C library, for this file's C arms
+- swift-foundation: `Sources/FoundationEssentials/Error/ErrorCodes+POSIX.swift:77`: CInterop.POSIXErrorCode on Windows; and POSIXError's API off Darwin, Linux and Android (each platform's errno set, platforms-2 8.4), where Code isn't deprecated
+- swift-foundation: `Sources/FoundationEssentials/Error/ErrorCodes+POSIX.swift:87`: POSIXError's API off Darwin, Linux and Android: each platform's errno set (platforms-2 8.4)
+- swift-foundation: `Sources/FoundationEssentials/Error/ErrorCodes+POSIX.swift:558`: POSIXError's static properties off Darwin, Linux and Android: each platform's errno set (platforms-2 8.4)
+- swift-foundation: `Sources/FoundationEssentials/FileManager/FileManager+Basics.swift:19`: the C library, for this file's C arms
+- swift-foundation: `Sources/FoundationEssentials/FileManager/FileManager+Basics.swift:25`: the C library, for this file's C arms
+- swift-foundation: `Sources/FoundationEssentials/FileManager/FileManager+Directories.swift:279`: fts off Darwin (see _FTSSequence)
+- swift-foundation: `Sources/FoundationEssentials/FileManager/FileManager+Files.swift:752`: StatFS.FileSystemID as a number on every platform: System's StatFS covers statvfs here, but its fsid is Darwin's and the BSDs' fsid_t and Linux's unsigned long, so one call needs a
+- swift-foundation: `Sources/FoundationEssentials/FileManager/FileManager+SymbolicLinks.swift:18`: the C library, for this file's C arms
+- swift-foundation: `Sources/FoundationEssentials/FileManager/FileManager+SymbolicLinks.swift:25`: the C library, for this file's C arms
+- swift-foundation: `Sources/FoundationEssentials/FileManager/FileManager+Utilities.swift:29`: the C library, for this file's C arms
+- swift-foundation: `Sources/FoundationEssentials/FileManager/FileManager+Utilities.swift:36`: the C library, for this file's C arms
+- swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:487`: fts off Darwin (see _FTSSequence); removal needs FTS_XDEV's same-device check
+- swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:1170`: fts off Darwin (see _FTSSequence)
+- swift-foundation: `Sources/FoundationEssentials/Platform.swift:254`: CString.copy on Windows (string_h's platforms), as strlcpy, which returns for a size of 0
+- swift-foundation: `Sources/FoundationEssentials/String/String+Path.swift:22`: the C library, for this file's C arms
+- swift-foundation: `Sources/FoundationEssentials/String/String+Path.swift:27`: the C library, for this file's C arms
+- swift-foundation: `Sources/FoundationEssentials/_ThreadLocal.swift:19`: the C library, for this file's C arms
+- swift-foundation: `Sources/FoundationEssentials/_ThreadLocal.swift:57`: PThread.Key on WASI without threads (coverage-5 N2); Windows shares the arm
+- swift-foundation: `Sources/FoundationInternationalization/Formatting/Date/ICUDateFormatter.swift:23`: the C library, for this file's C arms
+- swift-foundation: `Tests/FoundationEssentialsTests/DataTests.swift:23`: the C library, for this file's C arms
+- swift-foundation: `Tests/FoundationEssentialsTests/DecimalTests.swift:18`: the C library, for this file's C arms
+- swift-foundation: `Tests/FoundationEssentialsTests/DecimalTests.swift:21`: the C library, for this file's C arms
+- swift-foundation: `Tests/FoundationEssentialsTests/JSONEncoderTests.swift:25`: the C library, for this file's C arms
+- swift-foundation: `Tests/FoundationEssentialsTests/ProcessInfoTests.swift:26`: the C library, for this file's C arms
+- swift-foundation: `Tests/FoundationEssentialsTests/ProcessInfoTests.swift:33`: the C library, for this file's C arms
+- swift-foundation: `Tests/FoundationInternationalizationTests/DateComponentsTests.swift:29`: the C library, for this file's C arms
+- swift-foundation: `Tests/FoundationInternationalizationTests/DateComponentsTests.swift:32`: the C library, for this file's C arms
+- swift-nio: `Sources/NIOConcurrencyHelpers/atomics.swift:29`: PThread.yield on WASI without threads (coverage-5 N2)
+- swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:83`: the C library, for this file's C arms
+- swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:94`: the C library, for this file's C arms
+- swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:103`: the C library, for this file's C arms
+- swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:231`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:261`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:272`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:284`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:299`: SystemSockets on FreeBSD
+- swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:320`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:343`: SystemSockets on FreeBSD
+- swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:366`: SystemSockets on FreeBSD
+- swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:386`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:408`: SystemSockets on FreeBSD
+- swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:423`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:434`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:445`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:456`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:467`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:481`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:495`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:506`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:517`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:528`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:539`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:551`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:565`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:630`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:641`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:652`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:663`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:674`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:685`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:696`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:707`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:722`: SystemSockets on FreeBSD
+- swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:739`: SocketDescriptor.SocketOption.reusePort on Android and OpenBSD, and SystemSockets on
+- swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:780`: SystemSockets on FreeBSD
+- swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:831`: SystemSockets on FreeBSD
+- swift-nio: `Sources/NIOCore/ByteBuffer-core.swift:22`: the C library, for this file's C arms
+- swift-nio: `Sources/NIOCore/ByteBuffer-core.swift:26`: the C library, for this file's C arms
+- swift-nio: `Sources/NIOCore/GlobalSingletons.swift:23`: the C library, for this file's C arms
+- swift-nio: `Sources/NIOCore/GlobalSingletons.swift:27`: the C library, for this file's C arms
+- swift-nio: `Sources/NIOCore/IO.swift:34`: the C library, for this file's C arms
+- swift-nio: `Sources/NIOCore/IO.swift:38`: the C library, for this file's C arms
+- swift-nio: `Sources/NIOCore/Interfaces.swift:22`: the C library, for this file's C arms
+- swift-nio: `Sources/NIOCore/Interfaces.swift:28`: the C library, for this file's C arms
+- swift-nio: `Sources/NIOCore/Interfaces.swift:31`: the C library, for this file's C arms
+- swift-nio: `Sources/NIOCore/Interfaces.swift:211`: SystemSockets on FreeBSD, OpenBSD and Windows
+- swift-nio: `Sources/NIOCore/SocketAddresses.swift:74`: SystemSockets on FreeBSD
+- swift-nio: `Sources/NIOCore/SocketAddresses.swift:77`: the C library, for this file's C arms
+- swift-nio: `Sources/NIOCore/SocketAddresses.swift:139`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/SocketAddresses.swift:160`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/SocketAddresses.swift:181`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/SocketAddresses.swift:213`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/SocketAddresses.swift:226`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/SocketAddresses.swift:270`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/SocketAddresses.swift:279`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/SocketAddresses.swift:302`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/SocketAddresses.swift:321`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/SocketAddresses.swift:330`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/SocketAddresses.swift:356`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/SocketAddresses.swift:377`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/SocketAddresses.swift:404`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/SocketAddresses.swift:420`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/SocketAddresses.swift:435`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/SocketAddresses.swift:450`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/SocketAddresses.swift:465`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/SocketAddresses.swift:491`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/SocketAddresses.swift:530`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/SocketAddresses.swift:567`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/SocketAddresses.swift:611`: SystemSockets on FreeBSD
+- swift-nio: `Sources/NIOCore/SocketAddresses.swift:632`: SystemSockets on FreeBSD
+- swift-nio: `Sources/NIOCore/SocketAddresses.swift:665`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/SocketAddresses.swift:701`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/SocketAddresses.swift:734`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/SocketAddresses.swift:819`: SystemSockets on FreeBSD
+- swift-nio: `Sources/NIOCore/SocketAddresses.swift:872`: SystemSockets on FreeBSD
+- swift-nio: `Sources/NIOCore/SocketAddresses.swift:894`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/SocketAddresses.swift:996`: SystemSockets on FreeBSD
+- swift-nio: `Sources/NIOCore/SocketAddresses.swift:1012`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/SocketAddresses.swift:1046`: SystemSockets on FreeBSD
+- swift-nio: `Sources/NIOCore/SocketAddresses.swift:1059`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/SocketAddresses.swift:1104`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/SocketAddresses.swift:1126`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/SocketOptionProvider.swift:34`: the C library, for this file's C arms
+- swift-nio: `Sources/NIOCore/SocketOptionProvider.swift:38`: the C library, for this file's C arms
+- swift-nio: `Sources/NIOCore/SocketOptionProvider.swift:44`: the C library, for this file's C arms
+- swift-nio: `Sources/NIOCore/SocketOptionProvider.swift:197`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/SocketOptionProvider.swift:226`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/SocketOptionProvider.swift:251`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/SocketOptionProvider.swift:266`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOCore/SocketOptionProvider.swift:417`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOFS/FileInfo.swift:19`: the C library, for this file's C arms
+- swift-nio: `Sources/NIOFS/Internal/System Calls/Mocking.swift:25`: the C library, for this file's C arms
+- swift-nio: `Sources/NIOFS/Internal/SystemFileHandle.swift:25`: the C library, for this file's C arms
+- swift-nio: `Sources/NIOPosix/BSDSocketAPICommon.swift:84`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOPosix/BSDSocketAPICommon.swift:95`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOPosix/BSDSocketAPICommon.swift:104`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOPosix/BSDSocketAPICommon.swift:123`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOPosix/BSDSocketAPICommon.swift:151`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOPosix/BSDSocketAPICommon.swift:263`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOPosix/BSDSocketAPICommon.swift:315`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOPosix/BSDSocketAPIPosix.swift:96`: SystemSockets on FreeBSD
+- swift-nio: `Sources/NIOPosix/BSDSocketAPIPosix.swift:171`: SystemSockets on FreeBSD
+- swift-nio: `Sources/NIOPosix/BSDSocketAPIPosix.swift:360`: SystemSockets on FreeBSD
+- swift-nio: `Sources/NIOPosix/BSDSocketAPIPosix.swift:376`: SystemSockets on FreeBSD
+- swift-nio: `Sources/NIOPosix/BSDSocketAPIPosix.swift:441`: SystemSockets on FreeBSD
+- swift-nio: `Sources/NIOPosix/BaseSocket.swift:69`: family on Windows (Windows later)
+- swift-nio: `Sources/NIOPosix/BaseSocket.swift:84`: family on Windows (Windows later)
+- swift-nio: `Sources/NIOPosix/BaseSocket.swift:99`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOPosix/BaseSocket.swift:112`: family on Windows (Windows later)
+- swift-nio: `Sources/NIOPosix/BaseSocket.swift:138`: family on Windows (Windows later)
+- swift-nio: `Sources/NIOPosix/BaseSocket.swift:247`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOPosix/BaseSocket.swift:349`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOPosix/BaseSocket.swift:379`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOPosix/ControlMessage.swift:25`: SystemSockets on FreeBSD
+- swift-nio: `Sources/NIOPosix/ControlMessage.swift:28`: the C library, for this file's C arms
+- swift-nio: `Sources/NIOPosix/ControlMessage.swift:42`: SystemSockets on FreeBSD
+- swift-nio: `Sources/NIOPosix/ControlMessage.swift:203`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOPosix/ControlMessage.swift:288`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOPosix/ControlMessage.swift:308`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOPosix/ControlMessage.swift:333`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOPosix/ControlMessage.swift:435`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOPosix/ControlMessage.swift:476`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOPosix/ControlMessage.swift:488`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOPosix/DatagramVectorReadManager.swift:159`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOPosix/DatagramVectorReadManager.swift:230`: SystemSockets on FreeBSD
+- swift-nio: `Sources/NIOPosix/GetaddrinfoResolver.swift:202`: SystemSockets on FreeBSD
+- swift-nio: `Sources/NIOPosix/NonBlockingFileIO.swift:1358`: Stat on Windows (Windows later)
+- swift-nio: `Sources/NIOPosix/PendingDatagramWritesManager.swift:188`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOPosix/Socket.swift:213`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOPosix/Socket.swift:232`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOPosix/Socket.swift:281`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOPosix/Socket.swift:300`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOPosix/SocketChannel.swift:1294`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOPosix/SocketChannel.swift:1310`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOPosix/SocketChannel.swift:1333`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOPosix/SocketChannel.swift:1353`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOPosix/System.swift:70`: the C library's type and errno names that NIOPosix's files and its clients reach
+- swift-nio: `Sources/NIOPosix/System.swift:115`: SystemSockets on FreeBSD
+- swift-nio: `Sources/NIOPosix/System.swift:133`: SystemSockets on FreeBSD
+- swift-nio: `Sources/NIOPosix/System.swift:441`: SystemConfig.maxIOVectors on FreeBSD and OpenBSD; SocketDescriptor.ShutdownKind (SystemSockets) on FreeBSD
+- swift-nio: `Sources/NIOPosix/System.swift:510`: SystemSockets on FreeBSD
+- swift-nio: `Sources/NIOPosix/System.swift:517`: SystemSockets on OpenBSD: it uses C constants that OpenBSD lacks (IP_PKTINFO, IP_RECVTOS, TCP_KEEPIDLE, TCP_KEEPINTVL, TCP_KEEPCNT), so NIO's manifest doesn't name .openbsd for it
+- swift-nio: `Sources/NIOPosix/System.swift:534`: SystemSockets on FreeBSD
+- swift-nio: `Sources/NIOPosix/System.swift:549`: SystemSockets on FreeBSD
+- swift-nio: `Sources/NIOPosix/System.swift:586`: SystemSockets on FreeBSD
+- swift-nio: `Sources/NIOPosix/System.swift:618`: SystemSockets on FreeBSD
+- swift-nio: `Sources/NIOPosix/System.swift:663`: SystemSockets on FreeBSD
+- swift-nio: `Sources/NIOPosix/System.swift:699`: SystemSockets on FreeBSD
+- swift-nio: `Sources/NIOPosix/System.swift:735`: SystemSockets on FreeBSD
+- swift-nio: `Sources/NIOPosix/System.swift:763`: SystemSockets on FreeBSD
+- swift-nio: `Sources/NIOPosix/System.swift:850`: SystemSockets on FreeBSD
+- swift-nio: `Sources/NIOPosix/System.swift:871`: SystemSockets on FreeBSD
+- swift-nio: `Sources/NIOPosix/System.swift:942`: SystemSockets on FreeBSD
+- swift-nio: `Sources/NIOPosix/System.swift:1019`: SystemSockets on FreeBSD
+- swift-nio: `Sources/NIOPosix/System.swift:1045`: SystemSockets on FreeBSD
+- swift-nio: `Sources/NIOPosix/System.swift:1200`: SystemSockets on FreeBSD
+- swift-nio: `Sources/NIOPosix/Thread.swift:260`: PThread.Key on Windows
+- swift-nio: `Sources/NIOPosix/Thread.swift:321`: PThread.Key on Windows
+- swift-nio: `Sources/NIOPosix/Thread.swift:341`: PThread.Key on Windows
+- swift-nio: `Sources/NIOPosix/VsockAddress.swift:225`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOPosix/VsockAddress.swift:237`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/NIOPosix/VsockAddress.swift:248`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Sources/_NIOFileSystem/FileInfo.swift:19`: the C library, for this file's C arms
+- swift-nio: `Sources/_NIOFileSystem/Internal/System Calls/Mocking.swift:25`: the C library, for this file's C arms
+- swift-nio: `Sources/_NIOFileSystem/Internal/SystemFileHandle.swift:25`: the C library, for this file's C arms
+- swift-nio: `Tests/NIOConcurrencyHelpersTests/NIOConcurrencyHelpersTests.swift:30`: the C library, for this file's C arms
+- swift-nio: `Tests/NIOPosixTests/ChannelPipelineTest.swift:251`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Tests/NIOPosixTests/ControlMessageTests.swift:34`: SystemSockets on FreeBSD
+- swift-nio: `Tests/NIOPosixTests/HappyEyeballsTest.swift:28`: SystemSockets on FreeBSD
+- swift-nio: `Tests/NIOPosixTests/HappyEyeballsTest.swift:154`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Tests/NIOPosixTests/HappyEyeballsTest.swift:175`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Tests/NIOPosixTests/HappyEyeballsTest.swift:200`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Tests/NIOPosixTests/HappyEyeballsTest.swift:213`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Tests/NIOPosixTests/MulticastTest.swift:160`: SystemSockets on FreeBSD
+- swift-nio: `Tests/NIOPosixTests/MulticastTest.swift:182`: SystemSockets on FreeBSD
+- swift-nio: `Tests/NIOPosixTests/PendingDatagramWritesManagerTests.swift:49`: family on Windows (Windows later)
+- swift-nio: `Tests/NIOPosixTests/PendingDatagramWritesManagerTests.swift:191`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Tests/NIOPosixTests/SelectorTest.swift:57`: PThread.setCurrentName and PThread.ID.name() on OpenBSD, for ThreadOpsSystem's handle, which FreeBSD shares (see Thread.swift)
+- swift-nio: `Tests/NIOPosixTests/SocketAddressTest.swift:73`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Tests/NIOPosixTests/SocketAddressTest.swift:89`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Tests/NIOPosixTests/SocketAddressTest.swift:149`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Tests/NIOPosixTests/SocketAddressTest.swift:194`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Tests/NIOPosixTests/SocketAddressTest.swift:205`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Tests/NIOPosixTests/SocketAddressTest.swift:239`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Tests/NIOPosixTests/SocketAddressTest.swift:281`: SystemSockets on FreeBSD
+- swift-nio: `Tests/NIOPosixTests/SocketAddressTest.swift:317`: SystemSockets on FreeBSD
+- swift-nio: `Tests/NIOPosixTests/SocketAddressTest.swift:378`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Tests/NIOPosixTests/SocketAddressTest.swift:603`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Tests/NIOPosixTests/SocketAddressTest.swift:643`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Tests/NIOPosixTests/SocketChannelTest.swift:63`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Tests/NIOPosixTests/SocketOptionProviderTest.swift:159`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Tests/NIOPosixTests/SocketOptionProviderTest.swift:182`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Tests/NIOPosixTests/SocketOptionProviderTest.swift:247`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Tests/NIOPosixTests/SocketOptionProviderTest.swift:260`: SystemSockets on FreeBSD and Windows
+- swift-nio: `Tests/NIOPosixTests/SocketOptionProviderTest.swift:281`: SystemSockets on FreeBSD
+- swift-nio: `Tests/NIOPosixTests/SocketOptionProviderTest.swift:289`: SystemSockets on FreeBSD
+- swift-nio: `Tests/NIOPosixTests/SocketOptionProviderTest.swift:304`: SystemSockets on FreeBSD
+- swift-nio: `Tests/NIOPosixTests/SyscallAbstractionLayer.swift:515`: SystemSockets on FreeBSD
+- swift-nio: `Tests/NIOPosixTests/SystemCallWrapperHelpers.swift:116`: the test's own C-shaped helpers on FreeBSD and OpenBSD (the Darwin round's design call 19)
+- swift-nio: `Tests/NIOPosixTests/SystemTest.swift:57`: SystemSockets on FreeBSD
 - swift-subprocess: `Sources/Subprocess/Platforms/Subprocess+Darwin.swift:618`: C-string arguments for the C-values spawns. System's ProcessID.spawn with cFileActions: and cAttributes:, with or without credentials:, takes the arguments and environment only
 - swift-testing: `Sources/Testing/ExitTests/ExitStatus.swift:122`: stdlib.h and sysexits.h exit codes' C names, such as
 
@@ -656,123 +968,149 @@ The missing interfaces above, grouped, largest first: the order to fill them in.
 
 <details><summary>Each interface's markers (package: file:line)</summary>
 
+- C library (unread): swift-foundation: `Sources/FoundationEssentials/Data/Data+Writing.swift:28`; swift-foundation: `Sources/FoundationEssentials/Data/Data+Writing.swift:32`; swift-foundation: `Sources/FoundationEssentials/Data/Data+Writing.swift:40`; swift-foundation: `Sources/FoundationEssentials/Error/CocoaError+FilePath.swift:22`; swift-foundation: `Sources/FoundationEssentials/Error/CocoaError+FilePath.swift:28`; swift-foundation: `Sources/FoundationEssentials/Error/ErrorCodes+POSIX.swift:26`; swift-foundation: `Sources/FoundationEssentials/Error/ErrorCodes+POSIX.swift:32`; swift-foundation: `Sources/FoundationEssentials/FileManager/FileManager+Basics.swift:19`; swift-foundation: `Sources/FoundationEssentials/FileManager/FileManager+Basics.swift:25`; swift-foundation: `Sources/FoundationEssentials/FileManager/FileManager+SymbolicLinks.swift:18`; swift-foundation: `Sources/FoundationEssentials/FileManager/FileManager+SymbolicLinks.swift:25`; swift-foundation: `Sources/FoundationEssentials/FileManager/FileManager+Utilities.swift:29`; swift-foundation: `Sources/FoundationEssentials/FileManager/FileManager+Utilities.swift:36`; swift-foundation: `Sources/FoundationEssentials/String/String+Path.swift:22`; swift-foundation: `Sources/FoundationEssentials/String/String+Path.swift:27`; swift-foundation: `Sources/FoundationEssentials/_ThreadLocal.swift:19`; swift-foundation: `Sources/FoundationInternationalization/Formatting/Date/ICUDateFormatter.swift:23`; swift-foundation: `Tests/FoundationEssentialsTests/DataTests.swift:23`; swift-foundation: `Tests/FoundationEssentialsTests/DecimalTests.swift:18`; swift-foundation: `Tests/FoundationEssentialsTests/DecimalTests.swift:21`; swift-foundation: `Tests/FoundationEssentialsTests/JSONEncoderTests.swift:25`; swift-foundation: `Tests/FoundationEssentialsTests/ProcessInfoTests.swift:26`; swift-foundation: `Tests/FoundationEssentialsTests/ProcessInfoTests.swift:33`; swift-foundation: `Tests/FoundationInternationalizationTests/DateComponentsTests.swift:29`; swift-foundation: `Tests/FoundationInternationalizationTests/DateComponentsTests.swift:32`; swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:83`; swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:94`; swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:103`; swift-nio: `Sources/NIOCore/ByteBuffer-core.swift:22`; swift-nio: `Sources/NIOCore/ByteBuffer-core.swift:26`; swift-nio: `Sources/NIOCore/GlobalSingletons.swift:23`; swift-nio: `Sources/NIOCore/GlobalSingletons.swift:27`; swift-nio: `Sources/NIOCore/IO.swift:34`; swift-nio: `Sources/NIOCore/IO.swift:38`; swift-nio: `Sources/NIOCore/Interfaces.swift:22`; swift-nio: `Sources/NIOCore/Interfaces.swift:28`; swift-nio: `Sources/NIOCore/Interfaces.swift:31`; swift-nio: `Sources/NIOCore/SocketAddresses.swift:77`; swift-nio: `Sources/NIOCore/SocketOptionProvider.swift:34`; swift-nio: `Sources/NIOCore/SocketOptionProvider.swift:38`; swift-nio: `Sources/NIOCore/SocketOptionProvider.swift:44`; swift-nio: `Sources/NIOFS/FileInfo.swift:19`; swift-nio: `Sources/NIOFS/Internal/System Calls/Mocking.swift:25`; swift-nio: `Sources/NIOFS/Internal/SystemFileHandle.swift:25`; swift-nio: `Sources/NIOPosix/ControlMessage.swift:28`; swift-nio: `Sources/_NIOFileSystem/FileInfo.swift:19`; swift-nio: `Sources/_NIOFileSystem/Internal/System Calls/Mocking.swift:25`; swift-nio: `Sources/_NIOFileSystem/Internal/SystemFileHandle.swift:25`; swift-nio: `Tests/NIOConcurrencyHelpersTests/NIOConcurrencyHelpersTests.swift:30`
+- SystemSockets on FreeBSD and Windows (unread): swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:231`; swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:261`; swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:272`; swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:284`; swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:320`; swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:386`; swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:423`; swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:434`; swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:445`; swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:456`; swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:467`; swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:481`; swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:495`; swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:506`; swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:517`; swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:528`; swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:539`; swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:551`; swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:565`; swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:630`; swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:641`; swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:652`; swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:663`; swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:674`; swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:685`; swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:696`; swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:707`; swift-nio: `Sources/NIOCore/SocketAddresses.swift:139`; swift-nio: `Sources/NIOCore/SocketAddresses.swift:160`; swift-nio: `Sources/NIOCore/SocketAddresses.swift:181`; swift-nio: `Sources/NIOCore/SocketAddresses.swift:213`; swift-nio: `Sources/NIOCore/SocketAddresses.swift:226`; swift-nio: `Sources/NIOCore/SocketAddresses.swift:270`; swift-nio: `Sources/NIOCore/SocketAddresses.swift:279`; swift-nio: `Sources/NIOCore/SocketAddresses.swift:302`; swift-nio: `Sources/NIOCore/SocketAddresses.swift:321`; swift-nio: `Sources/NIOCore/SocketAddresses.swift:330`; swift-nio: `Sources/NIOCore/SocketAddresses.swift:356`; swift-nio: `Sources/NIOCore/SocketAddresses.swift:377`; swift-nio: `Sources/NIOCore/SocketAddresses.swift:404`; swift-nio: `Sources/NIOCore/SocketAddresses.swift:420`; swift-nio: `Sources/NIOCore/SocketAddresses.swift:435`; swift-nio: `Sources/NIOCore/SocketAddresses.swift:450`; swift-nio: `Sources/NIOCore/SocketAddresses.swift:465`; swift-nio: `Sources/NIOCore/SocketAddresses.swift:491`; swift-nio: `Sources/NIOCore/SocketAddresses.swift:530`; swift-nio: `Sources/NIOCore/SocketAddresses.swift:567`; swift-nio: `Sources/NIOCore/SocketAddresses.swift:665`; swift-nio: `Sources/NIOCore/SocketAddresses.swift:701`; swift-nio: `Sources/NIOCore/SocketAddresses.swift:734`; swift-nio: `Sources/NIOCore/SocketAddresses.swift:894`; swift-nio: `Sources/NIOCore/SocketAddresses.swift:1012`; swift-nio: `Sources/NIOCore/SocketAddresses.swift:1059`; swift-nio: `Sources/NIOCore/SocketAddresses.swift:1104`; swift-nio: `Sources/NIOCore/SocketAddresses.swift:1126`; swift-nio: `Sources/NIOCore/SocketOptionProvider.swift:197`; swift-nio: `Sources/NIOCore/SocketOptionProvider.swift:226`; swift-nio: `Sources/NIOCore/SocketOptionProvider.swift:251`; swift-nio: `Sources/NIOCore/SocketOptionProvider.swift:266`; swift-nio: `Sources/NIOCore/SocketOptionProvider.swift:417`; swift-nio: `Sources/NIOPosix/BSDSocketAPICommon.swift:84`; swift-nio: `Sources/NIOPosix/BSDSocketAPICommon.swift:95`; swift-nio: `Sources/NIOPosix/BSDSocketAPICommon.swift:104`; swift-nio: `Sources/NIOPosix/BSDSocketAPICommon.swift:123`; swift-nio: `Sources/NIOPosix/BSDSocketAPICommon.swift:151`; swift-nio: `Sources/NIOPosix/BSDSocketAPICommon.swift:263`; swift-nio: `Sources/NIOPosix/BSDSocketAPICommon.swift:315`; swift-nio: `Sources/NIOPosix/BaseSocket.swift:99`; swift-nio: `Sources/NIOPosix/BaseSocket.swift:247`; swift-nio: `Sources/NIOPosix/BaseSocket.swift:349`; swift-nio: `Sources/NIOPosix/BaseSocket.swift:379`; swift-nio: `Sources/NIOPosix/ControlMessage.swift:203`; swift-nio: `Sources/NIOPosix/ControlMessage.swift:288`; swift-nio: `Sources/NIOPosix/ControlMessage.swift:308`; swift-nio: `Sources/NIOPosix/ControlMessage.swift:333`; swift-nio: `Sources/NIOPosix/ControlMessage.swift:435`; swift-nio: `Sources/NIOPosix/ControlMessage.swift:476`; swift-nio: `Sources/NIOPosix/ControlMessage.swift:488`; swift-nio: `Sources/NIOPosix/DatagramVectorReadManager.swift:159`; swift-nio: `Sources/NIOPosix/PendingDatagramWritesManager.swift:188`; swift-nio: `Sources/NIOPosix/Socket.swift:213`; swift-nio: `Sources/NIOPosix/Socket.swift:232`; swift-nio: `Sources/NIOPosix/Socket.swift:281`; swift-nio: `Sources/NIOPosix/Socket.swift:300`; swift-nio: `Sources/NIOPosix/SocketChannel.swift:1294`; swift-nio: `Sources/NIOPosix/SocketChannel.swift:1310`; swift-nio: `Sources/NIOPosix/SocketChannel.swift:1333`; swift-nio: `Sources/NIOPosix/SocketChannel.swift:1353`; swift-nio: `Sources/NIOPosix/VsockAddress.swift:225`; swift-nio: `Sources/NIOPosix/VsockAddress.swift:237`; swift-nio: `Sources/NIOPosix/VsockAddress.swift:248`; swift-nio: `Tests/NIOPosixTests/ChannelPipelineTest.swift:251`; swift-nio: `Tests/NIOPosixTests/HappyEyeballsTest.swift:154`; swift-nio: `Tests/NIOPosixTests/HappyEyeballsTest.swift:175`; swift-nio: `Tests/NIOPosixTests/HappyEyeballsTest.swift:200`; swift-nio: `Tests/NIOPosixTests/HappyEyeballsTest.swift:213`; swift-nio: `Tests/NIOPosixTests/PendingDatagramWritesManagerTests.swift:191`; swift-nio: `Tests/NIOPosixTests/SocketAddressTest.swift:73`; swift-nio: `Tests/NIOPosixTests/SocketAddressTest.swift:89`; swift-nio: `Tests/NIOPosixTests/SocketAddressTest.swift:149`; swift-nio: `Tests/NIOPosixTests/SocketAddressTest.swift:194`; swift-nio: `Tests/NIOPosixTests/SocketAddressTest.swift:205`; swift-nio: `Tests/NIOPosixTests/SocketAddressTest.swift:239`; swift-nio: `Tests/NIOPosixTests/SocketAddressTest.swift:378`; swift-nio: `Tests/NIOPosixTests/SocketAddressTest.swift:603`; swift-nio: `Tests/NIOPosixTests/SocketAddressTest.swift:643`; swift-nio: `Tests/NIOPosixTests/SocketChannelTest.swift:63`; swift-nio: `Tests/NIOPosixTests/SocketOptionProviderTest.swift:159`; swift-nio: `Tests/NIOPosixTests/SocketOptionProviderTest.swift:182`; swift-nio: `Tests/NIOPosixTests/SocketOptionProviderTest.swift:247`; swift-nio: `Tests/NIOPosixTests/SocketOptionProviderTest.swift:260`
+- SystemSockets on FreeBSD (unread): swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:299`; swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:343`; swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:366`; swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:408`; swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:722`; swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:780`; swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:831`; swift-nio: `Sources/NIOCore/Interfaces.swift:211`; swift-nio: `Sources/NIOCore/SocketAddresses.swift:74`; swift-nio: `Sources/NIOCore/SocketAddresses.swift:611`; swift-nio: `Sources/NIOCore/SocketAddresses.swift:632`; swift-nio: `Sources/NIOCore/SocketAddresses.swift:819`; swift-nio: `Sources/NIOCore/SocketAddresses.swift:872`; swift-nio: `Sources/NIOCore/SocketAddresses.swift:996`; swift-nio: `Sources/NIOCore/SocketAddresses.swift:1046`; swift-nio: `Sources/NIOPosix/BSDSocketAPIPosix.swift:96`; swift-nio: `Sources/NIOPosix/BSDSocketAPIPosix.swift:171`; swift-nio: `Sources/NIOPosix/BSDSocketAPIPosix.swift:360`; swift-nio: `Sources/NIOPosix/BSDSocketAPIPosix.swift:376`; swift-nio: `Sources/NIOPosix/BSDSocketAPIPosix.swift:441`; swift-nio: `Sources/NIOPosix/ControlMessage.swift:25`; swift-nio: `Sources/NIOPosix/ControlMessage.swift:42`; swift-nio: `Sources/NIOPosix/DatagramVectorReadManager.swift:230`; swift-nio: `Sources/NIOPosix/GetaddrinfoResolver.swift:202`; swift-nio: `Sources/NIOPosix/System.swift:115`; swift-nio: `Sources/NIOPosix/System.swift:133`; swift-nio: `Sources/NIOPosix/System.swift:510`; swift-nio: `Sources/NIOPosix/System.swift:534`; swift-nio: `Sources/NIOPosix/System.swift:549`; swift-nio: `Sources/NIOPosix/System.swift:586`; swift-nio: `Sources/NIOPosix/System.swift:618`; swift-nio: `Sources/NIOPosix/System.swift:663`; swift-nio: `Sources/NIOPosix/System.swift:699`; swift-nio: `Sources/NIOPosix/System.swift:735`; swift-nio: `Sources/NIOPosix/System.swift:763`; swift-nio: `Sources/NIOPosix/System.swift:850`; swift-nio: `Sources/NIOPosix/System.swift:871`; swift-nio: `Sources/NIOPosix/System.swift:942`; swift-nio: `Sources/NIOPosix/System.swift:1019`; swift-nio: `Sources/NIOPosix/System.swift:1045`; swift-nio: `Sources/NIOPosix/System.swift:1200`; swift-nio: `Tests/NIOPosixTests/ControlMessageTests.swift:34`; swift-nio: `Tests/NIOPosixTests/HappyEyeballsTest.swift:28`; swift-nio: `Tests/NIOPosixTests/MulticastTest.swift:160`; swift-nio: `Tests/NIOPosixTests/MulticastTest.swift:182`; swift-nio: `Tests/NIOPosixTests/SocketAddressTest.swift:281`; swift-nio: `Tests/NIOPosixTests/SocketAddressTest.swift:317`; swift-nio: `Tests/NIOPosixTests/SocketOptionProviderTest.swift:281`; swift-nio: `Tests/NIOPosixTests/SocketOptionProviderTest.swift:289`; swift-nio: `Tests/NIOPosixTests/SocketOptionProviderTest.swift:304`; swift-nio: `Tests/NIOPosixTests/SyscallAbstractionLayer.swift:515`; swift-nio: `Tests/NIOPosixTests/SystemTest.swift:57`
+- `extattr_*` (missing): swift-foundation: `Sources/FoundationEssentials/Data/Data+Reading.swift:68`; swift-foundation: `Sources/FoundationEssentials/Data/Data+Writing.swift:850`; swift-foundation: `Sources/FoundationEssentials/FileManager/FileManager+Files.swift:498`; swift-foundation: `Sources/FoundationEssentials/FileManager/FileManager+Files.swift:548`; swift-foundation: `Sources/FoundationEssentials/FileManager/FileManager+Utilities.swift:198`
 - `remove` (covered): swift-testing: `Tests/TestingTests/AttachmentTests.swift:95`; swift-testing: `Tests/TestingTests/AttachmentTests.swift:112`; swift-testing: `Tests/TestingTests/AttachmentTests.swift:143`; swift-testing: `Tests/TestingTests/AttachmentTests.swift:151`; swift-testing: `Tests/TestingTests/AttachmentTests.swift:179`; swift-testing: `Tests/TestingTests/AttachmentTests.swift:199`; swift-testing: `Tests/TestingTests/Support/ColorTests.swift:40`; swift-testing: `Tests/TestingTests/Support/FileHandleTests.swift:286`; swift-testing: `Tests/TestingTests/SwiftPMTests.swift:387`; swift-testing: `Tests/TestingTests/SwiftPMTests.swift:413`; swift-testing: `Tests/TestingTests/SwiftPMTests.swift:435`; swift-testing: `Tests/TestingTests/SwiftPMTests.swift:464`; swift-testing: `Tests/TestingTests/SwiftPMTests.swift:563`; swift-testing: `Tests/TestingTests/SwiftPMTests.swift:613`
 - `free` (covered): swift-crypto: `Sources/CryptoBoringWrapper/AEAD/BoringSSLAEAD.swift:161`; swift-crypto: `Sources/CryptoBoringWrapper/AEAD/BoringSSLAEAD.swift:276`; swift-crypto: `Sources/CryptoBoringWrapper/AEAD/BoringSSLAEAD.swift:370`; swift-testing: `Sources/Testing/SourceAttribution/Backtrace+Symbolication.swift:150`; swift-testing: `Tests/TestingTests/ABIEntryPointTests.swift:242`
-- `load_command` (not System's): swift-build: `Sources/SWBUtil/MachO.swift:16`; swift-build: `Tests/SWBBuildSystemTests/MergeableLibrariesBuildOperationTests.swift:23`; swift-build: `Tests/SWBUtilTests/MachOTests.swift:20`
+- `pthread_set_name_np` (missing): swift-nio: `Sources/NIOPosix/Thread.swift:114`; swift-nio: `Sources/NIOPosix/Thread.swift:130`; swift-nio: `Sources/NIOPosix/ThreadPosix.swift:95`; swift-testing: `Sources/Testing/ExitTests/WaitFor.swift:175`
 - `abort` (covered): swift-build: `Sources/SwiftBuild/SWBBuildServiceConnection.swift:23`; swift-testing: `Tests/TestingTests/ExitTestTests.swift:89`; swift-testing: `Tests/TestingTests/ExitTestTests.swift:813`
 - `openpty` (covered): swift-build: `Tests/SwiftBuildTests/ConsoleCommands/CLIConnection.swift:127`; swift-testing: `Tests/TestingTests/Support/FileHandleTests.swift:168`
+- `byteCount` (missing): swift-foundation: `Sources/FoundationEssentials/Data/Data+Reading.swift:472`; swift-foundation: `Sources/FoundationEssentials/Data/Data.swift:84`
 - `EXIT_SUCCESS` (covered): swift-testing: `Sources/Testing/ABI/EntryPoints/EntryPoint.swift:38`; swift-testing: `Sources/Testing/ABI/EntryPoints/EntryPoint.swift:152`; swift-testing: `Sources/Testing/ExitTests/ExitTest.Condition.swift:232`
+- family on Windows (Windows later) (unread): swift-nio: `Sources/NIOPosix/BaseSocket.swift:69`; swift-nio: `Sources/NIOPosix/BaseSocket.swift:84`; swift-nio: `Sources/NIOPosix/BaseSocket.swift:112`; swift-nio: `Sources/NIOPosix/BaseSocket.swift:138`; swift-nio: `Tests/NIOPosixTests/PendingDatagramWritesManagerTests.swift:49`
+- fts off Darwin (see _FTSSequence) (unread): swift-foundation: `Sources/FoundationEssentials/FileManager/FileManager+Directories.swift:279`; swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:487`; swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations.swift:1170`
+- `MemoryMapping` (missing): swift-foundation: `Sources/FoundationEssentials/Data/Data+Reading.swift:472`; swift-foundation: `Sources/FoundationEssentials/Data/Data.swift:84`
 - `memset_s` (covered): swift-crypto: `Sources/Crypto/Util/SecureBytes.swift:316`; swift-crypto: `Sources/Crypto/Util/Zeroization.swift:29`; swift-crypto: `Sources/Crypto/Util/Zeroization.swift:38`; swift-crypto: `Sources/Crypto/Util/Zeroization.swift:47`; swift-crypto: `Sources/Crypto/Util/Zeroization.swift:56`
-- `segment_command` (not System's): swift-build: `Sources/SWBUtil/MachO.swift:16`; swift-build: `Tests/SWBUtilTests/MachOTests.swift:20`
+- `NetworkInterface` (missing): swift-nio: `Sources/NIOCore/SystemCallHelpers.swift:31`; swift-nio: `Sources/NIOCore/SystemCallHelpers.swift:238`; swift-nio: `Sources/NIOPosix/System.swift:146`; swift-nio: `Sources/NIOPosix/System.swift:1062`
+- `pthread_get_name_np` (missing): swift-nio: `Sources/NIOPosix/Thread.swift:114`; swift-nio: `Sources/NIOPosix/Thread.swift:130`; swift-nio: `Sources/NIOPosix/ThreadPosix.swift:95`
 - `strlen` (covered): swift-testing: `Sources/Testing/SourceAttribution/Backtrace+Symbolication.swift:150`; swift-testing: `Tests/TestingTests/ABIEntryPointTests.swift:242`
 - `wasip1` (missing): swift-async-algorithms: `Sources/AsyncAlgorithms/Locking.swift:15`; swift-async-algorithms: `Sources/AsyncSequenceValidation/TaskDriver.swift:17`
 - `which` (missing): swift-testing: `Sources/Testing/ABI/EntryPoints/EntryPoint.swift:38`; swift-testing: `Sources/Testing/Support/Environment.swift:90`
 - `_dyld_image_count` (covered): swift-foundation: `Sources/FoundationEssentials/AttributedString/AttributeScope.swift:69`
 - `_NSGetExecutablePath` (covered): swift-testing: `Sources/Testing/Support/Additions/CommandLineAdditions.swift:55`
 - adding a file action to C file actions (covered): swift-subprocess: `Tests/SubprocessTests/DarwinTests.swift:15`
-- `addr` (missing): swift-build: `Sources/SWBUtil/MachO.swift:16`
-- `AR_EFMT1` (standard library): swift-build: `Sources/SWBUtil/MachO.swift:71`
-- `ar_hdr` (standard library): swift-build: `Sources/SWBUtil/MachO.swift:71`
-- `ar_size` (standard library): swift-build: `Sources/SWBUtil/MachO.swift:71`
+- `address` (missing): swift-nio: `Sources/NIOCore/SocketAddresses.swift:923`; swift-nio: `Sources/NIOCore/SocketAddresses.swift:969`
 - `backtrace` (covered): swift-testing: `Sources/Testing/SourceAttribution/Backtrace.swift:67`
 - `backtrace_async` (missing): swift-testing: `Sources/Testing/SourceAttribution/Backtrace.swift:67`
-- `build_version_command` (not System's): swift-build: `Sources/SWBUtil/MachO.swift:16`
+- `BSDs` (missing): swift-nio: `Tests/NIOFSTests/FileInfoTests.swift:24`
+- `bytes` (missing): swift-nio: `Sources/NIOCore/SocketAddresses.swift:969`
+- C library's type and errno names that NIOPosix's files and its clients reach (unread): swift-nio: `Sources/NIOPosix/System.swift:70`
 - C-string arguments for the C-values spawns (covered): swift-subprocess: `Sources/Subprocess/Platforms/Subprocess+Darwin.swift:618`
 - `calloc` (covered): swift-testing: `Sources/Testing/ABI/ABI.swift:364`
-- `cmd` (missing): swift-build: `Sources/SWBUtil/MachO.swift:16`
-- `cmdsize` (missing): swift-build: `Sources/SWBUtil/MachO.swift:16`
+- CInterop.POSIXErrorCode on Windows (unread): swift-foundation: `Sources/FoundationEssentials/Error/ErrorCodes+POSIX.swift:77`
+- `CLocale` (missing): swift-foundation: `Tests/FoundationEssentialsTests/JSONEncoderTests.swift:1514`
+- ClockID.monotonicRaw on FreeBSD and OpenBSD (unread): WasmKit: `Sources/WASI/Platform/PAL/PALClock.swift:55`
+- `CNIOLinux` (missing): swift-nio: `Sources/NIOPosix/System.swift:87`
 - `copy_file_range` (missing): swift-testing: `Sources/Overlays/_Testing_Foundation/Attachments/_AttachableURLWrapper.swift:125`
-- `cpusubtype` (missing): swift-build: `Sources/SWBUtil/MachO.swift:16`
-- `cputype` (missing): swift-build: `Sources/SWBUtil/MachO.swift:16`
-- `dlopen` (covered): swift-build: `Sources/SWBUtil/Library.swift:18`
+- CString.copy on Windows (string_h's platforms) (unread): swift-foundation: `Sources/FoundationEssentials/Platform.swift:254`
 - `dlsym` (covered): swift-testing: `Sources/Testing/Support/GetSymbol.swift:34`
-- `dylib` (not System's): swift-build: `Sources/SWBUtil/MachO.swift:16`
-- `dylib_command` (not System's): swift-build: `Sources/SWBUtil/MachO.swift:16`
 - `DynamicLibrary` (covered): swift-foundation: `Sources/FoundationEssentials/AttributedString/AttributeScope.swift:68`
+- `EMULTIHOP` (covered): WasmKit: `Sources/WASI/Platform/PAL/PALErrnoMapping.swift:9`
+- `ENOLINK` (covered): WasmKit: `Sources/WASI/Platform/PAL/PALErrnoMapping.swift:9`
+- Errno.multiHop and .noLink on OpenBSD (the arm Windows shares maps the C values) (unread): WasmKit: `Sources/WASI/Platform/PAL/PALErrnoMapping.swift:122`
 - `EX_UNAVAILABLE` (covered): swift-testing: `Sources/Testing/ABI/EntryPoints/SwiftPMEntryPoint.swift:31`
 - `EXIT_FAILURE` (covered): swift-testing: `Sources/Testing/ABI/EntryPoints/EntryPoint.swift:38`; swift-testing: `Sources/Testing/ABI/EntryPoints/EntryPoint.swift:57`; swift-testing: `Sources/Testing/ABI/EntryPoints/EntryPoint.swift:161`
+- extended attributes on OpenBSD (unread): swift-foundation: `Sources/FoundationEssentials/Data/Data+Writing.swift:853`
 - `F_SETFD` (covered): swift-build: `Tests/SwiftBuildTests/ConsoleCommands/CLIConnection.swift:127`
-- `fat_arch` (not System's): swift-build: `Sources/SWBUtil/MachO.swift:16`
-- `fat_arch_64` (not System's): swift-build: `Sources/SWBUtil/MachO.swift:16`
-- `FAT_CIGAM` (not System's): swift-build: `Tests/SWBUtilTests/MachOTests.swift:20`
-- `FAT_CIGAM_64` (not System's): swift-build: `Tests/SWBUtilTests/MachOTests.swift:20`
-- `fat_header` (not System's): swift-build: `Sources/SWBUtil/MachO.swift:16`
+- `family` (missing): swift-nio: `Tests/NIOPosixTests/SocketAddressTest.swift:449`
 - `fclonefileat` (covered): swift-testing: `Sources/Overlays/_Testing_Foundation/Attachments/_AttachableURLWrapper.swift:125`
 - `fcntl` (covered): swift-build: `Tests/SwiftBuildTests/ConsoleCommands/CLIConnection.swift:127`
 - `FD_CLOEXEC` (covered): swift-build: `Tests/SwiftBuildTests/ConsoleCommands/CLIConnection.swift:127`
 - `fflush` (covered): swift-log: `Sources/Logging/Handlers/StreamLogHandler.swift:20`
 - `FICLONE` (covered): swift-testing: `Sources/Overlays/_Testing_Foundation/Attachments/_AttachableURLWrapper.swift:125`
-- `fileoff` (missing): swift-build: `Sources/SWBUtil/MachO.swift:16`
-- `filesize` (missing): swift-build: `Sources/SWBUtil/MachO.swift:16`
-- `filetype` (missing): swift-build: `Sources/SWBUtil/MachO.swift:16`
+- `file` (missing): swift-foundation: `Sources/FoundationEssentials/Data/Data+Reading.swift:472`
+- FilePath.makeUniqueFile(options:permissions:) on FreeBSD and OpenBSD (unread): swift-foundation: `Sources/FoundationEssentials/Data/Data+Writing.swift:294`
+- `fileSize` (missing): swift-foundation: `Sources/FoundationEssentials/Data/Data+Reading.swift:472`
 - `fmemopen` (missing): swift-testing: `Tests/TestingTests/Support/FileHandleTests.swift:224`
 - `fopencookie` (missing): swift-testing: `Tests/TestingTests/Support/FileHandleTests.swift:313`
+- `FTS_*` (missing): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:139`
+- `fts_close` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:139`
+- `fts_open` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:139`
+- `fts_read` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:139`
+- `fts_set` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:139`
+- `FTSENT` (covered): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:139`
 - `funopen` (missing): swift-testing: `Tests/TestingTests/Support/FileHandleTests.swift:313`
 - `fwrite` (covered): swift-log: `Sources/Logging/Handlers/StreamLogHandler.swift:20`
+- `generation` (missing): swift-nio: `Tests/NIOFSTests/FileInfoTests.swift:24`
 - `getc_unlocked` (missing): swift-testing: `Sources/Testing/Support/FileHandle.swift:518`
-- `getsectiondata` (missing): swift-testing: `Sources/_TestDiscovery/SectionBounds.swift:44`
+- `getsectiondata` (covered): swift-testing: `Sources/_TestDiscovery/SectionBounds.swift:44`
 - `gnu_get_libc_version` (missing): swift-testing: `Sources/Testing/Support/Versions.swift:240`
 - `images` (missing): swift-testing: `Sources/_TestDiscovery/SectionBounds.swift:44`
+- `in6_pktinfo` (covered): swift-nio: `Sources/NIOPosix/System.swift:87`
+- `IP_TOS` (covered): swift-nio: `Sources/NIOPosix/ControlMessage.swift:240`
+- `IPTOS_ECN_*` (covered): swift-nio: `Sources/NIOPosix/System.swift:87`
 - `isatty` (covered): swift-testing: `Sources/Testing/Support/FileHandle.swift:800`
+- `itimerspec` (covered): swift-nio: `Sources/NIOPosix/SelectorEpoll.swift:252`
 - `KERN_PROC_PATHNAME` (missing): swift-testing: `Sources/Testing/Support/Additions/CommandLineAdditions.swift:55`
-- `LC_MAIN` (not System's): swift-build: `Tests/SWBUtilTests/MachOTests.swift:20`
-- `LC_SEGMENT` (not System's): swift-build: `Tests/SWBUtilTests/MachOTests.swift:20`
-- `LC_SEGMENT_64` (not System's): swift-build: `Tests/SWBUtilTests/MachOTests.swift:20`
-- `LC_SYMTAB` (not System's): swift-build: `Tests/SWBUtilTests/MachOTests.swift:20`
-- `mach_header` (not System's): swift-build: `Sources/SWBUtil/MachO.swift:16`
-- `mach_header_64` (not System's): swift-build: `Sources/SWBUtil/MachO.swift:16`
-- `macho_arch_name_for_cpu_type` (not System's): swift-build: `Sources/SWBUtil/Architecture.swift:22`
-- `macho_arch_name_for_mach_header` (not System's): swift-build: `Sources/SWBUtil/Architecture.swift:22`
-- `macho_cpu_type_for_arch_name` (not System's): swift-build: `Sources/SWBUtil/Architecture.swift:22`
-- `magic` (missing): swift-build: `Sources/SWBUtil/MachO.swift:16`
+- `kinds` (missing): swift-foundation: `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift:139`
+- `LC_MAIN` (missing): swift-build: `Tests/SWBUtilTests/MachOTests.swift:21`
+- `LC_SYMTAB` (missing): swift-build: `Tests/SWBUtilTests/MachOTests.swift:21`
+- `macho_arch_name_for_cpu_type` (covered): swift-build: `Sources/SWBUtil/Architecture.swift:22`
+- `macho_arch_name_for_mach_header` (covered): swift-build: `Sources/SWBUtil/Architecture.swift:22`
+- `macho_cpu_type_for_arch_name` (covered): swift-build: `Sources/SWBUtil/Architecture.swift:22`
 - `malloc` (covered): swift-crypto: `Sources/CryptoBoringWrapper/AEAD/BoringSSLAEAD.swift:161`; swift-crypto: `Sources/CryptoBoringWrapper/AEAD/BoringSSLAEAD.swift:276`; swift-crypto: `Sources/CryptoBoringWrapper/AEAD/BoringSSLAEAD.swift:370`
+- `maxSymbolicLinks` (missing): swift-foundation: `Sources/FoundationEssentials/String/String+Path.swift:668`
 - `memcmp` (covered): swift-crypto: `Sources/_CryptoExtras/RSA/RSA_boring.swift:966`
 - `memmem` (missing): swift-testing: `Sources/Testing/ABI/ABI.VersionNumber.swift:225`
-- `minos` (missing): swift-build: `Sources/SWBUtil/MachO.swift:16`
-- `name` (covered): swift-build: `Sources/SWBUtil/MachO.swift:16`
+- `memmove` (standard library): swift-foundation: `Sources/FoundationEssentials/Platform.swift:112`
+- Memory.reallocate on Windows (unread): swift-foundation: `Sources/FoundationEssentials/Data/Representations/DataStorage.swift:90`
+- `mptcp_info` (missing): swift-nio: `Sources/NIOCore/SocketOptionProvider.swift:30`
+- `MPTCP_INFO` (missing): swift-nio: `Sources/NIOCore/SocketOptionProvider.swift:30`
 - `NAME_MAX` (covered): swift-testing: `Tests/TestingTests/AttachmentTests.swift:163`
-- `nfat_arch` (missing): swift-build: `Sources/SWBUtil/MachO.swift:16`
-- `offset` (covered): swift-build: `Sources/SWBUtil/MachO.swift:16`
-- `path` (missing): swift-build: `Sources/SWBUtil/MachO.swift:16`
+- `none` (missing): swift-foundation: `Sources/FoundationEssentials/Data/Data+Reading.swift:68`
+- `O_RSYNC` (covered): WasmKit: `Sources/WASI/Platform/PAL/PALFileDescriptor.swift:130`; WasmKit: `Sources/WASI/Platform/PAL/PALFileDescriptor.swift:299`; WasmKit: `Sources/WASI/Platform/PAL/PALFileDescriptor.swift:317`; WasmKit: `Sources/WASI/Platform/PAL/PALFileDescriptor.swift:411`; WasmKit: `Sources/WASI/Platform/PAL/PALFileDescriptor.swift:704`
 - `pipe2` (covered): swift-testing: `Sources/Testing/Support/FileHandle.swift:722`
-- `platform` (missing): swift-build: `Sources/SWBUtil/MachO.swift:16`
 - `posix_spawn_file_actions_addclosefrom_np` (covered): swift-testing: `Sources/Testing/ExitTests/SpawnProcess.swift:91`
+- POSIXError's API from an Errno off Darwin (unread): swift-foundation: `Sources/FoundationEssentials/Error/CocoaError+FilePath.swift:104`
+- POSIXError's API off Darwin (unread): swift-foundation: `Sources/FoundationEssentials/Error/ErrorCodes+POSIX.swift:87`
+- POSIXError's static properties off Darwin (unread): swift-foundation: `Sources/FoundationEssentials/Error/ErrorCodes+POSIX.swift:558`
 - `POSIXErrorCode` (covered): swift-foundation: `Sources/FoundationEssentials/Error/ErrorCodes+POSIX.swift:14`
+- PThread.Key on WASI without threads (coverage-5 N2) (unread): swift-foundation: `Sources/FoundationEssentials/_ThreadLocal.swift:57`
+- PThread.Key on Windows (unread): swift-nio: `Sources/NIOPosix/Thread.swift:260`; swift-nio: `Sources/NIOPosix/Thread.swift:321`; swift-nio: `Sources/NIOPosix/Thread.swift:341`
+- PThread.setCurrentName and PThread.ID.name() on OpenBSD (unread): swift-nio: `Tests/NIOPosixTests/SelectorTest.swift:57`
+- PThread.yield on WASI without threads (coverage-5 N2) (unread): swift-nio: `Sources/NIOConcurrencyHelpers/atomics.swift:29`
+- PThread.yield on WASI without threads (wasip1 has sched_yield) (unread): WasmKit: `Sources/WASI/Platform/PAL/PALFileDescriptor.swift:560`
 - `pthread_create` (covered): swift-async-algorithms: `Sources/AsyncSequenceValidation/TaskDriver.swift:17`
 - `pthread_join` (covered): swift-async-algorithms: `Sources/AsyncSequenceValidation/TaskDriver.swift:17`
 - `pthread_mutex_t` (covered): swift-certificates: `Sources/X509/Lock.swift:23`
-- `pthread_set_name_np` (missing): swift-testing: `Sources/Testing/ExitTests/WaitFor.swift:175`
 - `pthread_t` (covered): swift-async-algorithms: `Sources/AsyncSequenceValidation/TaskDriver.swift:17`
 - `raise` (covered): swift-testing: `Tests/TestingTests/ExitTestTests.swift:80`
-- readlinkat into a caller's buffer (System's readSymbolicLink returns a FilePath, which dro (covered): WasmKit: `Sources/WASI/Platform/PAL/PALFileDescriptor.swift:7`
+- `real` (missing): swift-foundation: `Tests/FoundationEssentialsTests/FileManager/FileManagerTests.swift:208`
 - `realpath` (covered): swift-testing: `Sources/Testing/Support/FileHandle.swift:901`
-- `rpath_command` (not System's): swift-build: `Sources/SWBUtil/MachO.swift:16`
-- `SARMAG` (standard library): swift-build: `Sources/SWBUtil/MachO.swift:71`
-- `sdk` (missing): swift-build: `Sources/SWBUtil/MachO.swift:16`
-- `section` (not System's): swift-build: `Sources/SWBUtil/MachO.swift:16`
-- `section_64` (not System's): swift-build: `Sources/SWBUtil/MachO.swift:16`
-- `segment_command_64` (not System's): swift-build: `Sources/SWBUtil/MachO.swift:16`
+- `release` (covered): swift-foundation: `Sources/FoundationEssentials/ProcessInfo/ProcessInfo.swift:432`
+- `S_IFWHT` (covered): swift-nio: `Tests/NIOFSTests/FileTypeTests.swift:48`
+- `secureValue` (missing): swift-foundation: `Sources/FoundationEssentials/Platform.swift:232`
+- `sendmmsg` (covered): swift-nio: `Sources/NIOPosix/System.swift:87`
 - `sigabbrev_np` (missing): swift-testing: `Sources/Testing/ExitTests/ExitStatus.swift:126`
 - `SIGABRT` (covered): swift-testing: `Tests/TestingTests/ExitTestTests.swift:50`; swift-testing: `Tests/TestingTests/ExitTestTests.swift:149`; swift-testing: `Tests/TestingTests/ExitTestTests.swift:181`; swift-testing: `Tests/TestingTests/ExitTestTests.swift:187`; swift-testing: `Tests/TestingTests/ExitTestTests.swift:813`
 - `SIGSEGV` (covered): swift-testing: `Tests/TestingTests/ExitTestTests.swift:80`; swift-testing: `Tests/TestingTests/ExitTestTests.swift:813`
-- `size` (missing): swift-build: `Sources/SWBUtil/MachO.swift:16`
+- `SO_REUSEPORT` (covered): swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:79`
+- SocketDescriptor.SocketOption.reusePort on Android and OpenBSD (unread): swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:739`
+- Stat on Windows (Windows later) (unread): swift-nio: `Sources/NIOPosix/NonBlockingFileIO.swift:1358`
+- StatFS.FileSystemID as a number on every platform (unread): swift-foundation: `Sources/FoundationEssentials/FileManager/FileManager+Files.swift:752`
 - stdlib.h and sysexits.h exit codes' C names (unread): swift-testing: `Sources/Testing/ExitTests/ExitStatus.swift:122`
 - `strchr` (missing): swift-testing: `Sources/Testing/Support/Environment.swift:90`
 - `strerror_r` (missing): swift-testing: `Sources/Testing/Support/CError.swift:67`
 - `strncmp` (covered): swift-testing: `Sources/Testing/Support/Environment.swift:90`
+- `sync` (covered): WasmKit: `Sources/WASI/Platform/PAL/PALFileDescriptor.swift:130`; WasmKit: `Sources/WASI/Platform/PAL/PALFileDescriptor.swift:411`
 - `sys_signame` (missing): swift-testing: `Sources/Testing/ExitTests/ExitStatus.swift:126`
 - `sysctl` (covered): swift-testing: `Sources/Testing/Support/Additions/CommandLineAdditions.swift:55`
+- SystemConfig.maxIOVectors on FreeBSD and OpenBSD (unread): swift-nio: `Sources/NIOPosix/System.swift:441`
+- `SystemIdentity` (missing): swift-foundation: `Sources/FoundationEssentials/ProcessInfo/ProcessInfo.swift:432`
+- SystemSockets on FreeBSD (PackageDescription can't name .freebsd) (unread): WasmKit: `Sources/CLICommands/TCPListener.swift:104`
+- SystemSockets on OpenBSD (unread): swift-nio: `Sources/NIOPosix/System.swift:517`
 - `task_set_exception_ports` (missing): swift-testing: `Sources/Testing/ExitTests/ExitTest.swift:219`
+- `TCP_INFO` (covered): swift-nio: `Sources/NIOCore/BSDSocketAPI.swift:73`
+- `tcp_info` (covered): swift-nio: `Sources/NIOCore/SocketOptionProvider.swift:21`
+- test's own C-shaped helpers on FreeBSD and OpenBSD (the Darwin round's design call 19) (unread): swift-nio: `Tests/NIOPosixTests/SystemCallWrapperHelpers.swift:116`
+- `timespec` (covered): swift-nio: `Sources/NIOPosix/SelectorEpoll.swift:252`
 - `timespec_get` (covered): swift-testing: `Sources/Testing/Events/Clock.swift:33`
 - `tmpfile` (missing): swift-testing: `Tests/TestingTests/Support/FileHandleTests.swift:257`
+- `unmap` (missing): swift-foundation: `Sources/FoundationEssentials/Data/Data.swift:84`
 - `usleep` (covered): swift-stress-tester: `SourceKitStressTester/Tests/SwiftCWrapperToolTests/SwiftCWrapperToolTests.swift:89` (outside the targets)
-- `uuid` (missing): swift-build: `Sources/SWBUtil/MachO.swift:16`
-- `uuid_command` (not System's): swift-build: `Sources/SWBUtil/MachO.swift:16`
-- `version` (covered): swift-build: `Sources/SWBUtil/MachO.swift:16`
-- `version_min_command` (not System's): swift-build: `Sources/SWBUtil/MachO.swift:16`
-- `vm_prot_t` (standard library): swift-build: `Sources/SWBUtil/MachO.swift:69`
-- `vmaddr` (missing): swift-build: `Sources/SWBUtil/MachO.swift:16`
-- `vmsize` (missing): swift-build: `Sources/SWBUtil/MachO.swift:16`
+- `version` (covered): swift-foundation: `Sources/FoundationEssentials/ProcessInfo/ProcessInfo.swift:432`
 
 </details>
 
@@ -782,15 +1120,15 @@ The goal: no library of the repositories that swift's update-checkout clones for
 
 | Platform | Library files that import one | Repositories | Library files, lexical |
 |---|---:|---:|---:|
-| Darwin | 16 | 5 | 19 |
-| Linux (glibc) | 32 (1 maybe) | 8 | 72 |
-| Musl | 26 (1 maybe) | 6 | 27 |
-| Android | 41 (1 maybe) | 8 | 40 |
-| WASI | 45 | 6 | 45 |
-| FreeBSD | 71 (1 maybe) | 9 | 72 |
-| OpenBSD | 70 (1 maybe) | 8 | 72 |
+| Darwin | 13 | 4 | 16 |
+| Linux (glibc) | 25 | 7 | 54 |
+| Musl | 19 | 5 | 21 |
+| Android | 34 | 6 | 34 |
+| WASI | 34 | 6 | 34 |
+| FreeBSD | 52 (1 maybe) | 8 | 54 |
+| OpenBSD | 51 | 7 | 54 |
 | Windows | 183 (4 maybe) | 21 | 183 |
-| **Any** | 216 | 23 | 218 |
+| **Any** | 209 | 23 | 211 |
 
 | Repository | Read at | Library, lexical | Darwin | Linux | Musl | Android | WASI | FreeBSD | OpenBSD | Windows | Tests | Other | Nested packages |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
@@ -810,7 +1148,7 @@ The goal: no library of the repositories that swift's update-checkout clones for
 | swift-asn1 | `../ecosystem/swift-asn1` @ `a54383ad` | — | — | — | — | — | — | — | — | — | — | — | — |
 | swift-async-algorithms | `../adopters/swift-async-algorithms` `migrate-all` @ `d4ad19b0` | 1 | — | 1 | 1 | 1 | — | 1 | 1 | 1 | — | — | — |
 | swift-atomics | `../ecosystem/swift-atomics` @ `0442cb5a` | — | — | — | — | — | — | — | — | — | — | — | — |
-| swift-build | `../adopters/swift-build` `migrate-all` @ `1dce162d` | 13 | 4 | 1 | 1 | 1 | — | 1 | 1 | 9 | 4 | — | — |
+| swift-build | `../adopters/swift-build` `migrate-all` @ `dad65aee` | 11 | 2 | — | — | — | — | — | — | 9 | 3 | — | — |
 | swift-certificates | `../adopters/swift-certificates` `migrate-all` @ `c310582c` | 3 | — | — | — | — | 1 | — | — | 3 | — | — | — |
 | swift-collections | `../ecosystem/swift-collections` @ `c11818f3` | — | — | — | — | — | — | — | — | — | — | — | — |
 | swift-corelibs-blocksruntime | not cloned | | | | | | | | | | | | |
@@ -824,7 +1162,7 @@ The goal: no library of the repositories that swift's update-checkout clones for
 | swift-driver | `../adopters/swift-driver` `migrate-unix` @ `e7850bd0` | 7 | — | — | — | — | — | — | — | 7 | 5 | — | — |
 | swift-experimental-string-processing | `../ecosystem/swift-experimental-string-processing` @ `db4678c7` | 1 | 1 | 1 | — | — | — | 1 | 1 | — | — | — | — |
 | swift-format | `../ecosystem/swift-format` @ `b15dd59f` | 3 | — | — | — | 1 | — | — | — | 2 | — | — | — |
-| swift-foundation | `../adopters/swift-foundation` `migrate-unix` @ `d7589041` | 31 | — | 8 | 8 | 10 | 21 | 23 | 23 | 27 | 7 | — | 2 |
+| swift-foundation | `../adopters/swift-foundation` `migrate-unix` @ `b948c6ee` | 31 | — | 7 | 7 | 9 | 16 | 15 | 15 | 27 | 7 | — | 2 |
 | swift-foundation-icu | `../ecosystem/swift-foundation-icu` @ `e8538d25` | — | — | — | — | — | — | — | — | — | — | — | 1 |
 | swift-installer-scripts | not cloned | | | | | | | | | | | | |
 | swift-integration-tests | not cloned | | | | | | | | | | | | |
@@ -832,7 +1170,7 @@ The goal: no library of the repositories that swift's update-checkout clones for
 | swift-lmdb | `../ecosystem/swift-lmdb` @ `866bc256` | — | — | — | — | — | — | — | — | — | — | — | — |
 | swift-log | `../adopters/swift-log` `migrate-all` @ `7e49107b` | 3 | — | — | — | — | 1 | — | — | 3 | 3 | — | — |
 | swift-markdown | `../ecosystem/swift-markdown` @ `392b73b8` | — | — | — | — | — | — | — | — | — | — | — | — |
-| swift-nio | `../adopters/swift-nio` `migrate-unix` @ `56deee84` | 48 | — | 3 | 3 | 3 | 13 | 26 | 26 | 34 | 19 | — | 2 |
+| swift-nio | `../adopters/swift-nio` `migrate-unix` @ `6f4e78e4` | 45 | — | 3 | 3 | 3 | 9 | 20 | 20 | 34 | 19 | — | 2 |
 | swift-numerics | `../ecosystem/swift-numerics` @ `0a5bc040` | — | — | — | — | — | — | — | — | — | — | — | — |
 | swift-sdk-generator | `../adopters/swift-sdk-generator` `migrate-unix` @ `bc251e13` | — | — | — | — | — | — | — | — | — | 1 | — | — |
 | swift-stress-tester | `../adopters/swift-stress-tester` `migrate-all` @ `e1702563` | — | — | — | — | — | — | — | — | — | — | — | — |
@@ -846,7 +1184,7 @@ The goal: no library of the repositories that swift's update-checkout clones for
 | swift-xcode-playground-support | not cloned | | | | | | | | | | | | |
 | swiftpm | `../adopters/swift-package-manager` `migrate-unix` @ `efff7333` | 12 | — | — | — | 1 | — | 1 | — | 11 | — | — | 1 |
 | wasi-libc | not cloned | | | | | | | | | | | | |
-| wasmkit | `../adopters/WasmKit` `migrate-unix` @ `fd06e2a3` | 12 | 1 | 6 (1 maybe) | 6 (1 maybe) | 5 (1 maybe) | 3 | 6 (1 maybe) | 6 (1 maybe) | 9 (3 maybe) | 2 | — | 1 |
+| wasmkit | `../adopters/WasmKit` `migrate-unix` @ `0c557c40` | 10 | — | 1 | 1 | — | 1 | 2 (1 maybe) | 2 | 9 (3 maybe) | 1 | — | 1 |
 | zlib | not cloned | | | | | | | | | | | | |
 
 38 repositories read; 23 compile an import of a platform module in library code on some platform: indexstore-db, llbuild, sourcekit-lsp, swift-argument-parser, swift-async-algorithms, swift-build, swift-certificates, swift-corelibs-foundation, swift-corelibs-xctest, swift-crypto, swift-docc, swift-driver, swift-experimental-string-processing, swift-format, swift-foundation, swift-log, swift-nio, swift-subprocess, swift-testing, swift-tools-protocols, swift-tools-support-core, swiftpm, wasmkit.
@@ -855,27 +1193,27 @@ All repositories, files by module and kind, lexically (the counted modules any f
 
 | Module | Library | Tests | Other | Nested packages | All |
 |---|---:|---:|---:|---:|---:|
-| Darwin | 18 | 3 | 1 | 5 | 27 |
-| Glibc | 72 | 15 | 0 | 6 | 93 |
-| Musl | 27 | 1 | 0 | 2 | 30 |
-| Bionic | 12 | 3 | 0 | 0 | 15 |
-| Android | 29 | 11 | 0 | 1 | 41 |
-| WASILibc | 45 | 5 | 0 | 1 | 51 |
+| Darwin | 15 | 3 | 1 | 5 | 24 |
+| Glibc | 54 | 14 | 0 | 6 | 74 |
+| Musl | 21 | 1 | 0 | 2 | 24 |
+| Bionic | 11 | 3 | 0 | 0 | 14 |
+| Android | 24 | 11 | 0 | 1 | 36 |
+| WASILibc | 34 | 5 | 0 | 1 | 40 |
 | ucrt | 38 | 9 | 0 | 1 | 48 |
 | WinSDK | 157 | 35 | 0 | 2 | 194 |
 | CRT | 34 | 12 | 0 | 0 | 46 |
-| MachO | 3 | 2 | 1 | 0 | 6 |
-| unistd | 5 | 0 | 0 | 0 | 5 |
+| MachO | 2 | 1 | 1 | 0 | 4 |
+| unistd | 4 | 0 | 0 | 0 | 4 |
 | stdlib_h | 3 | 0 | 0 | 0 | 3 |
 | string_h | 1 | 0 | 0 | 0 | 1 |
 | threads_h | 1 | 0 | 0 | 0 | 1 |
-| **Any** | 218 | 65 | 1 | 9 | 293 |
+| **Any** | 211 | 63 | 1 | 9 | 284 |
 
 # 5. Sites left
 
-**The floor** (no site left on a platform but exceptions) holds on no platform: Darwin (151 sites left), Linux (112 sites left), Musl (96 sites left), Android (124 sites left), FreeBSD (156 sites left), OpenBSD (156 sites left), WASI (116 sites left), Windows (542 sites left).
+**The floor** (no site left on a platform but exceptions) holds on no platform: Darwin (91 sites left), Linux (121 sites left), Musl (105 sites left), Android (129 sites left), FreeBSD (338 sites left), OpenBSD (330 sites left), WASI (223 sites left), Windows (681 sites left).
 
-The ledger: every site in the update-checkout cluster that still uses a platform C module, each with one category and its reason, so that nothing left on C is lost; in full in `ledger.json` (status.sh's `STATUS_LEDGER_JSON`). A *site* is an import of a module that `Utilities/adopter-coverage/modules.ini` counts ([count]) or lists ([report]), at its file and line, with the platforms whose build compiles it (`?`: maybe) and the C names it serves there; or a `SYSTEM-GAP:` marker that sits over no such import (one that does is part of the imports' reason). Every library, test and other file is read, at the commits section 4 reads, and the swift repository too. Categories, by `Utilities/adopter-coverage/exceptions.ini`'s entries first, then by each C name against System at `system-next` @ `a3dbd4ec` and `Utilities/adopter-coverage/mapping.ini`: 310 unexplained, 435 System gap, 18 queued, 33 exception, 123 undecided, 22 standard library; 27 excluded. How each is decided is in [How this is computed](#how-this-is-computed).
+The ledger: every site in the update-checkout cluster that still uses a platform C module, each with one category and its reason, so that nothing left on C is lost; in full in `ledger.json` (status.sh's `STATUS_LEDGER_JSON`). A *site* is an import of a module that `Utilities/adopter-coverage/modules.ini` counts ([count]) or lists ([report]), at its file and line, with the platforms whose build compiles it (`?`: maybe) and the C names it serves there; or a `SYSTEM-GAP:` marker that sits over no such import (one that does is part of the imports' reason). Every library, test and other file is read, at the commits section 4 reads, and the swift repository too. Categories, by `Utilities/adopter-coverage/exceptions.ini`'s entries first, then by each C name against System at `coverage-7` @ `020aa903` and `Utilities/adopter-coverage/mapping.ini`: 492 unexplained, 378 System gap, 19 queued, 33 exception, 123 undecided, 21 standard library; 27 excluded. How each is decided is in [How this is computed](#how-this-is-computed).
 
 ## Unexplained
 
@@ -903,6 +1241,7 @@ Sites that no entry and no System gap explains: the ones to look at. Either Syst
 | swift-async-algorithms | `Sources/AsyncAlgorithms/Locking.swift` | 21 `WinSDK` | Windows | System covers every C name it serves there: AcquireSRWLockExclusive, InitializeSRWLock, ReleaseSRWLockExclusive, SRWLOCK |
 | swift-build | `Sources/SWBLibc/libc.swift` | 14 `ucrt`, re-exported, 15 `CRT`, re-exported, 16 `WinSDK`, re-exported | Windows | no C name it serves was found on its platforms |
 | swift-build | `Sources/SWBTestSupport/Misc.swift` | 23 `WinSDK` | Windows | no C name it serves was found on its platforms |
+| swift-build | `Sources/SWBUtil/Architecture.swift` | 23-25 `MachO` (scoped), 1 marker ×3 | Darwin | System covers every C name it serves there: macho_arch_name_for_cpu_type, macho_arch_name_for_mach_header, macho_cpu_type_for_arch_name |
 | swift-build | `Sources/SWBUtil/FSProxy.swift` | 38 `WinSDK` (scoped) | Windows | System covers every C name it serves there: HANDLE |
 | swift-build | `Sources/SWBUtil/HashContext.swift` | 14 `WinSDK` | Windows | no C name it serves was found on its platforms |
 | swift-build | `Sources/SwiftBuild/SWBBuildServiceConnection.swift` | 25 `Darwin` (scoped), 1 marker | Darwin | System covers every C name it serves there: abort |
@@ -926,48 +1265,62 @@ Sites that no entry and no System gap explains: the ones to look at. Either Syst
 | swift-format | `Sources/swift-format/Utilities/TTY.swift` | 16 `Android` | Android | System covers every C name it serves there: isatty |
 | swift-foundation | `Benchmarks/Benchmarks/Base64/Base64.swift` | 27 `Glibc`, 30 `Darwin` | Darwin, Linux, FreeBSD, OpenBSD | no C name it serves was found on its platforms |
 | swift-foundation | `Benchmarks/Benchmarks/DataIO/BenchmarkDataIO.swift` | 27 `Glibc`, 30 `Darwin` | Darwin, Linux, FreeBSD, OpenBSD | no C name it serves was found on its platforms |
-| swift-foundation | `Sources/FoundationEssentials/Data/Data+Reading.swift` | 31 `Musl` | Musl | System covers every C name it serves there: realloc |
-| swift-foundation | `Sources/FoundationEssentials/Data/Data+Writing.swift` | 28 `Android`, 29 `unistd`, 38 `WASILibc` | Android, WASI | System covers every C name it serves there: dirfd |
-| swift-foundation | `Sources/FoundationEssentials/Data/Data+Writing.swift` | 33 `Musl` | none | no platform's build compiles it (a branch none takes, or a flag the model sets false) |
-| swift-foundation | `Sources/FoundationEssentials/Data/Data.swift` | 74 `string_h` | none | no platform's build compiles it (a branch none takes, or a flag the model sets false) |
-| swift-foundation | `Sources/FoundationEssentials/Data/DataProtocol.swift` | 18 `Glibc`, 20 `ucrt`, 22 `WASILibc` | FreeBSD, OpenBSD, WASI, Windows | no C name it serves was found on its platforms |
-| swift-foundation | `Sources/FoundationEssentials/Data/DataProtocol.swift` | 26 `stdlib_h` | none | no platform's build compiles it (a branch none takes, or a flag the model sets false) |
+| swift-foundation | `Sources/FoundationEssentials/Data/Data+Reading.swift` | 29 `Musl` | Musl | no C name it serves was found on its platforms |
+| swift-foundation | `Sources/FoundationEssentials/Data/Data+Reading.swift` | 472 marker: MemoryMapping, byteCount, file, fileSize on WASI | WASI? | the marker names no C interface |
+| swift-foundation | `Sources/FoundationEssentials/Data/Data+Writing.swift` | 29 `Android`, 1 marker, 30 `unistd`, 1 marker, 41 `WASILibc`, 1 marker | Android, WASI | System covers every C name it serves there: dirfd |
+| swift-foundation | `Sources/FoundationEssentials/Data/Data+Writing.swift` | 35 `Musl` | none | no platform's build compiles it (a branch none takes, or a flag the model sets false) |
+| swift-foundation | `Sources/FoundationEssentials/Data/Data+Writing.swift` | 294 marker: FilePath.makeUniqueFile(options:permissions:) on FreeBSD and OpenBSD; … | FreeBSD?, OpenBSD?, Windows? | the marker names no C interface (FilePath.makeUniqueFile(options:permissions:) on FreeBSD and OpenBSD) |
+| swift-foundation | `Sources/FoundationEssentials/Data/Data+Writing.swift` | 853 marker: extended attributes on OpenBSD, which has none | OpenBSD? | the marker names no C interface (extended attributes on OpenBSD) |
+| swift-foundation | `Sources/FoundationEssentials/Data/Data.swift` | 69 `string_h` | none | no platform's build compiles it (a branch none takes, or a flag the model sets false) |
+| swift-foundation | `Sources/FoundationEssentials/Data/Data.swift` | 84 marker: MemoryMapping, byteCount, unmap on WASI | WASI | the marker names no C interface |
+| swift-foundation | `Sources/FoundationEssentials/Data/DataProtocol.swift` | 18 `ucrt` | Windows | no C name it serves was found on its platforms |
+| swift-foundation | `Sources/FoundationEssentials/Data/DataProtocol.swift` | 22 `stdlib_h` | none | no platform's build compiles it (a branch none takes, or a flag the model sets false) |
 | swift-foundation | `Sources/FoundationEssentials/Data/Representations/DataStorage.swift` | 20 `Glibc`, 22 `Musl`, 26 `WASILibc`, 30 `Bionic` | Linux, Musl, Android, FreeBSD, OpenBSD, WASI | System covers every C name it serves there: realloc |
 | swift-foundation | `Sources/FoundationEssentials/Data/Representations/DataStorage.swift` | 34 `stdlib_h` | none | no platform's build compiles it (a branch none takes, or a flag the model sets false) |
-| swift-foundation | `Sources/FoundationEssentials/Date.swift` | 17 `Glibc`, 23 `WASILibc` | FreeBSD, OpenBSD, WASI | System covers every C name it serves there: gmtime_r, strftime, time_t |
-| swift-foundation | `Sources/FoundationEssentials/Error/CocoaError+FilePath.swift` | 22 `Glibc`, 27 `WASILibc` | FreeBSD, OpenBSD, WASI | no C name it serves was found on its platforms |
-| swift-foundation | `Sources/FoundationEssentials/Error/CocoaError+FilePath.swift` | 24 `CRT`, 25 `WinSDK` | Windows | System covers every C name it serves there: DWORD |
-| swift-foundation | `Sources/FoundationEssentials/Error/ErrorCodes+POSIX.swift` | 26 `Glibc`, 31 `WASILibc` | FreeBSD, OpenBSD, WASI | System covers every C name it serves there: POSIXErrorCode |
+| swift-foundation | `Sources/FoundationEssentials/Data/Representations/DataStorage.swift` | 90 marker: Memory.reallocate on Windows, which shares this arm | Darwin?, Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | the marker names no C interface (Memory.reallocate on Windows) |
+| swift-foundation | `Sources/FoundationEssentials/Date.swift` | 21 `WinSDK` | Windows | System covers every C name it serves there: FILETIME, GetSystemTimePreciseAsFileTime |
+| swift-foundation | `Sources/FoundationEssentials/Error/CocoaError+FilePath.swift` | 23 `Glibc`, 1 marker, 29 `WASILibc`, 1 marker | FreeBSD, OpenBSD, WASI | no C name it serves was found on its platforms |
+| swift-foundation | `Sources/FoundationEssentials/Error/CocoaError+FilePath.swift` | 25 `CRT`, 26 `WinSDK` | Windows | System covers every C name it serves there: DWORD |
+| swift-foundation | `Sources/FoundationEssentials/Error/CocoaError+FilePath.swift` | 104 marker: POSIXError's API from an Errno off Darwin, Linux and Android: each pla… | FreeBSD, OpenBSD, WASI, Windows | the marker names no C interface (POSIXError's API from an Errno off Darwin) |
+| swift-foundation | `Sources/FoundationEssentials/Error/ErrorCodes+POSIX.swift` | 27 `Glibc`, 1 marker, 33 `WASILibc`, 1 marker | FreeBSD, OpenBSD, WASI | System covers every C name it serves there: POSIXErrorCode |
+| swift-foundation | `Sources/FoundationEssentials/Error/ErrorCodes+POSIX.swift` | 77 marker: CInterop.POSIXErrorCode on Windows; and POSIXError's API off Darwin, L… | FreeBSD, OpenBSD, WASI, Windows | the marker names no C interface (CInterop.POSIXErrorCode on Windows) |
+| swift-foundation | `Sources/FoundationEssentials/Error/ErrorCodes+POSIX.swift` | 87 marker: POSIXError's API off Darwin, Linux and Android: each platform's errno … | FreeBSD, OpenBSD, WASI, Windows | the marker names no C interface (POSIXError's API off Darwin) |
+| swift-foundation | `Sources/FoundationEssentials/Error/ErrorCodes+POSIX.swift` | 558 marker: POSIXError's static properties off Darwin, Linux and Android: each pla… | FreeBSD, OpenBSD, WASI, Windows | the marker names no C interface (POSIXError's static properties off Darwin) |
 | swift-foundation | `Sources/FoundationEssentials/Error/ErrorCodes+Win32.swift` | 13 `WinSDK` | Windows | System covers every C name it serves there: DWORD |
-| swift-foundation | `Sources/FoundationEssentials/FileManager/FileManager+Basics.swift` | 19 `Glibc`, 24 `WASILibc` | FreeBSD, OpenBSD, WASI | no C name it serves was found on its platforms |
+| swift-foundation | `Sources/FoundationEssentials/FileManager/FileManager+Basics.swift` | 20 `Glibc`, 1 marker, 26 `WASILibc`, 1 marker | FreeBSD, OpenBSD, WASI | no C name it serves was found on its platforms |
+| swift-foundation | `Sources/FoundationEssentials/FileManager/FileManager+Directories.swift` | 279 marker: fts off Darwin (see _FTSSequence) | Linux, Musl, Android, FreeBSD, WASI | the marker names no C interface (fts off Darwin (see _FTSSequence)) |
 | swift-foundation | `Sources/FoundationEssentials/FileManager/FileManager+Files.swift` | 24 `Android`, 30 `Musl` | Musl, Android | System covers every C name it serves there: f_bavail, f_blocks, f_ffree, f_files, f_frsize, f_fsid, statvfs |
 | swift-foundation | `Sources/FoundationEssentials/FileManager/FileManager+Files.swift` | 37 `WASILibc` | WASI | no C name it serves was found on its platforms |
-| swift-foundation | `Sources/FoundationEssentials/FileManager/FileManager+SymbolicLinks.swift` | 18 `Glibc`, 24 `WASILibc` | FreeBSD, OpenBSD, WASI | no C name it serves was found on its platforms |
-| swift-foundation | `Sources/FoundationEssentials/FileManager/FileManager+Utilities.swift` | 29 `Glibc`, 35 `WASILibc` | FreeBSD, OpenBSD, WASI | no C name it serves was found on its platforms |
-| swift-foundation | `Sources/FoundationEssentials/FileManager/FileManager+Utilities.swift` | 32 `CRT`, 33 `WinSDK` | Windows | System covers every C name it serves there: FILETIME |
+| swift-foundation | `Sources/FoundationEssentials/FileManager/FileManager+Files.swift` | 752 marker: StatFS.FileSystemID as a number on every platform: System's StatFS cov… | Linux, Musl, Android, FreeBSD, OpenBSD | the marker names no C interface (StatFS.FileSystemID as a number on every platform) |
+| swift-foundation | `Sources/FoundationEssentials/FileManager/FileManager+SymbolicLinks.swift` | 19 `Glibc`, 1 marker, 26 `WASILibc`, 1 marker | FreeBSD, OpenBSD, WASI | no C name it serves was found on its platforms |
+| swift-foundation | `Sources/FoundationEssentials/FileManager/FileManager+Utilities.swift` | 30 `Glibc`, 1 marker, 37 `WASILibc`, 1 marker | FreeBSD, OpenBSD, WASI | no C name it serves was found on its platforms |
+| swift-foundation | `Sources/FoundationEssentials/FileManager/FileManager+Utilities.swift` | 33 `CRT`, 34 `WinSDK` | Windows | System covers every C name it serves there: FILETIME |
+| swift-foundation | `Sources/FoundationEssentials/FileManager/FileOperations.swift` | 487 marker: fts off Darwin (see _FTSSequence); removal needs FTS_XDEV's same-devic…, 1170 marker: fts off Darwin (see _FTSSequence) | Linux, Musl, Android, FreeBSD, OpenBSD, WASI | the marker names no C interface (fts off Darwin (see _FTSSequence)) |
 | swift-foundation | `Sources/FoundationEssentials/Platform.swift` | 67 `stdlib_h`, 68 `unistd`, 72 `stdlib_h` | none | no platform's build compiles it (a branch none takes, or a flag the model sets false) |
-| swift-foundation | `Sources/FoundationEssentials/ProcessInfo/ProcessInfo.swift` | 22 `Bionic`, 23 `unistd`, 27 `Musl` | Musl, Android | System covers every C name it serves there: clock_gettime, timespec, tv_nsec |
-| swift-foundation | `Sources/FoundationEssentials/ProcessInfo/ProcessInfo.swift` | 25 `Glibc` | Linux, FreeBSD, OpenBSD | System covers every C name it serves there: clock_gettime, strdup, timespec, tv_nsec, uname, utsname |
-| swift-foundation | `Sources/FoundationEssentials/ProcessInfo/ProcessInfo.swift` | 31 `WASILibc` | WASI | System covers every C name it serves there: clock_gettime, strdup, timespec, tv_nsec |
-| swift-foundation | `Sources/FoundationEssentials/String/String+Path.swift` | 22 `Glibc` | FreeBSD, OpenBSD | no C name it serves was found on its platforms |
-| swift-foundation | `Sources/FoundationEssentials/TimeZone/TimeZone_Cache.swift` | 16 `unistd`, 20 `Glibc` | Android, FreeBSD, OpenBSD | no C name it serves was found on its platforms |
-| swift-foundation | `Sources/FoundationEssentials/URL/URL_Impl.swift` | 18 `Glibc`, 22 `WASILibc` | FreeBSD, OpenBSD, WASI | no C name it serves was found on its platforms |
-| swift-foundation | `Sources/FoundationEssentials/UUID.swift` | 16 `Glibc`, 22 `WASILibc` | FreeBSD, OpenBSD, WASI | no C name it serves was found on its platforms |
-| swift-foundation | `Sources/FoundationEssentials/UUID.swift` | 20 `WinSDK` | Windows | System covers every C name it serves there: FILETIME, GetSystemTimePreciseAsFileTime |
-| swift-foundation | `Sources/FoundationEssentials/WASILibc+Extensions.swift` | 14 `WASILibc` | WASI | System covers every C name it serves there: clockid_t |
-| swift-foundation | `Sources/FoundationEssentials/_ThreadLocal.swift` | 16 `Glibc` | FreeBSD, OpenBSD | no C name it serves was found on its platforms |
-| swift-foundation | `Sources/FoundationEssentials/_ThreadLocal.swift` | 20 `WinSDK` | Windows | System covers every C name it serves there: DWORD, FlsAlloc, FlsGetValue, FlsSetValue |
-| swift-foundation | `Sources/FoundationEssentials/_ThreadLocal.swift` | 22 `threads_h` | none | no platform's build compiles it (a branch none takes, or a flag the model sets false) |
-| swift-foundation | `Sources/FoundationInternationalization/Formatting/Date/ICUDateFormatter.swift` | 23 `Glibc` | FreeBSD, OpenBSD | no C name it serves was found on its platforms |
+| swift-foundation | `Sources/FoundationEssentials/Platform.swift` | 232 marker: ProcessEnvironment.secureValue, secureValue on WASI | WASI? | the marker names no C interface |
+| swift-foundation | `Sources/FoundationEssentials/Platform.swift` | 254 marker: CString.copy on Windows (string_h's platforms), as strlcpy, which retu… | Android | the marker names no C interface (CString.copy on Windows (string_h's platforms)) |
+| swift-foundation | `Sources/FoundationEssentials/ProcessInfo/ProcessInfo.swift` | 432 marker: SystemIdentity, SystemIdentity.current, release, version on WASI | WASI? | the marker names no C interface |
+| swift-foundation | `Sources/FoundationEssentials/String/String+Path.swift` | 23 `Glibc`, 1 marker | FreeBSD, OpenBSD | no C name it serves was found on its platforms |
+| swift-foundation | `Sources/FoundationEssentials/String/String+Path.swift` | 668 marker: SystemConfig.maxSymbolicLinks, maxSymbolicLinks on WASI | WASI? | the marker names no C interface |
+| swift-foundation | `Sources/FoundationEssentials/TimeZone/TimeZone_Cache.swift` | 16 `unistd` | Android | no C name it serves was found on its platforms |
+| swift-foundation | `Sources/FoundationEssentials/UUID.swift` | 16 `WinSDK` | Windows | System covers every C name it serves there: FILETIME, GetSystemTimePreciseAsFileTime |
+| swift-foundation | `Sources/FoundationEssentials/WASILibc+Extensions.swift` | 14 `WASILibc` | WASI | no C name it serves was found on its platforms |
+| swift-foundation | `Sources/FoundationEssentials/_ThreadLocal.swift` | 17 `WinSDK` | Windows | System covers every C name it serves there: DWORD, FlsAlloc, FlsGetValue, FlsSetValue |
+| swift-foundation | `Sources/FoundationEssentials/_ThreadLocal.swift` | 20 `threads_h`, 1 marker | none | no platform's build compiles it (a branch none takes, or a flag the model sets false) |
+| swift-foundation | `Sources/FoundationEssentials/_ThreadLocal.swift` | 57 marker: PThread.Key on WASI without threads (coverage-5 N2); Windows shares th… | WASI, Windows | the marker names no C interface (PThread.Key on WASI without threads (coverage-5 N2)) |
+| swift-foundation | `Sources/FoundationInternationalization/Formatting/Date/ICUDateFormatter.swift` | 24 `Glibc`, 1 marker | FreeBSD, OpenBSD | no C name it serves was found on its platforms |
 | swift-foundation | `Sources/FoundationInternationalization/TimeZone/TimeZone_ICU.swift` | 18 `ucrt` | Windows | no C name it serves was found on its platforms |
-| swift-foundation | `Tests/FoundationEssentialsTests/DataTests.swift` | 23 `Glibc`, 25 `ucrt` | FreeBSD, OpenBSD, Windows | no C name it serves was found on its platforms |
-| swift-foundation | `Tests/FoundationEssentialsTests/DecimalTests.swift` | 18 `Glibc`, 20 `WASILibc`, 22 `CRT` | FreeBSD, OpenBSD, WASI, Windows | no C name it serves was found on its platforms |
+| swift-foundation | `Tests/FoundationEssentialsTests/DataTests.swift` | 24 `Glibc`, 1 marker, 26 `ucrt` | FreeBSD, OpenBSD, Windows | no C name it serves was found on its platforms |
+| swift-foundation | `Tests/FoundationEssentialsTests/DecimalTests.swift` | 19 `Glibc`, 1 marker, 22 `WASILibc`, 1 marker, 24 `CRT` | FreeBSD, OpenBSD, WASI, Windows | no C name it serves was found on its platforms |
 | swift-foundation | `Tests/FoundationEssentialsTests/FileManager/FileManagerTests.swift` | 22 `Android`, 33 `Bionic`, 35 `Glibc`, 37 `Musl`, 39 `CRT`, 40 `WinSDK` | Linux, Musl, Android, FreeBSD, OpenBSD, Windows | no C name it serves was found on its platforms |
+| swift-foundation | `Tests/FoundationEssentialsTests/FileManager/FileManagerTests.swift` | 208 marker: UserID.real, real on WASI | WASI | the marker names no C interface |
 | swift-foundation | `Tests/FoundationEssentialsTests/JSONEncoderTests.swift` | 19 `Bionic`, 21 `Glibc` | none | no platform's build compiles it (a branch none takes, or a flag the model sets false) |
-| swift-foundation | `Tests/FoundationEssentialsTests/JSONEncoderTests.swift` | 25 `WASILibc` | WASI | System covers every C name it serves there: LC_ALL, setlocale |
-| swift-foundation | `Tests/FoundationEssentialsTests/ProcessInfoTests.swift` | 26 `Glibc` | FreeBSD, OpenBSD | no C name it serves was found on its platforms |
+| swift-foundation | `Tests/FoundationEssentialsTests/JSONEncoderTests.swift` | 26 `WASILibc`, 1 marker | WASI | System covers every C name it serves there: LC_ALL, setlocale |
+| swift-foundation | `Tests/FoundationEssentialsTests/JSONEncoderTests.swift` | 1514 marker: CLocale, CLocale.globalName, CLocale.setGlobal, globalName on Windows … | WASI, Windows | the marker names no C interface |
+| swift-foundation | `Tests/FoundationEssentialsTests/ProcessInfoTests.swift` | 27 `Glibc`, 1 marker | FreeBSD, OpenBSD | no C name it serves was found on its platforms |
+| swift-foundation | `Tests/FoundationEssentialsTests/ProcessInfoTests.swift` | 33 marker: the C library, for this file's C arms | WASI | the marker names no C interface (C library) |
 | swift-foundation | `Tests/FoundationEssentialsTests/StringTests.swift` | 20 `CRT` | Windows | no C name it serves was found on its platforms |
-| swift-foundation | `Tests/FoundationInternationalizationTests/DateComponentsTests.swift` | 29 `Glibc`, 31 `WASILibc`, 33 `CRT` | FreeBSD, OpenBSD, WASI, Windows | no C name it serves was found on its platforms |
+| swift-foundation | `Tests/FoundationInternationalizationTests/DateComponentsTests.swift` | 30 `Glibc`, 1 marker, 33 `WASILibc`, 1 marker, 35 `CRT` | FreeBSD, OpenBSD, WASI, Windows | no C name it serves was found on its platforms |
 | swift-log | `Sources/Logging/Handlers/StreamLogHandler.swift` | 22 `WASILibc`, 1 marker | WASI | System covers every C name it serves there: fflush, fwrite, stdout |
 | swift-log | `Sources/Logging/Locks.swift` | 30 `ucrt`, 31 `WinSDK` | Windows | System covers every C name it serves there: AcquireSRWLockExclusive, AcquireSRWLockShared, InitializeSRWLock, ReleaseSRWLockExclusive, ReleaseSRWLockShared, SRWLOCK |
 | swift-log | `Sources/Logging/MetadataProvider.swift` | 17 `CRT` | Windows | no C name it serves was found on its platforms |
@@ -977,28 +1330,36 @@ Sites that no entry and no System gap explains: the ones to look at. Either Syst
 | swift-nio | `IntegrationTests/allocation-counter-tests-framework/template/scaffolding.swift` | 31 `Glibc` | Linux, FreeBSD, OpenBSD | no C name it serves was found on its platforms |
 | swift-nio | `Sources/NIOConcurrencyHelpers/NIOLock.swift` | 16 `ucrt`, 17 `WinSDK` | Windows | System covers every C name it serves there: AcquireSRWLockExclusive, InitializeSRWLock, ReleaseSRWLockExclusive, SRWLOCK |
 | swift-nio | `Sources/NIOConcurrencyHelpers/atomics.swift` | 23 `ucrt`, 24 `WinSDK` | Windows | System covers every C name it serves there: Sleep |
-| swift-nio | `Sources/NIOConcurrencyHelpers/atomics.swift` | 30 `Glibc` | FreeBSD, OpenBSD | System covers every C name it serves there: sched_yield |
-| swift-nio | `Sources/NIOCore/BSDSocketAPI.swift` | 72 `Glibc`, 74 `Musl` | Linux, Musl | System covers every C name it serves there: TCP_INFO |
-| swift-nio | `Sources/NIOCore/BSDSocketAPI.swift` | 80 `Glibc` | FreeBSD | System covers every C name it serves there: IPPROTO_IP, IPPROTO_IPV6, IPPROTO_TCP, IPPROTO_UDP, IPV6_JOIN_GROUP, IPV6_LEAVE_GROUP, IPV6_MULTICAST_HOPS, IPV6_MULTICAST_IF… |
-| swift-nio | `Sources/NIOCore/ByteBuffer-core.swift` | 16 `ucrt`, 22 `Glibc`, 25 `WASILibc` | FreeBSD, OpenBSD, WASI, Windows | no C name it serves was found on its platforms |
-| swift-nio | `Sources/NIOCore/FileHandle.swift` | 18 `ucrt` | Windows | System covers every C name it serves there: O_CREAT, O_RDONLY, O_RDWR, O_WRONLY, _O_NOINHERIT, _S_IREAD, _S_IWRITE |
-| swift-nio | `Sources/NIOCore/FileHandle.swift` | 22 `Glibc` | FreeBSD, OpenBSD | System covers every C name it serves there: O_CREAT |
-| swift-nio | `Sources/NIOCore/FileHandle.swift` | 25 `WASILibc` | WASI | no C name it serves was found on its platforms |
-| swift-nio | `Sources/NIOCore/FileRegion.swift` | 15 `ucrt`, 19 `Glibc`, 21 `WASILibc` | FreeBSD, OpenBSD, WASI, Windows | no C name it serves was found on its platforms |
-| swift-nio | `Sources/NIOCore/GlobalSingletons.swift` | 20 `ucrt`, 21 `WinSDK`, 23 `Glibc`, 26 `WASILibc` | FreeBSD, OpenBSD, WASI, Windows | no C name it serves was found on its platforms |
+| swift-nio | `Sources/NIOConcurrencyHelpers/atomics.swift` | 29 marker: PThread.yield on WASI without threads (coverage-5 N2) | FreeBSD, OpenBSD, WASI | the marker names no C interface (PThread.yield on WASI without threads (coverage-5 N2)) |
+| swift-nio | `Sources/NIOConcurrencyHelpers/atomics.swift` | 31 `Glibc` | FreeBSD, OpenBSD | System covers every C name it serves there: sched_yield |
+| swift-nio | `Sources/NIOCore/BSDSocketAPI.swift` | 74 `Glibc`, 1 marker, 76 `Musl` | Linux, Musl | System covers every C name it serves there: TCP_INFO |
+| swift-nio | `Sources/NIOCore/BSDSocketAPI.swift` | 84 `Glibc`, 1 marker | FreeBSD | System covers every C name it serves there: IPPROTO_IP, IPPROTO_IPV6, IPPROTO_TCP, IPPROTO_UDP, IPV6_JOIN_GROUP, IPV6_LEAVE_GROUP, IPV6_MULTICAST_HOPS, IPV6_MULTICAST_IF… |
+| swift-nio | `Sources/NIOCore/BSDSocketAPI.swift` | 231 marker: SystemSockets on FreeBSD and Windows, 261 marker: SystemSockets on FreeBSD and Windows, 272 marker: SystemSockets on FreeBSD and Windows, 284 marker: SystemSockets on FreeBSD and Windows, 320 marker: SystemSockets on FreeBSD and Windows, 386 marker: SystemSockets on FreeBSD and Windows, 423 marker: SystemSockets on FreeBSD and Windows, 434 marker: SystemSockets on FreeBSD and Windows, 445 marker: SystemSockets on FreeBSD and Windows, 456 marker: SystemSockets on FreeBSD and Windows, 467 marker: SystemSockets on FreeBSD and Windows, 481 marker: SystemSockets on FreeBSD and Windows, 495 marker: SystemSockets on FreeBSD and Windows, 506 marker: SystemSockets on FreeBSD and Windows, 517 marker: SystemSockets on FreeBSD and Windows, 528 marker: SystemSockets on FreeBSD and Windows, 539 marker: SystemSockets on FreeBSD and Windows, 551 marker: SystemSockets on FreeBSD and Windows, 565 marker: SystemSockets on FreeBSD and Windows, 630 marker: SystemSockets on FreeBSD and Windows, 641 marker: SystemSockets on FreeBSD and Windows, 652 marker: SystemSockets on FreeBSD and Windows, 663 marker: SystemSockets on FreeBSD and Windows, 674 marker: SystemSockets on FreeBSD and Windows, 685 marker: SystemSockets on FreeBSD and Windows, 696 marker: SystemSockets on FreeBSD and Windows, 707 marker: SystemSockets on FreeBSD and Windows | FreeBSD, OpenBSD, WASI, Windows | the marker names no C interface (SystemSockets on FreeBSD and Windows) |
+| swift-nio | `Sources/NIOCore/BSDSocketAPI.swift` | 299 marker: SystemSockets on FreeBSD, 343 marker: SystemSockets on FreeBSD, 366 marker: SystemSockets on FreeBSD, 408 marker: SystemSockets on FreeBSD, 722 marker: SystemSockets on FreeBSD, 780 marker: SystemSockets on FreeBSD, 831 marker: SystemSockets on FreeBSD | FreeBSD, OpenBSD, WASI | the marker names no C interface (SystemSockets on FreeBSD) |
+| swift-nio | `Sources/NIOCore/BSDSocketAPI.swift` | 739 marker: SocketDescriptor.SocketOption.reusePort on Android and OpenBSD, and Sy… | Android, FreeBSD, OpenBSD | the marker names no C interface (SocketDescriptor.SocketOption.reusePort on Android and OpenBSD) |
+| swift-nio | `Sources/NIOCore/ByteBuffer-core.swift` | 16 `ucrt`, 23 `Glibc`, 1 marker, 27 `WASILibc`, 1 marker | FreeBSD, OpenBSD, WASI, Windows | no C name it serves was found on its platforms |
+| swift-nio | `Sources/NIOCore/FileHandle.swift` | 18 `ucrt` | Windows | System covers every C name it serves there: O_RDONLY, O_RDWR, O_WRONLY, _O_NOINHERIT, _S_IREAD, _S_IWRITE |
+| swift-nio | `Sources/NIOCore/FileRegion.swift` | 15 `ucrt` | Windows | no C name it serves was found on its platforms |
+| swift-nio | `Sources/NIOCore/GlobalSingletons.swift` | 20 `ucrt`, 21 `WinSDK`, 24 `Glibc`, 1 marker, 28 `WASILibc`, 1 marker | FreeBSD, OpenBSD, WASI, Windows | no C name it serves was found on its platforms |
 | swift-nio | `Sources/NIOCore/IO.swift` | 17 `WinSDK` (scoped) | Windows | System covers every C name it serves there: FormatMessageW |
 | swift-nio | `Sources/NIOCore/IO.swift` | 24 `WinSDK` (scoped) | Windows | System covers every C name it serves there: DWORD |
 | swift-nio | `Sources/NIOCore/IO.swift` | 26 `WinSDK` (scoped) | Windows | System covers every C name it serves there: WORD |
-| swift-nio | `Sources/NIOCore/IO.swift` | 34 `Glibc`, 37 `WASILibc` | FreeBSD, OpenBSD, WASI | no C name it serves was found on its platforms |
-| swift-nio | `Sources/NIOCore/Interfaces.swift` | 20 `Glibc` | FreeBSD | System covers every C name it serves there: IFF_BROADCAST, IFF_MULTICAST, IFF_POINTOPOINT, ifa_addr, ifa_dstaddr, ifa_flags, ifa_name, ifa_netmask… |
-| swift-nio | `Sources/NIOCore/Interfaces.swift` | 25 `WASILibc` | WASI | System covers every C name it serves there: sa_family |
-| swift-nio | `Sources/NIOCore/Interfaces.swift` | 34 `WinSDK` (scoped) | Windows | System covers every C name it serves there: IP_ADAPTER_ADDRESSES |
-| swift-nio | `Sources/NIOCore/Interfaces.swift` | 35 `WinSDK` (scoped) | Windows | System covers every C name it serves there: IP_ADAPTER_UNICAST_ADDRESS |
-| swift-nio | `Sources/NIOCore/SocketAddresses.swift` | 76 `WASILibc` | WASI | System covers every C name it serves there: s_addr, sin6_addr, sin6_family, sin6_flowinfo, sin6_port, sin6_scope_id, sin_addr, sin_family… |
-| swift-nio | `Sources/NIOCore/SocketOptionProvider.swift` | 20 `Glibc`, 22 `Musl`, 24 `Bionic` | Linux, Musl, Android | no C name it serves was found on its platforms |
-| swift-nio | `Sources/NIOCore/SocketOptionProvider.swift` | 31 `Glibc`, 34 `Glibc`, 39 `WASILibc` | FreeBSD, OpenBSD, WASI | System covers every C name it serves there: linger |
-| swift-nio | `Sources/NIOCore/SystemCallHelpers.swift` | 25 `Glibc` | FreeBSD, OpenBSD | System covers every C name it serves there: ifaddrs |
-| swift-nio | `Sources/NIOCore/SystemCallHelpers.swift` | 28 `WASILibc` | WASI | no C name it serves was found on its platforms |
+| swift-nio | `Sources/NIOCore/IO.swift` | 35 `Glibc`, 1 marker, 39 `WASILibc`, 1 marker | FreeBSD, OpenBSD, WASI | no C name it serves was found on its platforms |
+| swift-nio | `Sources/NIOCore/Interfaces.swift` | 23 `Glibc`, 1 marker, 32 `WASILibc`, 1 marker | FreeBSD, WASI | System covers every C name it serves there: sa_family |
+| swift-nio | `Sources/NIOCore/Interfaces.swift` | 28 marker: the C library, for this file's C arms | OpenBSD | the marker names no C interface (C library) |
+| swift-nio | `Sources/NIOCore/Interfaces.swift` | 41 `WinSDK` (scoped) | Windows | System covers every C name it serves there: IP_ADAPTER_ADDRESSES |
+| swift-nio | `Sources/NIOCore/Interfaces.swift` | 42 `WinSDK` (scoped) | Windows | System covers every C name it serves there: IP_ADAPTER_UNICAST_ADDRESS |
+| swift-nio | `Sources/NIOCore/Interfaces.swift` | 211 marker: SystemSockets on FreeBSD, OpenBSD and Windows | FreeBSD, OpenBSD, WASI, Windows | the marker names no C interface (SystemSockets on FreeBSD) |
+| swift-nio | `Sources/NIOCore/SocketAddresses.swift` | 78 `WASILibc`, 1 marker | WASI | System covers every C name it serves there: s_addr, sin6_addr, sin6_family, sin6_flowinfo, sin6_port, sin6_scope_id, sin_addr, sin_family… |
+| swift-nio | `Sources/NIOCore/SocketAddresses.swift` | 139 marker: SystemSockets on FreeBSD and Windows, 160 marker: SystemSockets on FreeBSD and Windows, 181 marker: SystemSockets on FreeBSD and Windows, 213 marker: SystemSockets on FreeBSD and Windows, 226 marker: SystemSockets on FreeBSD and Windows, 270 marker: SystemSockets on FreeBSD and Windows, 279 marker: SystemSockets on FreeBSD and Windows, 302 marker: SystemSockets on FreeBSD and Windows, 321 marker: SystemSockets on FreeBSD and Windows, 330 marker: SystemSockets on FreeBSD and Windows, 356 marker: SystemSockets on FreeBSD and Windows, 377 marker: SystemSockets on FreeBSD and Windows, 404 marker: SystemSockets on FreeBSD and Windows, 420 marker: SystemSockets on FreeBSD and Windows, 435 marker: SystemSockets on FreeBSD and Windows, 450 marker: SystemSockets on FreeBSD and Windows, 465 marker: SystemSockets on FreeBSD and Windows, 491 marker: SystemSockets on FreeBSD and Windows, 530 marker: SystemSockets on FreeBSD and Windows, 567 marker: SystemSockets on FreeBSD and Windows, 665 marker: SystemSockets on FreeBSD and Windows, 701 marker: SystemSockets on FreeBSD and Windows, 734 marker: SystemSockets on FreeBSD and Windows, 894 marker: SystemSockets on FreeBSD and Windows, 1012 marker: SystemSockets on FreeBSD and Windows, 1059 marker: SystemSockets on FreeBSD and Windows, 1104 marker: SystemSockets on FreeBSD and Windows, 1126 marker: SystemSockets on FreeBSD and Windows | FreeBSD, OpenBSD, WASI, Windows | the marker names no C interface (SystemSockets on FreeBSD and Windows) |
+| swift-nio | `Sources/NIOCore/SocketAddresses.swift` | 611 marker: SystemSockets on FreeBSD, 632 marker: SystemSockets on FreeBSD, 819 marker: SystemSockets on FreeBSD, 872 marker: SystemSockets on FreeBSD, 996 marker: SystemSockets on FreeBSD, 1046 marker: SystemSockets on FreeBSD | FreeBSD, OpenBSD, WASI | the marker names no C interface (SystemSockets on FreeBSD) |
+| swift-nio | `Sources/NIOCore/SocketAddresses.swift` | 923 marker: address, family on Windows (Windows later), 969 marker: address, bytes, family on Windows (Windows later) | FreeBSD, OpenBSD, WASI, Windows | the marker names no C interface |
+| swift-nio | `Sources/NIOCore/SocketOptionProvider.swift` | 22 `Glibc`, 1 marker | Linux | System covers every C name it serves there: tcp_info |
+| swift-nio | `Sources/NIOCore/SocketOptionProvider.swift` | 24 `Musl`, 26 `Bionic` | Musl, Android | no C name it serves was found on its platforms |
+| swift-nio | `Sources/NIOCore/SocketOptionProvider.swift` | 35 `Glibc`, 1 marker, 39 `Glibc`, 1 marker, 45 `WASILibc`, 1 marker | FreeBSD, OpenBSD, WASI | System covers every C name it serves there: linger |
+| swift-nio | `Sources/NIOCore/SocketOptionProvider.swift` | 197 marker: SystemSockets on FreeBSD and Windows, 226 marker: SystemSockets on FreeBSD and Windows, 251 marker: SystemSockets on FreeBSD and Windows, 266 marker: SystemSockets on FreeBSD and Windows, 417 marker: SystemSockets on FreeBSD and Windows | FreeBSD, OpenBSD, WASI, Windows | the marker names no C interface (SystemSockets on FreeBSD and Windows) |
+| swift-nio | `Sources/NIOCore/SystemCallHelpers.swift` | 31 marker: NetworkInterface on Windows, 238 marker: NetworkInterface on Windows | Windows | the marker names no C interface |
+| swift-nio | `Sources/NIOCore/Utilities.swift` | 21 `Glibc`, 27 `Glibc`, 51 `WASILibc` | FreeBSD, OpenBSD, WASI | no C name it serves was found on its platforms |
 | swift-nio | `Sources/NIOCore/Utilities.swift` | 32 `WinSDK` (scoped) | Windows | System covers every C name it serves there: RelationProcessorCore |
 | swift-nio | `Sources/NIOCore/Utilities.swift` | 36 `WinSDK` (scoped) | Windows | System covers every C name it serves there: ERROR_SUCCESS |
 | swift-nio | `Sources/NIOCore/Utilities.swift` | 38 `WinSDK` (scoped) | Windows | System covers every C name it serves there: GetAdaptersAddresses |
@@ -1007,15 +1368,15 @@ Sites that no entry and no System gap explains: the ones to look at. Either Syst
 | swift-nio | `Sources/NIOCore/Utilities.swift` | 43 `WinSDK` (scoped) | Windows | System covers every C name it serves there: IP_ADAPTER_UNICAST_ADDRESS |
 | swift-nio | `Sources/NIOCore/Utilities.swift` | 44 `WinSDK` (scoped) | Windows | System covers every C name it serves there: SYSTEM_LOGICAL_PROCESSOR_INFORMATION |
 | swift-nio | `Sources/NIOCore/Utilities.swift` | 47 `WinSDK` (scoped) | Windows | System covers every C name it serves there: DWORD |
-| swift-nio | `Sources/NIOCore/Utilities.swift` | 51 `WASILibc` | WASI | no C name it serves was found on its platforms |
-| swift-nio | `Sources/NIOEmbedded/Embedded.swift` | 28 `Glibc`, 31 `WASILibc` | FreeBSD, OpenBSD, WASI | no C name it serves was found on its platforms |
-| swift-nio | `Sources/NIOFS/FileInfo.swift` | 19 `Glibc` | FreeBSD, OpenBSD | System covers every C name it serves there: st_atim, st_ctim, st_mtim |
-| swift-nio | `Sources/NIOFS/Internal/System Calls/Errno.swift` | 20 `Glibc` | FreeBSD, OpenBSD | no C name it serves was found on its platforms |
+| swift-nio | `Sources/NIOEmbedded/Embedded.swift` | 26 `WinSDK` | Windows | no C name it serves was found on its platforms |
+| swift-nio | `Sources/NIOFS/FileInfo.swift` | 20 `Glibc`, 1 marker | FreeBSD, OpenBSD | System covers every C name it serves there: st_atim, st_ctim, st_mtim |
 | swift-nio | `Sources/NIOFS/Internal/System Calls/FileDescriptor+Syscalls.swift` | 22 `Glibc` | FreeBSD, OpenBSD | no C name it serves was found on its platforms |
-| swift-nio | `Sources/NIOFS/Internal/System Calls/Mocking.swift` | 25 `Glibc` | FreeBSD, OpenBSD | no C name it serves was found on its platforms |
+| swift-nio | `Sources/NIOFS/Internal/System Calls/Mocking.swift` | 26 `Glibc`, 1 marker | FreeBSD, OpenBSD | no C name it serves was found on its platforms |
 | swift-nio | `Sources/NIOFS/Internal/System Calls/Syscall.swift` | 22 `Glibc` | FreeBSD, OpenBSD | no C name it serves was found on its platforms |
-| swift-nio | `Sources/NIOFS/Internal/SystemFileHandle.swift` | 25 `Glibc` | FreeBSD, OpenBSD | no C name it serves was found on its platforms |
+| swift-nio | `Sources/NIOFS/Internal/SystemFileHandle.swift` | 26 `Glibc`, 1 marker | FreeBSD, OpenBSD | no C name it serves was found on its platforms |
 | swift-nio | `Sources/NIOHTTP1Server/main.swift` | 21 `WinSDK` | Windows | System covers every C name it serves there: STD_INPUT_HANDLE, STD_OUTPUT_HANDLE |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPICommon.swift` | 84 marker: SystemSockets on FreeBSD and Windows, 95 marker: SystemSockets on FreeBSD and Windows, 104 marker: SystemSockets on FreeBSD and Windows, 123 marker: SystemSockets on FreeBSD and Windows, 151 marker: SystemSockets on FreeBSD and Windows, 263 marker: SystemSockets on FreeBSD and Windows, 315 marker: SystemSockets on FreeBSD and Windows | FreeBSD, OpenBSD, Windows | the marker names no C interface (SystemSockets on FreeBSD and Windows) |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIPosix.swift` | 96 marker: SystemSockets on FreeBSD, 171 marker: SystemSockets on FreeBSD, 360 marker: SystemSockets on FreeBSD, 376 marker: SystemSockets on FreeBSD, 441 marker: SystemSockets on FreeBSD | FreeBSD, OpenBSD | the marker names no C interface (SystemSockets on FreeBSD) |
 | swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 31 `WinSDK` (scoped) | Windows | System covers every C name it serves there: INVALID_HANDLE_VALUE |
 | swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 89 `WinSDK` (scoped) | Windows | System covers every C name it serves there: ReadFile |
 | swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 91 `WinSDK` (scoped) | Windows | System covers every C name it serves there: WriteFile |
@@ -1024,42 +1385,75 @@ Sites that no entry and no System gap explains: the ones to look at. Either Syst
 | swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 104 `WinSDK` (scoped) | Windows | System covers every C name it serves there: OVERLAPPED |
 | swift-nio | `Sources/NIOPosix/BaseSocket.swift` | 34 `WinSDK` (scoped) | Windows | System covers every C name it serves there: EAFNOSUPPORT |
 | swift-nio | `Sources/NIOPosix/BaseSocket.swift` | 35 `WinSDK` (scoped) | Windows | System covers every C name it serves there: EBADF |
+| swift-nio | `Sources/NIOPosix/BaseSocket.swift` | 69 marker: family on Windows (Windows later), 84 marker: family on Windows (Windows later), 112 marker: family on Windows (Windows later), 138 marker: family on Windows (Windows later) | FreeBSD, OpenBSD, Windows | the marker names no C interface (family on Windows (Windows later)) |
+| swift-nio | `Sources/NIOPosix/BaseSocket.swift` | 99 marker: SystemSockets on FreeBSD and Windows, 247 marker: SystemSockets on FreeBSD and Windows, 349 marker: SystemSockets on FreeBSD and Windows, 379 marker: SystemSockets on FreeBSD and Windows | FreeBSD, OpenBSD, Windows | the marker names no C interface (SystemSockets on FreeBSD and Windows) |
 | swift-nio | `Sources/NIOPosix/Bootstrap.swift` | 26 `ucrt` | Windows | System covers every C name it serves there: FILE_TYPE_PIPE, GetFileType, HANDLE, INVALID_HANDLE_VALUE, _get_osfhandle |
 | swift-nio | `Sources/NIOPosix/Bootstrap.swift` | 28 `WinSDK` (scoped) | Windows | System covers every C name it serves there: GetFileType |
 | swift-nio | `Sources/NIOPosix/Bootstrap.swift` | 30 `WinSDK` (scoped) | Windows | System covers every C name it serves there: FILE_TYPE_PIPE |
 | swift-nio | `Sources/NIOPosix/Bootstrap.swift` | 31 `WinSDK` (scoped) | Windows | System covers every C name it serves there: INVALID_HANDLE_VALUE |
 | swift-nio | `Sources/NIOPosix/Bootstrap.swift` | 33 `WinSDK` (scoped) | Windows | System covers every C name it serves there: DWORD |
 | swift-nio | `Sources/NIOPosix/Bootstrap.swift` | 34 `WinSDK` (scoped) | Windows | System covers every C name it serves there: HANDLE |
-| swift-nio | `Sources/NIOPosix/ControlMessage.swift` | 28 `Glibc` | OpenBSD | System covers every C name it serves there: IPPROTO_IP, IPPROTO_IPV6, IPV6_TCLASS, IP_TOS, cmsg_len, cmsg_level, cmsg_type, ipi6_addr… |
+| swift-nio | `Sources/NIOPosix/ControlMessage.swift` | 25 marker: SystemSockets on FreeBSD, 42 marker: SystemSockets on FreeBSD | FreeBSD, OpenBSD | the marker names no C interface (SystemSockets on FreeBSD) |
+| swift-nio | `Sources/NIOPosix/ControlMessage.swift` | 30 `Glibc`, 1 marker | OpenBSD | System covers every C name it serves there: IPPROTO_IP, IPPROTO_IPV6, IPV6_TCLASS, IP_TOS, cmsg_len, cmsg_level, cmsg_type, ipi6_addr… |
+| swift-nio | `Sources/NIOPosix/ControlMessage.swift` | 203 marker: SystemSockets on FreeBSD and Windows, 288 marker: SystemSockets on FreeBSD and Windows, 308 marker: SystemSockets on FreeBSD and Windows, 333 marker: SystemSockets on FreeBSD and Windows, 435 marker: SystemSockets on FreeBSD and Windows, 476 marker: SystemSockets on FreeBSD and Windows, 488 marker: SystemSockets on FreeBSD and Windows | FreeBSD, OpenBSD, Windows | the marker names no C interface (SystemSockets on FreeBSD and Windows) |
+| swift-nio | `Sources/NIOPosix/DatagramVectorReadManager.swift` | 159 marker: SystemSockets on FreeBSD and Windows | FreeBSD, OpenBSD, Windows | the marker names no C interface (SystemSockets on FreeBSD and Windows) |
+| swift-nio | `Sources/NIOPosix/DatagramVectorReadManager.swift` | 230 marker: SystemSockets on FreeBSD | FreeBSD, OpenBSD | the marker names no C interface (SystemSockets on FreeBSD) |
+| swift-nio | `Sources/NIOPosix/GetaddrinfoResolver.swift` | 202 marker: SystemSockets on FreeBSD | FreeBSD, OpenBSD | the marker names no C interface (SystemSockets on FreeBSD) |
+| swift-nio | `Sources/NIOPosix/NonBlockingFileIO.swift` | 1358 marker: Stat on Windows (Windows later) | WASI, Windows | the marker names no C interface (Stat on Windows (Windows later)) |
+| swift-nio | `Sources/NIOPosix/PendingDatagramWritesManager.swift` | 188 marker: SystemSockets on FreeBSD and Windows | FreeBSD, OpenBSD, Windows | the marker names no C interface (SystemSockets on FreeBSD and Windows) |
+| swift-nio | `Sources/NIOPosix/SelectorEpoll.swift` | 252 marker: the selector's C timer structs (itimerspec, timespec) over System's In… | Linux?, Musl?, Android? | System covers every C name it serves there: itimerspec, timespec |
+| swift-nio | `Sources/NIOPosix/Socket.swift` | 213 marker: SystemSockets on FreeBSD and Windows, 232 marker: SystemSockets on FreeBSD and Windows, 281 marker: SystemSockets on FreeBSD and Windows, 300 marker: SystemSockets on FreeBSD and Windows | FreeBSD, OpenBSD, Windows | the marker names no C interface (SystemSockets on FreeBSD and Windows) |
 | swift-nio | `Sources/NIOPosix/SocketChannel.swift` | 40 `WinSDK` (scoped) | Windows | System covers every C name it serves there: ECONNABORTED |
 | swift-nio | `Sources/NIOPosix/SocketChannel.swift` | 41 `WinSDK` (scoped) | Windows | System covers every C name it serves there: ECONNREFUSED |
 | swift-nio | `Sources/NIOPosix/SocketChannel.swift` | 42 `WinSDK` (scoped) | Windows | System covers every C name it serves there: EMFILE |
 | swift-nio | `Sources/NIOPosix/SocketChannel.swift` | 43 `WinSDK` (scoped) | Windows | System covers every C name it serves there: ENFILE |
 | swift-nio | `Sources/NIOPosix/SocketChannel.swift` | 44 `WinSDK` (scoped) | Windows | System covers every C name it serves there: ENOBUFS |
 | swift-nio | `Sources/NIOPosix/SocketChannel.swift` | 45 `WinSDK` (scoped) | Windows | System covers every C name it serves there: ENOMEM |
-| swift-nio | `Sources/NIOPosix/System.swift` | 73 `Musl`, re-exported, 75 `Android`, re-exported | Musl, Android | no C name it serves was found on its platforms |
-| swift-nio | `Sources/NIOPosix/System.swift` | 86 `Glibc`, re-exported | OpenBSD | System covers every C name it serves there: EAGAIN, EINPROGRESS, IPPROTO_UDP, SHUT_RD, SHUT_RDWR, SHUT_WR, UIO_MAXIOV, kevent |
+| swift-nio | `Sources/NIOPosix/SocketChannel.swift` | 1294 marker: SystemSockets on FreeBSD and Windows, 1310 marker: SystemSockets on FreeBSD and Windows, 1333 marker: SystemSockets on FreeBSD and Windows, 1353 marker: SystemSockets on FreeBSD and Windows | FreeBSD, OpenBSD, Windows | the marker names no C interface (SystemSockets on FreeBSD and Windows) |
+| swift-nio | `Sources/NIOPosix/System.swift` | 70 marker: the C library's type and errno names that NIOPosix's files and its cli… | Linux, Musl, Android, FreeBSD | the marker names no C interface (C library's type and errno names that NIOPosix's files and its clients reach) |
+| swift-nio | `Sources/NIOPosix/System.swift` | 77 `Musl`, re-exported, 79 `Android`, re-exported | Musl, Android | no C name it serves was found on its platforms |
+| swift-nio | `Sources/NIOPosix/System.swift` | 92 `Glibc`, re-exported | OpenBSD | System covers every C name it serves there: EAGAIN, EINPROGRESS, IPPROTO_UDP, SHUT_RD, SHUT_RDWR, SHUT_WR, UIO_MAXIOV, kevent |
+| swift-nio | `Sources/NIOPosix/System.swift` | 115 marker: SystemSockets on FreeBSD, 133 marker: SystemSockets on FreeBSD, 510 marker: SystemSockets on FreeBSD, 534 marker: SystemSockets on FreeBSD, 549 marker: SystemSockets on FreeBSD, 586 marker: SystemSockets on FreeBSD, 618 marker: SystemSockets on FreeBSD, 663 marker: SystemSockets on FreeBSD, 699 marker: SystemSockets on FreeBSD, 735 marker: SystemSockets on FreeBSD, 763 marker: SystemSockets on FreeBSD, 850 marker: SystemSockets on FreeBSD, 871 marker: SystemSockets on FreeBSD, 942 marker: SystemSockets on FreeBSD, 1019 marker: SystemSockets on FreeBSD, 1045 marker: SystemSockets on FreeBSD, 1200 marker: SystemSockets on FreeBSD | FreeBSD, OpenBSD | the marker names no C interface (SystemSockets on FreeBSD) |
+| swift-nio | `Sources/NIOPosix/System.swift` | 146 marker: NetworkInterface on Windows, 1062 marker: NetworkInterface on Windows | Windows | the marker names no C interface |
+| swift-nio | `Sources/NIOPosix/System.swift` | 441 marker: SystemConfig.maxIOVectors on FreeBSD and OpenBSD; SocketDescriptor.Shu… | FreeBSD, OpenBSD | the marker names no C interface (SystemConfig.maxIOVectors on FreeBSD and OpenBSD) |
+| swift-nio | `Sources/NIOPosix/System.swift` | 517 marker: SystemSockets on OpenBSD: it uses C constants that OpenBSD lacks (IP_P… | OpenBSD | the marker names no C interface (SystemSockets on OpenBSD) |
 | swift-nio | `Sources/NIOPosix/Thread.swift` | 30 `WinSDK` | Windows | System covers every C name it serves there: CloseHandle, GetCurrentThread, GetCurrentThreadId |
-| swift-nio | `Sources/_NIOFileSystem/FileInfo.swift` | 19 `Glibc` | FreeBSD, OpenBSD | System covers every C name it serves there: st_atim, st_ctim, st_mtim |
-| swift-nio | `Sources/_NIOFileSystem/Internal/System Calls/Errno.swift` | 20 `Glibc` | FreeBSD, OpenBSD | no C name it serves was found on its platforms |
+| swift-nio | `Sources/NIOPosix/Thread.swift` | 260 marker: PThread.Key on Windows, 321 marker: PThread.Key on Windows, 341 marker: PThread.Key on Windows | FreeBSD, OpenBSD, Windows | the marker names no C interface (PThread.Key on Windows) |
+| swift-nio | `Sources/NIOPosix/VsockAddress.swift` | 225 marker: SystemSockets on FreeBSD and Windows, 237 marker: SystemSockets on FreeBSD and Windows, 248 marker: SystemSockets on FreeBSD and Windows | FreeBSD, OpenBSD, Windows | the marker names no C interface (SystemSockets on FreeBSD and Windows) |
+| swift-nio | `Sources/_NIOFileSystem/FileInfo.swift` | 20 `Glibc`, 1 marker | FreeBSD, OpenBSD | System covers every C name it serves there: st_atim, st_ctim, st_mtim |
 | swift-nio | `Sources/_NIOFileSystem/Internal/System Calls/FileDescriptor+Syscalls.swift` | 22 `Glibc` | FreeBSD, OpenBSD | no C name it serves was found on its platforms |
-| swift-nio | `Sources/_NIOFileSystem/Internal/System Calls/Mocking.swift` | 25 `Glibc` | FreeBSD, OpenBSD | no C name it serves was found on its platforms |
+| swift-nio | `Sources/_NIOFileSystem/Internal/System Calls/Mocking.swift` | 26 `Glibc`, 1 marker | FreeBSD, OpenBSD | no C name it serves was found on its platforms |
 | swift-nio | `Sources/_NIOFileSystem/Internal/System Calls/Syscall.swift` | 22 `Glibc` | FreeBSD, OpenBSD | no C name it serves was found on its platforms |
-| swift-nio | `Sources/_NIOFileSystem/Internal/SystemFileHandle.swift` | 25 `Glibc` | FreeBSD, OpenBSD | no C name it serves was found on its platforms |
-| swift-nio | `Tests/NIOConcurrencyHelpersTests/NIOConcurrencyHelpersTests.swift` | 30 `Glibc` | FreeBSD, OpenBSD | no C name it serves was found on its platforms |
-| swift-nio | `Tests/NIOConcurrencyHelpersTests/NIOConcurrencyHelpersTests.swift` | 32 `WinSDK` | Windows | System covers every C name it serves there: Sleep |
+| swift-nio | `Sources/_NIOFileSystem/Internal/SystemFileHandle.swift` | 26 `Glibc`, 1 marker | FreeBSD, OpenBSD | no C name it serves was found on its platforms |
+| swift-nio | `Tests/NIOConcurrencyHelpersTests/NIOConcurrencyHelpersTests.swift` | 31 `Glibc`, 1 marker | FreeBSD, OpenBSD | no C name it serves was found on its platforms |
+| swift-nio | `Tests/NIOConcurrencyHelpersTests/NIOConcurrencyHelpersTests.swift` | 33 `WinSDK` | Windows | System covers every C name it serves there: Sleep |
 | swift-nio | `Tests/NIOCoreTests/XCTest+Extensions.swift` | 29 `WinSDK` | Windows | System covers every C name it serves there: Sleep |
 | swift-nio | `Tests/NIOEmbeddedTests/TestUtils.swift` | 31 `WinSDK` | Windows | System covers every C name it serves there: Sleep |
-| swift-nio | `Tests/NIOFSTests/FileInfoTests.swift` | 24 `Glibc` | Linux, FreeBSD, OpenBSD | System covers every C name it serves there: S_IFREG, st_atim, st_blksize, st_blocks, st_ctim, st_dev, st_gid, st_ino… |
-| swift-nio | `Tests/NIOFSTests/FileInfoTests.swift` | 26 `Android` | Android | System covers every C name it serves there: st_atim, st_blksize, st_blocks, st_ctim, st_dev, st_gid, st_ino, st_mode… |
-| swift-nio | `Tests/NIOFSTests/FileTypeTests.swift` | 48 `Glibc` | FreeBSD, OpenBSD | no C name it serves was found on its platforms |
+| swift-nio | `Tests/NIOFSTests/FileInfoTests.swift` | 27 `Glibc`, 1 marker | Linux, FreeBSD, OpenBSD | System covers every C name it serves there: S_IFREG, st_atim, st_blksize, st_blocks, st_ctim, st_dev, st_gid, st_ino… |
+| swift-nio | `Tests/NIOFSTests/FileInfoTests.swift` | 29 `Android` | Android | System covers every C name it serves there: st_atim, st_blksize, st_blocks, st_ctim, st_dev, st_gid, st_ino, st_mode… |
 | swift-nio | `Tests/NIOHTTP1Tests/TestUtils.swift` | 59 `WinSDK`, 60 `ucrt` | Windows | System covers every C name it serves there: CreateDirectoryW, Sleep, _O_BINARY, _O_RDWR, _SH_DENYNO, _S_IREAD, _S_IWRITE, _sopen_s |
 | swift-nio | `Tests/NIOPosixTests/AsyncChannelBootstrapTests.swift` | 23 `ucrt` | Windows | System covers every C name it serves there: _O_BINARY |
-| swift-nio | `Tests/NIOPosixTests/HappyEyeballsTest.swift` | 28 `Glibc` | FreeBSD, OpenBSD | System covers every C name it serves there: sin6_addr, sin6_family, sin6_flowinfo, sin6_port, sin6_scope_id, sin_addr, sin_family, sin_port |
-| swift-nio | `Tests/NIOPosixTests/NIOFileHandleTest.swift` | 22 `ucrt` | Windows | System covers every C name it serves there: _O_BINARY |
+| swift-nio | `Tests/NIOPosixTests/ChannelPipelineTest.swift` | 251 marker: SystemSockets on FreeBSD and Windows | FreeBSD, OpenBSD, WASI, Windows | the marker names no C interface (SystemSockets on FreeBSD and Windows) |
+| swift-nio | `Tests/NIOPosixTests/ControlMessageTests.swift` | 34 marker: SystemSockets on FreeBSD | FreeBSD, OpenBSD, WASI | the marker names no C interface (SystemSockets on FreeBSD) |
+| swift-nio | `Tests/NIOPosixTests/HappyEyeballsTest.swift` | 29 `Glibc`, 1 marker | FreeBSD, OpenBSD | System covers every C name it serves there: sin6_addr, sin6_family, sin6_flowinfo, sin6_port, sin6_scope_id, sin_addr, sin_family, sin_port |
+| swift-nio | `Tests/NIOPosixTests/HappyEyeballsTest.swift` | 154 marker: SystemSockets on FreeBSD and Windows, 175 marker: SystemSockets on FreeBSD and Windows, 200 marker: SystemSockets on FreeBSD and Windows, 213 marker: SystemSockets on FreeBSD and Windows | FreeBSD, OpenBSD, WASI, Windows | the marker names no C interface (SystemSockets on FreeBSD and Windows) |
+| swift-nio | `Tests/NIOPosixTests/MulticastTest.swift` | 160 marker: SystemSockets on FreeBSD, 182 marker: SystemSockets on FreeBSD | FreeBSD, OpenBSD, WASI | the marker names no C interface (SystemSockets on FreeBSD) |
+| swift-nio | `Tests/NIOPosixTests/NIOFileHandleTest.swift` | 22 `ucrt` | Windows | no C name it serves was found on its platforms |
 | swift-nio | `Tests/NIOPosixTests/NIOTransportAccessibleChannelCoreTests.swift` | 21 `WinSDK` | Windows | no C name it serves was found on its platforms |
+| swift-nio | `Tests/NIOPosixTests/PendingDatagramWritesManagerTests.swift` | 49 marker: family on Windows (Windows later) | FreeBSD, OpenBSD, WASI, Windows | the marker names no C interface (family on Windows (Windows later)) |
+| swift-nio | `Tests/NIOPosixTests/PendingDatagramWritesManagerTests.swift` | 191 marker: SystemSockets on FreeBSD and Windows | FreeBSD, OpenBSD, WASI, Windows | the marker names no C interface (SystemSockets on FreeBSD and Windows) |
+| swift-nio | `Tests/NIOPosixTests/SelectorTest.swift` | 57 marker: PThread.setCurrentName and PThread.ID.name() on OpenBSD, for ThreadOps… | FreeBSD, OpenBSD, WASI | the marker names no C interface (PThread.setCurrentName and PThread.ID.name() on OpenBSD) |
+| swift-nio | `Tests/NIOPosixTests/SocketAddressTest.swift` | 73 marker: SystemSockets on FreeBSD and Windows, 89 marker: SystemSockets on FreeBSD and Windows, 149 marker: SystemSockets on FreeBSD and Windows, 194 marker: SystemSockets on FreeBSD and Windows, 205 marker: SystemSockets on FreeBSD and Windows, 239 marker: SystemSockets on FreeBSD and Windows, 378 marker: SystemSockets on FreeBSD and Windows, 603 marker: SystemSockets on FreeBSD and Windows, 643 marker: SystemSockets on FreeBSD and Windows | FreeBSD, OpenBSD, WASI, Windows | the marker names no C interface (SystemSockets on FreeBSD and Windows) |
+| swift-nio | `Tests/NIOPosixTests/SocketAddressTest.swift` | 281 marker: SystemSockets on FreeBSD, 317 marker: SystemSockets on FreeBSD | FreeBSD, OpenBSD | the marker names no C interface (SystemSockets on FreeBSD) |
+| swift-nio | `Tests/NIOPosixTests/SocketAddressTest.swift` | 449 marker: family, unspecified on Windows (Windows later) | FreeBSD, OpenBSD, WASI, Windows | the marker names no C interface |
+| swift-nio | `Tests/NIOPosixTests/SocketChannelTest.swift` | 63 marker: SystemSockets on FreeBSD and Windows | FreeBSD, OpenBSD, WASI, Windows | the marker names no C interface (SystemSockets on FreeBSD and Windows) |
+| swift-nio | `Tests/NIOPosixTests/SocketOptionProviderTest.swift` | 159 marker: SystemSockets on FreeBSD and Windows, 182 marker: SystemSockets on FreeBSD and Windows, 247 marker: SystemSockets on FreeBSD and Windows, 260 marker: SystemSockets on FreeBSD and Windows | FreeBSD, OpenBSD, WASI, Windows | the marker names no C interface (SystemSockets on FreeBSD and Windows) |
+| swift-nio | `Tests/NIOPosixTests/SocketOptionProviderTest.swift` | 281 marker: SystemSockets on FreeBSD, 289 marker: SystemSockets on FreeBSD, 304 marker: SystemSockets on FreeBSD | FreeBSD, OpenBSD, WASI | the marker names no C interface (SystemSockets on FreeBSD) |
 | swift-nio | `Tests/NIOPosixTests/StrictCrashTests.swift` | 24 `ucrt` | Windows | no C name it serves was found on its platforms |
+| swift-nio | `Tests/NIOPosixTests/SyscallAbstractionLayer.swift` | 515 marker: SystemSockets on FreeBSD | FreeBSD, OpenBSD, WASI | the marker names no C interface (SystemSockets on FreeBSD) |
+| swift-nio | `Tests/NIOPosixTests/SystemCallWrapperHelpers.swift` | 116 marker: the test's own C-shaped helpers on FreeBSD and OpenBSD (the Darwin rou… | FreeBSD, OpenBSD, WASI | the marker names no C interface (test's own C-shaped helpers on FreeBSD and OpenBSD (the Darwin round's design call 19)) |
 | swift-nio | `Tests/NIOPosixTests/SystemCrashTests.swift` | 30 `ucrt` | Windows | no C name it serves was found on its platforms |
+| swift-nio | `Tests/NIOPosixTests/SystemTest.swift` | 57 marker: SystemSockets on FreeBSD | FreeBSD, OpenBSD, WASI | the marker names no C interface (SystemSockets on FreeBSD) |
 | swift-nio | `Tests/NIOPosixTests/TestUtils.swift` | 56 `WinSDK`, 57 `ucrt` | Windows | System covers every C name it serves there: CreateDirectoryW, Sleep, _O_BINARY, _O_RDWR, _SH_DENYNO, _S_IREAD, _S_IWRITE, _sopen_s |
 | swift-nio | `Tests/NIOTestUtilsTests/NIOHTTP1TestServerTest.swift` | 32 `WinSDK` | Windows | System covers every C name it serves there: Sleep |
 | swift-sdk-generator | `Tests/AsyncProcessTests/IntegrationTests.swift` | 79 `Android` | none | no platform's build compiles it (a branch none takes, or a flag the model sets false) |
@@ -1086,6 +1480,7 @@ Sites that no entry and no System gap explains: the ones to look at. Either Syst
 | swift-testing | `Sources/Testing/ExitTests/ExitTest.Condition.swift` | 232 marker: stdlib.h EXIT_SUCCESS in Embedded Swift, which SystemPackage | Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | System covers every C name it serves there: EXIT_SUCCESS |
 | swift-testing | `Sources/Testing/Support/CError.swift` | 67 marker: string.h strerror_r on FreeBSD and OpenBSD: Errno's description | Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | System covers every C name it serves there: strerror_r |
 | swift-testing | `Tests/TestingTests/AttachmentTests.swift` | 41 `WinSDK` | none | no platform's build compiles it (a branch none takes, or a flag the model sets false) |
+| swift-testing | `Tests/TestingTests/ExitTestTests.swift` | 89 marker: stdlib.h abort, every platform | Darwin?, Linux?, Musl?, Android?, FreeBSD?, OpenBSD?, WASI?, Windows? | System covers every C name it serves there: abort |
 | swift-tools-protocols | `Sources/LanguageServerProtocolTransport/JSONRPCConnection.swift` | 24 `WinSDK` | Windows | no C name it serves was found on its platforms |
 | swift-tools-protocols | `Sources/SKLogging/SetGlobalLogFileHandler.swift` | 25 `WinSDK` | Windows | System covers every C name it serves there: CloseHandle, OpenProcess, PROCESS_QUERY_INFORMATION |
 | swift-tools-protocols | `Sources/ToolsProtocolsSwiftExtensions/URLExtensions.swift` | 16 `WinSDK` | Windows | no C name it serves was found on its platforms |
@@ -1100,20 +1495,19 @@ Sites that no entry and no System gap explains: the ones to look at. Either Syst
 | swiftpm | `Sources/Runtimes/PackageDescription/PackageDescription.swift` | 14 `ucrt` | Windows | System covers every C name it serves there: HANDLE, _O_APPEND, _close, _fdopen, _open_osfhandle, atexit, fclose, fputs |
 | swiftpm | `Sources/Runtimes/PackageDescription/PackageDescription.swift` | 15 `WinSDK` (scoped) | Windows | System covers every C name it serves there: HANDLE |
 | wasmkit | `Examples/embedded-wat/Sources/embedded-wat/Entrypoint.swift` | 4 `WASILibc`, 6 `Darwin`, 8 `Glibc` | Darwin, Linux, FreeBSD, OpenBSD, WASI | no C name it serves was found on its platforms |
-| wasmkit | `Sources/CLICommands/Run.swift` | 14 `Glibc`, 16 `Musl` | Linux, Musl, FreeBSD, OpenBSD | System covers every C name it serves there: exit |
-| wasmkit | `Sources/CLICommands/TCPListener.swift` | 105 `Glibc`, 107 `Musl`, 109 `Android` | Linux?, Musl?, Android?, FreeBSD?, OpenBSD? | System covers every C name it serves there: AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR, bind, close, inet_pton, listen… |
-| wasmkit | `Sources/WASI/Platform/PAL/PALClock.swift` | 9 `Musl`, 11 `Android` | Musl, Android | System covers every C name it serves there: CLOCK_MONOTONIC, CLOCK_MONOTONIC_RAW, CLOCK_REALTIME, clock_getres, clock_gettime, clockid_t, timespec, tv_nsec… |
-| wasmkit | `Sources/WASI/Platform/PAL/PALClock.swift` | 14 `WASILibc` | WASI | System covers every C name it serves there: clock_getres, clock_gettime, clockid_t, timespec, tv_nsec, tv_sec |
-| wasmkit | `Sources/WASI/Platform/PAL/PALErrnoMapping.swift` | 7 `Glibc`, 10 `Musl`, 13 `Android`, 19 `WASILibc` | Linux, Musl, Android, FreeBSD, OpenBSD, WASI | no C name it serves was found on its platforms |
-| wasmkit | `Sources/WASI/Platform/PAL/PALFileDescriptor.swift` | 9 `Darwin` (scoped), 1 marker | Darwin | System covers every C name it serves there: readlinkat |
-| wasmkit | `Sources/WASI/Platform/PAL/PALFileDescriptor.swift` | 11 `Glibc`, 14 `Musl`, 17 `Android` | Linux, Musl, Android, FreeBSD, OpenBSD | System covers every C name it serves there: AT_REMOVEDIR, AT_SYMLINK_NOFOLLOW, DT_BLK, DT_CHR, DT_DIR, DT_LNK, DT_REG, DT_SOCK… |
-| wasmkit | `Sources/WASI/Platform/PAL/PALFileDescriptor.swift` | 24 `WASILibc` | WASI | System covers every C name it serves there: AT_REMOVEDIR, AT_SYMLINK_NOFOLLOW, O_RDONLY, O_RDWR, O_WRONLY, SEEK_CUR, SEEK_END, SEEK_SET… |
+| wasmkit | `Sources/CLICommands/TCPListener.swift` | 104 marker: SystemSockets on FreeBSD (PackageDescription can't name .freebsd) | FreeBSD?, WASI? | the marker names no C interface (SystemSockets on FreeBSD (PackageDescription can't name .freebsd)) |
+| wasmkit | `Sources/CLICommands/TCPListener.swift` | 106 `Glibc` | FreeBSD? | System covers every C name it serves there: AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR, bind, close, inet_pton, listen… |
+| wasmkit | `Sources/CLICommands/TCPListener.swift` | 108 `Musl`, 110 `Android` | none | no platform's build compiles it (a branch none takes, or a flag the model sets false) |
+| wasmkit | `Sources/WASI/Platform/PAL/PALClock.swift` | 55 marker: ClockID.monotonicRaw on FreeBSD and OpenBSD, which have no raw monoton… | Linux, Musl, Android, FreeBSD, OpenBSD | the marker names no C interface (ClockID.monotonicRaw on FreeBSD and OpenBSD) |
+| wasmkit | `Sources/WASI/Platform/PAL/PALErrnoMapping.swift` | 122 marker: Errno.multiHop and .noLink on OpenBSD (the arm Windows shares maps the… | OpenBSD, Windows | the marker names no C interface (Errno.multiHop and .noLink on OpenBSD (the arm Windows shares maps the C values)) |
+| wasmkit | `Sources/WASI/Platform/PAL/PALFileDescriptor.swift` | 9 `Glibc`, 12 `Musl` | Linux, Musl, FreeBSD, OpenBSD | System covers every C name it serves there: F_GETFL, F_SETFL, O_APPEND, O_CREAT, O_DIRECTORY, O_DSYNC, O_EXCL, O_NOFOLLOW… |
+| wasmkit | `Sources/WASI/Platform/PAL/PALFileDescriptor.swift` | 19 `WASILibc` | WASI | System covers every C name it serves there: O_RDONLY, O_RDWR, O_WRONLY, mode_t, openat, st_atim, st_ctim, st_mtim |
+| wasmkit | `Sources/WASI/Platform/PAL/PALFileDescriptor.swift` | 299 marker: StatusFlags.readSync (O_RSYNC) on Linux, 317 marker: OpenOptions.readSync (O_RSYNC) on Linux | Linux, Musl | System covers every C name it serves there: O_RSYNC |
+| wasmkit | `Sources/WASI/Platform/PAL/PALFileDescriptor.swift` | 560 marker: PThread.yield on WASI without threads (wasip1 has sched_yield) | WASI | the marker names no C interface (PThread.yield on WASI without threads (wasip1 has sched_yield)) |
 | wasmkit | `Sources/WasmKit/Execution/StatsCollector.swift` | 7 `ucrt` | Windows? | System covers every C name it serves there: fwrite |
 | wasmkit | `Sources/WasmKit/Platform/AtomicParkingLot.swift` | 38 `WinSDK` | Windows? | System covers every C name it serves there: AcquireSRWLockExclusive, CONDITION_VARIABLE, DWORD, GetTickCount64, INFINITE, InitializeConditionVariable, InitializeSRWLock, ReleaseSRWLockExclusive… |
-| wasmkit | `Sources/WasmKit/Platform/SystemVirtualMemory.swift` | 14 `Android` | Android | System covers every C name it serves there: MAP_ANON, MAP_PRIVATE, PROT_NONE, mmap |
 | wasmkit | `Sources/WasmTools/WasmTools.swift` | 7 `ucrt` | Windows | System covers every C name it serves there: _O_BINARY, _close |
 | wasmkit | `Tests/WASITests/TestSupport.swift` | 7 `ucrt` | Windows | System covers every C name it serves there: strerror |
-| wasmkit | `Tests/WASITests/WASITests.swift` | 11 `Glibc` | Linux, Musl | System covers every C name it serves there: RLIMIT_NOFILE, getrlimit, rlim_cur, rlim_t, rlimit, setrlimit |
 
 ## System gaps, by sites unblocked
 
@@ -1121,31 +1515,31 @@ Each row is a gap in System at `system-next`: a mapping.ini entry (or a C name i
 
 | # | Gap | Lacks | Unblocks | Holds | Repositories | C names | System |
 |---:|---|---|---:|---:|---|---|---|
-| 1 | E3: Mach-O's file structures and architecture names, vm_prot_t, and ar.h's archive header | Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | 63 (4 files) | 65 | swift-build, swift-syntax | `AR_EFMT1`, `FAT_CIGAM`, `FAT_CIGAM_64`, `FAT_MAGIC`, `FAT_MAGIC_64`, `LC_BUILD_VERSION`… | kept by hand (`exceptions.ini`) |
-| 2 | [multicast] | WASI, Windows | 22 (3 files) | 24 | swift-nio | `IPV6_JOIN_GROUP`, `IPV6_LEAVE_GROUP`, `IPV6_MULTICAST_HOPS`, `IPV6_MULTICAST_IF`, `IPV6_MULTICAST_LOOP`, `IP_ADD_MEMBERSHIP`… | SocketDescriptor.IPv6Option.joinGroup isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, … |
-| 3 | [address families] | Windows | 19 (6 files) | 24 | swift-certificates, swift-nio | `AF_INET`, `AF_INET6`, `AF_UNIX`, `AF_UNSPEC`, `PF_INET`, `PF_INET6`… | SocketAddress.Family.ipv4 isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI) |
-| 4 | [Win32 errors] | Windows | 18 (11 files) | 64 | indexstore-db, sourcekit-lsp, swift-build, swift-driver, swift-foundation, swift-nio, swift-subprocess, swift-testing, swift-tools-support-core, swiftpm, wasmkit | `ERROR_IO_INCOMPLETE`, `ERROR_NOT_FOUND`, `ERROR_TIMEOUT`, `FACILITY_WIN32`, `FORMAT_MESSAGE_ALLOCATE_BUFFER`, `FORMAT_MESSAGE_FROM_SYSTEM`… | System's implementation uses it; no public declaration names it |
-| 5 | [socket options] | Android, OpenBSD, WASI, Windows | 16 (2 files) | 18 | swift-nio | `SOL_SOCKET`, `SO_BROADCAST`, `SO_ERROR`, `SO_KEEPALIVE`, `SO_LINGER`, `SO_RCVBUF`… | SocketDescriptor.AncillaryMessageBuffer.Message.timestamp isn't built on Windows (only Darwin, Linux, Musl, … |
-| 6 | [Winsock addresses] | Windows | 16 (5 files) | 18 | swift-certificates, swift-nio | `ADDRESS_FAMILY`, `IN6_ADDR`, `IN_ADDR`, `SOCKADDR`, `SOCKADDR_IN`, `SOCKADDR_IN6`… | System names it nowhere |
-| 7 | [sockaddr types] | Windows | 15 (9 files) | 17 | swift-certificates, swift-nio | `in6_addr`, `in_addr`, `sockaddr`, `sockaddr_in`, `sockaddr_in6`, `sockaddr_un`… | CInterop.SockLen isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI) |
-| 8 | [remove] | WASI, Windows | 14 (4 files) | 14 | swift-testing | `remove` | FilePath.remove isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
-| 9 | [Windows name resolution] | Windows | 8 (2 files) | 9 | swift-nio | `ADDRINFOW`, `FreeAddrInfoW`, `GetAddrInfoW`, `gai_strerrorA` | System names it nowhere |
-| 10 | [Winsock sockets] | Windows | 7 (3 files) | 12 | swift-nio | `FIONBIO`, `INVALID_SOCKET`, `SOCKET`, `SOCKET_ERROR`, `closesocket`, `ioctlsocket` | System names it nowhere |
-| 11 | [protocol levels] | Windows | 7 (2 files) | 9 | swift-nio | `IPPROTO_IP`, `IPPROTO_IPV6`, `IPPROTO_TCP`, `IPPROTO_UDP` | SocketDescriptor.ProtocolID.ip isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, … |
-| 12 | [INADDR_ANY] | Windows | 7 (4 files) | 7 | swift-nio | `INADDR_ANY`, `INET6_ADDRSTRLEN`, `INET_ADDRSTRLEN` | IPv4Address.Host.descriptionCapacity isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, … |
-| 13 | [signal numbers] | WASI, Windows | 6 (2 files) | 10 | sourcekit-lsp, swift-driver, swift-testing, swiftpm | `SIGABRT`, `SIGINT`, `SIGSEGV`, `SIGTERM` | Signal.abort isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
-| 14 | [string functions] | Windows | 6 (5 files) | 21 | swift-certificates, swift-crypto, swift-foundation, swift-subprocess, swift-testing, swift-tools-support-core | `_strdup`, `memcmp`, `strlen`, `strncmp`, `wcslen` | System's implementation uses it; no public declaration names it |
-| 15 | [Winsock messages] | Windows | 6 (2 files) | 7 | swift-nio | `LPFN_WSARECVMSG`, `LPFN_WSASENDMSG`, `LPWSAMSG`, `WSABUF`, `WSACMSGHDR`, `WSAIoctl`… | System names it nowhere |
-| 16 | E5: a dlopen that runs in the caller's image | Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | 5 (1 file) | 5 | swift-build | `dlopen` | kept by hand (`exceptions.ini`) |
-| 17 | strncasecmp | Linux, Musl, Android, FreeBSD, OpenBSD, WASI | 5 (1 file) | 5 | swift-foundation | `strncasecmp` | System's implementation uses it; no public declaration names it |
-| 18 | [socket types] | Windows | 5 (2 files) | 6 | swift-nio | `SOCK_DGRAM`, `SOCK_RAW`, `SOCK_STREAM` | SocketDescriptor.ConnectionType.datagram isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, … |
-| 19 | memset_s | Windows | 5 (2 files) | 5 | swift-crypto | `memset_s` | Memory.secureZero isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI) |
+| 1 | [multicast] | WASI, Windows | 22 (3 files) | 24 | swift-nio | `IPV6_JOIN_GROUP`, `IPV6_LEAVE_GROUP`, `IPV6_MULTICAST_HOPS`, `IPV6_MULTICAST_IF`, `IPV6_MULTICAST_LOOP`, `IP_ADD_MEMBERSHIP`… | SocketDescriptor.IPv6Option.joinGroup isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, … |
+| 2 | [address families] | Windows | 19 (6 files) | 24 | swift-certificates, swift-nio | `AF_INET`, `AF_INET6`, `AF_UNIX`, `AF_UNSPEC`, `PF_INET`, `PF_INET6`… | SocketAddress.Family.ipv4 isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI) |
+| 3 | [Win32 errors] | Windows | 17 (10 files) | 63 | indexstore-db, sourcekit-lsp, swift-build, swift-driver, swift-foundation, swift-nio, swift-subprocess, swift-testing, swift-tools-support-core, swiftpm, wasmkit | `ERROR_IO_INCOMPLETE`, `ERROR_NOT_FOUND`, `ERROR_TIMEOUT`, `FACILITY_WIN32`, `FORMAT_MESSAGE_ALLOCATE_BUFFER`, `FORMAT_MESSAGE_FROM_SYSTEM`… | System's implementation uses it; no public declaration names it |
+| 4 | [socket options] | Android, OpenBSD, WASI, Windows | 16 (2 files) | 18 | swift-nio | `SOL_SOCKET`, `SO_BROADCAST`, `SO_ERROR`, `SO_KEEPALIVE`, `SO_LINGER`, `SO_RCVBUF`… | SocketDescriptor.AncillaryMessageBuffer.Message.timestamp isn't built on Windows (only Darwin, Linux, Musl, … |
+| 5 | [Winsock addresses] | Windows | 16 (5 files) | 18 | swift-certificates, swift-nio | `ADDRESS_FAMILY`, `IN6_ADDR`, `IN_ADDR`, `SOCKADDR`, `SOCKADDR_IN`, `SOCKADDR_IN6`… | System names it nowhere |
+| 6 | [sockaddr types] | Windows | 15 (9 files) | 17 | swift-certificates, swift-nio | `in6_addr`, `in_addr`, `sockaddr`, `sockaddr_in`, `sockaddr_in6`, `sockaddr_un`… | CInterop.SockLen isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI) |
+| 7 | [remove] | WASI, Windows | 14 (4 files) | 14 | swift-testing | `remove` | FilePath.remove isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
+| 8 | [Windows name resolution] | Windows | 8 (2 files) | 9 | swift-nio | `ADDRINFOW`, `FreeAddrInfoW`, `GetAddrInfoW`, `gai_strerrorA` | System names it nowhere |
+| 9 | [Winsock sockets] | Windows | 7 (3 files) | 12 | swift-nio | `FIONBIO`, `INVALID_SOCKET`, `SOCKET`, `SOCKET_ERROR`, `closesocket`, `ioctlsocket` | System names it nowhere |
+| 10 | [protocol levels] | Windows | 7 (2 files) | 9 | swift-nio | `IPPROTO_IP`, `IPPROTO_IPV6`, `IPPROTO_TCP`, `IPPROTO_UDP` | SocketDescriptor.ProtocolID.ip isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, … |
+| 11 | [INADDR_ANY] | Windows | 7 (4 files) | 7 | swift-nio | `INADDR_ANY`, `INET6_ADDRSTRLEN`, `INET_ADDRSTRLEN` | IPv4Address.Host.descriptionCapacity isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, … |
+| 12 | [signal numbers] | WASI, Windows | 6 (2 files) | 10 | sourcekit-lsp, swift-driver, swift-testing, swiftpm | `SIGABRT`, `SIGINT`, `SIGSEGV`, `SIGTERM` | Signal.abort isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
+| 13 | [string functions] | Windows | 6 (5 files) | 21 | swift-certificates, swift-crypto, swift-foundation, swift-subprocess, swift-testing, swift-tools-support-core | `_strdup`, `memcmp`, `strlen`, `strncmp`, `wcslen` | System's implementation uses it; no public declaration names it |
+| 14 | [Winsock messages] | Windows | 6 (2 files) | 7 | swift-nio | `LPFN_WSARECVMSG`, `LPFN_WSASENDMSG`, `LPWSAMSG`, `WSABUF`, `WSACMSGHDR`, `WSAIoctl`… | System names it nowhere |
+| 15 | strncasecmp | Linux, Musl, Android, FreeBSD, OpenBSD, WASI | 5 (1 file) | 5 | swift-foundation | `strncasecmp` | System's implementation uses it; no public declaration names it |
+| 16 | extattr_* | FreeBSD, OpenBSD, WASI, Windows | 5 (4 files) | 5 | swift-foundation | `extattr_*` | System names it nowhere |
+| 17 | [socket types] | Windows | 5 (2 files) | 6 | swift-nio | `SOCK_DGRAM`, `SOCK_RAW`, `SOCK_STREAM` | SocketDescriptor.ConnectionType.datagram isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, … |
+| 18 | memset_s | Windows | 5 (2 files) | 5 | swift-crypto | `memset_s` | Memory.secureZero isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI) |
+| 19 | [thread names] | Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, Windows | 4 (3 files) | 4 | swift-nio, swift-testing | `pthread_get_name_np`, `pthread_set_name_np` | System names it nowhere |
 | 20 | [Windows local memory] | Windows | 4 (3 files) | 16 | swift-build, swift-foundation, swift-nio, swift-subprocess, swift-testing, swift-tools-support-core | `LocalFree` | System's implementation uses it; no public declaration names it |
-| 21 | [Windows errno] | Windows | 4 (3 files) | 9 | swift-foundation, swift-nio, swift-subprocess, swift-tools-support-core, wasmkit | `_get_errno`, `_set_errno`, `errno_t` | System names it nowhere |
-| 22 | LoadLibraryW | Windows | 4 (2 files) | 6 | indexstore-db, sourcekit-lsp, swift-driver, swift-foundation | `LoadLibraryW` | System names it nowhere |
-| 23 | [Windows known folders] | Windows | 4 (4 files) | 5 | swift-build, swift-docc, swift-foundation, swiftpm | `CoTaskMemFree`, `FOLDERID_ProgramFilesX86`, `FOLDERID_System`, `FOLDERID_UserProgramFiles`, `KF_FLAG_DEFAULT`, `KNOWNFOLDERID`… | System names it nowhere |
-| 24 | [shutdown] | Windows | 4 (1 file) | 5 | swift-nio | `SD_BOTH`, `SD_RECEIVE`, `SD_SEND`, `shutdown` | System names it nowhere |
-| 25 | [ECN, TOS and packet info] | Windows | 4 (2 files) | 4 | swift-nio | `IPV6_PKTINFO`, `IPV6_RECVTCLASS`, `IP_PKTINFO`, `IP_RECVTOS` | SocketDescriptor.IPv6Option.receiveTrafficClass isn't built on Windows (only Darwin, Linux, Musl, Android, … |
+| 21 | [Windows errno] | Windows | 4 (3 files) | 8 | swift-nio, swift-subprocess, swift-tools-support-core, wasmkit | `_get_errno`, `_set_errno`, `errno_t` | System names it nowhere |
+| 22 | [ECN, TOS and packet info] | Windows | 5 (3 files) | 5 | swift-nio | `IPV6_PKTINFO`, `IPV6_RECVTCLASS`, `IP_PKTINFO`, `IP_RECVTOS`, `IP_TOS` | SocketDescriptor.AncillaryMessageBuffer.Message.typeOfService isn't built on Windows (only Darwin, Linux, … |
+| 23 | LoadLibraryW | Windows | 4 (2 files) | 6 | indexstore-db, sourcekit-lsp, swift-driver, swift-foundation | `LoadLibraryW` | System names it nowhere |
+| 24 | [Windows known folders] | Windows | 4 (4 files) | 5 | swift-build, swift-docc, swift-foundation, swiftpm | `CoTaskMemFree`, `FOLDERID_ProgramFilesX86`, `FOLDERID_System`, `FOLDERID_UserProgramFiles`, `KF_FLAG_DEFAULT`, `KNOWNFOLDERID`… | System names it nowhere |
+| 25 | [shutdown] | Windows | 4 (1 file) | 5 | swift-nio | `SD_BOTH`, `SD_RECEIVE`, `SD_SEND`, `shutdown` | System names it nowhere |
 | 26 | [IPV6_V6ONLY and IP_HDRINCL] | WASI, Windows | 3 (2 files) | 5 | swift-nio | `IPV6_V6ONLY`, `IP_HDRINCL` | SocketDescriptor.IPv6Option.v6Only isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, … |
 | 27 | [TCP_NODELAY] | WASI, Windows | 3 (2 files) | 4 | swift-nio | `TCP_NODELAY` | SocketDescriptor.TCPOption.noDelay isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, … |
 | 28 | [sendfile] | FreeBSD, Windows | 3 (2 files) | 4 | swift-nio | `TF_USE_KERNEL_APC`, `TransmitFile`, `sendfile` | System names it nowhere |
@@ -1155,10 +1549,10 @@ Each row is a gap in System at `system-next`: a mapping.ini entry (or a C name i
 | 32 | [Windows handles] | Windows | 3 (3 files) | 8 | swift-foundation, swift-nio, swift-subprocess, swift-tools-support-core | `DUPLICATE_SAME_ACCESS`, `SECURITY_ATTRIBUTES`, `WAIT_OBJECT_0`, `WAIT_TIMEOUT` | System names it nowhere |
 | 33 | [Windows paths] | Windows | 3 (3 files) | 5 | swift-build, swift-foundation, swift-subprocess, swift-testing, swift-tools-support-core | `PATHCCH_ALLOW_LONG_PATHS` | System's implementation uses it; no public declaration names it |
 | 34 | [inet_ntop and inet_pton] | Windows | 3 (2 files) | 4 | swift-certificates, swift-nio | `inet_ntop`, `inet_pton` | IPv4Address.Host.init isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI) |
-| 35 | timeout | Linux, FreeBSD, OpenBSD, Windows | 2 (2 files) | 3 | swift-subprocess | `timeout` | System names it nowhere |
-| 36 | getloadavg | Darwin, Linux, FreeBSD, OpenBSD | 2 (1 file) | 2 | swift-experimental-string-processing | `getloadavg` | System names it nowhere |
-| 37 | MAP_ANONYMOUS | Linux, Musl | 2 (1 file) | 2 | wasmkit | `MAP_ANONYMOUS` | System names it nowhere |
-| 38 | ifa_next | FreeBSD, OpenBSD | 2 (1 file) | 2 | swift-nio | `ifa_next` | System names it nowhere |
+| 35 | [Mach-O file format] | Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | 2 (1 file) | 4 | swift-build, swift-syntax | `LC_MAIN`, `LC_SYMTAB`, `mach_header_64` | System names it nowhere |
+| 36 | [loaded images] | Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | 3 (2 files) | 3 | swift-syntax, swift-testing | `_dyld_get_image_header`, `getsectiondata` | DynamicLibrary.sectionData isn't built on Linux (only Darwin) |
+| 37 | timeout | Linux, FreeBSD, OpenBSD, Windows | 2 (2 files) | 3 | swift-subprocess | `timeout` | System names it nowhere |
+| 38 | getloadavg | Darwin, Linux, FreeBSD, OpenBSD | 2 (1 file) | 2 | swift-experimental-string-processing | `getloadavg` | System names it nowhere |
 | 39 | [Winsock errors] | Windows | 2 (2 files) | 6 | swift-nio | `WSAEINVAL`, `WSAEWOULDBLOCK`, `WSAGetLastError` | System names it nowhere |
 | 40 | [SO_RCVTIMEO and SO_TIMESTAMP] | Windows | 3 (2 files) | 3 | swift-nio | `SO_RCVTIMEO` | SocketDescriptor.SocketOption.receiveTimeout isn't built on Windows (only Darwin, Linux, Musl, Android, … |
 | 41 | [getenv] | Windows | 2 (1 file) | 4 | swift-foundation, swift-nio, swiftpm | `_dupenv_s`, `_putenv` | System names it nowhere |
@@ -1170,155 +1564,159 @@ Each row is a gap in System at `system-next`: a mapping.ini entry (or a C name i
 | 47 | MAXIMUM_REPARSE_DATA_BUFFER_SIZE | Windows | 2 (1 file) | 2 | swift-foundation | `MAXIMUM_REPARSE_DATA_BUFFER_SIZE` | System names it nowhere |
 | 48 | PCWSTR | Windows | 2 (2 files) | 2 | swift-foundation, swift-testing | `PCWSTR` | System names it nowhere |
 | 49 | [sockaddr_storage] | Windows | 2 (2 files) | 2 | swift-nio | `sockaddr_storage` | CInterop.SockAddrStorage isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI) |
-| 50 | getsectiondata | Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | 1 (1 file) | 3 | swift-syntax, swift-testing | `getsectiondata` | System names it nowhere |
-| 51 | _dyld_get_image_header | Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | 2 (1 file) | 2 | swift-syntax | `_dyld_get_image_header` | System names it nowhere |
-| 52 | funopen | Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | 1 (1 file) | 1 | swift-testing | `funopen` | System names it nowhere |
-| 53 | getc_unlocked | Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | 1 (1 file) | 1 | swift-testing | `getc_unlocked` | System names it nowhere |
-| 54 | strchr | Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | 1 (1 file) | 1 | swift-testing | `strchr` | System names it nowhere |
-| 55 | task_set_exception_ports | Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | 1 (1 file) | 1 | swift-testing | `task_set_exception_ports` | System names it nowhere |
-| 56 | [thread names] | Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, Windows | 1 (1 file) | 1 | swift-testing | `pthread_set_name_np` | System names it nowhere |
-| 57 | memmem | Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI | 1 (1 file) | 1 | swift-testing | `memmem` | System names it nowhere |
-| 58 | fmemopen | Darwin, Linux, Musl, Android, FreeBSD, OpenBSD | 1 (1 file) | 1 | swift-testing | `fmemopen` | System names it nowhere |
-| 59 | tmpfile | Darwin, Linux, Musl, Android, FreeBSD, OpenBSD | 1 (1 file) | 1 | swift-testing | `tmpfile` | System names it nowhere |
-| 60 | posix_spawn_file_actions_addclosefrom_np | Darwin, Android, OpenBSD, WASI, Windows | 1 (1 file) | 1 | swift-testing | `posix_spawn_file_actions_addclosefrom_np` | SpawnFileAction.closeAll isn't built on Darwin (only Linux, Musl, FreeBSD) |
-| 61 | [usleep] | WASI, Windows | 1 (1 file) | 2 | swift-sdk-generator, swift-stress-tester | `usleep` | PThread.sleep(for:) isn't built on WASI |
-| 62 | isatty | WASI, Windows | 1 (1 file) | 2 | swift-testing, swift-tools-support-core | `isatty` | TerminalDescriptor.init isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
-| 63 | [stdio] | Windows | 2 (2 files) | 2 | swift-tools-support-core, swiftpm | `fileno`, `fopen` | FileStream.fileDescriptor isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI) |
-| 64 | CLOCK_MONOTONIC_RAW | FreeBSD, OpenBSD | 1 (1 file) | 1 | wasmkit | `CLOCK_MONOTONIC_RAW` | ClockID.monotonicRaw isn't built on FreeBSD (only Darwin, Linux, Musl, Android) |
-| 65 | [dlopen] | WASI, Windows | 1 (1 file) | 1 | swift-testing | `dlsym` | DynamicLibrary.address isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
-| 66 | [exit] | WASI, Windows | 1 (1 file) | 1 | swift-testing | `EX_UNAVAILABLE` | ProcessID.ExitCode.serviceUnavailable isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, … |
-| 67 | mktemp | FreeBSD, OpenBSD | 1 (1 file) | 1 | swift-foundation | `mktemp` | FilePath.makeUniqueFile isn't built on FreeBSD (only Darwin, Linux, Musl, Android) |
-| 68 | raise | WASI, Windows | 1 (1 file) | 1 | swift-testing | `raise` | Signal.raise isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
-| 69 | realpath | WASI, Windows | 1 (1 file) | 1 | swift-testing | `realpath` | FilePath.canonicalized isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
-| 70 | sin_addr | Windows | 1 (1 file) | 4 | swift-nio | `sin_addr` | System's accessor isn't built on Windows |
-| 71 | sin_port | Windows | 1 (1 file) | 4 | swift-nio | `sin_port` | System's accessor isn't built on Windows |
-| 72 | LARGE_INTEGER | Windows | 1 (1 file) | 3 | swift-foundation, wasmkit | `LARGE_INTEGER` | System's implementation uses it; no public declaration names it |
-| 73 | [Windows threads] | Windows | 3 (2 files) | 3 | swift-foundation, swift-nio | `CompareObjectHandles` | System names it nowhere |
-| 74 | [Windows process exit] | Windows | 1 (1 file) | 3 | swift-build, swift-subprocess | `RegisterWaitForSingleObject`, `UnregisterWait`, `WAITORTIMERCALLBACK`, `WT_EXECUTELONGFUNCTION`, `WT_EXECUTEONLYONCE` | System names it nowhere |
-| 75 | [accept] | Windows | 1 (1 file) | 3 | swift-nio | `accept` | SocketDescriptor.accept isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
-| 76 | [listen] | Windows | 1 (1 file) | 3 | swift-nio | `listen` | SocketDescriptor.listen isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
-| 77 | ERROR_FILENAME_EXCED_RANGE | Windows | 1 (1 file) | 2 | sourcekit-lsp, swift-foundation | `ERROR_FILENAME_EXCED_RANGE` | System names it nowhere |
-| 78 | [Windows I/O completion ports] | Windows | 1 (1 file) | 2 | swift-subprocess, swift-tools-support-core | `LPOVERLAPPED` | System names it nowhere |
-| 79 | [bind] | Windows | 1 (1 file) | 2 | swift-nio | `bind` | SocketDescriptor.bind isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
-| 80 | [connect] | Windows | 1 (1 file) | 2 | swift-nio | `connect` | SocketDescriptor.connect isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
-| 81 | [poll] | Windows | 1 (1 file) | 2 | swift-nio | `POLLERR`, `POLLHUP`, `POLLNVAL`, `POLLRDNORM`, `POLLWRNORM`, `WSAPoll`… | CInterop.PollFD isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI) |
-| 82 | [send and receive] | Windows | 1 (1 file) | 2 | swift-nio | `recv`, `send` | SocketDescriptor.receive isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
-| 83 | [socket] | Windows | 1 (1 file) | 2 | swift-nio | `socket` | SocketDescriptor.open isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
-| 84 | __time64_t | Windows | 1 (1 file) | 2 | swift-foundation, swift-log | `__time64_t` | System's implementation uses it; no public declaration names it |
-| 85 | calloc | Windows | 1 (1 file) | 2 | swift-foundation, swift-testing | `calloc` | Memory.allocateZeroed isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI) |
-| 86 | ConvertSidToStringSidW | Windows | 1 (1 file) | 1 | swift-foundation | `ConvertSidToStringSidW` | System names it nowhere |
-| 87 | Internal | Windows | 1 (1 file) | 1 | swift-format | `Internal` | System names it nowhere |
-| 88 | LPCWSTR | Windows | 1 (1 file) | 1 | swift-build | `LPCWSTR` | System names it nowhere |
-| 89 | MAXSYMLINKS | WASI | 1 (1 file) | 1 | swift-foundation | `MAXSYMLINKS` | SystemConfig.maxSymbolicLinks isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
-| 90 | NAME_MAX | WASI | 1 (1 file) | 1 | swift-testing | `NAME_MAX` | SystemConfig.maxFileNameBytes isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
-| 91 | PIPE_NOWAIT | Windows | 1 (1 file) | 1 | swift-log | `PIPE_NOWAIT` | System names it nowhere |
-| 92 | UnmapViewOfFile | Windows | 1 (1 file) | 1 | swift-foundation | `UnmapViewOfFile` | System names it nowhere |
-| 93 | [Windows consoles] | Windows | 1 (1 file) | 1 | swiftpm | `ReadConsoleA` | System names it nowhere |
-| 94 | [Windows named pipes] | Windows | 1 (1 file) | 1 | swift-subprocess | `FILE_FLAG_FIRST_PIPE_INSTANCE`, `PIPE_READMODE_BYTE`, `PIPE_REJECT_REMOTE_CLIENTS`, `PIPE_WAIT` | System names it nowhere |
-| 95 | [getuid] | WASI | 1 (1 file) | 1 | swift-foundation | `getuid` | UserID.real isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
-| 96 | [pipe] | WASI | 1 (1 file) | 1 | swift-testing | `pipe2` | FileDescriptor.pipe isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, Windows) |
-| 97 | _time64 | Windows | 1 (1 file) | 1 | swift-log | `_time64` | System names it nowhere |
-| 98 | buf | Windows | 1 (1 file) | 1 | swift-argument-parser | `buf` | System's implementation uses it; no public declaration names it |
-| 99 | f_frsize | FreeBSD | 1 (1 file) | 1 | swift-foundation | `f_frsize` | System's accessor isn't built on FreeBSD |
-| 100 | fseek | Windows | 1 (1 file) | 1 | wasmkit | `fseek` | System names it nowhere |
-| 101 | gnu_get_libc_version | Linux | 1 (1 file) | 1 | swift-testing | `gnu_get_libc_version` | System names it nowhere |
-| 102 | munmap | WASI | 1 (1 file) | 1 | swift-foundation | `munmap` | MemoryMapping.unmap isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
-| 103 | overwrite | Windows | 1 (1 file) | 1 | swift-foundation | `overwrite` | System's implementation uses it; no public declaration names it |
-| 104 | raw | Windows | 1 (1 file) | 1 | swift-subprocess | `raw` | System names it nowhere |
-| 105 | timespec_get | Windows | 1 (1 file) | 1 | swift-testing | `timespec_get` | ClockID.currentTimeSpec isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI) |
-| 106 | KERN_PROC_PATHNAME | Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | 0 (0 files) | 1 | swift-testing | `KERN_PROC_PATHNAME` | System names it nowhere |
-| 107 | backtrace_async | Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | 0 (0 files) | 1 | swift-testing | `backtrace_async` | System names it nowhere |
-| 108 | backtrace | Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | 1 (1 file) | 1 | swift-testing | `backtrace` | CallStack.returnAddresses isn't built on Linux (only Darwin) |
-| 109 | copy_file_range | Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | 0 (0 files) | 1 | swift-testing | `copy_file_range` | System names it nowhere |
-| 110 | sigabbrev_np | Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | 0 (0 files) | 1 | swift-testing | `sigabbrev_np` | System names it nowhere |
-| 111 | sys_signame | Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | 1 (1 file) | 1 | swift-testing | `sys_signame` | System names it nowhere |
-| 112 | _NSGetExecutablePath | Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | 0 (0 files) | 1 | swift-testing | `_NSGetExecutablePath` | FilePath.currentExecutable isn't built on Linux (only Darwin) |
-| 113 | sysctl | Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | 1 (1 file) | 1 | swift-testing | `sysctl` | SystemControl isn't built on Linux (only Darwin) |
-| 114 | fclonefileat | Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | 0 (0 files) | 1 | swift-testing | `fclonefileat` | FileDescriptor.clone isn't built on Linux (only Darwin) |
-| 115 | FICLONE | Darwin, FreeBSD, OpenBSD, WASI, Windows | 1 (1 file) | 1 | swift-testing | `FICLONE` | FileDescriptor.cloneContents isn't built on Darwin (only Linux, Musl, Android) |
-| 116 | label | Linux, Musl, Android, FreeBSD, OpenBSD, WASI | 0 (0 files) | 4 | swift-nio, swift-sdk-generator | `label` | System names it nowhere |
-| 117 | ws_col | Linux, Musl, FreeBSD, OpenBSD | 2 (1 file) | 2 | swift-nio | `ws_col` | System names it nowhere |
-| 118 | useconds_t | Android, WASI | 2 (1 file) | 2 | swift-sdk-generator | `useconds_t` | System names it nowhere |
-| 119 | ai_family | FreeBSD, OpenBSD, Windows | 0 (0 files) | 2 | swift-nio | `ai_family` | System names it nowhere |
-| 120 | ai_flags | FreeBSD, OpenBSD | 1 (1 file) | 1 | swift-nio | `ai_flags` | System names it nowhere |
-| 121 | [Windows file information] | Windows | 0 (0 files) | 5 | swift-foundation, swift-subprocess | `INVALID_FILE_ATTRIBUTES` | System's implementation uses it; no public declaration names it |
-| 122 | SetFileTime | Windows | 2 (1 file) | 4 | swift-foundation, wasmkit | `SetFileTime` | System names it nowhere |
-| 123 | FILE_END_OF_FILE_INFO | Windows | 2 (1 file) | 2 | wasmkit | `FILE_END_OF_FILE_INFO` | System's implementation uses it; no public declaration names it |
-| 124 | ERROR_INVALID_ACCESS | Windows | 0 (0 files) | 3 | swift-foundation, wasmkit | `ERROR_INVALID_ACCESS` | System names it nowhere |
-| 125 | ERROR_INVALID_DATA | Windows | 0 (0 files) | 3 | swift-foundation, wasmkit | `ERROR_INVALID_DATA` | System names it nowhere |
-| 126 | ERROR_INVALID_DRIVE | Windows | 0 (0 files) | 3 | swift-foundation, wasmkit | `ERROR_INVALID_DRIVE` | System names it nowhere |
-| 127 | msg_hdr | Windows | 0 (0 files) | 3 | swift-nio | `msg_hdr` | System's accessor isn't built on Windows |
-| 128 | msg_len | Windows | 2 (2 files) | 3 | swift-nio | `msg_len` | System's accessor isn't built on Windows |
-| 129 | sin6_addr | Windows | 0 (0 files) | 3 | swift-nio | `sin6_addr` | System's accessor isn't built on Windows |
-| 130 | sin6_family | Windows | 0 (0 files) | 3 | swift-nio | `sin6_family` | System's accessor isn't built on Windows |
-| 131 | sin6_flowinfo | Windows | 0 (0 files) | 3 | swift-nio | `sin6_flowinfo` | System's accessor isn't built on Windows |
-| 132 | sin6_port | Windows | 0 (0 files) | 3 | swift-nio | `sin6_port` | System's accessor isn't built on Windows |
-| 133 | sin6_scope_id | Windows | 0 (0 files) | 3 | swift-nio | `sin6_scope_id` | System's accessor isn't built on Windows |
-| 134 | sin_family | Windows | 1 (1 file) | 3 | swift-nio | `sin_family` | System's accessor isn't built on Windows |
-| 135 | st_mode | Windows | 0 (0 files) | 3 | llbuild, swift-foundation-icu | `st_mode` | System's accessor isn't built on Windows |
-| 136 | sun_family | Windows | 0 (0 files) | 3 | swift-nio | `sun_family` | System's accessor isn't built on Windows |
-| 137 | sun_path | Windows | 2 (2 files) | 3 | swift-nio | `sun_path` | System's accessor isn't built on Windows |
-| 138 | ss_family | Windows | 1 (1 file) | 1 | swift-nio | `ss_family` | System's accessor isn't built on Windows |
-| 139 | ERROR_BAD_NETPATH | Windows | 0 (0 files) | 2 | wasmkit | `ERROR_BAD_NETPATH` | System names it nowhere |
-| 140 | ERROR_BAD_NET_NAME | Windows | 0 (0 files) | 2 | wasmkit | `ERROR_BAD_NET_NAME` | System names it nowhere |
-| 141 | ERROR_CANCELLED | Windows | 0 (0 files) | 2 | swift-foundation | `ERROR_CANCELLED` | System names it nowhere |
-| 142 | POSIXErrorCode | Windows | 2 (1 file) | 2 | swift-foundation | `POSIXErrorCode` | CInterop.POSIXErrorCode isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI) |
-| 143 | ERROR_CANNOT_MAKE | Windows | 0 (0 files) | 2 | wasmkit | `ERROR_CANNOT_MAKE` | System names it nowhere |
-| 144 | ERROR_CURRENT_DIRECTORY | Windows | 0 (0 files) | 2 | wasmkit | `ERROR_CURRENT_DIRECTORY` | System names it nowhere |
-| 145 | ERROR_DRIVE_LOCKED | Windows | 0 (0 files) | 2 | wasmkit | `ERROR_DRIVE_LOCKED` | System names it nowhere |
-| 146 | ERROR_FAIL_I24 | Windows | 0 (0 files) | 2 | wasmkit | `ERROR_FAIL_I24` | System names it nowhere |
-| 147 | ERROR_FILE_SYSTEM_LIMITATION | Windows | 0 (0 files) | 2 | swift-foundation | `ERROR_FILE_SYSTEM_LIMITATION` | System names it nowhere |
-| 148 | FILE_RENAME_INFO | Windows | 2 (1 file) | 2 | swift-foundation | `FILE_RENAME_INFO` | System's implementation uses it; no public declaration names it |
-| 149 | ERROR_INVALID_BLOCK | Windows | 0 (0 files) | 2 | wasmkit | `ERROR_INVALID_BLOCK` | System names it nowhere |
-| 150 | ERROR_INVALID_STARTING_CODESEG | Windows | 0 (0 files) | 2 | wasmkit | `ERROR_INVALID_STARTING_CODESEG` | System names it nowhere |
-| 151 | ERROR_INVALID_TARGET_HANDLE | Windows | 0 (0 files) | 2 | wasmkit | `ERROR_INVALID_TARGET_HANDLE` | System names it nowhere |
-| 152 | ERROR_LOCK_FAILED | Windows | 0 (0 files) | 2 | wasmkit | `ERROR_LOCK_FAILED` | System names it nowhere |
-| 153 | ERROR_MAX_THRDS_REACHED | Windows | 0 (0 files) | 2 | wasmkit | `ERROR_MAX_THRDS_REACHED` | System names it nowhere |
-| 154 | ERROR_NETWORK_ACCESS_DENIED | Windows | 0 (0 files) | 2 | wasmkit | `ERROR_NETWORK_ACCESS_DENIED` | System names it nowhere |
-| 155 | ERROR_NO_MORE_FILES | Windows | 0 (0 files) | 2 | wasmkit | `ERROR_NO_MORE_FILES` | System names it nowhere |
-| 156 | ERROR_SEEK_ON_DEVICE | Windows | 0 (0 files) | 2 | wasmkit | `ERROR_SEEK_ON_DEVICE` | System names it nowhere |
-| 157 | ERROR_WRITE_PROTECT | Windows | 2 (1 file) | 2 | wasmkit | `ERROR_WRITE_PROTECT` | System names it nowhere |
-| 158 | GetCurrentDirectoryW | Windows | 0 (0 files) | 2 | swift-foundation | `GetCurrentDirectoryW` | System names it nowhere |
-| 159 | SetCurrentDirectoryW | Windows | 2 (1 file) | 2 | swift-foundation | `SetCurrentDirectoryW` | System names it nowhere |
-| 160 | JOBOBJECT_EXTENDED_LIMIT_INFORMATION | Windows | 0 (0 files) | 2 | swift-subprocess, swift-tools-support-core | `JOBOBJECT_EXTENDED_LIMIT_INFORMATION` | System's implementation uses it; no public declaration names it |
-| 161 | LC_ALL | Windows | 0 (0 files) | 2 | swift-foundation | `LC_ALL` | CLocale.Category.all isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI) |
-| 162 | TOKEN_ELEVATION | Windows | 1 (1 file) | 1 | swift-foundation | `TOKEN_ELEVATION` | System's implementation uses it; no public declaration names it |
-| 163 | setlocale | Windows | 1 (1 file) | 1 | swift-foundation | `setlocale` | CLocale.globalName isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI) |
-| 164 | STARTUPINFOW | Windows | 0 (0 files) | 2 | swift-subprocess, swift-tools-support-core | `STARTUPINFOW` | System's implementation uses it; no public declaration names it |
-| 165 | [Windows process creation] | Windows | 0 (0 files) | 2 | swift-subprocess, swift-tools-support-core | `CREATE_UNICODE_ENVIRONMENT`, `CreateProcessWithLogonW`, `DeleteProcThreadAttributeList`, `EXTENDED_STARTUPINFO_PRESENT`, `InitializeProcThreadAttributeList`, `LOGON_WITH_PROFILE`… | System names it nowhere |
-| 166 | [environment block] | Windows | 1 (1 file) | 2 | swift-foundation, swift-subprocess | `FreeEnvironmentStringsW` | System's implementation uses it; no public declaration names it |
-| 167 | ULONGLONG | Windows | 1 (1 file) | 1 | swift-foundation | `ULONGLONG` | System's implementation uses it; no public declaration names it |
-| 168 | ULONG_PTR | Windows | 1 (1 file) | 1 | swift-tools-support-core | `ULONG_PTR` | System's implementation uses it; no public declaration names it |
-| 169 | st_dev | Windows | 0 (0 files) | 2 | llbuild | `st_dev` | System's accessor isn't built on Windows |
-| 170 | st_ino | Windows | 0 (0 files) | 2 | llbuild | `st_ino` | System's accessor isn't built on Windows |
-| 171 | st_size | Windows | 2 (1 file) | 2 | llbuild | `st_size` | System's accessor isn't built on Windows |
-| 172 | BELOW_NORMAL_PRIORITY_CLASS | Windows | 0 (0 files) | 1 | sourcekit-lsp | `BELOW_NORMAL_PRIORITY_CLASS` | System names it nowhere |
-| 173 | ERROR_DISK_RESOURCES_EXHAUSTED | Windows | 0 (0 files) | 1 | swift-foundation | `ERROR_DISK_RESOURCES_EXHAUSTED` | System names it nowhere |
-| 174 | ERROR_LABEL_TOO_LONG | Windows | 0 (0 files) | 1 | swift-foundation | `ERROR_LABEL_TOO_LONG` | System names it nowhere |
-| 175 | FILE_NAME_NORMALIZED | Windows | 1 (1 file) | 1 | swift-foundation | `FILE_NAME_NORMALIZED` | System names it nowhere |
-| 176 | FindClose | Windows | 0 (0 files) | 1 | swift-foundation | `FindClose` | System's implementation uses it; no public declaration names it |
-| 177 | FindExInfoBasic | Windows | 0 (0 files) | 1 | swift-foundation | `FindExInfoBasic` | System names it nowhere |
-| 178 | FindExSearchNameMatch | Windows | 0 (0 files) | 1 | swift-foundation | `FindExSearchNameMatch` | System names it nowhere |
-| 179 | FindFirstFileExW | Windows | 0 (0 files) | 1 | swift-foundation | `FindFirstFileExW` | System names it nowhere |
-| 180 | FindNextFileW | Windows | 0 (0 files) | 1 | swift-foundation | `FindNextFileW` | System's implementation uses it; no public declaration names it |
-| 181 | WIN32_FIND_DATAW | Windows | 1 (1 file) | 1 | swift-foundation | `WIN32_FIND_DATAW` | System's implementation uses it; no public declaration names it |
-| 182 | IDLE_PRIORITY_CLASS | Windows | 0 (0 files) | 1 | sourcekit-lsp | `IDLE_PRIORITY_CLASS` | System names it nowhere |
-| 183 | NORMAL_PRIORITY_CLASS | Windows | 1 (1 file) | 1 | sourcekit-lsp | `NORMAL_PRIORITY_CLASS` | System names it nowhere |
-| 184 | MAP_FAILED | WASI | 0 (0 files) | 1 | swift-foundation | `MAP_FAILED` | MemoryMapping.init isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
-| 185 | MAP_PRIVATE | WASI | 0 (0 files) | 1 | swift-foundation | `MAP_PRIVATE` | MemoryMapping.Options.private isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
-| 186 | PROT_READ | WASI | 0 (0 files) | 1 | swift-foundation | `PROT_READ` | MemoryMapping.Protection.read isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
-| 187 | mmap | WASI | 1 (1 file) | 1 | swift-foundation | `mmap` | MemoryMapping isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
-| 188 | PSID | Windows | 0 (0 files) | 1 | swift-subprocess | `PSID` | System's implementation uses it; no public declaration names it |
-| 189 | UNLEN | Windows | 1 (1 file) | 1 | swift-subprocess | `UNLEN` | System names it nowhere |
-| 190 | WSAEFAULT | Windows | 0 (0 files) | 1 | swift-nio | `WSAEFAULT` | System names it nowhere |
-| 191 | [Windows delete] | Windows | 0 (0 files) | 1 | swift-nio | `FILE_DISPOSITION_INFO_EX` | System's implementation uses it; no public declaration names it |
-| 192 | cmsg_len | Windows | 1 (1 file) | 1 | swift-nio | `cmsg_len` | System's accessor isn't built on Windows |
-| 193 | [file type bits] | Windows | 0 (0 files) | 1 | swift-foundation-icu | `S_IFDIR`, `S_IFMT` | FileType.directory isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI) |
-| 194 | [stat] | Windows | 1 (1 file) | 1 | swift-foundation-icu | `stat` | Stat.init isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI) |
-| 195 | [gettimeofday] | Windows | 0 (0 files) | 1 | swift-nio | `timeval` | CInterop.TimeVal isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI) |
-| 196 | l_linger | Windows | 0 (0 files) | 1 | swift-nio | `l_linger` | System's accessor isn't built on Windows |
-| 197 | l_onoff | Windows | 0 (0 files) | 1 | swift-nio | `l_onoff` | System's accessor isn't built on Windows |
-| 198 | tv_usec | Windows | 1 (1 file) | 1 | swift-nio | `tv_usec` | System's accessor isn't built on Windows |
+| 50 | funopen | Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | 1 (1 file) | 1 | swift-testing | `funopen` | System names it nowhere |
+| 51 | getc_unlocked | Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | 1 (1 file) | 1 | swift-testing | `getc_unlocked` | System names it nowhere |
+| 52 | strchr | Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | 1 (1 file) | 1 | swift-testing | `strchr` | System names it nowhere |
+| 53 | task_set_exception_ports | Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | 1 (1 file) | 1 | swift-testing | `task_set_exception_ports` | System names it nowhere |
+| 54 | memmem | Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI | 1 (1 file) | 1 | swift-testing | `memmem` | System names it nowhere |
+| 55 | fmemopen | Darwin, Linux, Musl, Android, FreeBSD, OpenBSD | 1 (1 file) | 1 | swift-testing | `fmemopen` | System names it nowhere |
+| 56 | tmpfile | Darwin, Linux, Musl, Android, FreeBSD, OpenBSD | 1 (1 file) | 1 | swift-testing | `tmpfile` | System names it nowhere |
+| 57 | posix_spawn_file_actions_addclosefrom_np | Darwin, Android, OpenBSD, WASI, Windows | 1 (1 file) | 1 | swift-testing | `posix_spawn_file_actions_addclosefrom_np` | SpawnFileAction.closeAll isn't built on Darwin (only Linux, Musl, FreeBSD) |
+| 58 | [file type bits] | OpenBSD, Windows | 1 (1 file) | 2 | swift-foundation-icu, swift-nio | `S_IFDIR`, `S_IFMT`, `S_IFWHT` | FileType.directory isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI) |
+| 59 | [usleep] | WASI, Windows | 1 (1 file) | 2 | swift-sdk-generator, swift-stress-tester | `usleep` | PThread.sleep(for:) isn't built on WASI |
+| 60 | isatty | WASI, Windows | 1 (1 file) | 2 | swift-testing, swift-tools-support-core | `isatty` | TerminalDescriptor.init isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
+| 61 | [stdio] | Windows | 2 (2 files) | 2 | swift-tools-support-core, swiftpm | `fileno`, `fopen` | FileStream.fileDescriptor isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI) |
+| 62 | [dlopen] | WASI, Windows | 1 (1 file) | 1 | swift-testing | `dlsym` | DynamicLibrary.address isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
+| 63 | [exit] | WASI, Windows | 1 (1 file) | 1 | swift-testing | `EX_UNAVAILABLE` | ProcessID.ExitCode.serviceUnavailable isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, … |
+| 64 | mktemp | FreeBSD, OpenBSD | 1 (1 file) | 1 | swift-foundation | `mktemp` | FilePath.makeUniqueFile isn't built on FreeBSD (only Darwin, Linux, Musl, Android) |
+| 65 | raise | WASI, Windows | 1 (1 file) | 1 | swift-testing | `raise` | Signal.raise isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
+| 66 | realpath | WASI, Windows | 1 (1 file) | 1 | swift-testing | `realpath` | FilePath.canonicalized isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
+| 67 | sin_addr | Windows | 1 (1 file) | 4 | swift-nio | `sin_addr` | System's accessor isn't built on Windows |
+| 68 | sin_port | Windows | 1 (1 file) | 4 | swift-nio | `sin_port` | System's accessor isn't built on Windows |
+| 69 | LARGE_INTEGER | Windows | 1 (1 file) | 3 | swift-foundation, wasmkit | `LARGE_INTEGER` | System's implementation uses it; no public declaration names it |
+| 70 | [Windows threads] | Windows | 3 (2 files) | 3 | swift-foundation, swift-nio | `CompareObjectHandles` | System names it nowhere |
+| 71 | [Windows process exit] | Windows | 1 (1 file) | 3 | swift-build, swift-subprocess | `RegisterWaitForSingleObject`, `UnregisterWait`, `WAITORTIMERCALLBACK`, `WT_EXECUTELONGFUNCTION`, `WT_EXECUTEONLYONCE` | System names it nowhere |
+| 72 | [accept] | Windows | 1 (1 file) | 3 | swift-nio | `accept` | SocketDescriptor.accept isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
+| 73 | [listen] | Windows | 1 (1 file) | 3 | swift-nio | `listen` | SocketDescriptor.listen isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
+| 74 | [synchronized I/O flags] | WASI | 1 (1 file) | 3 | wasmkit | `O_RSYNC` | FileDescriptor.OpenOptions.readSync isn't built on WASI (only Linux, Musl, Android, OpenBSD) |
+| 75 | sync | WASI | 2 (1 file) | 2 | wasmkit | `sync` | FileDescriptor.synchronizeAllFileSystems isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, … |
+| 76 | ERROR_FILENAME_EXCED_RANGE | Windows | 1 (1 file) | 2 | sourcekit-lsp, swift-foundation | `ERROR_FILENAME_EXCED_RANGE` | System names it nowhere |
+| 77 | [Windows I/O completion ports] | Windows | 1 (1 file) | 2 | swift-subprocess, swift-tools-support-core | `LPOVERLAPPED` | System names it nowhere |
+| 78 | [bind] | Windows | 1 (1 file) | 2 | swift-nio | `bind` | SocketDescriptor.bind isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
+| 79 | [connect] | Windows | 1 (1 file) | 2 | swift-nio | `connect` | SocketDescriptor.connect isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
+| 80 | [poll] | Windows | 1 (1 file) | 2 | swift-nio | `POLLERR`, `POLLHUP`, `POLLNVAL`, `POLLRDNORM`, `POLLWRNORM`, `WSAPoll`… | CInterop.PollFD isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI) |
+| 81 | [send and receive] | Windows | 1 (1 file) | 2 | swift-nio | `recv`, `send` | SocketDescriptor.receive isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
+| 82 | [socket] | Windows | 1 (1 file) | 2 | swift-nio | `socket` | SocketDescriptor.open isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
+| 83 | calloc | Windows | 1 (1 file) | 2 | swift-foundation, swift-testing | `calloc` | Memory.allocateZeroed isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI) |
+| 84 | ConvertSidToStringSidW | Windows | 1 (1 file) | 1 | swift-foundation | `ConvertSidToStringSidW` | System names it nowhere |
+| 85 | Internal | Windows | 1 (1 file) | 1 | swift-format | `Internal` | System names it nowhere |
+| 86 | LPCWSTR | Windows | 1 (1 file) | 1 | swift-build | `LPCWSTR` | System names it nowhere |
+| 87 | MAXSYMLINKS | WASI | 1 (1 file) | 1 | swift-foundation | `MAXSYMLINKS` | SystemConfig.maxSymbolicLinks isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
+| 88 | NAME_MAX | WASI | 1 (1 file) | 1 | swift-testing | `NAME_MAX` | SystemConfig.maxFileNameBytes isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
+| 89 | PIPE_NOWAIT | Windows | 1 (1 file) | 1 | swift-log | `PIPE_NOWAIT` | System names it nowhere |
+| 90 | UnmapViewOfFile | Windows | 1 (1 file) | 1 | swift-foundation | `UnmapViewOfFile` | System names it nowhere |
+| 91 | [Windows consoles] | Windows | 1 (1 file) | 1 | swiftpm | `ReadConsoleA` | System names it nowhere |
+| 92 | [Windows named pipes] | Windows | 1 (1 file) | 1 | swift-subprocess | `FILE_FLAG_FIRST_PIPE_INSTANCE`, `PIPE_READMODE_BYTE`, `PIPE_REJECT_REMOTE_CLIENTS`, `PIPE_WAIT` | System names it nowhere |
+| 93 | [getuid] | WASI | 1 (1 file) | 1 | swift-foundation | `getuid` | UserID.real isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
+| 94 | [pipe] | WASI | 1 (1 file) | 1 | swift-testing | `pipe2` | FileDescriptor.pipe isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, Windows) |
+| 95 | buf | Windows | 1 (1 file) | 1 | swift-argument-parser | `buf` | System's implementation uses it; no public declaration names it |
+| 96 | f_frsize | FreeBSD | 1 (1 file) | 1 | swift-foundation | `f_frsize` | System's accessor isn't built on FreeBSD |
+| 97 | fseek | Windows | 1 (1 file) | 1 | wasmkit | `fseek` | System names it nowhere |
+| 98 | gnu_get_libc_version | Linux | 1 (1 file) | 1 | swift-testing | `gnu_get_libc_version` | System names it nowhere |
+| 99 | munmap | WASI | 1 (1 file) | 1 | swift-foundation | `munmap` | MemoryMapping.unmap isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
+| 100 | overwrite | Windows | 1 (1 file) | 1 | swift-foundation | `overwrite` | System's implementation uses it; no public declaration names it |
+| 101 | raw | Windows | 1 (1 file) | 1 | swift-subprocess | `raw` | System names it nowhere |
+| 102 | timespec_get | Windows | 1 (1 file) | 1 | swift-testing | `timespec_get` | ClockID.currentTimeSpec isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI) |
+| 103 | KERN_PROC_PATHNAME | Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | 0 (0 files) | 1 | swift-testing | `KERN_PROC_PATHNAME` | System names it nowhere |
+| 104 | backtrace_async | Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | 0 (0 files) | 1 | swift-testing | `backtrace_async` | System names it nowhere |
+| 105 | backtrace | Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | 1 (1 file) | 1 | swift-testing | `backtrace` | CallStack.returnAddresses isn't built on Linux (only Darwin) |
+| 106 | copy_file_range | Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | 0 (0 files) | 1 | swift-testing | `copy_file_range` | System names it nowhere |
+| 107 | sigabbrev_np | Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | 0 (0 files) | 1 | swift-testing | `sigabbrev_np` | System names it nowhere |
+| 108 | sys_signame | Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | 1 (1 file) | 1 | swift-testing | `sys_signame` | System names it nowhere |
+| 109 | _NSGetExecutablePath | Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | 0 (0 files) | 1 | swift-testing | `_NSGetExecutablePath` | FilePath.currentExecutable isn't built on Linux (only Darwin) |
+| 110 | sysctl | Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | 1 (1 file) | 1 | swift-testing | `sysctl` | SystemControl isn't built on Linux (only Darwin) |
+| 111 | fclonefileat | Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | 0 (0 files) | 1 | swift-testing | `fclonefileat` | FileDescriptor.clone isn't built on Linux (only Darwin) |
+| 112 | FICLONE | Darwin, FreeBSD, OpenBSD, WASI, Windows | 1 (1 file) | 1 | swift-testing | `FICLONE` | FileDescriptor.cloneContents isn't built on Darwin (only Linux, Musl, Android) |
+| 113 | label | Linux, Musl, Android, FreeBSD, OpenBSD, WASI | 0 (0 files) | 4 | swift-nio, swift-sdk-generator | `label` | System names it nowhere |
+| 114 | ws_col | Linux, Musl, FreeBSD, OpenBSD | 2 (1 file) | 2 | swift-nio | `ws_col` | System names it nowhere |
+| 115 | useconds_t | Android, WASI | 2 (1 file) | 2 | swift-sdk-generator | `useconds_t` | System names it nowhere |
+| 116 | IPTOS_ECN_* | Linux, Musl, Android, FreeBSD | 0 (0 files) | 1 | swift-nio | `IPTOS_ECN_*` | System names it nowhere |
+| 117 | [sendmmsg and recvmmsg] | FreeBSD | 1 (1 file) | 1 | swift-nio | `sendmmsg` | SocketDescriptor.sendMessages isn't built on FreeBSD (only Darwin, Linux, Musl, Android) |
+| 118 | ai_family | FreeBSD, OpenBSD, Windows | 0 (0 files) | 2 | swift-nio | `ai_family` | System names it nowhere |
+| 119 | ai_flags | FreeBSD, OpenBSD | 1 (1 file) | 1 | swift-nio | `ai_flags` | System names it nowhere |
+| 120 | MPTCP_INFO | Linux, Musl | 0 (0 files) | 1 | swift-nio | `MPTCP_INFO` | System names it nowhere |
+| 121 | [TCP connection info] | Linux, Musl | 1 (1 file) | 1 | swift-nio | `mptcp_info` | System names it nowhere |
+| 122 | [Windows file information] | Windows | 0 (0 files) | 5 | swift-foundation, swift-subprocess | `INVALID_FILE_ATTRIBUTES` | System's implementation uses it; no public declaration names it |
+| 123 | SetFileTime | Windows | 2 (1 file) | 4 | swift-foundation, wasmkit | `SetFileTime` | System names it nowhere |
+| 124 | FILE_END_OF_FILE_INFO | Windows | 2 (1 file) | 2 | wasmkit | `FILE_END_OF_FILE_INFO` | System's implementation uses it; no public declaration names it |
+| 125 | ERROR_INVALID_ACCESS | Windows | 0 (0 files) | 3 | swift-foundation, wasmkit | `ERROR_INVALID_ACCESS` | System names it nowhere |
+| 126 | ERROR_INVALID_DATA | Windows | 0 (0 files) | 3 | swift-foundation, wasmkit | `ERROR_INVALID_DATA` | System names it nowhere |
+| 127 | ERROR_INVALID_DRIVE | Windows | 0 (0 files) | 3 | swift-foundation, wasmkit | `ERROR_INVALID_DRIVE` | System names it nowhere |
+| 128 | msg_hdr | Windows | 0 (0 files) | 3 | swift-nio | `msg_hdr` | System's accessor isn't built on Windows |
+| 129 | msg_len | Windows | 2 (2 files) | 3 | swift-nio | `msg_len` | System's accessor isn't built on Windows |
+| 130 | sin6_addr | Windows | 0 (0 files) | 3 | swift-nio | `sin6_addr` | System's accessor isn't built on Windows |
+| 131 | sin6_family | Windows | 0 (0 files) | 3 | swift-nio | `sin6_family` | System's accessor isn't built on Windows |
+| 132 | sin6_flowinfo | Windows | 0 (0 files) | 3 | swift-nio | `sin6_flowinfo` | System's accessor isn't built on Windows |
+| 133 | sin6_port | Windows | 0 (0 files) | 3 | swift-nio | `sin6_port` | System's accessor isn't built on Windows |
+| 134 | sin6_scope_id | Windows | 0 (0 files) | 3 | swift-nio | `sin6_scope_id` | System's accessor isn't built on Windows |
+| 135 | sin_family | Windows | 1 (1 file) | 3 | swift-nio | `sin_family` | System's accessor isn't built on Windows |
+| 136 | st_mode | Windows | 0 (0 files) | 3 | llbuild, swift-foundation-icu | `st_mode` | System's accessor isn't built on Windows |
+| 137 | [stat] | Windows | 1 (1 file) | 1 | swift-foundation-icu | `stat` | Stat.init isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI) |
+| 138 | sun_family | Windows | 0 (0 files) | 3 | swift-nio | `sun_family` | System's accessor isn't built on Windows |
+| 139 | sun_path | Windows | 2 (2 files) | 3 | swift-nio | `sun_path` | System's accessor isn't built on Windows |
+| 140 | ss_family | Windows | 1 (1 file) | 1 | swift-nio | `ss_family` | System's accessor isn't built on Windows |
+| 141 | ERROR_BAD_NETPATH | Windows | 0 (0 files) | 2 | wasmkit | `ERROR_BAD_NETPATH` | System names it nowhere |
+| 142 | ERROR_BAD_NET_NAME | Windows | 0 (0 files) | 2 | wasmkit | `ERROR_BAD_NET_NAME` | System names it nowhere |
+| 143 | ERROR_CANCELLED | Windows | 0 (0 files) | 2 | swift-foundation | `ERROR_CANCELLED` | System names it nowhere |
+| 144 | POSIXErrorCode | Windows | 2 (1 file) | 2 | swift-foundation | `POSIXErrorCode` | CInterop.POSIXErrorCode isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI) |
+| 145 | ERROR_CANNOT_MAKE | Windows | 0 (0 files) | 2 | wasmkit | `ERROR_CANNOT_MAKE` | System names it nowhere |
+| 146 | ERROR_CURRENT_DIRECTORY | Windows | 0 (0 files) | 2 | wasmkit | `ERROR_CURRENT_DIRECTORY` | System names it nowhere |
+| 147 | ERROR_DRIVE_LOCKED | Windows | 0 (0 files) | 2 | wasmkit | `ERROR_DRIVE_LOCKED` | System names it nowhere |
+| 148 | ERROR_FAIL_I24 | Windows | 0 (0 files) | 2 | wasmkit | `ERROR_FAIL_I24` | System names it nowhere |
+| 149 | ERROR_FILE_SYSTEM_LIMITATION | Windows | 0 (0 files) | 2 | swift-foundation | `ERROR_FILE_SYSTEM_LIMITATION` | System names it nowhere |
+| 150 | FILE_RENAME_INFO | Windows | 2 (1 file) | 2 | swift-foundation | `FILE_RENAME_INFO` | System's implementation uses it; no public declaration names it |
+| 151 | ERROR_INVALID_BLOCK | Windows | 0 (0 files) | 2 | wasmkit | `ERROR_INVALID_BLOCK` | System names it nowhere |
+| 152 | ERROR_INVALID_STARTING_CODESEG | Windows | 0 (0 files) | 2 | wasmkit | `ERROR_INVALID_STARTING_CODESEG` | System names it nowhere |
+| 153 | ERROR_INVALID_TARGET_HANDLE | Windows | 0 (0 files) | 2 | wasmkit | `ERROR_INVALID_TARGET_HANDLE` | System names it nowhere |
+| 154 | ERROR_LOCK_FAILED | Windows | 0 (0 files) | 2 | wasmkit | `ERROR_LOCK_FAILED` | System names it nowhere |
+| 155 | ERROR_MAX_THRDS_REACHED | Windows | 0 (0 files) | 2 | wasmkit | `ERROR_MAX_THRDS_REACHED` | System names it nowhere |
+| 156 | ERROR_NETWORK_ACCESS_DENIED | Windows | 0 (0 files) | 2 | wasmkit | `ERROR_NETWORK_ACCESS_DENIED` | System names it nowhere |
+| 157 | ERROR_NO_MORE_FILES | Windows | 0 (0 files) | 2 | wasmkit | `ERROR_NO_MORE_FILES` | System names it nowhere |
+| 158 | ERROR_SEEK_ON_DEVICE | Windows | 0 (0 files) | 2 | wasmkit | `ERROR_SEEK_ON_DEVICE` | System names it nowhere |
+| 159 | ERROR_WRITE_PROTECT | Windows | 2 (1 file) | 2 | wasmkit | `ERROR_WRITE_PROTECT` | System names it nowhere |
+| 160 | GetCurrentDirectoryW | Windows | 0 (0 files) | 2 | swift-foundation | `GetCurrentDirectoryW` | System names it nowhere |
+| 161 | SetCurrentDirectoryW | Windows | 2 (1 file) | 2 | swift-foundation | `SetCurrentDirectoryW` | System names it nowhere |
+| 162 | JOBOBJECT_EXTENDED_LIMIT_INFORMATION | Windows | 0 (0 files) | 2 | swift-subprocess, swift-tools-support-core | `JOBOBJECT_EXTENDED_LIMIT_INFORMATION` | System's implementation uses it; no public declaration names it |
+| 163 | LC_ALL | Windows | 0 (0 files) | 2 | swift-foundation | `LC_ALL` | CLocale.Category.all isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI) |
+| 164 | TOKEN_ELEVATION | Windows | 1 (1 file) | 1 | swift-foundation | `TOKEN_ELEVATION` | System's implementation uses it; no public declaration names it |
+| 165 | setlocale | Windows | 1 (1 file) | 1 | swift-foundation | `setlocale` | CLocale.globalName isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI) |
+| 166 | STARTUPINFOW | Windows | 0 (0 files) | 2 | swift-subprocess, swift-tools-support-core | `STARTUPINFOW` | System's implementation uses it; no public declaration names it |
+| 167 | [Windows process creation] | Windows | 0 (0 files) | 2 | swift-subprocess, swift-tools-support-core | `CREATE_UNICODE_ENVIRONMENT`, `CreateProcessWithLogonW`, `DeleteProcThreadAttributeList`, `EXTENDED_STARTUPINFO_PRESENT`, `InitializeProcThreadAttributeList`, `LOGON_WITH_PROFILE`… | System names it nowhere |
+| 168 | [environment block] | Windows | 1 (1 file) | 2 | swift-foundation, swift-subprocess | `FreeEnvironmentStringsW` | System's implementation uses it; no public declaration names it |
+| 169 | ULONGLONG | Windows | 1 (1 file) | 1 | swift-foundation | `ULONGLONG` | System's implementation uses it; no public declaration names it |
+| 170 | ULONG_PTR | Windows | 1 (1 file) | 1 | swift-tools-support-core | `ULONG_PTR` | System's implementation uses it; no public declaration names it |
+| 171 | st_dev | Windows | 0 (0 files) | 2 | llbuild | `st_dev` | System's accessor isn't built on Windows |
+| 172 | st_ino | Windows | 0 (0 files) | 2 | llbuild | `st_ino` | System's accessor isn't built on Windows |
+| 173 | st_size | Windows | 2 (1 file) | 2 | llbuild | `st_size` | System's accessor isn't built on Windows |
+| 174 | BELOW_NORMAL_PRIORITY_CLASS | Windows | 0 (0 files) | 1 | sourcekit-lsp | `BELOW_NORMAL_PRIORITY_CLASS` | System names it nowhere |
+| 175 | EMULTIHOP | OpenBSD | 0 (0 files) | 1 | wasmkit | `EMULTIHOP` | Errno.multiHop isn't built on OpenBSD (only Darwin, Linux, Musl, Android, FreeBSD, WASI) |
+| 176 | ENOLINK | OpenBSD | 1 (1 file) | 1 | wasmkit | `ENOLINK` | Errno.noLink isn't built on OpenBSD (only Darwin, Linux, Musl, Android, FreeBSD, WASI) |
+| 177 | ERROR_DISK_RESOURCES_EXHAUSTED | Windows | 0 (0 files) | 1 | swift-foundation | `ERROR_DISK_RESOURCES_EXHAUSTED` | System names it nowhere |
+| 178 | ERROR_LABEL_TOO_LONG | Windows | 0 (0 files) | 1 | swift-foundation | `ERROR_LABEL_TOO_LONG` | System names it nowhere |
+| 179 | FILE_NAME_NORMALIZED | Windows | 1 (1 file) | 1 | swift-foundation | `FILE_NAME_NORMALIZED` | System names it nowhere |
+| 180 | FindClose | Windows | 0 (0 files) | 1 | swift-foundation | `FindClose` | System's implementation uses it; no public declaration names it |
+| 181 | FindExInfoBasic | Windows | 0 (0 files) | 1 | swift-foundation | `FindExInfoBasic` | System names it nowhere |
+| 182 | FindExSearchNameMatch | Windows | 0 (0 files) | 1 | swift-foundation | `FindExSearchNameMatch` | System names it nowhere |
+| 183 | FindFirstFileExW | Windows | 0 (0 files) | 1 | swift-foundation | `FindFirstFileExW` | System names it nowhere |
+| 184 | FindNextFileW | Windows | 0 (0 files) | 1 | swift-foundation | `FindNextFileW` | System's implementation uses it; no public declaration names it |
+| 185 | WIN32_FIND_DATAW | Windows | 1 (1 file) | 1 | swift-foundation | `WIN32_FIND_DATAW` | System's implementation uses it; no public declaration names it |
+| 186 | IDLE_PRIORITY_CLASS | Windows | 0 (0 files) | 1 | sourcekit-lsp | `IDLE_PRIORITY_CLASS` | System names it nowhere |
+| 187 | NORMAL_PRIORITY_CLASS | Windows | 1 (1 file) | 1 | sourcekit-lsp | `NORMAL_PRIORITY_CLASS` | System names it nowhere |
+| 188 | MAP_FAILED | WASI | 0 (0 files) | 1 | swift-foundation | `MAP_FAILED` | MemoryMapping.init isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
+| 189 | MAP_PRIVATE | WASI | 0 (0 files) | 1 | swift-foundation | `MAP_PRIVATE` | MemoryMapping.Options.private isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
+| 190 | PROT_READ | WASI | 0 (0 files) | 1 | swift-foundation | `PROT_READ` | MemoryMapping.Protection.read isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
+| 191 | mmap | WASI | 1 (1 file) | 1 | swift-foundation | `mmap` | MemoryMapping isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
+| 192 | PSID | Windows | 0 (0 files) | 1 | swift-subprocess | `PSID` | System's implementation uses it; no public declaration names it |
+| 193 | UNLEN | Windows | 1 (1 file) | 1 | swift-subprocess | `UNLEN` | System names it nowhere |
+| 194 | WSAEFAULT | Windows | 0 (0 files) | 1 | swift-nio | `WSAEFAULT` | System names it nowhere |
+| 195 | [Windows delete] | Windows | 0 (0 files) | 1 | swift-nio | `FILE_DISPOSITION_INFO_EX` | System's implementation uses it; no public declaration names it |
+| 196 | cmsg_len | Windows | 1 (1 file) | 1 | swift-nio | `cmsg_len` | System's accessor isn't built on Windows |
+| 197 | [gettimeofday] | Windows | 0 (0 files) | 1 | swift-nio | `timeval` | CInterop.TimeVal isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI) |
+| 198 | __time64_t | Windows | 0 (0 files) | 1 | swift-log | `__time64_t` | System's implementation uses it; no public declaration names it |
+| 199 | _time64 | Windows | 1 (1 file) | 1 | swift-log | `_time64` | System names it nowhere |
+| 200 | l_linger | Windows | 0 (0 files) | 1 | swift-nio | `l_linger` | System's accessor isn't built on Windows |
+| 201 | l_onoff | Windows | 0 (0 files) | 1 | swift-nio | `l_onoff` | System's accessor isn't built on Windows |
+| 202 | tv_usec | Windows | 1 (1 file) | 1 | swift-nio | `tv_usec` | System's accessor isn't built on Windows |
 
 ## Queued work
 
@@ -1326,11 +1724,9 @@ System or adopter work already identified, with where; ranked by the sites each 
 
 | Entry | Sites | Work | Where | Ends | Repositories |
 |---|---:|---|---|---|---|
-| N1: fts on Linux in swift-foundation | 13 | System and adopter | Prototype/Coverage5/REPORT.md, Needs design N1 (its rank 2) | DirectoryWalk's same-device option, then Foundation's comparison run on Linux | swift-foundation |
+| N1: fts on Linux in swift-foundation | 14 | adopter | Prototype/Coverage5/REPORT.md, Needs design N1 (its rank 2) | Foundation's comparison run on Linux, and its Linux walks on DirectoryWalk | swift-foundation |
 | N2: the thread API on WASI without threads | 3 (+1) | System | Prototype/Coverage5/REPORT.md, Needs design N2 (its rank 6) | a decision, and System's API for it on WASI | swift-async-algorithms, swift-certificates, swift-nio |
 | N3: pseudoterminals on OpenBSD | 2 (+1) | System | Prototype/Coverage5/REPORT.md, Needs design N3 (its rank 9) | TerminalDescriptor.openPseudoterminal() on OpenBSD | swift-build, swift-testing |
-| E2: swift-syntax's memcmp in SyntaxText.swift | 0 | adopter | Michael's answers of 2026-10-05, in the coordinator's correction to recollapse-a, recollapse-b and ledger | SwiftSyntax calling Memory.compare(_:_:) | — |
-| E4: SWBLibc's and TSCLibc's Unix re-exports | 0 | adopter | Michael's answers of 2026-10-05, in the coordinator's correction to recollapse-a, recollapse-b and ledger | the Unix re-exports gone, with their importers on System | — |
 | N4: a byte view on FilePath.Component | 0 | System | Prototype/Coverage5/REPORT.md, Needs design N4 (its rank 11) | the view | — |
 | N5: collation | 0 | System | Prototype/Coverage5/REPORT.md, Needs design N5 (its rank 14) | a decision | — |
 | N6: wide characters | 0 | System | Prototype/Coverage5/REPORT.md, Needs design N6 (its rank 15) | a decision | — |
@@ -1357,14 +1753,12 @@ Reported modules (modules.ini [report]), sites by module: `os` 27.
 
 ## Not System's: mapping.ini's lane verdicts, unreviewed
 
-mapping.ini's 14 `wrap = no` entries were written by lanes and never reviewed by Michael: lane proposals, not decisions. Each is listed with the sites it holds; the Mach-O and ar.h ones are System gaps now (`exceptions.ini` E3).
+mapping.ini's 11 `wrap = no` entries were written by lanes and never reviewed by Michael: lane proposals, not decisions. Each is listed with the sites it holds.
 
 | mapping.ini entry | Category | Sites | Symbols |
 |---|---|---:|---|
 | [Windows window messages] | not System's (lane verdict, unreviewed) | 0 | `EnumWindows`, `GetWindowThreadProcessId`, `SendMessage`, `WM_CLOSE`, `HWND`, `_subprocess_windows_send_vm_close` |
 | [autoreleasepool] | not System's (lane verdict, unreviewed) | 0 | `autoreleasepool` |
-| [Mach-O file format] | System gap (E3) | 58 | `mach_header`, `mach_header_64`, `load_command`, `segment_command`, `segment_command_64`, `section`… |
-| [Mach-O architecture names] | System gap (E3) | 3 | `macho_arch_name_for_mach_header`, `macho_cpu_type_for_arch_name`, `macho_arch_name_for_cpu_type` |
 | [Dispatch] | not System's (lane verdict, unreviewed) | 0 | `DispatchQueue`, `DispatchGroup`, `DispatchData`, `DispatchSemaphore`, `DispatchTime`, `DispatchSpecificKey`… |
 | [Security keychain] | not System's (lane verdict, unreviewed) | 0 | `SecItemAdd`, `SecItemCopyMatching`, `SecItemDelete`, `SecItemUpdate`, `kSecAttrAccount`, `kSecAttrCreationDate`… |
 | [Security identities and keys] | not System's (lane verdict, unreviewed) | 0 | `SecIdentityRef`, `SecCertificateRef`, `SecKeyRef`, `SecCertificateCopyData`, `SecIdentityCopyCertificate`, `SecIdentityCopyPrivateKey`… |
@@ -1374,7 +1768,6 @@ mapping.ini's 14 `wrap = no` entries were written by lanes and never reviewed by
 | [other frameworks' names] | not System's (lane verdict, unreviewed) | 0 | `Logger`, `NSDictionary`, `CFRunLoopStop` |
 | [Objective-C runtime] | not System's (lane verdict, unreviewed) | 0 | `NSObject`, `description` |
 | [SQLite] | not System's (lane verdict, unreviewed) | 0 | `sqlite3_bind_blob`, `sqlite3_bind_int64`, `sqlite3_bind_null`, `sqlite3_bind_text`, `sqlite3_busy_timeout`, `sqlite3_clear_bindings`… |
-| [ar archive header] | System gap (E3) | 3 | `ar_hdr`, `ar_name`, `ar_size`, `SARMAG`, `AR_EFMT1`, `ARMAG`… |
 
 Imports of the modules modules.ini lists as not System's (reviewed by Michael, 2026-10-05: libraries, not OS interfaces) aren't sites: `Dispatch` 215, `ObjectiveC` 5.
 
@@ -1389,7 +1782,6 @@ Sites whose C names that System doesn't cover all have the standard library's an
 | [Win32 scalar types] | 4 | swift-nio, wasmkit |
 | [memory copies] | 1 | swift-foundation |
 | [mutexes] | 1 | swift-subprocess |
-| [termination] | 1 | swift-testing |
 
 ## Excluded
 
@@ -1463,59 +1855,18 @@ Not sites at all; they count nowhere.
 
 **swift-atomics**, at `../ecosystem/swift-atomics` @ `0442cb5a`: no sites.
 
-**swift-build**, at `../adopters/swift-build` `migrate-all` @ `1dce162d`: 87 sites, 7 of them unexplained (above).
+**swift-build**, at `../adopters/swift-build` `migrate-all` @ `dad65aee`: 24 sites, 10 of them unexplained (above).
 
 - `Sources/MockToolchainCASPlugin/MockCASFileLock.swift` 17 `WinSDK` (Windows): **System gap**: [Win32 errors] (GetLastError: Windows)
 - `Sources/SWBCore/SpecImplementations/Tools/SwiftCompiler.swift` 26 `os` (submodule) (Darwin): **undecided** (module os): `os` (modules.ini [report]: Michael decides module by module)
 - `Sources/SWBTaskExecution/DynamicTaskSpecs/CompilationCachingUploader.swift` 20 `os` (Darwin): **undecided** (module os): `os` (modules.ini [report]: Michael decides module by module)
-- `Sources/SWBUtil/Architecture.swift` 23-25 `MachO` (scoped), 1 marker ×3 (Darwin): **System gap**: E3 (macho_arch_name_for_cpu_type, macho_arch_name_for_mach_header, macho_cpu_type_for_arch_name: Darwin)
 - `Sources/SWBUtil/HeavyCache.swift` 14 `os` (Darwin): **undecided** (module os): `os` (modules.ini [report]: Michael decides module by module)
-- `Sources/SWBUtil/Library.swift` 18 marker: dlopen in the caller's image. `Library.open` is emitted into its calle… (Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows): **System gap**: E5 (dlopen: Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows)
-- `Sources/SWBUtil/Library.swift` 21 `Darwin` (scoped) (Darwin): **System gap**: E5 (dlopen: Darwin)
-- `Sources/SWBUtil/Library.swift` 23 `Glibc` (scoped) (Linux, FreeBSD, OpenBSD): **System gap**: E5 (dlopen: Linux, FreeBSD, OpenBSD)
-- `Sources/SWBUtil/Library.swift` 25 `Musl` (scoped) (Musl): **System gap**: E5 (dlopen: Musl)
-- `Sources/SWBUtil/Library.swift` 27 `Android` (scoped) (Android): **System gap**: E5 (dlopen: Android)
-- `Sources/SWBUtil/MachO.swift` 22-37 `MachO` (scoped), 1 marker ×16 (Darwin): **System gap**: E3 (build_version_command, dylib, dylib_command…: Darwin)
-- `Sources/SWBUtil/MachO.swift` 38 `MachO` (scoped), 1 marker (Darwin): **System gap**: E3 (MH_MAGIC, build_version_command, dylib…: Darwin)
-- `Sources/SWBUtil/MachO.swift` 39 `MachO` (scoped), 1 marker (Darwin): **System gap**: E3 (MH_CIGAM, build_version_command, dylib…: Darwin)
-- `Sources/SWBUtil/MachO.swift` 40 `MachO` (scoped), 1 marker (Darwin): **System gap**: E3 (MH_MAGIC_64, build_version_command, dylib…: Darwin)
-- `Sources/SWBUtil/MachO.swift` 41 `MachO` (scoped), 1 marker (Darwin): **System gap**: E3 (MH_CIGAM_64, build_version_command, dylib…: Darwin)
-- `Sources/SWBUtil/MachO.swift` 42 `MachO` (scoped), 1 marker (Darwin): **System gap**: E3 (MH_OBJECT, build_version_command, dylib…: Darwin)
-- `Sources/SWBUtil/MachO.swift` 43 `MachO` (scoped), 1 marker (Darwin): **System gap**: E3 (MH_EXECUTE, build_version_command, dylib…: Darwin)
-- `Sources/SWBUtil/MachO.swift` 44 `MachO` (scoped), 1 marker (Darwin): **System gap**: E3 (MH_DYLIB, build_version_command, dylib…: Darwin)
-- `Sources/SWBUtil/MachO.swift` 45 `MachO` (scoped), 1 marker (Darwin): **System gap**: E3 (MH_BUNDLE, build_version_command, dylib…: Darwin)
-- `Sources/SWBUtil/MachO.swift` 46 `MachO` (scoped), 1 marker (Darwin): **System gap**: E3 (LC_SEGMENT, build_version_command, dylib…: Darwin)
-- `Sources/SWBUtil/MachO.swift` 47 `MachO` (scoped), 1 marker (Darwin): **System gap**: E3 (LC_SEGMENT_64, build_version_command, dylib…: Darwin)
-- `Sources/SWBUtil/MachO.swift` 48 `MachO` (scoped), 1 marker (Darwin): **System gap**: E3 (LC_ID_DYLIB, build_version_command, dylib…: Darwin)
-- `Sources/SWBUtil/MachO.swift` 49 `MachO` (scoped), 1 marker (Darwin): **System gap**: E3 (LC_LOAD_DYLIB, build_version_command, dylib…: Darwin)
-- `Sources/SWBUtil/MachO.swift` 50 `MachO` (scoped), 1 marker (Darwin): **System gap**: E3 (LC_LOAD_WEAK_DYLIB, build_version_command, dylib…: Darwin)
-- `Sources/SWBUtil/MachO.swift` 51 `MachO` (scoped), 1 marker (Darwin): **System gap**: E3 (LC_REEXPORT_DYLIB, build_version_command, dylib…: Darwin)
-- `Sources/SWBUtil/MachO.swift` 52 `MachO` (scoped), 1 marker (Darwin): **System gap**: E3 (LC_LAZY_LOAD_DYLIB, build_version_command, dylib…: Darwin)
-- `Sources/SWBUtil/MachO.swift` 53 `MachO` (scoped), 1 marker (Darwin): **System gap**: E3 (LC_LOAD_UPWARD_DYLIB, build_version_command, dylib…: Darwin)
-- `Sources/SWBUtil/MachO.swift` 54 `MachO` (scoped), 1 marker (Darwin): **System gap**: E3 (LC_UUID, build_version_command, dylib…: Darwin)
-- `Sources/SWBUtil/MachO.swift` 55 `MachO` (scoped), 1 marker (Darwin): **System gap**: E3 (LC_RPATH, build_version_command, dylib…: Darwin)
-- `Sources/SWBUtil/MachO.swift` 56 `MachO` (scoped), 1 marker (Darwin): **System gap**: E3 (LC_BUILD_VERSION, build_version_command, dylib…: Darwin)
-- `Sources/SWBUtil/MachO.swift` 57 `MachO` (scoped), 1 marker (Darwin): **System gap**: E3 (LC_VERSION_MIN_MACOSX, build_version_command, dylib…: Darwin)
-- `Sources/SWBUtil/MachO.swift` 58 `MachO` (scoped), 1 marker (Darwin): **System gap**: E3 (LC_VERSION_MIN_IPHONEOS, build_version_command, dylib…: Darwin)
-- `Sources/SWBUtil/MachO.swift` 59 `MachO` (scoped), 1 marker (Darwin): **System gap**: E3 (LC_VERSION_MIN_TVOS, build_version_command, dylib…: Darwin)
-- `Sources/SWBUtil/MachO.swift` 60 `MachO` (scoped), 1 marker (Darwin): **System gap**: E3 (LC_VERSION_MIN_WATCHOS, build_version_command, dylib…: Darwin)
-- `Sources/SWBUtil/MachO.swift` 61 `MachO` (scoped), 1 marker (Darwin): **System gap**: E3 (FAT_MAGIC, build_version_command, dylib…: Darwin)
-- `Sources/SWBUtil/MachO.swift` 62 `MachO` (scoped), 1 marker (Darwin): **System gap**: E3 (FAT_CIGAM, build_version_command, dylib…: Darwin)
-- `Sources/SWBUtil/MachO.swift` 63 `MachO` (scoped), 1 marker (Darwin): **System gap**: E3 (FAT_MAGIC_64, build_version_command, dylib…: Darwin)
-- `Sources/SWBUtil/MachO.swift` 64 `MachO` (scoped), 1 marker (Darwin): **System gap**: E3 (FAT_CIGAM_64, build_version_command, dylib…: Darwin)
-- `Sources/SWBUtil/MachO.swift` 65 `MachO` (scoped), 1 marker (Darwin): **System gap**: E3 (SYMDEF, build_version_command, dylib…: Darwin)
-- `Sources/SWBUtil/MachO.swift` 66 `MachO` (scoped), 1 marker (Darwin): **System gap**: E3 (SYMDEF_SORTED, build_version_command, dylib…: Darwin)
-- `Sources/SWBUtil/MachO.swift` 67 `MachO` (scoped), 1 marker (Darwin): **System gap**: E3 (SYMDEF_64, build_version_command, dylib…: Darwin)
-- `Sources/SWBUtil/MachO.swift` 68 `MachO` (scoped), 1 marker (Darwin): **System gap**: E3 (SYMDEF_64_SORTED, build_version_command, dylib…: Darwin)
-- `Sources/SWBUtil/MachO.swift` 70 `Darwin` (scoped), 1 marker (Darwin): **System gap**: E3 (vm_prot_t: Darwin)
-- `Sources/SWBUtil/MachO.swift` 72-74 `Darwin` (scoped), 1 marker ×3 (Darwin): **System gap**: E3 (AR_EFMT1, SARMAG, ar_hdr…: Darwin)
 - `Sources/SWBUtil/OSLog.swift` 16 `os` (Darwin): **undecided** (module os): `os` (modules.ini [report]: Michael decides module by module)
 - `Sources/SWBUtil/PathWindows.swift` 14 `WinSDK` (Windows): **System gap**: [Win32 errors] (FACILITY_WIN32, GetLastError: Windows); [Windows local memory] (LocalFree: Windows); [Windows paths] (PATHCCH_ALLOW_LONG_PATHS: Windows)
 - `Sources/SWBUtil/Win32.swift` 14 `WinSDK` (Windows): **System gap**: [Win32 errors] (GetLastError: Windows); LPCWSTR (LPCWSTR: Windows); [PATH_MAX] (MAX_PATH: Windows)
 - `Sources/SWBUtil/Win32Error.swift` 14 `WinSDK` (Windows): **System gap**: [Win32 errors] (FORMAT_MESSAGE_ALLOCATE_BUFFER, FORMAT_MESSAGE_FROM_SYSTEM, FORMAT_MESSAGE_IGNORE_INSERTS: Windows); [Windows local memory] (LocalFree: Windows)
 - `Sources/SWBWindowsPlatform/KnownFolders.swift` 17 `WinSDK` (Windows): **System gap**: [Windows known folders] (CoTaskMemFree, FOLDERID_ProgramFilesX86, FOLDERID_UserProgramFiles…: Windows)
-- `Tests/SWBBuildSystemTests/MergeableLibrariesBuildOperationTests.swift` 24 `MachO` (scoped), 1 marker (Darwin): **System gap**: E3 (load_command: Darwin)
-- `Tests/SWBUtilTests/MachOTests.swift` 22-29 `MachO` (scoped), 1 marker ×8 (Darwin): **System gap**: E3 (FAT_CIGAM, FAT_CIGAM_64, LC_MAIN…: Darwin)
+- `Tests/SWBUtilTests/MachOTests.swift` 22-23 `MachO` (scoped), 1 marker ×2 (Darwin): **System gap**: [Mach-O file format] (LC_MAIN, LC_SYMTAB: Darwin)
 - `Tests/SwiftBuildTests/ConsoleCommands/CLIConnection.swift` 21 `WinSDK` (Windows): **System gap**: [Win32 errors] (GetLastError: Windows); [Windows DLLs] (GetModuleHandleW: Windows); UINT (UINT: Windows)
 - `Tests/SwiftBuildTests/ConsoleCommands/CLIConnection.swift` 127 marker: TerminalDescriptor.openPseudoterminal() on OpenBSD (openpty, fcntl, F_… (OpenBSD): **queued** (N3): N3 (openpty: OpenBSD)
 - `Tests/SwiftBuildTests/ConsoleCommands/ServiceConsoleTests.swift` 19 `WinSDK` (Windows): **System gap**: [Win32 errors] (GetLastError: Windows); [Windows process exit] (RegisterWaitForSingleObject, UnregisterWait, WT_EXECUTELONGFUNCTION…: Windows)
@@ -1600,27 +1951,27 @@ Not sites at all; they count nowhere.
 
 - `Sources/SwiftFormat/Utilities/FileIterator.swift` 16 `WinSDK` (Windows): **System gap**: Internal (Internal: Windows)
 
-**swift-foundation**, at `../adopters/swift-foundation` `migrate-unix` @ `d7589041`: 166 sites, 80 of them unexplained (above).
+**swift-foundation**, at `../adopters/swift-foundation` `migrate-unix` @ `b948c6ee`: 178 sites, 87 of them unexplained (above).
 
 - `Sources/FoundationEssentials/AttributedString/AttributeScope.swift` 68 marker: DynamicLibrary, in the framework build (not built here): dlopen with R…, 70 `Darwin`, 1 marker, 71 `MachO` (submodule), 1 marker (none): **excluded** (E7d): Foundation's #if FOUNDATION_FRAMEWORK code
 - `Sources/FoundationEssentials/Calendar/Calendar_Enumerate.swift` 15 `os` (none): **excluded** (E7d): Foundation's #if FOUNDATION_FRAMEWORK code
 - `Sources/FoundationEssentials/Calendar/Calendar_Gregorian.swift` 15 `os` (none): **excluded** (E7d): Foundation's #if FOUNDATION_FRAMEWORK code
 - `Sources/FoundationEssentials/Data/Data+Error.swift` 15 `os` (none): **excluded** (E7d): Foundation's #if FOUNDATION_FRAMEWORK code
-- `Sources/FoundationEssentials/Data/Data+Reading.swift` 27 `Android` (Android): **standard library**: [C scalar types] (SSIZE_MAX: Android)
-- `Sources/FoundationEssentials/Data/Data+Reading.swift` 29 `Glibc` (Linux, FreeBSD, OpenBSD): **standard library**: [C scalar types] (SSIZE_MAX: Linux)
-- `Sources/FoundationEssentials/Data/Data+Reading.swift` 33 `CRT`, 34 `WinSDK` (Windows): **System gap**: [Win32 errors] (GetLastError: Windows)
-- `Sources/FoundationEssentials/Data/Data+Reading.swift` 36 `WASILibc` (WASI): **System gap**: MAP_FAILED (MAP_FAILED: WASI); MAP_PRIVATE (MAP_PRIVATE: WASI); PROT_READ (PROT_READ: WASI); mmap (mmap: WASI)
-- `Sources/FoundationEssentials/Data/Data+Writing.swift` 31 `Glibc` (FreeBSD, OpenBSD): **System gap**: mktemp (mktemp: FreeBSD, OpenBSD)
-- `Sources/FoundationEssentials/Data/Data+Writing.swift` 35 `CRT`, 36 `WinSDK` (Windows): **System gap**: ERROR_FILE_SYSTEM_LIMITATION (ERROR_FILE_SYSTEM_LIMITATION: Windows); FILE_RENAME_INFO (FILE_RENAME_INFO: Windows); [Win32 errors] (GetLastError: Windows); [Windows file information] (INVALID_FILE_ATTRIBUTES: Windows); [string functions] (strlen, wcslen: Windows)
-- `Sources/FoundationEssentials/Data/Data.swift` 49 `Glibc` (FreeBSD, OpenBSD): **standard library**: [memory copies] (memcpy, memset: FreeBSD, OpenBSD)
-- `Sources/FoundationEssentials/Data/Data.swift` 54 `ucrt` (Windows): **System gap**: [string functions] (memcmp: Windows)
-- `Sources/FoundationEssentials/Data/Data.swift` 59 `WASILibc` (WASI): **System gap**: munmap (munmap: WASI)
-- `Sources/FoundationEssentials/Data/Data.swift` 78 `WinSDK` (scoped) (Windows): **System gap**: UnmapViewOfFile (UnmapViewOfFile: Windows)
+- `Sources/FoundationEssentials/Data/Data+Reading.swift` 25 `Android` (Android): **standard library**: [C scalar types] (SSIZE_MAX: Android)
+- `Sources/FoundationEssentials/Data/Data+Reading.swift` 27 `Glibc` (Linux, FreeBSD, OpenBSD): **standard library**: [C scalar types] (SSIZE_MAX: Linux)
+- `Sources/FoundationEssentials/Data/Data+Reading.swift` 31 `CRT`, 32 `WinSDK` (Windows): **System gap**: [Win32 errors] (GetLastError: Windows)
+- `Sources/FoundationEssentials/Data/Data+Reading.swift` 34 `WASILibc` (WASI): **System gap**: MAP_FAILED (MAP_FAILED: WASI); MAP_PRIVATE (MAP_PRIVATE: WASI); PROT_READ (PROT_READ: WASI); mmap (mmap: WASI)
+- `Sources/FoundationEssentials/Data/Data+Reading.swift` 68 marker: FilePath.extendedAttribute on FreeBSD (extattr_*), OpenBSD and WASI (n… (FreeBSD?, OpenBSD?, WASI?, Windows?): **System gap**: extattr_* (extattr_*: FreeBSD, OpenBSD, WASI, Windows)
+- `Sources/FoundationEssentials/Data/Data+Writing.swift` 33 `Glibc`, 1 marker (FreeBSD, OpenBSD): **System gap**: mktemp (mktemp: FreeBSD, OpenBSD)
+- `Sources/FoundationEssentials/Data/Data+Writing.swift` 37 `CRT`, 38 `WinSDK` (Windows): **System gap**: ERROR_FILE_SYSTEM_LIMITATION (ERROR_FILE_SYSTEM_LIMITATION: Windows); FILE_RENAME_INFO (FILE_RENAME_INFO: Windows); [Win32 errors] (GetLastError: Windows); [Windows file information] (INVALID_FILE_ATTRIBUTES: Windows); [string functions] (strlen, wcslen: Windows)
+- `Sources/FoundationEssentials/Data/Data+Writing.swift` 850 marker: FileDescriptor.setExtendedAttribute on FreeBSD (extattr_*) (FreeBSD?): **System gap**: extattr_* (extattr_*: FreeBSD)
+- `Sources/FoundationEssentials/Data/Data.swift` 50 `ucrt` (Windows): **System gap**: [string functions] (memcmp: Windows)
+- `Sources/FoundationEssentials/Data/Data.swift` 57 `WASILibc` (WASI): **System gap**: munmap (munmap: WASI)
+- `Sources/FoundationEssentials/Data/Data.swift` 73 `WinSDK` (scoped) (Windows): **System gap**: UnmapViewOfFile (UnmapViewOfFile: Windows)
 - `Sources/FoundationEssentials/Data/Representations/DataStorage.swift` 24 `ucrt` (Windows): **standard library**: [malloc] (realloc: Windows)
-- `Sources/FoundationEssentials/Date.swift` 21 `WinSDK` (Windows): **System gap**: __time64_t (__time64_t: Windows); [Windows errno] (errno_t: Windows)
 - `Sources/FoundationEssentials/Error/ErrorCodes+POSIX.swift` 15 `Darwin` (scoped), 1 marker (none): **excluded** (E7d): Foundation's #if FOUNDATION_FRAMEWORK code
-- `Sources/FoundationEssentials/Error/ErrorCodes+POSIX.swift` 28 `CRT`, 29 `WinSDK` (Windows): **System gap**: ERROR_CANCELLED (ERROR_CANCELLED: Windows); POSIXErrorCode (POSIXErrorCode: Windows)
-- `Sources/FoundationEssentials/FileManager/FileManager+Basics.swift` 21 `CRT`, 22 `WinSDK` (Windows): **System gap**: [Windows threads] (CompareObjectHandles: Windows); LARGE_INTEGER (LARGE_INTEGER: Windows); [Windows local memory] (LocalFree: Windows)
+- `Sources/FoundationEssentials/Error/ErrorCodes+POSIX.swift` 29 `CRT`, 30 `WinSDK` (Windows): **System gap**: ERROR_CANCELLED (ERROR_CANCELLED: Windows); POSIXErrorCode (POSIXErrorCode: Windows)
+- `Sources/FoundationEssentials/FileManager/FileManager+Basics.swift` 22 `CRT`, 23 `WinSDK` (Windows): **System gap**: [Windows threads] (CompareObjectHandles: Windows); LARGE_INTEGER (LARGE_INTEGER: Windows); [Windows local memory] (LocalFree: Windows)
 - `Sources/FoundationEssentials/FileManager/FileManager+Directories.swift` 16 `os` (none): **excluded** (E7d): Foundation's #if FOUNDATION_FRAMEWORK code
 - `Sources/FoundationEssentials/FileManager/FileManager+Directories.swift` 24 `Android`, 25 `unistd` (Android): **queued** (N1): N1 (FTS_NOCHDIR, FTS_NOSTAT, FTS_PHYSICAL: Android)
 - `Sources/FoundationEssentials/FileManager/FileManager+Directories.swift` 27 `Glibc` (Linux, FreeBSD, OpenBSD): **queued** (N1): N1 (FTS_NOCHDIR, FTS_NOSTAT, FTS_PHYSICAL: Linux, FreeBSD)
@@ -1629,12 +1980,15 @@ Not sites at all; they count nowhere.
 - `Sources/FoundationEssentials/FileManager/FileManager+Directories.swift` 34 `WASILibc` (WASI): **queued** (N1): N1 (FTS_NOCHDIR, FTS_NOSTAT, FTS_PHYSICAL: WASI)
 - `Sources/FoundationEssentials/FileManager/FileManager+Files.swift` 27 `Glibc` (Linux, FreeBSD, OpenBSD): **System gap**: f_frsize (f_frsize: FreeBSD)
 - `Sources/FoundationEssentials/FileManager/FileManager+Files.swift` 33 `CRT`, 34 `WinSDK` (Windows): **System gap**: [Win32 errors] (GetLastError: Windows); [Windows file information] (INVALID_FILE_ATTRIBUTES: Windows); SetFileTime (SetFileTime: Windows)
-- `Sources/FoundationEssentials/FileManager/FileManager+SymbolicLinks.swift` 20 `CRT`, 21 `WinSDK` (Windows): **System gap**: [Win32 errors] (GetLastError: Windows); MAXIMUM_REPARSE_DATA_BUFFER_SIZE (MAXIMUM_REPARSE_DATA_BUFFER_SIZE: Windows)
+- `Sources/FoundationEssentials/FileManager/FileManager+Files.swift` 498 marker: FilePath.extendedAttribute on FreeBSD (extattr_*), 548 marker: FilePath.extendedAttributeNames on FreeBSD (extattr_*) (FreeBSD): **System gap**: extattr_* (extattr_*: FreeBSD)
+- `Sources/FoundationEssentials/FileManager/FileManager+SymbolicLinks.swift` 21 `CRT`, 22 `WinSDK` (Windows): **System gap**: [Win32 errors] (GetLastError: Windows); MAXIMUM_REPARSE_DATA_BUFFER_SIZE (MAXIMUM_REPARSE_DATA_BUFFER_SIZE: Windows)
+- `Sources/FoundationEssentials/FileManager/FileManager+Utilities.swift` 198 marker: FilePath.setExtendedAttribute on FreeBSD (extattr_*) (FreeBSD): **System gap**: extattr_* (extattr_*: FreeBSD)
 - `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift` 15 `WinSDK` (Windows): **System gap**: FindClose (FindClose: Windows); FindExInfoBasic (FindExInfoBasic: Windows); FindExSearchNameMatch (FindExSearchNameMatch: Windows); FindFirstFileExW (FindFirstFileExW: Windows); FindNextFileW (FindNextFileW: Windows); [Win32 errors] (GetLastError: Windows); and 1 more
 - `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift` 121 `Android` (Android): **queued** (N1): N1 (FTS, FTSENT, FTS_SKIP…: Android)
 - `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift` 125 `Glibc` (Linux, FreeBSD, OpenBSD): **queued** (N1): N1 (FTS, FTSENT, FTS_SKIP…: Linux, FreeBSD, OpenBSD)
 - `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift` 128 `Musl` (Musl): **queued** (N1): N1 (FTS, FTSENT, FTS_SKIP…: Musl)
 - `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift` 130 `WASILibc` (WASI): **queued** (N1): N1 (FTS, FTSENT, FTS_SKIP…: WASI)
+- `Sources/FoundationEssentials/FileManager/FileOperations+Enumeration.swift` 139 marker: fts (fts_open, fts_read, fts_set, fts_close, FTSENT, the FTS_* options… (Linux, Musl, Android, FreeBSD, OpenBSD, WASI): **queued** (N1): N1 (FTSENT, FTS_*, fts_close…: Linux, Musl, Android, FreeBSD, OpenBSD, WASI)
 - `Sources/FoundationEssentials/FileManager/FileOperations.swift` 20 `Android` (Android): **queued** (N1): N1 (FTS_NOCHDIR, FTS_NOSTAT, FTS_PHYSICAL…: Android)
 - `Sources/FoundationEssentials/FileManager/FileOperations.swift` 22 `Glibc` (Linux, FreeBSD, OpenBSD): **queued** (N1): N1 (FTS_NOCHDIR, FTS_NOSTAT, FTS_PHYSICAL…: Linux, FreeBSD, OpenBSD)
 - `Sources/FoundationEssentials/FileManager/FileOperations.swift` 24 `Musl` (Musl): **queued** (N1): N1 (FTS_NOCHDIR, FTS_NOSTAT, FTS_PHYSICAL…: Musl)
@@ -1652,16 +2006,17 @@ Not sites at all; they count nowhere.
 - `Sources/FoundationEssentials/Platform.swift` 49 `Glibc` (Linux, FreeBSD, OpenBSD): **System gap**: strncasecmp (strncasecmp: Linux, FreeBSD, OpenBSD)
 - `Sources/FoundationEssentials/Platform.swift` 53 `Musl` (Musl): **System gap**: strncasecmp (strncasecmp: Musl)
 - `Sources/FoundationEssentials/Platform.swift` 79 `WASILibc` (WASI): **System gap**: strncasecmp (strncasecmp: WASI)
-- `Sources/FoundationEssentials/ProcessInfo/ProcessInfo.swift` 29 `WinSDK` (Windows): **System gap**: [environment block] (FreeEnvironmentStringsW: Windows); LoadLibraryW (LoadLibraryW: Windows); [Win32 errors] (NTSTATUS: Windows); ULONGLONG (ULONGLONG: Windows); [string functions] (_strdup, wcslen: Windows)
+- `Sources/FoundationEssentials/Platform.swift` 112 marker: memmove (not System's: the standard library's copyMemory(from:byteCoun… (Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows): **standard library**: [memory copies] (memmove: Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows)
+- `Sources/FoundationEssentials/ProcessInfo/ProcessInfo.swift` 21 `WinSDK` (Windows): **System gap**: [environment block] (FreeEnvironmentStringsW: Windows); LoadLibraryW (LoadLibraryW: Windows); [Win32 errors] (NTSTATUS: Windows); ULONGLONG (ULONGLONG: Windows); [string functions] (_strdup, wcslen: Windows)
 - `Sources/FoundationEssentials/String/String+Internals.swift` 21 `WinSDK` (Windows): **System gap**: [Win32 errors] (GetLastError: Windows); [Windows local memory] (LocalFree: Windows); [string functions] (wcslen: Windows)
-- `Sources/FoundationEssentials/String/String+Path.swift` 24 `WinSDK` (Windows): **System gap**: ConvertSidToStringSidW (ConvertSidToStringSidW: Windows)
-- `Sources/FoundationEssentials/String/String+Path.swift` 26 `WASILibc` (WASI): **System gap**: MAXSYMLINKS (MAXSYMLINKS: WASI)
-- `Sources/FoundationEssentials/TimeZone/TimeZone_Cache.swift` 22 `ucrt`, 26 `WinSDK` (Windows): **System gap**: [string functions] (wcslen: Windows)
+- `Sources/FoundationEssentials/String/String+Path.swift` 25 `WinSDK` (Windows): **System gap**: ConvertSidToStringSidW (ConvertSidToStringSidW: Windows)
+- `Sources/FoundationEssentials/String/String+Path.swift` 28 `WASILibc`, 1 marker (WASI): **System gap**: MAXSYMLINKS (MAXSYMLINKS: WASI)
+- `Sources/FoundationEssentials/TimeZone/TimeZone_Cache.swift` 20 `ucrt`, 24 `WinSDK` (Windows): **System gap**: [string functions] (wcslen: Windows)
 - `Sources/FoundationEssentials/URL/URL.swift` 629 `os` (scoped) (Darwin): **undecided** (module os): `os` (modules.ini [report]: Michael decides module by module)
 - `Sources/FoundationEssentials/URL/URLComponents_ObjC.swift` 16 `os` (none): **excluded** (E7d): Foundation's #if FOUNDATION_FRAMEWORK code
 - `Sources/FoundationEssentials/URL/URL_Bridge.swift` 18 `os` (none): **excluded** (E7d): Foundation's #if FOUNDATION_FRAMEWORK code
-- `Sources/FoundationEssentials/URL/URL_Impl.swift` 20 `WinSDK` (Windows): **System gap**: PCWSTR (PCWSTR: Windows)
-- `Sources/FoundationEssentials/URL/URL_Impl.swift` 29 `os` (none): **excluded** (E7d): Foundation's #if FOUNDATION_FRAMEWORK code
+- `Sources/FoundationEssentials/URL/URL_Impl.swift` 17 `WinSDK` (Windows): **System gap**: PCWSTR (PCWSTR: Windows)
+- `Sources/FoundationEssentials/URL/URL_Impl.swift` 24 `os` (none): **excluded** (E7d): Foundation's #if FOUNDATION_FRAMEWORK code
 - `Sources/FoundationEssentials/URL/URL_Swift.swift` 16 `os` (none): **excluded** (E7d): Foundation's #if FOUNDATION_FRAMEWORK code
 - `Sources/FoundationEssentials/UUID_Wrappers.swift` 18 `Darwin` (submodule) (none): **excluded** (E7d): Foundation's #if FOUNDATION_FRAMEWORK code
 - `Sources/FoundationEssentials/WinSDK+Extensions.swift` 14 `WinSDK` (Windows): **System gap**: ERROR_BAD_ARGUMENTS (ERROR_BAD_ARGUMENTS: Windows); ERROR_DISK_RESOURCES_EXHAUSTED (ERROR_DISK_RESOURCES_EXHAUSTED: Windows); ERROR_FILENAME_EXCED_RANGE (ERROR_FILENAME_EXCED_RANGE: Windows); ERROR_INVALID_ACCESS (ERROR_INVALID_ACCESS: Windows); ERROR_INVALID_DATA (ERROR_INVALID_DATA: Windows); ERROR_INVALID_DRIVE (ERROR_INVALID_DRIVE: Windows); and 6 more
@@ -1674,7 +2029,7 @@ Not sites at all; they count nowhere.
 - `Sources/FoundationInternationalization/TimeZone/TimeZone_ObjC.swift` 17 `os` (none): **excluded** (E7d): Foundation's #if FOUNDATION_FRAMEWORK code
 - `Tests/FoundationEssentialsTests/FileManager/FileManagerTests.swift` 42 `WASILibc` (WASI): **System gap**: [getuid] (getuid: WASI)
 - `Tests/FoundationEssentialsTests/JSONEncoderTests.swift` 23 `CRT` (Windows): **System gap**: LC_ALL (LC_ALL: Windows); setlocale (setlocale: Windows)
-- `Tests/FoundationEssentialsTests/ProcessInfoTests.swift` 30 `CRT` (Windows): **System gap**: [getenv] (_putenv: Windows); overwrite (overwrite: Windows)
+- `Tests/FoundationEssentialsTests/ProcessInfoTests.swift` 31 `CRT` (Windows): **System gap**: [getenv] (_putenv: Windows); overwrite (overwrite: Windows)
 
 **swift-foundation-icu**, at `../ecosystem/swift-foundation-icu` @ `e8538d25`: 1 sites.
 
@@ -1691,10 +2046,10 @@ Not sites at all; they count nowhere.
 
 **swift-markdown**, at `../ecosystem/swift-markdown` @ `392b73b8`: no sites.
 
-**swift-nio**, at `../adopters/swift-nio` `migrate-unix` @ `56deee84`: 311 sites, 108 of them unexplained (above).
+**swift-nio**, at `../adopters/swift-nio` `migrate-unix` @ `6f4e78e4`: 493 sites, 286 of them unexplained (above).
 
 - `Sources/NIOConcurrencyHelpers/NIOThreadPoolWorkAvailable.swift` 16 `ucrt`, 17 `WinSDK` (Windows): **System gap**: [Win32 errors] (GetLastError: Windows)
-- `Sources/NIOConcurrencyHelpers/atomics.swift` 32 `WASILibc` (WASI): **queued** (N2): N2 (sched_yield: WASI)
+- `Sources/NIOConcurrencyHelpers/atomics.swift` 33 `WASILibc` (WASI): **queued** (N2): N2 (sched_yield: WASI)
 - `Sources/NIOConcurrencyHelpers/lock.swift` 16 `ucrt`, 17 `WinSDK` (Windows): **System gap**: [Win32 errors] (ERROR_TIMEOUT, GetLastError: Windows)
 - `Sources/NIOCore/BSDSocketAPI.swift` 16 `ucrt` (Windows): **System gap**: [Win32 errors] (GetLastError: Windows); [protocol levels] (IPPROTO_IP, IPPROTO_IPV6, IPPROTO_TCP…: Windows); [multicast] (IPV6_JOIN_GROUP, IPV6_LEAVE_GROUP, IPV6_MULTICAST_HOPS…: Windows); [IPV6_V6ONLY and IP_HDRINCL] (IPV6_V6ONLY, IP_HDRINCL: Windows); [address families] (PF_INET, PF_INET6, PF_UNIX: Windows); [Winsock sockets] (SOCKET: Windows); and 5 more
 - `Sources/NIOCore/BSDSocketAPI.swift` 18 `WinSDK` (scoped) (Windows): **System gap**: [protocol levels] (IPPROTO_IP: Windows)
@@ -1734,9 +2089,9 @@ Not sites at all; they count nowhere.
 - `Sources/NIOCore/BSDSocketAPI.swift` 60 `WinSDK` (scoped) (Windows): **System gap**: [inet_ntop and inet_pton] (inet_pton: Windows)
 - `Sources/NIOCore/BSDSocketAPI.swift` 62 `WinSDK` (scoped) (Windows): **System gap**: [Win32 errors] (GetLastError: Windows)
 - `Sources/NIOCore/BSDSocketAPI.swift` 63 `WinSDK` (scoped) (Windows): **System gap**: [Winsock errors] (WSAGetLastError: Windows)
-- `Sources/NIOCore/BSDSocketAPI.swift` 77 `Android` (Android): **System gap**: [socket options] (SO_REUSEPORT: Android)
-- `Sources/NIOCore/BSDSocketAPI.swift` 90 `Glibc` (OpenBSD): **System gap**: [socket options] (SO_REUSEPORT: OpenBSD)
-- `Sources/NIOCore/BSDSocketAPI.swift` 98 `WASILibc` (WASI): **System gap**: [multicast] (IPV6_JOIN_GROUP, IPV6_LEAVE_GROUP, IPV6_MULTICAST_HOPS…: WASI); [IPV6_V6ONLY and IP_HDRINCL] (IPV6_V6ONLY, IP_HDRINCL: WASI); [socket options] (SOL_SOCKET: WASI); [TCP_NODELAY] (TCP_NODELAY: WASI)
+- `Sources/NIOCore/BSDSocketAPI.swift` 80 `Android`, 1 marker (Android): **System gap**: [socket options] (SO_REUSEPORT: Android)
+- `Sources/NIOCore/BSDSocketAPI.swift` 95 `Glibc`, 1 marker (OpenBSD): **System gap**: [socket options] (SO_REUSEPORT: OpenBSD)
+- `Sources/NIOCore/BSDSocketAPI.swift` 104 `WASILibc`, 1 marker (WASI): **System gap**: [multicast] (IPV6_JOIN_GROUP, IPV6_LEAVE_GROUP, IPV6_MULTICAST_HOPS…: WASI); [IPV6_V6ONLY and IP_HDRINCL] (IPV6_V6ONLY, IP_HDRINCL: WASI); [socket options] (SOL_SOCKET: WASI); [TCP_NODELAY] (TCP_NODELAY: WASI)
 - `Sources/NIOCore/IO.swift` 16 `ucrt` (Windows): **System gap**: [Win32 errors] (FORMAT_MESSAGE_ALLOCATE_BUFFER, FORMAT_MESSAGE_FROM_SYSTEM, FORMAT_MESSAGE_IGNORE_INSERTS…: Windows); [Windows local memory] (LocalFree: Windows)
 - `Sources/NIOCore/IO.swift` 18 `WinSDK` (scoped) (Windows): **System gap**: [Windows local memory] (LocalFree: Windows)
 - `Sources/NIOCore/IO.swift` 19 `WinSDK` (scoped) (Windows): **System gap**: [Win32 errors] (FORMAT_MESSAGE_ALLOCATE_BUFFER: Windows)
@@ -1745,17 +2100,17 @@ Not sites at all; they count nowhere.
 - `Sources/NIOCore/IO.swift` 22 `WinSDK` (scoped) (Windows): **System gap**: [Win32 errors] (LANG_NEUTRAL: Windows)
 - `Sources/NIOCore/IO.swift` 23 `WinSDK` (scoped) (Windows): **System gap**: [Win32 errors] (SUBLANG_DEFAULT: Windows)
 - `Sources/NIOCore/IO.swift` 25 `WinSDK` (scoped) (Windows): **standard library**: [Win32 scalar types] (WCHAR: Windows)
-- `Sources/NIOCore/Interfaces.swift` 27 `WinSDK` (scoped) (Windows): **System gap**: [address families] (AF_INET: Windows)
-- `Sources/NIOCore/Interfaces.swift` 28 `WinSDK` (scoped) (Windows): **System gap**: [address families] (AF_INET6: Windows)
-- `Sources/NIOCore/Interfaces.swift` 30 `WinSDK` (scoped) (Windows): **System gap**: [INADDR_ANY] (INET_ADDRSTRLEN: Windows)
-- `Sources/NIOCore/Interfaces.swift` 31 `WinSDK` (scoped) (Windows): **System gap**: [INADDR_ANY] (INET6_ADDRSTRLEN: Windows)
-- `Sources/NIOCore/Interfaces.swift` 33 `WinSDK` (scoped) (Windows): **System gap**: [Winsock addresses] (ADDRESS_FAMILY: Windows)
-- `Sources/NIOCore/Interfaces.swift` 37 `WinSDK` (scoped) (Windows): **System gap**: [sockaddr types] (sockaddr: Windows)
-- `Sources/NIOCore/Interfaces.swift` 38 `WinSDK` (scoped) (Windows): **System gap**: [sockaddr types] (sockaddr_in: Windows)
-- `Sources/NIOCore/Interfaces.swift` 39 `WinSDK` (scoped) (Windows): **System gap**: [sockaddr types] (sockaddr_in6: Windows)
-- `Sources/NIOCore/Interfaces.swift` 40 `WinSDK` (scoped) (Windows): **System gap**: [sockaddr_storage] (sockaddr_storage: Windows)
-- `Sources/NIOCore/Interfaces.swift` 41 `WinSDK` (scoped) (Windows): **System gap**: [sockaddr types] (sockaddr_un: Windows)
-- `Sources/NIOCore/Interfaces.swift` 43 `WinSDK` (scoped) (Windows): **standard library**: [Win32 scalar types] (UINT8: Windows)
+- `Sources/NIOCore/Interfaces.swift` 34 `WinSDK` (scoped) (Windows): **System gap**: [address families] (AF_INET: Windows)
+- `Sources/NIOCore/Interfaces.swift` 35 `WinSDK` (scoped) (Windows): **System gap**: [address families] (AF_INET6: Windows)
+- `Sources/NIOCore/Interfaces.swift` 37 `WinSDK` (scoped) (Windows): **System gap**: [INADDR_ANY] (INET_ADDRSTRLEN: Windows)
+- `Sources/NIOCore/Interfaces.swift` 38 `WinSDK` (scoped) (Windows): **System gap**: [INADDR_ANY] (INET6_ADDRSTRLEN: Windows)
+- `Sources/NIOCore/Interfaces.swift` 40 `WinSDK` (scoped) (Windows): **System gap**: [Winsock addresses] (ADDRESS_FAMILY: Windows)
+- `Sources/NIOCore/Interfaces.swift` 44 `WinSDK` (scoped) (Windows): **System gap**: [sockaddr types] (sockaddr: Windows)
+- `Sources/NIOCore/Interfaces.swift` 45 `WinSDK` (scoped) (Windows): **System gap**: [sockaddr types] (sockaddr_in: Windows)
+- `Sources/NIOCore/Interfaces.swift` 46 `WinSDK` (scoped) (Windows): **System gap**: [sockaddr types] (sockaddr_in6: Windows)
+- `Sources/NIOCore/Interfaces.swift` 47 `WinSDK` (scoped) (Windows): **System gap**: [sockaddr_storage] (sockaddr_storage: Windows)
+- `Sources/NIOCore/Interfaces.swift` 48 `WinSDK` (scoped) (Windows): **System gap**: [sockaddr types] (sockaddr_un: Windows)
+- `Sources/NIOCore/Interfaces.swift` 50 `WinSDK` (scoped) (Windows): **standard library**: [Win32 scalar types] (UINT8: Windows)
 - `Sources/NIOCore/SocketAddresses.swift` 16 `ucrt` (Windows): **System gap**: [Winsock addresses] (ADDRESS_FAMILY, IN6_ADDR, IN_ADDR: Windows); [Windows name resolution] (ADDRINFOW, FreeAddrInfoW, GetAddrInfoW…: Windows); ai_family (ai_family: Windows); sin6_addr (sin6_addr: Windows); sin6_family (sin6_family: Windows); sin6_flowinfo (sin6_flowinfo: Windows); and 7 more
 - `Sources/NIOCore/SocketAddresses.swift` 18 `WinSDK` (scoped) (Windows): **System gap**: [address families] (AF_INET: Windows)
 - `Sources/NIOCore/SocketAddresses.swift` 19 `WinSDK` (scoped) (Windows): **System gap**: [address families] (AF_INET6: Windows)
@@ -1774,16 +2129,14 @@ Not sites at all; they count nowhere.
 - `Sources/NIOCore/SocketAddresses.swift` 36 `WinSDK` (scoped) (Windows): **System gap**: [sockaddr_storage] (sockaddr_storage: Windows)
 - `Sources/NIOCore/SocketAddresses.swift` 37 `WinSDK` (scoped) (Windows): **System gap**: [sockaddr types] (sockaddr_un: Windows)
 - `Sources/NIOCore/SocketAddresses.swift` 39 `WinSDK` (scoped) (Windows): **standard library**: [C scalar types] (u_short: Windows)
-- `Sources/NIOCore/SocketAddresses.swift` 74 `Glibc` (FreeBSD, OpenBSD): **System gap**: ai_family (ai_family: FreeBSD, OpenBSD); ai_flags (ai_flags: FreeBSD, OpenBSD)
-- `Sources/NIOCore/SocketOptionProvider.swift` 37 `WinSDK` (Windows): **System gap**: [linger] (linger: Windows)
-- `Sources/NIOCore/Utilities.swift` 21 `Glibc` (FreeBSD): **System gap**: ifa_next (ifa_next: FreeBSD)
-- `Sources/NIOCore/Utilities.swift` 27 `Glibc` (OpenBSD): **System gap**: ifa_next (ifa_next: OpenBSD)
+- `Sources/NIOCore/SocketAddresses.swift` 75 `Glibc`, 1 marker (FreeBSD, OpenBSD): **System gap**: ai_family (ai_family: FreeBSD, OpenBSD); ai_flags (ai_flags: FreeBSD, OpenBSD)
+- `Sources/NIOCore/SocketOptionProvider.swift` 30 marker: mptcp_info (MPTCP_INFO), on Linux (Linux, Musl): **System gap**: MPTCP_INFO (MPTCP_INFO: Linux, Musl); [TCP connection info] (mptcp_info: Linux, Musl)
+- `Sources/NIOCore/SocketOptionProvider.swift` 42 `WinSDK` (Windows): **System gap**: [linger] (linger: Windows)
 - `Sources/NIOCore/Utilities.swift` 31 `ucrt` (Windows): **System gap**: [address families] (AF_UNSPEC: Windows); [Windows adapters] (ERROR_BUFFER_OVERFLOW: Windows); [Win32 errors] (GetLastError: Windows); [getenv] (_dupenv_s: Windows)
 - `Sources/NIOCore/Utilities.swift` 34 `WinSDK` (scoped) (Windows): **System gap**: [address families] (AF_UNSPEC: Windows)
 - `Sources/NIOCore/Utilities.swift` 35 `WinSDK` (scoped) (Windows): **System gap**: [Windows adapters] (ERROR_BUFFER_OVERFLOW: Windows)
 - `Sources/NIOCore/Utilities.swift` 39 `WinSDK` (scoped) (Windows): **System gap**: [Win32 errors] (GetLastError: Windows)
 - `Sources/NIOCore/Utilities.swift` 45 `WinSDK` (scoped) (Windows): **standard library**: [Win32 scalar types] (ULONG: Windows)
-- `Sources/NIOEmbedded/Embedded.swift` 34 `WinSDK` (Windows): **System gap**: [Win32 errors] (GetLastError: Windows)
 - `Sources/NIOMulticastChat/main.swift` 26 `WinSDK` (Windows): **System gap**: sin_addr (sin_addr: Windows)
 - `Sources/NIOPosix/BSDSocketAPICommon.swift` 25 `ucrt` (Windows): **System gap**: [Winsock sockets] (INVALID_SOCKET: Windows); [ECN, TOS and packet info] (IPV6_RECVTCLASS, IP_RECVTOS: Windows); [socket types] (SOCK_DGRAM, SOCK_RAW, SOCK_STREAM: Windows)
 - `Sources/NIOPosix/BSDSocketAPICommon.swift` 27 `WinSDK` (scoped) (Windows): **System gap**: [Winsock sockets] (INVALID_SOCKET: Windows)
@@ -1863,6 +2216,7 @@ Not sites at all; they count nowhere.
 - `Sources/NIOPosix/BSDSocketAPIWindows.swift` 111 `WinSDK` (scoped) (Windows): **System gap**: [Winsock messages] (WSAMSG: Windows)
 - `Sources/NIOPosix/BSDSocketAPIWindows.swift` 113 `WinSDK` (scoped) (Windows): **System gap**: [Winsock messages] (LPFN_WSARECVMSG: Windows)
 - `Sources/NIOPosix/BaseSocket.swift` 37 `WinSDK` (scoped) (Windows): **System gap**: [sockaddr types] (socklen_t: Windows)
+- `Sources/NIOPosix/ControlMessage.swift` 240 marker: SocketDescriptor.AncillaryMessageBuffer's type for the received TOS by… (Linux, Musl, Android, FreeBSD, OpenBSD, Windows): **System gap**: [ECN, TOS and packet info] (IP_TOS: Windows)
 - `Sources/NIOPosix/DatagramVectorReadManager.swift` 33 `WinSDK` (Windows): **System gap**: msg_hdr (msg_hdr: Windows); msg_len (msg_len: Windows)
 - `Sources/NIOPosix/GetaddrinfoResolver.swift` 45 `WinSDK` (scoped) (Windows): **System gap**: [address families] (AF_INET: Windows)
 - `Sources/NIOPosix/GetaddrinfoResolver.swift` 46 `WinSDK` (scoped) (Windows): **System gap**: [address families] (AF_INET6: Windows)
@@ -1883,12 +2237,16 @@ Not sites at all; they count nowhere.
 - `Sources/NIOPosix/SocketChannel.swift` 49 `WinSDK` (scoped) (Windows): **System gap**: [multicast] (ipv6_mreq: Windows)
 - `Sources/NIOPosix/SocketChannel.swift` 50 `WinSDK` (scoped) (Windows): **System gap**: [sockaddr types] (socklen_t: Windows)
 - `Sources/NIOPosix/SocketProtocols.swift` 22 `WinSDK` (scoped) (Windows): **System gap**: [sockaddr types] (socklen_t: Windows)
-- `Sources/NIOPosix/System.swift` 71 `Glibc`, re-exported (Linux, FreeBSD): **System gap**: [sendfile] (sendfile: FreeBSD)
-- `Sources/NIOPosix/System.swift` 92 `ucrt`, re-exported (Windows): **System gap**: [protocol levels] (IPPROTO_UDP: Windows); [ECN, TOS and packet info] (IPV6_PKTINFO, IP_PKTINFO: Windows); [Windows errno] (_get_errno: Windows)
+- `Sources/NIOPosix/System.swift` 75 `Glibc`, re-exported (Linux, FreeBSD): **System gap**: [sendfile] (sendfile: FreeBSD)
+- `Sources/NIOPosix/System.swift` 87 marker: sendmmsg and recvmmsg's mmsghdr, in6_pktinfo and IPTOS_ECN_* (CNIOLinu… (Linux, Musl, Android, FreeBSD): **System gap**: IPTOS_ECN_* (IPTOS_ECN_*: Linux, Musl, Android, FreeBSD); [sendmmsg and recvmmsg] (sendmmsg: FreeBSD)
+- `Sources/NIOPosix/System.swift` 98 `ucrt`, re-exported (Windows): **System gap**: [protocol levels] (IPPROTO_UDP: Windows); [ECN, TOS and packet info] (IPV6_PKTINFO, IP_PKTINFO: Windows); [Windows errno] (_get_errno: Windows)
+- `Sources/NIOPosix/Thread.swift` 114 marker: PThread.setCurrentName and PThread.ID.name() on OpenBSD (pthread_set_n…, 130 marker: PThread.setCurrentName and PThread.ID.name() on OpenBSD (pthread_set_n… (FreeBSD, OpenBSD): **System gap**: [thread names] (pthread_get_name_np, pthread_set_name_np: FreeBSD, OpenBSD)
+- `Sources/NIOPosix/ThreadPosix.swift` 95 marker: PThread.setCurrentName and PThread.ID.name() on OpenBSD (pthread_set_n… (FreeBSD, OpenBSD): **System gap**: [thread names] (pthread_get_name_np, pthread_set_name_np: FreeBSD, OpenBSD)
 - `Sources/NIOPosix/ThreadWindows.swift` 19 `WinSDK` (Windows): **System gap**: [Windows threads] (CompareObjectHandles: Windows); [Windows handles] (DUPLICATE_SAME_ACCESS, WAIT_OBJECT_0: Windows); [Win32 errors] (GetLastError: Windows); [Windows local memory] (LocalFree: Windows)
 - `Sources/NIOPosix/Windows.swift` 19 `WinSDK` (Windows): **System gap**: [Win32 errors] (GetLastError, SetLastError: Windows); [Windows local memory] (LocalFree: Windows); [Winsock sockets] (SOCKET, SOCKET_ERROR: Windows); [Winsock errors] (WSAGetLastError: Windows); [send and receive] (recv: Windows)
+- `Tests/NIOFSTests/FileTypeTests.swift` 49 `Glibc`, 1 marker (FreeBSD, OpenBSD): **System gap**: [file type bits] (S_IFWHT: OpenBSD)
 - `Tests/NIOPosixTests/ChannelPipelineTest.swift` 31 `WinSDK` (Windows): **System gap**: sin_port (sin_port: Windows)
-- `Tests/NIOPosixTests/HappyEyeballsTest.swift` 30 `WinSDK` (Windows): **System gap**: sin6_addr (sin6_addr: Windows); sin6_family (sin6_family: Windows); sin6_flowinfo (sin6_flowinfo: Windows); sin6_port (sin6_port: Windows); sin6_scope_id (sin6_scope_id: Windows); sin_addr (sin_addr: Windows); and 2 more
+- `Tests/NIOPosixTests/HappyEyeballsTest.swift` 31 `WinSDK` (Windows): **System gap**: sin6_addr (sin6_addr: Windows); sin6_family (sin6_family: Windows); sin6_flowinfo (sin6_flowinfo: Windows); sin6_port (sin6_port: Windows); sin6_scope_id (sin6_scope_id: Windows); sin_addr (sin_addr: Windows); and 2 more
 - `Tests/NIOPosixTests/PendingDatagramWritesManagerTests.swift` 38 `WinSDK` (Windows): **System gap**: msg_hdr (msg_hdr: Windows); msg_len (msg_len: Windows); [sockaddr types] (socklen_t: Windows)
 - `Tests/NIOPosixTests/SocketAddressTest.swift` 22 `WinSDK` (Windows): **System gap**: [address families] (AF_UNSPEC: Windows); sin6_addr (sin6_addr: Windows); sin6_family (sin6_family: Windows); sin6_flowinfo (sin6_flowinfo: Windows); sin6_port (sin6_port: Windows); sin6_scope_id (sin6_scope_id: Windows); and 6 more
 - `Tests/NIOPosixTests/SocketOptionProviderTest.swift` 21 `WinSDK` (Windows): **System gap**: WSAEFAULT (WSAEFAULT: Windows); l_linger (l_linger: Windows); l_onoff (l_onoff: Windows); [linger] (linger: Windows); [gettimeofday] (timeval: Windows); tv_usec (tv_usec: Windows)
@@ -1926,10 +2284,10 @@ Not sites at all; they count nowhere.
 
 **swift-syntax**, at `../adopters/swift-syntax` `migrate-all` @ `e6918103`: 6 sites, 2 of them unexplained (above).
 
-- `EditorExtension/SwiftRefactorExtension/CommandDiscovery.swift` 13 `Darwin`, 15 `MachO` (Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows): **System gap**: _dyld_get_image_header (_dyld_get_image_header: Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows); getsectiondata (getsectiondata: Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows); E3 (mach_header_64: Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows)
+- `EditorExtension/SwiftRefactorExtension/CommandDiscovery.swift` 13 `Darwin`, 15 `MachO` (Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows): **System gap**: [loaded images] (_dyld_get_image_header, getsectiondata: Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows); [Mach-O file format] (mach_header_64: Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows)
 - `Sources/SwiftSyntaxBuilder/SyntaxParsable+ExpressibleByStringInterpolation.swift` 21 `os`, 33 `os` (Darwin?): **undecided** (module os): `os` (modules.ini [report]: Michael decides module by module)
 
-**swift-testing**, at `../adopters/swift-testing` `migrate-all` @ `e2f8d449`: 65 sites, 14 of them unexplained (above).
+**swift-testing**, at `../adopters/swift-testing` `migrate-all` @ `e2f8d449`: 65 sites, 15 of them unexplained (above).
 
 - `Sources/Overlays/_Testing_Foundation/Attachments/Attachment+URL.swift` 17 `WinSDK` (Windows?): **System gap**: [Windows local memory] (LocalFree: Windows); [Windows paths] (PATHCCH_ALLOW_LONG_PATHS: Windows); UINT (UINT: Windows)
 - `Sources/Overlays/_Testing_Foundation/Attachments/_AttachableURLWrapper.swift` 125 marker: file cloning (sys/clonefile.h fclonefileat, linux/fs.h FICLONE, FreeBS… (Darwin?, Linux?, Musl?, Android?, FreeBSD?, OpenBSD?, WASI?, Windows?): **System gap**: FICLONE (FICLONE: Darwin, FreeBSD, OpenBSD, WASI, Windows); copy_file_range (copy_file_range: Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows); fclonefileat (fclonefileat: Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows)
@@ -1954,13 +2312,12 @@ Not sites at all; they count nowhere.
 - `Sources/Testing/Support/FileHandle.swift` 901 marker: stdlib.h realpath on WASI: FilePath.canonicalized() (Darwin?, Linux?, Musl?, Android?, FreeBSD?, OpenBSD?, WASI?, Windows?): **System gap**: realpath (realpath: WASI, Windows)
 - `Sources/Testing/Support/GetSymbol.swift` 34 marker: dlfcn.h dlsym with RTLD_DEFAULT or a handle the caller owns: DynamicLi… (Darwin?, Linux?, Musl?, Android?, FreeBSD?, OpenBSD?, WASI?, Windows?): **System gap**: [dlopen] (dlsym: WASI, Windows)
 - `Sources/Testing/Support/Versions.swift` 240 marker: gnu/libc-version.h gnu_get_libc_version: the C library's version at ru… (Linux): **System gap**: gnu_get_libc_version (gnu_get_libc_version: Linux)
-- `Sources/_TestDiscovery/SectionBounds.swift` 44 marker: Mach-O images: mach-o/getsect.h getsectiondata and mach-o/dyld.h (Darwin?, Linux?, Musl?, Android?, FreeBSD?, OpenBSD?, WASI?, Windows?): **System gap**: getsectiondata (getsectiondata: Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows)
+- `Sources/_TestDiscovery/SectionBounds.swift` 44 marker: Mach-O images: mach-o/getsect.h getsectiondata and mach-o/dyld.h (Darwin?, Linux?, Musl?, Android?, FreeBSD?, OpenBSD?, WASI?, Windows?): **System gap**: [loaded images] (getsectiondata: Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows)
 - `Tests/TestingTests/ABIEntryPointTests.swift` 242 marker: stdlib.h free and string.h strlen on Windows: Memory.free(_:) (Darwin?, Linux?, Musl?, Android?, FreeBSD?, OpenBSD?, WASI?, Windows?): **System gap**: [string functions] (strlen: Windows)
 - `Tests/TestingTests/AttachmentTests.swift` 95 marker: stdio.h remove on Windows and WASI: FilePath.remove(), 112 marker: stdio.h remove, as above, 143 marker: stdio.h remove, as above, 151 marker: stdio.h remove, as above, 179 marker: stdio.h remove, as above, 199 marker: stdio.h remove, as above (Darwin?, Linux?, Musl?, Android?, FreeBSD?, OpenBSD?, WASI?, Windows?): **System gap**: [remove] (remove: WASI, Windows)
 - `Tests/TestingTests/AttachmentTests.swift` 163 marker: limits.h NAME_MAX on WASI: SystemConfig.maxFileNameBytes (Darwin?, Linux?, Musl?, Android?, FreeBSD?, OpenBSD?, WASI?): **System gap**: NAME_MAX (NAME_MAX: WASI)
 - `Tests/TestingTests/ExitTestTests.swift` 50 marker: signal.h SIGABRT on Windows: Signal.abort, 149 marker: signal.h SIGABRT, as above, 181 marker: signal.h SIGABRT, as above, 187 marker: signal.h SIGABRT, as above (Darwin?, Linux?, Musl?, Android?, FreeBSD?, OpenBSD?, WASI?, Windows?): **System gap**: [signal numbers] (SIGABRT: WASI, Windows)
 - `Tests/TestingTests/ExitTestTests.swift` 80 marker: signal.h raise and SIGSEGV on Windows: Signal.segmentationViolation.ra… (Darwin?, Linux?, Musl?, Android?, FreeBSD?, OpenBSD?, WASI?, Windows?): **System gap**: [signal numbers] (SIGSEGV: WASI, Windows); raise (raise: WASI, Windows)
-- `Tests/TestingTests/ExitTestTests.swift` 89 marker: stdlib.h abort, every platform (Darwin?, Linux?, Musl?, Android?, FreeBSD?, OpenBSD?, WASI?, Windows?): **standard library**: [termination] (abort: Windows)
 - `Tests/TestingTests/ExitTestTests.swift` 813 marker: stdlib.h abort and signal.h SIGABRT and SIGSEGV, as above (Darwin?, Linux?, Musl?, Android?, FreeBSD?, OpenBSD?, WASI?, Windows?): **System gap**: [signal numbers] (SIGABRT, SIGSEGV: WASI, Windows)
 - `Tests/TestingTests/Support/ColorTests.swift` 40 marker: stdio.h remove on Windows and WASI: FilePath.remove() (Darwin?, Linux?, Musl?, Android?, FreeBSD?, OpenBSD?, WASI?, Windows?): **System gap**: [remove] (remove: WASI, Windows)
 - `Tests/TestingTests/Support/FileHandleTests.swift` 168 marker: pty.h openpty on OpenBSD: TerminalDescriptor.openPseudoterminal() (Darwin?, Linux?, Musl?, Android?, FreeBSD?, OpenBSD?): **queued** (N3): N3 (openpty: OpenBSD)
@@ -1999,18 +2356,18 @@ Not sites at all; they count nowhere.
 - `Sources/PackageRegistryCommand/PackageRegistryCommand+Auth.swift` 30 `WinSDK` (Windows): **System gap**: [Windows consoles] (ReadConsoleA: Windows)
 - `Sources/Runtimes/PackagePlugin/Plugin.swift` 15 `ucrt`, 16 `WinSDK` (Windows): **System gap**: [Win32 errors] (GetLastError: Windows); [Windows DLLs] (GetModuleHandleW: Windows)
 
-**wasmkit**, at `../adopters/WasmKit` `migrate-unix` @ `fd06e2a3`: 39 sites, 26 of them unexplained (above).
+**wasmkit**, at `../adopters/WasmKit` `migrate-unix` @ `0c557c40`: 33 sites, 19 of them unexplained (above).
 
 - `Sources/CLICommands/Platform.swift` 7 `ucrt` (Windows): **System gap**: [Windows errno] (_get_errno: Windows); fseek (fseek: Windows)
-- `Sources/CLICommands/Run.swift` 24 `os` (submodule) (Darwin): **undecided** (module os): `os` (modules.ini [report]: Michael decides module by module)
-- `Sources/WASI/Platform/PAL/PALClock.swift` 7 `Glibc` (Linux, FreeBSD, OpenBSD): **System gap**: CLOCK_MONOTONIC_RAW (CLOCK_MONOTONIC_RAW: FreeBSD, OpenBSD)
-- `Sources/WASI/Platform/PAL/PALErrnoMapping.swift` 16 `ucrt`, 17 `WinSDK` (Windows): **System gap**: ERROR_BAD_NETPATH (ERROR_BAD_NETPATH: Windows); ERROR_BAD_NET_NAME (ERROR_BAD_NET_NAME: Windows); ERROR_CANNOT_MAKE (ERROR_CANNOT_MAKE: Windows); ERROR_CURRENT_DIRECTORY (ERROR_CURRENT_DIRECTORY: Windows); ERROR_DRIVE_LOCKED (ERROR_DRIVE_LOCKED: Windows); ERROR_FAIL_I24 (ERROR_FAIL_I24: Windows); and 12 more
-- `Sources/WASI/Platform/PAL/PALFileDescriptor.swift` 20 `ucrt`, 21 `WinSDK` (Windows): **System gap**: FILE_END_OF_FILE_INFO (FILE_END_OF_FILE_INFO: Windows); [Win32 errors] (GetLastError: Windows); SetFileTime (SetFileTime: Windows); [Windows errno] (_get_errno: Windows)
+- `Sources/CLICommands/Run.swift` 20 `os` (submodule) (Darwin): **undecided** (module os): `os` (modules.ini [report]: Michael decides module by module)
+- `Sources/WASI/Platform/PAL/PALErrnoMapping.swift` 10 `Glibc`, 1 marker (OpenBSD): **System gap**: EMULTIHOP (EMULTIHOP: OpenBSD); ENOLINK (ENOLINK: OpenBSD)
+- `Sources/WASI/Platform/PAL/PALErrnoMapping.swift` 13 `ucrt`, 14 `WinSDK` (Windows): **System gap**: ERROR_BAD_NETPATH (ERROR_BAD_NETPATH: Windows); ERROR_BAD_NET_NAME (ERROR_BAD_NET_NAME: Windows); ERROR_CANNOT_MAKE (ERROR_CANNOT_MAKE: Windows); ERROR_CURRENT_DIRECTORY (ERROR_CURRENT_DIRECTORY: Windows); ERROR_DRIVE_LOCKED (ERROR_DRIVE_LOCKED: Windows); ERROR_FAIL_I24 (ERROR_FAIL_I24: Windows); and 12 more
+- `Sources/WASI/Platform/PAL/PALFileDescriptor.swift` 15 `ucrt`, 16 `WinSDK` (Windows): **System gap**: FILE_END_OF_FILE_INFO (FILE_END_OF_FILE_INFO: Windows); [Win32 errors] (GetLastError: Windows); SetFileTime (SetFileTime: Windows); [Windows errno] (_get_errno: Windows)
+- `Sources/WASI/Platform/PAL/PALFileDescriptor.swift` 130 marker: OpenOptions.readSync (O_RSYNC) on Linux, and OpenOptions.dataSync and …, 411 marker: OpenOptions.readSync (O_RSYNC) on Linux, and OpenOptions.dataSync and … (Linux, Musl, WASI): **System gap**: [synchronized I/O flags] (O_RSYNC: WASI); sync (sync: WASI)
+- `Sources/WASI/Platform/PAL/PALFileDescriptor.swift` 704 marker: OpenOptions.readSync and StatusFlags.readSync (O_RSYNC) on Linux, and … (Linux, Musl, WASI): **System gap**: [synchronized I/O flags] (O_RSYNC: WASI)
 - `Sources/WASI/Platform/PAL/PALSystemClocks.swift` 6 `WinSDK` (Windows): **System gap**: [Win32 errors] (GetLastError: Windows); LARGE_INTEGER (LARGE_INTEGER: Windows)
 - `Sources/WasmKit/Execution/SignpostTracer.swift` 2 `os` (submodule) (Darwin): **undecided** (module os): `os` (modules.ini [report]: Michael decides module by module)
 - `Sources/WasmKit/Platform/SystemVirtualMemory.swift` 5 `WinSDK` (Windows): **standard library**: [Win32 scalar types] (SIZE_T: Windows)
-- `Sources/WasmKit/Platform/SystemVirtualMemory.swift` 10 `Glibc` (Linux, FreeBSD, OpenBSD): **System gap**: MAP_ANONYMOUS (MAP_ANONYMOUS: Linux)
-- `Sources/WasmKit/Platform/SystemVirtualMemory.swift` 12 `Musl` (Musl): **System gap**: MAP_ANONYMOUS (MAP_ANONYMOUS: Musl)
 - `Sources/WasmParser/Platform/FileIO.swift` 7 `ucrt` (Windows?): **System gap**: [Windows errno] (_get_errno: Windows)
 
 </details>

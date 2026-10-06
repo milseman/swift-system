@@ -252,6 +252,7 @@ target_sources(SystemPackage PRIVATE
   Internals/Constants+Archive.swift
   Internals/Constants+MachO.swift
   Internals/Constants+Provisional.swift
+  Internals/Syscalls+MachO.swift
   Internals/Syscalls+Provisional.swift
   Internals/Syscalls+ProvisionalLocale.swift
   Internals/Syscalls+ProvisionalMath.swift

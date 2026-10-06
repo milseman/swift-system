@@ -14,6 +14,21 @@
 // standard library's copyMemory(from:byteCount:) and initializeMemory(as:
 // repeating:) do what they do.
 
+// Must import here to call memcmp in @_alwaysEmitIntoClient code.
+#if SYSTEM_PACKAGE_DARWIN
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif canImport(Musl)
+import Musl
+#elseif canImport(WASILibc)
+import WASILibc
+#elseif canImport(Android)
+import Android
+#else
+#error("Unsupported Platform")
+#endif
+
 @available(System 199, *)
 extension Memory {
   /// Compares two buffers' bytes, in order, as unsigned numbers.
@@ -27,17 +42,26 @@ extension Memory {
   ///
   /// The corresponding C function is `memcmp`.
   @_alwaysEmitIntoClient
+  @inline(__always)
   public static func compare(_ lhs: UnsafeRawBufferPointer, _ rhs: UnsafeRawBufferPointer) -> Int {
     _compare(lhs, rhs)
   }
 
-  @usableFromInline
+  // Emitted into the client with its memcmp call, and inlined into the
+  // caller with compare, so that the client's optimizer sees the call with
+  // the caller's count: a comparison of a count it knows becomes loads and
+  // compares, as a memcmp the client calls itself does. Without
+  // @inline(__always), here and on compare, the optimizer keeps the
+  // comparison a function of its own, which hides the count. memcmp has no
+  // mock hook, so none is lost.
+  @_alwaysEmitIntoClient
+  @inline(__always)
   internal static func _compare(_ lhs: UnsafeRawBufferPointer, _ rhs: UnsafeRawBufferPointer) -> Int {
     // memcmp's pointers must be valid even for a count of zero, which an
     // empty buffer's nil start isn't.
     let count = min(lhs.count, rhs.count)
     if count > 0 {
-      let order = system_memcmp(lhs.baseAddress!, rhs.baseAddress!, count)
+      let order = memcmp(lhs.baseAddress!, rhs.baseAddress!, count)
       if order != 0 { return order < 0 ? -1 : 1 }
     }
     return lhs.count == rhs.count ? 0 : (lhs.count < rhs.count ? -1 : 1)
@@ -110,6 +134,7 @@ extension Memory {
   ///
   /// The corresponding C function is `memcmp`.
   @_alwaysEmitIntoClient
+  @inline(__always)
   public static func compare(_ lhs: RawSpan, _ rhs: RawSpan) -> Int {
     lhs.withUnsafeBytes { lhs in rhs.withUnsafeBytes { rhs in _compare(lhs, rhs) } }
   }

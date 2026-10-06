@@ -352,9 +352,10 @@ The walk's shape:
   shared with the walk, and `entry.path` appends the name on demand.
 
 Not included: following links (`FTS_LOGICAL`, `FTS_COMFOLLOW`) and the
-cycle detection that needs; staying on one file system (`FTS_XDEV`); and
-sorting (`fts`'s `compar`). A physical walk can't cycle, except through a
-bind mount, and then it stops at the descriptor limit.
+cycle detection that needs, and sorting (`fts`'s `compar`). Staying on one
+file system (`FTS_XDEV`) came later, as `DirectoryWalk.Options.sameDevice`.
+A physical walk can't cycle, except through a bind mount, and then it stops
+at the descriptor limit.
 
 ## `getdents64`
 
