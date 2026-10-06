@@ -144,7 +144,10 @@ def run(ctx):
                 findings.append(Finding(path_of(pid), line_of(text, f'"{q}"'), "pitches/requires", "error",
                                         f"requires `{q}`, which isn't a pitch"))
         for t, uses in sorted(r.get("unownedTypes", {}).items()):
-            via = ", ".join(f"`{u['declaration']}` ({u['link']})" for u in uses[:3])
+            # pitches.py keeps up to five uses, in a set's order; sorted, the
+            # examples at least don't shuffle between runs of one graph.
+            via = ", ".join(f"`{u['declaration']}` ({u['link']})"
+                            for u in sorted(uses, key=lambda u: (u["declaration"], u["link"]))[:3])
             findings.append(Finding(path_of(pid), 1, "pitches/prerequisite", "warning",
                                     f"needs `{t}`, a new type no pitch owns: {via}"))
     for decl, owners in sorted(result["overlaps"].items()):

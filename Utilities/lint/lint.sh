@@ -14,4 +14,6 @@
 set -euo pipefail
 export PYTHONDONTWRITEBYTECODE=1
 export GIT_NO_LAZY_FETCH=1
+# pitches.py keeps examples in a set's order: a fixed hash seed keeps them from shuffling between runs.
+export PYTHONHASHSEED=0
 exec python3 "$(cd "$(dirname "$0")" && pwd -P)/scripts/lint.py" "$@"
