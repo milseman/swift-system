@@ -388,17 +388,25 @@ def c_names(doc, nid):
 
 def locate(headers, c):
     """A C name's header: a field's is its struct's (`stat.st_size` is in
-    sys/stat.h); one the code reaches but the graph has no struct for is
-    looked up as a field."""
+    sys/stat.h), if that header names the field too; Darwin's `struct stat`
+    has `st_atimespec`, not `st_atim`. One the code reaches but the graph
+    has no struct for is looked up as a field."""
     if "field" in c["cKinds"] and "." in c["name"]:
-        return headers.locate(c["name"].split(".", 1)[0], ["type"])
+        struct, field = c["name"].split(".", 1)
+        r = headers.locate(struct, ["type"])
+        if r["header"] and not headers.has_identifier(r["header"], field.split(".", 1)[0]):
+            return {"header": None, "module": None, "sdkModule": None,
+                    "how": f"not in the macOS SDK: {r['header']} has no {field}"}
+        return r
     return headers.locate(c["name"], c["cKinds"])
 
 
 def primary_header(cnames, platforms, headers, reaches_c=None):
-    """The C name a declaration is grouped by, with its header and module.
-    A declaration with no C name is Swift-only when its code reaches no C at
-    all (`reaches_c` False, from the graph), and has no C name otherwise."""
+    """The C name a declaration is grouped by, with its header and module:
+    the first of its C names the macOS SDK declares (`stat.st_atimespec`,
+    not another platform's `stat.st_atim`, which comes first). A declaration
+    with no C name is Swift-only when its code reaches no C at all
+    (`reaches_c` False, from the graph), and has no C name otherwise."""
     if "Darwin" not in (platforms or []):
         return None, {"header": NOT_DARWIN, "module": NOT_DARWIN, "sdkModule": NOT_DARWIN, "how": "not on Darwin"}
     # `int`, as a type's doc comment can name it, isn't any header's.

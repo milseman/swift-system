@@ -44,16 +44,20 @@ sys.path.insert(0, os.path.join(UTILITIES, "api-delta", "scripts"))
 import scan_sources as ss  # noqa: E402  (api-delta's lexer, for its attribute pattern)
 
 # Bump when the cached scan's shape or the reduction below changes.
-SCAN_FORMAT = 2
+SCAN_FORMAT = 3
 MODULE_DIRS = ss.MODULE_DIRS
 ACCESS_RE = re.compile(r"\b(?:public|open|internal|package)\b(?:\([^)]*\))?")
 ATTR_RE = re.compile(ss.ATTR)
 
-# The same kinds api-graph gives scan-only declarations (build_graph.py).
+# The kinds api-graph gives scan-only declarations (build_graph.py), which
+# scan_kind refines as the symbol graphs do.
 SCAN_KIND = {"struct": "swift.struct", "enum": "swift.enum", "class": "swift.class", "protocol": "swift.protocol",
              "actor": "swift.actor", "typealias": "swift.typealias", "func": "swift.method", "init": "swift.init",
              "init?": "swift.init", "init!": "swift.init", "var": "swift.property", "let": "swift.property",
              "subscript": "swift.subscript", "case": "swift.enum.case", "macro": "swift.macro"}
+# A function named by an operator, not an identifier: `==(lhs:rhs:)`, and
+# `< ()`, as the scanner names `static func < (lhs:rhs:)`.
+OPERATOR_NAME_RE = re.compile(r"\s*[^\w\s`(]")
 
 # An enum case declaration at the start of a line: `case a`, `case b(Int)`,
 # `indirect case c`, after any attributes.
@@ -141,11 +145,21 @@ def is_public(d):
 
 
 def scan_kind(d):
-    kind = SCAN_KIND.get(d["kw"], "swift." + d["kw"])
-    if d["kw"] == "func" and not d["scopes"]:
+    """A scanned declaration's kind, as the symbol graphs give it (Swift
+    6.2): an operator is `swift.func.op`, a type's static member or global;
+    a `class` member is static, like a `static` one; a static subscript is
+    a type subscript. A top-level `var` stays a property, not the symbol
+    graphs' `swift.var`: the scanner loses some declarations' scopes
+    (IORing.swift's instance properties)."""
+    kw = d["kw"]
+    if kw == "func" and OPERATOR_NAME_RE.match(d["name"]):
+        return "swift.func.op"
+    kind = SCAN_KIND.get(kw, "swift." + kw)
+    if kw == "func" and not d["scopes"]:
         kind = "swift.func"
-    if d["kw"] in ("var", "let", "func") and "static" in d["modifiers"]:
-        kind = {"swift.method": "swift.type.method", "swift.property": "swift.type.property"}.get(kind, kind)
+    if kw in ("var", "let", "func", "subscript") and {"static", "class"} & set(d["modifiers"]):
+        kind = {"swift.method": "swift.type.method", "swift.property": "swift.type.property",
+                "swift.subscript": "swift.type.subscript"}.get(kind, kind)
     return kind
 
 

@@ -16,8 +16,9 @@ Two sources, used together:
 
 So a macro or constant is looked up by its `#define` first, a struct by its
 definition, and a function or anything else by the vocabulary's module,
-confirmed against the module's headers. A name in neither is "not in the
-macOS SDK". Only `usr/include` is indexed; a vocabulary module in a
+confirmed against the module's headers and the headers in no module that
+they include (netinet6/in6.h, from netinet/in.h). A name in neither is "not
+in the macOS SDK". Only `usr/include` is indexed; a vocabulary module in a
 framework (CoreFoundation.CFBase) maps to the framework's header of that
 name.
 """
@@ -319,13 +320,28 @@ class Headers:
         self.memo = {}
 
     def text(self, h):
+        """A header's text without comments: from usr/include, or for a
+        framework's header (`CoreFoundation/CFBase.h`, as framework_header
+        names it), from the framework's Headers."""
         if h not in self.text_cache:
-            p = os.path.join(self.include, h)
-            try:
-                self.text_cache[h] = COMMENT_RE.sub(" ", read_text(p))
-            except OSError:
-                self.text_cache[h] = ""
+            paths = [os.path.join(self.include, h)]
+            if "/" in h:
+                fw, rest = h.split("/", 1)
+                paths.append(os.path.join(self.sdk, "System", "Library", "Frameworks", f"{fw}.framework", "Headers",
+                                          rest))
+            self.text_cache[h] = ""
+            for p in paths:
+                try:
+                    self.text_cache[h] = COMMENT_RE.sub(" ", read_text(p))
+                    break
+                except OSError:
+                    continue
         return self.text_cache[h]
+
+    def has_identifier(self, h, name):
+        """Whether a header names `name` as an identifier, outside comments:
+        sys/stat.h names `st_atimespec`, and not `st_atim`."""
+        return re.search(rf"\b{re.escape(name)}\b", self.text(h)) is not None
 
     def module_headers(self, module):
         """A module's own headers, or, for one with none, its submodules'."""
@@ -349,6 +365,20 @@ class Headers:
                 return h
         return None
 
+    def in_included(self, name, module, call=False):
+        """A header in no module that names the name, included by one of the
+        headers module_headers gives the module: netinet6/in6.h, which
+        Darwin.POSIX.netinet.in's netinet/in.h includes, for `in6addr_any`,
+        which the vocabulary has in Darwin."""
+        pat = re.compile(rf"\b{re.escape(name)}\b" + (r"\s*\(" if call else ""))
+        own = bool(self.headers.get(module))
+        hs = [h for h, m in self.included_by.items()
+              if m and (m == module or (not own and m.startswith(module + ".")))]
+        for h in sorted(hs, key=header_rank):
+            if pat.search(self.text(h)):
+                return h
+        return None
+
     def darwin_header(self, h):
         """Whether a header is Darwin's: in a module, included by one, or in Darwin's directories."""
         if h in self.module_of or h in self.included_by:
@@ -362,6 +392,11 @@ class Headers:
                 "how": how}
 
     def vocab_hit(self, name, bits, call=False):
+        """The name's header in the first of its vocabulary modules with a
+        header that names it: one of the module's own (module_headers), or
+        one in no module that they include. A module with none is passed
+        over, not given its first header (`ar.h`, for Darwin), which says
+        nothing about the name."""
         cands = [(m, k) for m, k in self.by_name.get(name, []) if not bits or any(k & (1 << b) for b in bits)]
         cands.sort(key=lambda mk: (not mk[0].startswith(("Darwin", "_DarwinFoundation")),
                                    "_tgmath" in mk[0], mk[0]))
@@ -370,9 +405,11 @@ class Headers:
                 h = self.in_module(name, m, call=call)
                 if h:
                     return self.result(h, m, "vocabulary")
-                hs = self.module_headers(m)
-                if hs:
-                    return self.result(sorted(hs, key=header_rank)[0], m, "vocabulary (module's header)")
+                # A header in no module is in the module of the header that
+                # includes it, as for a #define in it.
+                h = self.in_included(name, m, call=call)
+                if h:
+                    return self.result(h, None, "vocabulary (included header)")
             else:
                 h = self.framework_header(m)
                 return self.result(h, m, "vocabulary (framework)")
