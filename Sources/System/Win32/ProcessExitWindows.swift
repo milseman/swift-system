@@ -91,12 +91,14 @@ extension ProcessID {
   /// On Windows, the C runtime first raises `SIGABRT`
   /// if a handler for it was installed with `signal`.
   /// If none was, or the handler returns,
-  /// the process ends at once with a fast-fail exception,
-  /// which no exception handler sees,
-  /// and which Windows Error Reporting can record as a crash.
+  /// it ends the process with a fast-fail exception,
+  /// which no exception handler sees.
+  /// Windows Error Reporting records it as a crash,
+  /// and, as for any crash, can show a dialog before the process ends.
   /// The exit code that the process's parent reads is then
   /// `STATUS_STACK_BUFFER_OVERRUN` (`0xC0000409`), whatever the cause.
-  /// With the debug C runtime, or once `_set_abort_behavior`
+  /// With the debug C runtime, which first shows the message
+  /// "abort() has been called", or once `_set_abort_behavior`
   /// turns off `_CALL_REPORTFAULT`,
   /// the process exits with code 3 instead.
   ///
