@@ -287,6 +287,12 @@ int _system_get_LC_ALL_MASK(void);
 #endif // __linux__
 
 #if defined(__linux__) && defined(__GLIBC__)
+// <ar.h>, the archive format's header, which glibc's Swift module doesn't
+// include, as Musl's and Bionic's do. It declares only struct ar_hdr and
+// macros, so ar_hdr is CSystem's, as no other module declares it, and
+// clients read it through System's accessors (Provisional+Ar.swift).
+#include <ar.h>
+
 // glibc's allocator extensions, which it declares in <malloc.h>, which its
 // Swift module doesn't include. <malloc.h> includes <stdio.h>, and so FILE,
 // which this header mustn't declare (see the top of this file), so these
