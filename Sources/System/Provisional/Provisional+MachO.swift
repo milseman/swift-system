@@ -1189,12 +1189,12 @@ extension MachOFile {
   /// Returns the processor type and subtype that an architecture's name
   /// identifies.
   ///
+  ///     let arm64e = MachOFile.cpuType(forArchitectureName: "arm64e")
+  ///     // arm64e?.cpuType == .arm64
+  ///
   /// - Parameter name: An architecture's name, such as `arm64e` or `x86_64`.
   /// - Returns: The processor type and subtype,
   ///   or `nil` if the dynamic loader doesn't know the name.
-  ///
-  ///       let arm64e = MachOFile.cpuType(forArchitectureName: "arm64e")
-  ///       // arm64e?.cpuType == .arm64
   ///
   /// The corresponding C function is `macho_cpu_type_for_arch_name`.
   ///
