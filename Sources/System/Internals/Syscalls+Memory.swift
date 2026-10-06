@@ -8,8 +8,10 @@
 */
 
 // The C allocator: malloc and its variants, Darwin's zones and glibc's
-// extensions; and memcmp, memchr, and secure zeroing. free is system_free,
-// in Syscalls+PathsAndFiles.swift, which has no mock hook.
+// extensions; and memchr and secure zeroing. free is system_free, in
+// Syscalls+PathsAndFiles.swift, which has no mock hook. memcmp has no
+// wrapper here: Memory._compare calls it in code emitted into the client,
+// whose optimizer can then expand a comparison of a count it knows.
 //
 // A mocked allocation records its arguments and fails if an error is
 // forced; otherwise it allocates for real, so that the caller can use the
@@ -289,12 +291,6 @@ internal func system_open_memstream(
 #endif // os(Linux) && canImport(Glibc)
 
 // MARK: - Memory functions
-
-internal func system_memcmp(
-  _ lhs: UnsafeRawPointer, _ rhs: UnsafeRawPointer, _ count: Int
-) -> CInt {
-  memcmp(lhs, rhs, count)
-}
 
 internal func system_memchr(
   _ start: UnsafeRawPointer, _ byte: CInt, _ count: Int

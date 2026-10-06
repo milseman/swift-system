@@ -23,6 +23,7 @@
 
 #if !os(Windows)
 
+// Must import here to call strcmp and strncmp in @_alwaysEmitIntoClient code.
 #if SYSTEM_PACKAGE_DARWIN
 import Darwin
 #elseif canImport(Glibc)
@@ -176,11 +177,14 @@ extension CString {
     _compare(string, other)
   }
 
-  @usableFromInline
+  // Emitted into the client with its strcmp call, so that the client's
+  // optimizer sees the call, as it does a strcmp the client calls itself:
+  // a comparison with a literal, such as the empty string, can fold.
+  @_alwaysEmitIntoClient
   internal static func _compare(
     _ string: UnsafePointer<CChar>, _ other: UnsafePointer<CChar>
   ) -> Int {
-    Int(system_strcmp(string, other))
+    Int(strcmp(string, other))
   }
 
   /// Compares at most a number of bytes of two C strings,
@@ -210,12 +214,14 @@ extension CString {
     _compare(string, other, maxLength: maxLength)
   }
 
-  @usableFromInline
+  // Emitted into the client with its strncmp call, as _compare(_:_:) is:
+  // a comparison with a literal prefix can become loads and compares.
+  @_alwaysEmitIntoClient
   internal static func _compare(
     _ string: UnsafePointer<CChar>, _ other: UnsafePointer<CChar>, maxLength: Int
   ) -> Int {
     precondition(maxLength >= 0, "CString.compare(_:_:maxLength:): 'maxLength' must not be negative")
-    return Int(system_strncmp(string, other, maxLength))
+    return Int(strncmp(string, other, maxLength))
   }
 
   /// Copies a C string into a buffer, truncating it to fit,
