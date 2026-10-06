@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:">
+<meta name="color-scheme" content="light dark">
+<title>Swift System: what system-next adds, and who needs it</title>
+<style>
+/*CSS*/
+</style>
+</head>
+<body>
+<div class="page">
+<header class="top">
+  <div class="top-row">
+    <h1>Swift System: what <code>system-next</code> adds, and who needs it</h1>
+    <button type="button" id="theme" class="theme" title="Light, dark, or as the system is">Theme: auto</button>
+  </div>
+  <p class="lede" id="lede">Loading…</p>
+</header>
+
+<section class="charts" id="charts" aria-label="Burn-down charts"></section>
+
+<section class="controls" aria-label="Search and filters">
+  <label class="search"><span class="vh">Search</span>
+    <input type="search" id="q" placeholder="Search API (a name, type or C name) or packages" autocomplete="off" spellcheck="false">
+  </label>
+  <label>Packages <select id="f-cluster"></select></label>
+  <label>Data <select id="f-kind"></select></label>
+  <label>Pitch <select id="f-state"></select></label>
+  <label>Use <select id="f-use"></select></label>
+  <span id="chips" class="chips"></span>
+  <button type="button" id="reset" class="link">Clear filters</button>
+</section>
+
+<nav class="tabs" role="tablist" aria-label="Views">
+  <button type="button" role="tab" id="tab-api" aria-selected="true">By API</button>
+  <button type="button" role="tab" id="tab-pkg" aria-selected="false">By package</button>
+  <span class="tab-note" id="tab-note"></span>
+</nav>
+
+<main id="view" class="view" aria-live="polite"></main>
+
+<details class="about" id="about">
+  <summary>About this page: what each number means, where the data comes from, and what doesn't agree</summary>
+  <div id="about-body"></div>
+</details>
+<footer class="foot" id="foot"></footer>
+</div>
+<div id="tip" class="tip" role="tooltip" hidden></div>
+<script type="application/json" id="data">/*DATA*/</script>
+<script id="model">
+/*MODEL*/
+</script>
+<script id="ui">
+/*UI*/
+</script>
+</body>
+</html>
