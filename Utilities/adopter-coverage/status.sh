@@ -9,7 +9,9 @@
 # doesn't, the standard library's answer or another module's, from
 # mapping.ini), and which of update-checkout's repositories still import a
 # platform C module in library code, per platform, with each adopter at its
-# newest migration branch. It's cheap enough to rerun after every merge:
+# newest migration branch, and the ledger of every site left on a platform C
+# module, each with its category, ranked (scripts/ledger.py, with
+# modules.ini and exceptions.ini). It's cheap enough to rerun after every merge:
 # api-delta and the release builds run again only when System's sources
 # changed since their last runs, and each package manifest is evaluated
 # once. See README.md in this directory.
@@ -19,6 +21,8 @@
 # Environment:
 #   STATUS_ADOPTERS     the adopters' checkouts (default: adopters next to this worktree)
 #   STATUS_BRANCH       each package's migration branch (default migrate-darwin)
+#   STATUS_MARKERS      section 3's markers: newest (default), at the branch section 4
+#                       reads; or branch, at STATUS_BRANCH, the old view
 #   STATUS_BRANCHES     packages whose migration branch is another, as NAME=BRANCH,
 #                       space-separated (default swift-foundation=no-darwin)
 #   STATUS_ECOSYSTEM    the ecosystem's clones and scheme-main.tsv, for section 4's
@@ -31,16 +35,20 @@
 #   STATUS_SYSTEM_NEXT  System's integration branch (default system-next)
 #   STATUS_OUT          the report (default Prototype/Status/STATUS.md in this worktree)
 #   STATUS_WORK         scratch and caches, the release builds' in abi/ (default .build/status)
+#   STATUS_LEDGER_JSON  the ledger as JSON (default STATUS_WORK/ledger.json)
 #   STATUS_API_DELTA=1  rerun api-delta even when its last run is current
 #   STATUS_SWIFT        more `swift` executables to evaluate manifests with, colon-separated
 #                       (installed toolchains are tried anyway, after the default one)
 #   ADOPTER_COVERAGE_RESULTS  the results store, for its SDK vocabulary (optional)
 #
 # Only commits are read, here, in the packages' checkouts, and in the
-# ecosystem's clones (their HEADs); the one file written outside
-# STATUS_WORK is the report.
+# ecosystem's clones (their HEADs); a partial clone is read within its sparse
+# checkout, and lazy fetching is off, so nothing is fetched. The one file
+# written outside STATUS_WORK is the report (and STATUS_LEDGER_JSON, if set
+# elsewhere).
 set -euo pipefail
 export PYTHONDONTWRITEBYTECODE=1
+export GIT_NO_LAZY_FETCH=1
 
 TOOL="$(cd "$(dirname "$0")" && pwd -P)"
 S="$TOOL/scripts"
@@ -108,4 +116,5 @@ for b in $PLATFORM_BRANCHES_FOR; do branch_for+=(--platform-branches-for "$b"); 
 python3 "$S/status.py" --repo "$REPO" --adopters "$ADOPTERS" --api-delta "$API" --out "$OUT" \
   --branch "$BRANCH" ${branch_for[@]+"${branch_for[@]}"} --base "$BASE" --system-next "$NEXT" \
   --cache "$WORK/manifests" --abi-work "$WORK/abi" ${VOCAB:+--vocab "$VOCAB"} --ecosystem "$ECO" \
-  --platform-branches "$(echo $PLATFORM_BRANCHES | tr ' ' ',')"
+  --platform-branches "$(echo $PLATFORM_BRANCHES | tr ' ' ',')" --markers "${STATUS_MARKERS:-newest}" \
+  --ledger-work "$WORK/ledger" --ledger-json "$(abspath "${STATUS_LEDGER_JSON:-$WORK/ledger.json}")"

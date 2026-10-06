@@ -457,3 +457,33 @@ declarations; `reach.py --kind part` ranks parts alone.
 Nothing needed. Noted: `derive.py` reads `nil` in "with `UTIME_OMIT` for a
 `nil` time" and `value` in "the 8 bytes of `value`" as argument C names;
 harmless for the coverage checks, and filtered here.
+
+## 7. High-value carve-outs (ledger lane, 2026-10-05)
+
+`SUGGESTIONS.md` now opens with *High-value carve-outs*, from
+`scripts/value.py`: the carve-outs that pass the vision's three tests for a
+high-return pitch, as approximated (`scripts/method.md`, decision 42):
+
+1. **A potential adopter in the update-checkout cluster**: a package of
+   `scheme-main.tsv` (matched to the adopter packages by remote) that uses it
+   on its migration branch or calls a C interface it newly wraps, from reach's
+   adopted and would-benefit sites.
+2. **No new design pattern**: no open question, direct or inherited, and no
+   type promoted to shared vocabulary among its declarations.
+3. **A meaningful but not enormous chunk**: `config.json`'s `valueSize`, 3 to
+   60 declarations.
+
+They're ranked by the cluster's sites, then by the penalty score, each with
+its packages and their sites; a part is listed only when its cluster doesn't
+pass. The section ends with the carve-outs with the most sites that fail a
+test, and why. The suggested order, carve-outs by reach and the rest of the
+file are unchanged; `suggestions.json` gains `highValue`, and
+`value.py --all` prints every carve-out with each test's result.
+
+Rejected: a weighted score of sites against the penalty (a weight nobody has
+chosen, and it hides why one carve-out outranks another); every package's
+sites (the server packages' reach isn't the toolchain's); and parts beside
+their passing cluster (the same declarations twice). Open: whether the
+cluster should leave out swift-corelibs-foundation, whose status Michael
+hasn't decided (it counts now), and whether a tier-1 subset of the cluster
+should weigh more. Tests: `scripts/test_value.py`.

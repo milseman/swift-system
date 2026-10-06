@@ -58,7 +58,10 @@ SWIFT_ENV = {
                 "arch": {"x86_64", "arm64"}},
     "OpenBSD": {"os": {"OpenBSD"}, "import": {"Glibc"} | _CORELIBS | _EVERYWHERE,
                 "arch": {"x86_64", "arm64"}},
-    "WASI":    {"os": {"WASI"}, "import": {"WASILibc", "Foundation", "FoundationEssentials", "Synchronization"},
+    # wasip1's SDK has the wasi_pthread module, threads or not, which
+    # swift-async-algorithms tests for (../adopters/PACKAGES-6-REPORT.md).
+    "WASI":    {"os": {"WASI"}, "import": {"WASILibc", "wasi_pthread", "Foundation", "FoundationEssentials",
+                                         "Synchronization"},
                 "arch": {"wasm32"}},
     "Windows": {"os": {"Windows"}, "import": {"WinSDK", "ucrt", "CRT"} | _CORELIBS | _EVERYWHERE,
                 "arch": {"x86_64", "arm64"}},

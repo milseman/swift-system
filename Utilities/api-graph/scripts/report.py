@@ -28,6 +28,7 @@ import sys
 
 sys.dont_write_bytecode = True
 import reach  # noqa: E402
+import value  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PLATFORMS = ["Darwin", "Linux", "Musl", "Android", "FreeBSD", "OpenBSD", "WASI", "Windows"]
@@ -303,6 +304,7 @@ def main():
     ap.add_argument("--previous")
     ap.add_argument("--adopters", help="adopters.json, from adopters.py")
     ap.add_argument("--pitches", help="pitches.json, from pitches.py: what the pitch files already cover")
+    ap.add_argument("--scheme", help="scheme-main.tsv: the update-checkout cluster, for the high-value carve-outs")
     a = ap.parse_args()
 
     g = load(a.graph)
@@ -337,6 +339,11 @@ def main():
     if pitched:
         for x in cands:
             x["pitched"] = pitched[x["id"]]
+    scheme = value.scheme_repos(a.scheme) if adopters and a.scheme and os.path.exists(a.scheme) else None
+    if scheme is not None:
+        rows, _, _ = value.rank(doc, scheme)
+        doc["highValue"] = [{k: t[k] for k in ("id", "kind", "declarations", "sites", "adopter", "rank", "score")}
+                            for t in rows]
     json.dump(doc, open(os.path.join(a.out, "suggestions.json"), "w"), indent=1)
 
     L = []
@@ -354,6 +361,8 @@ def main():
       "(`GRAPH.md`). Every suggestion has a bundle in `suggestions/`. [How this was generated]"
       "(#how-this-was-generated) records each design decision and the alternative it rejected.")
     w("")
+    if scheme is not None:
+        value.section(w, doc, scheme)
 
     # ------------------------------------------------------------ summary
     n_graph = sum(1 for n in nodes.values() if n["source"] == "graph")
