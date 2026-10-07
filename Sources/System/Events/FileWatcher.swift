@@ -441,6 +441,9 @@ extension FileWatcher {
   /// The fewest bytes that a buffer for ``read(into:retryOnInterrupt:)``
   /// needs, to hold any one event: an event's header,
   /// and the longest name with its zero byte.
+  ///
+  /// The corresponding C constant is `NAME_MAX`,
+  /// which this adds to the size of a `struct inotify_event`.
   @_alwaysEmitIntoClient
   public static var minimumReadByteCount: Int {
     MemoryLayout<inotify_event>.size + Int(_NAME_MAX) + 1

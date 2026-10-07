@@ -198,6 +198,9 @@ extension SignalSet: SetAlgebra {
   }
 
   /// Removes the signals that aren't in another set.
+  ///
+  /// The corresponding C function is `sigdelset`, for each signal
+  /// that the other set lacks.
   @_alwaysEmitIntoClient
   public mutating func formIntersection(_ other: SignalSet) {
     for signal in _members where !other.contains(signal) { _delete(signal) }
@@ -205,6 +208,8 @@ extension SignalSet: SetAlgebra {
 
   /// Replaces the set with the signals in one set or the other,
   /// but not both.
+  ///
+  /// The corresponding C functions are `sigaddset` and `sigdelset`.
   @_alwaysEmitIntoClient
   public mutating func formSymmetricDifference(_ other: SignalSet) {
     for signal in other._members {

@@ -124,6 +124,8 @@ extension CInterop.POSIXErrorCode {
 
   /// The code's error number.
   ///
+  /// The corresponding C type is `int`, as error numbers.
+  ///
   /// - Note: Provisional: the overlay's types may move to the Swift standard library.
   @_alwaysEmitIntoClient
   public var errno: Errno { Errno(rawValue: rawValue) }
