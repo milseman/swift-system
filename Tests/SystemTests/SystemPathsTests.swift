@@ -69,6 +69,20 @@ final class ConfigurationStringTest: XCTestCase {
     }
   }
 
+  #if os(Linux) && canImport(Glibc)
+  func testTheCLibrarysVersion() throws {
+    // "glibc 2.39": the name, then what gnu_get_libc_version returns
+    // (which Glibc's Swift module doesn't import).
+    let value = try XCTUnwrap(try SystemConfig.string(.gnuLibraryVersion))
+    XCTAssertTrue(value.hasPrefix("glibc "), value)
+    let numbers = value.dropFirst("glibc ".count).split(separator: ".").map { Int($0) }
+    XCTAssertGreaterThanOrEqual(numbers.count, 2, value)
+    XCTAssertTrue(numbers.allSatisfy { $0 != nil }, value)
+    // At least the version System was built with.
+    XCTAssertGreaterThanOrEqual(numbers[0]! * 1000 + numbers[1]!, Int(__GLIBC__) * 1000 + Int(__GLIBC_MINOR__))
+  }
+  #endif
+
   #if SYSTEM_PACKAGE_DARWIN
   func testUserDirectories() throws {
     let user = try XCTUnwrap(try SystemConfig.string(.userDirectory))

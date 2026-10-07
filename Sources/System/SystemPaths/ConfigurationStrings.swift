@@ -133,6 +133,24 @@ extension SystemConfig.StringName {
   @available(*, unavailable, renamed: "userCacheDirectory")
   public static var _CS_DARWIN_USER_CACHE_DIR: Self { userCacheDirectory }
   #endif // SYSTEM_PACKAGE_DARWIN
+
+  #if os(Linux) && canImport(Glibc)
+  /// The name and version of the GNU C library that the process runs with,
+  /// such as `"glibc 2.39"`.
+  ///
+  /// It's the version at run time, which can be newer
+  /// than the one the program was built with.
+  /// `gnu_get_libc_version` returns the same version, without the name.
+  ///
+  /// The corresponding C constant is `_CS_GNU_LIBC_VERSION`.
+  /// - Note: Only available on Linux with glibc.
+  @_alwaysEmitIntoClient
+  public static var gnuLibraryVersion: Self { Self(rawValue: __CS_GNU_LIBC_VERSION) }
+
+  @_alwaysEmitIntoClient
+  @available(*, unavailable, renamed: "gnuLibraryVersion")
+  public static var _CS_GNU_LIBC_VERSION: Self { gnuLibraryVersion }
+  #endif // os(Linux) && canImport(Glibc)
 }
 
 #endif // !os(Windows) && !os(WASI) && !os(Android)
