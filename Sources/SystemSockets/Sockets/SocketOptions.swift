@@ -252,7 +252,7 @@ extension SocketDescriptor {
   public func getOption<T>(
     _ level: OptionLevel,
     _ option: CInt
-  ) throws -> T {
+  ) throws(Errno) -> T {
     try _getOption(level, option).get()
   }
 
@@ -297,7 +297,7 @@ extension SocketDescriptor {
     _ level: OptionLevel,
     _ option: CInt,
     to value: T
-  ) throws {
+  ) throws(Errno) {
     try _setOption(level, option, to: value).get()
   }
 
@@ -327,37 +327,37 @@ extension SocketDescriptor {
 extension SocketDescriptor {
   /// Gets a socket-level option as an integer.
   @_alwaysEmitIntoClient
-  public func getSocketOption(_ option: SocketOption) throws -> CInt {
+  public func getSocketOption(_ option: SocketOption) throws(Errno) -> CInt {
     try getOption(.socket, option.rawValue)
   }
 
   /// Sets a socket-level option as an integer.
   @_alwaysEmitIntoClient
-  public func setSocketOption(_ option: SocketOption, to value: CInt) throws {
+  public func setSocketOption(_ option: SocketOption, to value: CInt) throws(Errno) {
     try setOption(.socket, option.rawValue, to: value)
   }
 
   /// Gets a TCP-level option as an integer.
   @_alwaysEmitIntoClient
-  public func getTCPOption(_ option: TCPOption) throws -> CInt {
+  public func getTCPOption(_ option: TCPOption) throws(Errno) -> CInt {
     try getOption(.tcp, option.rawValue)
   }
 
   /// Sets a TCP-level option as an integer.
   @_alwaysEmitIntoClient
-  public func setTCPOption(_ option: TCPOption, to value: CInt) throws {
+  public func setTCPOption(_ option: TCPOption, to value: CInt) throws(Errno) {
     try setOption(.tcp, option.rawValue, to: value)
   }
 
   /// Enables reuse of local addresses.
   @_alwaysEmitIntoClient
-  public func setReuseAddress(_ enabled: Bool = true) throws {
+  public func setReuseAddress(_ enabled: Bool = true) throws(Errno) {
     try setSocketOption(.reuseAddress, to: enabled ? 1 : 0)
   }
 
   /// Disables the Nagle algorithm.
   @_alwaysEmitIntoClient
-  public func setNoDelay(_ enabled: Bool = true) throws {
+  public func setNoDelay(_ enabled: Bool = true) throws(Errno) {
     try setTCPOption(.noDelay, to: enabled ? 1 : 0)
   }
 }

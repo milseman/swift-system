@@ -45,7 +45,7 @@ extension SocketDescriptor {
     _ type: ConnectionType,
     protocol: ProtocolID = .default,
     retryOnInterrupt: Bool = true
-  ) throws -> SocketDescriptor {
+  ) throws(Errno) -> SocketDescriptor {
     try _open(domain, type, protocol: `protocol`, retryOnInterrupt: retryOnInterrupt).get()
   }
 
@@ -83,7 +83,7 @@ extension SocketDescriptor {
     _ type: ConnectionType,
     protocol: ProtocolID = .default,
     retryOnInterrupt: Bool = true
-  ) throws -> (SocketDescriptor, SocketDescriptor) {
+  ) throws(Errno) -> (SocketDescriptor, SocketDescriptor) {
     try _pair(domain, type, protocol: `protocol`, retryOnInterrupt: retryOnInterrupt).get()
   }
 
@@ -108,7 +108,7 @@ extension SocketDescriptor {
   ///
   /// The corresponding C function is `close`.
   @_alwaysEmitIntoClient
-  public func close() throws {
+  public func close() throws(Errno) {
     try _close().get()
   }
 
@@ -125,7 +125,7 @@ extension SocketDescriptor {
   ///
   /// The corresponding C function is `shutdown`.
   @_alwaysEmitIntoClient
-  public func shutdown(_ how: ShutdownKind) throws {
+  public func shutdown(_ how: ShutdownKind) throws(Errno) {
     try _shutdown(how).get()
   }
 
@@ -147,7 +147,7 @@ extension SocketDescriptor {
   ///
   /// The corresponding C function is `bind`.
   @_alwaysEmitIntoClient
-  public func bind(to address: SocketAddress) throws {
+  public func bind(to address: SocketAddress) throws(Errno) {
     try _bind(to: address).get()
   }
 
@@ -168,7 +168,7 @@ extension SocketDescriptor {
   ///
   /// The corresponding C function is `listen`.
   @_alwaysEmitIntoClient
-  public func listen(backlog: Int) throws {
+  public func listen(backlog: Int) throws(Errno) {
     try _listen(backlog: backlog).get()
   }
 
@@ -186,7 +186,7 @@ extension SocketDescriptor {
   ///
   /// The corresponding C function is `accept`.
   @_alwaysEmitIntoClient
-  public func accept(retryOnInterrupt: Bool = true) throws -> SocketDescriptor {
+  public func accept(retryOnInterrupt: Bool = true) throws(Errno) -> SocketDescriptor {
     try _accept(retryOnInterrupt: retryOnInterrupt).get()
   }
 
@@ -209,7 +209,7 @@ extension SocketDescriptor {
   public func accept(
     client: inout SocketAddress,
     retryOnInterrupt: Bool = true
-  ) throws -> SocketDescriptor {
+  ) throws(Errno) -> SocketDescriptor {
     try _accept(client: &client, retryOnInterrupt: retryOnInterrupt).get()
   }
 
@@ -231,7 +231,7 @@ extension SocketDescriptor {
   ///
   /// The corresponding C function is `connect`.
   @_alwaysEmitIntoClient
-  public func connect(to address: SocketAddress) throws {
+  public func connect(to address: SocketAddress) throws(Errno) {
     try _connect(to: address).get()
   }
 
@@ -263,7 +263,7 @@ extension SocketDescriptor {
     _ buffer: UnsafeRawBufferPointer,
     flags: MessageFlags = .none,
     retryOnInterrupt: Bool = true
-  ) throws -> Int {
+  ) throws(Errno) -> Int {
     try _send(buffer, flags: flags, retryOnInterrupt: retryOnInterrupt).get()
   }
 
@@ -292,7 +292,7 @@ extension SocketDescriptor {
     into buffer: UnsafeMutableRawBufferPointer,
     flags: MessageFlags = .none,
     retryOnInterrupt: Bool = true
-  ) throws -> Int {
+  ) throws(Errno) -> Int {
     try _receive(into: buffer, flags: flags, retryOnInterrupt: retryOnInterrupt).get()
   }
 
@@ -323,7 +323,7 @@ extension SocketDescriptor {
     to address: SocketAddress,
     flags: MessageFlags = .none,
     retryOnInterrupt: Bool = true
-  ) throws -> Int {
+  ) throws(Errno) -> Int {
     try _send(buffer, to: address, flags: flags, retryOnInterrupt: retryOnInterrupt).get()
   }
 
@@ -364,7 +364,7 @@ extension SocketDescriptor {
     sender: inout SocketAddress,
     flags: MessageFlags = .none,
     retryOnInterrupt: Bool = true
-  ) throws -> Int {
+  ) throws(Errno) -> Int {
     try _receive(into: buffer, sender: &sender, flags: flags, retryOnInterrupt: retryOnInterrupt).get()
   }
 
@@ -706,7 +706,7 @@ extension SocketDescriptor {
   ///
   /// The corresponding C function is `getsockname`.
   @_alwaysEmitIntoClient
-  public func getLocalAddress(into address: inout SocketAddress) throws {
+  public func getLocalAddress(into address: inout SocketAddress) throws(Errno) {
     try _getLocalAddress(into: &address).get()
   }
 
@@ -725,7 +725,7 @@ extension SocketDescriptor {
   ///
   /// The corresponding C function is `getpeername`.
   @_alwaysEmitIntoClient
-  public func getPeerAddress(into address: inout SocketAddress) throws {
+  public func getPeerAddress(into address: inout SocketAddress) throws(Errno) {
     try _getPeerAddress(into: &address).get()
   }
 
