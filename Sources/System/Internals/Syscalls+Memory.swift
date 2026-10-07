@@ -298,6 +298,12 @@ internal func system_memchr(
   memchr(start, byte, count)
 }
 
+internal func system_memmem(
+  _ start: UnsafeRawPointer, _ count: Int, _ bytes: UnsafeRawPointer, _ byteCount: Int
+) -> UnsafeMutableRawPointer? {
+  memmem(start, count, bytes, byteCount)
+}
+
 // Stores that the compiler can't remove, as it can a memset of memory that
 // isn't read again.
 #if SYSTEM_PACKAGE_DARWIN

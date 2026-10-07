@@ -91,6 +91,37 @@ extension Memory {
     return UnsafeRawPointer(found) - start
   }
 
+  /// Returns the offsets where some bytes first appear in a buffer.
+  ///
+  /// - Parameters:
+  ///   - bytes: The bytes to look for.
+  ///   - buffer: The buffer to look in.
+  /// - Returns: The range of offsets from the start of `buffer`
+  ///   where it first contains `bytes`, or `nil` if it doesn't.
+  ///   Empty `bytes` are found at offset 0.
+  ///
+  /// The C library's search is typically faster than
+  /// a search of the buffer's bytes, such as `firstRange(of:)`.
+  ///
+  /// The corresponding C function is `memmem`.
+  @_alwaysEmitIntoClient
+  public static func firstRange(
+    of bytes: UnsafeRawBufferPointer, in buffer: UnsafeRawBufferPointer
+  ) -> Range<Int>? {
+    _firstRange(of: bytes, in: buffer)
+  }
+
+  @usableFromInline
+  internal static func _firstRange(
+    of bytes: UnsafeRawBufferPointer, in buffer: UnsafeRawBufferPointer
+  ) -> Range<Int>? {
+    guard let needle = bytes.baseAddress, bytes.count > 0 else { return 0..<0 }
+    guard let start = buffer.baseAddress, buffer.count >= bytes.count else { return nil }
+    guard let found = system_memmem(start, buffer.count, needle, bytes.count) else { return nil }
+    let offset = UnsafeRawPointer(found) - start
+    return offset..<(offset + bytes.count)
+  }
+
   /// Overwrites a buffer with zeros, with stores that the compiler
   /// can't remove.
   ///
@@ -151,6 +182,21 @@ extension Memory {
   @_alwaysEmitIntoClient
   public static func firstIndex(of byte: UInt8, in bytes: RawSpan) -> Int? {
     bytes.withUnsafeBytes { _firstIndex(of: byte, in: $0) }
+  }
+
+  /// Returns the offsets where some bytes first appear in a span.
+  ///
+  /// - Parameters:
+  ///   - bytes: The bytes to look for.
+  ///   - span: The bytes to look in.
+  /// - Returns: The range of offsets from the start of `span`
+  ///   where it first contains `bytes`, or `nil` if it doesn't.
+  ///   Empty `bytes` are found at offset 0.
+  ///
+  /// The corresponding C function is `memmem`.
+  @_alwaysEmitIntoClient
+  public static func firstRange(of bytes: RawSpan, in span: RawSpan) -> Range<Int>? {
+    bytes.withUnsafeBytes { bytes in span.withUnsafeBytes { _firstRange(of: bytes, in: $0) } }
   }
 
   /// Overwrites a span's bytes with zeros, with stores that the compiler
