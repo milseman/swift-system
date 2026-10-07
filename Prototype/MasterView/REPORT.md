@@ -1,5 +1,7 @@
 # Master view: what system-next adds, and who needs it
 
+**Superseded in part, 2026-10-07:** the views-2 lane replaced the burn-down charts with the intersection's figures, made the examples a user, and resolved section 7's api-graph needs; see `VIEWS-2-REPORT.md`. This report stands as the record of 2026-10-06.
+
 **Status: done, 2026-10-06.** The page is `Prototype/MasterView/master.html`, from a run against `system-next` at `0e339dc` and `main` at `1b452c2`. The tool is `Utilities/master-view/` (its README says how to run it, what it reads, and what every number on the page means). Nothing is left to resume; section 7 lists what's needed outside this lane.
 
 ## 1. What

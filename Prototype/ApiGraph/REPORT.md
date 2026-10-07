@@ -487,3 +487,43 @@ their passing cluster (the same declarations twice). Open: whether the
 cluster should leave out swift-corelibs-foundation, whose status Michael
 hasn't decided (it counts now), and whether a tier-1 subset of the cluster
 should weigh more. Tests: `scripts/test_value.py`.
+
+## 8. Newest branches, the examples, qualifiers (views-2 lane, 2026-10-07)
+
+Three changes to the adopters step, which master-view's report (sections 4
+and 5) asked for; method.md has them as decisions 43, 44 and the end of 18:
+
+- **Each clone is read at its newest migration branch**, the first of
+  `migrate-all`, `migrate-unix`, `migrate-darwin` it has
+  (`API_GRAPH_ADOPTER_BRANCHES`; `API_GRAPH_ADOPTER_BRANCH` still names one
+  branch for all), as status.py reads them for the ledger, so the uses and
+  the C uses left are of the same commit. `adopted.branch` records the
+  branch read, `adopted.branches` every one the clone has.
+- **The examples' repository is a user**, read at its `main` as a package
+  written on System (`API_GRAPH_EXAMPLES`, default `../swift-system-examples`):
+  built and indexed like a migration, every line of its Sources its own, no
+  hunks, `role: examples` on its package node. It counts toward reach.
+- **Only a type is a qualifier**: the index's symbol kind decides, so a
+  property or method before another name is a use.
+
+The run (cold, `HEAD_REF=system-next` at `7c545cc`, 17 min 21 s, the 22
+builds, 21 migrations and the examples, four at a time about 13 min of it)
+filed the snapshot `7c545cc…` in `../api-graph-snapshots`. Against
+`dd30d5c`'s: 1,947 `usedBy` links (1,413), 4,553 sites (3,226), 22 packages
+using new API (19); qualifier-only links 69 (206), none of them on a member
+(147). 11 migrations were read at `migrate-all` and 10 at `migrate-unix`
+(commit 4516473's message says 13 and 9: a miscount), 20 by their build's
+index, one partly (sourcekit-lsp) and one by name (swift-testing); the
+examples use 225 new declarations at 470 sites.
+
+Known limits found on the way: swift-stress-tester's manifest is in a
+subdirectory (`SourceKitStressTester/`), so `discover` skips it and its
+migration isn't read; swift-testing's `migrate-all` needs Swift tools 6.3,
+so its build fails under 6.2 and it's matched by name only (lowering the
+tools version, as the `:libraries` path already does, is the likely fix);
+sourcekit-lsp's `Diagnose` target fails under 6.2, so its index is partial.
+Section 7's open question has news: Michael set swift-corelibs-foundation
+and swift-corelibs-xctest aside on 2026-10-07 ("likely superseded by
+swift-foundation; to revisit") for the master view's figures; `value.py`
+still counts them in the update-checkout cluster. Tests:
+`scripts/test_adopters.py` (4).

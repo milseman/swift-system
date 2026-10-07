@@ -168,13 +168,13 @@
       var freshN = fresh.reduce(function (n, k) { return n + ((d.perRepo || {})[k] || 0); }, 0);
       var marked = Object.keys(nm).filter(function (k) { return !aside[k]; });
       var markedN = marked.reduce(function (n, k) { return n + nm[k]; }, 0);
-      if (moved.length) words.push(signed(work) + " in update-checkout's code (" +
-        moved.slice(0, 4).map(function (k) { return k + " " + signed(c[k]); }).join(", ") + (moved.length > 4 ? ", …" : "") + ")");
+      if (moved.length) words.push("in the adopters' code, " + signed(work) + ": " +
+        moved.slice(0, 4).map(function (k) { return k + " " + signed(c[k]); }).join(", ") + (moved.length > 4 ? ", …" : ""));
       if (freshN) words.push(signed(freshN) + " newly counted, not new C: " + fresh.join(", ") + " read for the first time");
       if (markedN) words.push(signed(markedN) + " newly counted, not new C: SYSTEM-GAP markers over C already used (" + marked.join(", ") + ")");
       var total = ucTotal(t.last) - ucTotal(t.prev);
       out.textContent = when + (total === 0 && !words.length ? "no change in update-checkout." :
-        signed(total) + " in update-checkout" + (words.length ? ": " + words.join("; ") : "") + ".");
+        signed(total) + " in update-checkout" + (words.length ? ". " + words.join("; ").replace(/^./, function (x) { return x.toUpperCase(); }) : "") + ".");
     }
     return out;
   }
