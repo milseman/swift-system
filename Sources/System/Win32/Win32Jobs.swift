@@ -291,7 +291,9 @@ extension Win32 {
 extension Win32.JobNotification {
   /// What a job's packet reports.
   ///
-  /// The corresponding C type is the `JOB_OBJECT_MSG_*` constants.
+  /// Its values are the `JOB_OBJECT_MSG_*` constants.
+  ///
+  /// The corresponding C type is `DWORD`.
   @frozen
   public struct Kind: RawRepresentable, Sendable, Hashable, Codable {
     /// The raw C value.

@@ -89,7 +89,9 @@ extension Win32 {
 
   /// Options for ``moveFile(_:to:flags:)``.
   ///
-  /// The corresponding C parameter of `MoveFileExW` is `dwFlags`.
+  /// `MoveFileExW` takes these in its `dwFlags` parameter.
+  ///
+  /// The corresponding C type is `DWORD`.
   @frozen
   public struct MoveFileFlags: OptionSet, Sendable, Hashable, Codable {
     /// The raw C flags.
@@ -162,8 +164,7 @@ extension Win32 {
 
   /// Options for ``copyFile(_:to:flags:)``.
   ///
-  /// The corresponding C field of `COPYFILE2_EXTENDED_PARAMETERS` is
-  /// `dwCopyFlags`.
+  /// The corresponding C field is `COPYFILE2_EXTENDED_PARAMETERS.dwCopyFlags`.
   @frozen
   public struct CopyFileFlags: OptionSet, Sendable, Hashable, Codable {
     /// The raw C flags.
@@ -269,7 +270,9 @@ extension Win32 {
 extension Win32 {
   /// Options for ``createSymbolicLink(_:to:flags:)``.
   ///
-  /// The corresponding C parameter of `CreateSymbolicLinkW` is `dwFlags`.
+  /// `CreateSymbolicLinkW` takes these in its `dwFlags` parameter.
+  ///
+  /// The corresponding C type is `DWORD`.
   @frozen
   public struct SymbolicLinkFlags: OptionSet, Sendable, Hashable, Codable {
     /// The raw C flags.
@@ -352,7 +355,7 @@ extension Win32 {
   /// Whether and how a file is deleted, for
   /// ``Win32/FileHandle/setDisposition(_:)``.
   ///
-  /// The corresponding C field of `FILE_DISPOSITION_INFO_EX` is `Flags`.
+  /// The corresponding C field is `FILE_DISPOSITION_INFO_EX.Flags`.
   @frozen
   public struct DispositionFlags: OptionSet, Sendable, Hashable, Codable {
     /// The raw C flags.
@@ -412,8 +415,9 @@ extension Win32 {
 
   /// How ``Win32/FileHandle/rename(to:flags:)`` renames a file.
   ///
-  /// The corresponding C field of `FILE_RENAME_INFO` is `Flags`, for
-  /// `FileRenameInfoEx`.
+  /// They're the flags of a rename with `FileRenameInfoEx`.
+  ///
+  /// The corresponding C field is `FILE_RENAME_INFO.Flags`.
   @frozen
   public struct RenameFlags: OptionSet, Sendable, Hashable, Codable {
     /// The raw C flags.

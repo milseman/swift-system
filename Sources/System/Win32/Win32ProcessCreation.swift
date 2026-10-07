@@ -22,7 +22,9 @@ extension Win32 {
   /// `EXTENDED_STARTUPINFO_PRESENT` itself, as its environment and standard
   /// handles need them.
   ///
-  /// The corresponding C parameter of `CreateProcessW` is `dwCreationFlags`.
+  /// `CreateProcessW` takes these in its `dwCreationFlags` parameter.
+  ///
+  /// The corresponding C type is `DWORD`.
   @frozen
   public struct ProcessCreationFlags: OptionSet, Sendable, Hashable, Codable {
     /// The raw C flags.

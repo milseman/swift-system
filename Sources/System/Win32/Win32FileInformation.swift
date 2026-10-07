@@ -343,7 +343,9 @@ extension Win32 {
 extension Win32 {
   /// The kind of a reparse point: what a path that reaches it does.
   ///
-  /// The corresponding C values are the `IO_REPARSE_TAG_*` constants.
+  /// Its values are the `IO_REPARSE_TAG_*` constants.
+  ///
+  /// The corresponding C type is `DWORD`.
   @frozen
   public struct ReparseTag: RawRepresentable, Sendable, Hashable, Codable {
     /// The raw C tag.

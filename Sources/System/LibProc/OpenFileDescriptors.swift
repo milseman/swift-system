@@ -95,7 +95,9 @@ extension ProcessID {
 extension ProcessID.OpenFileDescriptor {
   /// What an open file descriptor refers to.
   ///
-  /// The corresponding C type is the `PROX_FDTYPE_*` values.
+  /// Its values are the `PROX_FDTYPE_*` constants.
+  ///
+  /// The corresponding C field is `proc_fdinfo.proc_fdtype`.
   /// - Note: Only available on macOS.
   @frozen
   public struct Kind: RawRepresentable, Hashable, Sendable {

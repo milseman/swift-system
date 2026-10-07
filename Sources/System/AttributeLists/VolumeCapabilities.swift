@@ -67,7 +67,10 @@ extension FilePath {
 extension FilePath.VolumeCapabilities {
   /// Capabilities of a volume's format.
   ///
-  /// The corresponding C constants are the `VOL_CAP_FMT_*` values.
+  /// Its bits are the `VOL_CAP_FMT_*` constants.
+  ///
+  /// The corresponding C field is `vol_capabilities_attr_t.capabilities`,
+  /// at `VOL_CAPABILITIES_FORMAT`.
   /// - Note: Only available on Darwin.
   @frozen
   public struct Format: OptionSet, Sendable, Hashable {
@@ -244,7 +247,10 @@ extension FilePath.VolumeCapabilities {
 
   /// Capabilities of a volume's file system implementation.
   ///
-  /// The corresponding C constants are the `VOL_CAP_INT_*` values.
+  /// Its bits are the `VOL_CAP_INT_*` constants.
+  ///
+  /// The corresponding C field is `vol_capabilities_attr_t.capabilities`,
+  /// at `VOL_CAPABILITIES_INTERFACES`.
   /// - Note: Only available on Darwin.
   @frozen
   public struct Interfaces: OptionSet, Sendable, Hashable {

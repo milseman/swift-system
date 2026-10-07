@@ -17,7 +17,9 @@ import WinSDK
 extension Win32 {
   /// One of a process's three standard handles.
   ///
-  /// The corresponding C parameter of `GetStdHandle` is `nStdHandle`.
+  /// `GetStdHandle` takes one in its `nStdHandle` parameter.
+  ///
+  /// The corresponding C type is `DWORD`.
   @frozen
   public struct StandardHandle: RawRepresentable, Sendable, Hashable, Codable {
     /// The raw C value.
@@ -131,7 +133,9 @@ extension Win32 {
   /// an output flag. So a mode holding ``processedInput`` also contains
   /// ``processedOutput``, and only the handle's kind tells which it means.
   ///
-  /// The corresponding C parameter of `SetConsoleMode` is `dwMode`.
+  /// `SetConsoleMode` takes a mode in its `dwMode` parameter.
+  ///
+  /// The corresponding C type is `DWORD`.
   @frozen
   public struct ConsoleMode: OptionSet, Sendable, Hashable, Codable {
     /// The raw C mode.
@@ -465,7 +469,9 @@ extension Win32.FileHandle {
 extension Win32 {
   /// An event that a console delivers to the processes attached to it.
   ///
-  /// The corresponding C parameter of a `HandlerRoutine` is `dwCtrlType`.
+  /// A `HandlerRoutine` receives one in its `dwCtrlType` parameter.
+  ///
+  /// The corresponding C type is `DWORD`.
   @frozen
   public struct ConsoleControlEvent: RawRepresentable, Sendable, Hashable, Codable {
     /// The raw C value.
