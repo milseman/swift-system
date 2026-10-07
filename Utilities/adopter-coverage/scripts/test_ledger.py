@@ -370,6 +370,31 @@ class CategoryTests(unittest.TestCase):
         s = self.categorize(site(kind="marker", markers=[marker], platforms={"Linux": "T", "WASI": "T"}))
         self.assertEqual((s["category"], s["holder"]), ("System gap", ["[statfs]"]))
 
+    def test_marker_names_where_they_are_missing(self):
+        # Each name is answered on the platforms the marker names right after
+        # it, of those the site compiles on: fsync is System's on Linux.
+        def categorize(text, platforms=("Linux", "Windows")):
+            marker = {"line": 2, "text": text, "imported": []}
+            return self.categorize(site(kind="marker", markers=[marker], platforms={p: "M" for p in platforms}))
+        s = categorize("unistd.h fsync on Linux: FileDescriptor.synchronize()")
+        self.assertEqual(s["category"], "unexplained")
+        s = categorize("sys/vfs.h statfs on Windows, and unistd.h fsync on Linux")
+        self.assertEqual((s["category"], s["holder"]), ("System gap", ["[statfs]"]))
+        self.assertEqual(s["holders"][0]["platforms"], ["Windows"])
+        s = categorize("unistd.h fsync (and fdatasync), on Linux")
+        self.assertEqual(s["category"], "unexplained")
+        # A word that isn't a platform names none; nor does a platform the
+        # site isn't compiled on.
+        s = categorize("unistd.h fsync in Embedded Swift")
+        self.assertEqual(s["holders"][0]["platforms"], ["Windows"])
+        s = categorize("unistd.h fsync on OpenBSD")
+        self.assertEqual(s["holders"][0]["platforms"], ["Windows"])
+        self.assertEqual(ledger.named_platforms("backtrace on Linux, Android, FreeBSD and OpenBSD, and "
+                                                "backtrace_async on Darwin", "backtrace"),
+                         {"Linux", "Android", "FreeBSD", "OpenBSD"})
+        self.assertEqual(ledger.named_platforms("backtrace on Linux, and backtrace_async on Darwin",
+                                                "backtrace_async"), {"Darwin"})
+
 
 class MarkerParserTests(unittest.TestCase):
     """status.py's marker parser, which the ledger reads markers with."""

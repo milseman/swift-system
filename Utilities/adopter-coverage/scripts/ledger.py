@@ -830,6 +830,30 @@ def marker_names(site, vocab, coverage):
     return list(dict.fromkeys(names)), list(dict.fromkeys(phrases))
 
 
+# The platforms a marker says a C name is missing on, in the words right
+# after it: `isatty on WASI`, `backtrace on Linux, Android, FreeBSD and
+# OpenBSD`, `mptcp_info (MPTCP_INFO), on Linux`. A word that isn't a
+# platform ends the list (`strchr in Embedded Swift` names none), as lint's
+# markers check reads them.
+PLATFORM_OF = {"Darwin": "Darwin", "macOS": "Darwin", "iOS": "Darwin", "Linux": "Linux", "Musl": "Musl",
+               "Android": "Android", "Bionic": "Android", "WASI": "WASI", "FreeBSD": "FreeBSD",
+               "OpenBSD": "OpenBSD", "Windows": "Windows"}
+_LIST_SEPARATOR = r"\s*,\s*(?:and\s+|or\s+)?|\s+(?:and|or)\s+"
+_QUALIFIER = re.compile(r"(?:\(\))?(?:\s*\([^()]*\))?\)?,?\s+(?:on|in|for)\s+"
+                        r"([A-Z]\w*(?:(?:" + _LIST_SEPARATOR + r")[A-Z]\w*)*)")
+
+
+def named_platforms(text, name):
+    """The platforms that a marker's text names right after a C name it
+    gives, as where it's missing; an empty set if it names none."""
+    found = set()
+    for m in re.finditer(r"(?<![\w.])" + re.escape(name) + r"(?!\w)", text):
+        q = _QUALIFIER.match(text, m.end())
+        if q:
+            found |= {PLATFORM_OF[w] for w in re.split(_LIST_SEPARATOR, q.group(1)) if w in PLATFORM_OF}
+    return found
+
+
 def categorize(site, entries, coverage, modules, vocab=None):
     """Sets the site's category, holders (its `holder` ids), every holder
     with its names and platforms (`holders`), and reason. A site's own
@@ -856,7 +880,11 @@ def categorize(site, entries, coverage, modules, vocab=None):
     names = {n: dict(ps) for n, ps in site["names"].items()}
     from_markers, phrases = marker_names(site, vocab, coverage)
     for n in from_markers:
-        names.setdefault(n, {p: [] for p in site["platforms"]})
+        # A name the marker says is missing on some platforms is answered
+        # there, of the ones the site compiles on.
+        named = set().union(*(named_platforms(mk["text"], n) for mk in site["markers"]))
+        where = [p for p in site["platforms"] if p in named] or list(site["platforms"])
+        names.setdefault(n, {p: [] for p in where})
     answers = {}   # name -> {platform: (category, unit, how)}
     for n, ps in sorted(names.items()):
         field = n in coverage.fields and n not in coverage.names and n not in coverage.entry_of
@@ -1340,7 +1368,9 @@ METHOD = """
   (Prototype/Win32/WindowsModel and Rust's Win32 bindings, where rustc is installed) on Windows only; not a
   declaration or a label, not a member of anything but a platform module (a C field is one), a call-only word (`read`,
   `close`) only when called, and none the repository declares itself, in Swift or in its C headers, unless qualified
-  (`Glibc.read`). A file's names count for each of its imports compiled on the platform. Rejected: adopter-coverage's
+  (`Glibc.read`). A file's names count for each of its imports compiled on the platform. A marker's names count on
+  the platforms its site compiles on, or on those of them the marker names right after a name (`isatty on WASI`,
+  `backtrace on Linux and Android, and backtrace_async on Darwin`), as lint's markers check reads them. Rejected: adopter-coverage's
   extractions (`interfaces.json.gz`), which exist for some repositories, at other commits; and a vocabulary of any
   capitalized name, which reads every Swift type as C.
 - **Categories**: `exceptions.ini`'s entries decide a site first, by kind: *excluded* (not a site), *exception* (Michael's
