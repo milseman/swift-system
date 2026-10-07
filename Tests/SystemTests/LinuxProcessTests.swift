@@ -91,6 +91,21 @@ final class LinuxProcessTests: XCTestCase {
   }
   #endif
 
+  // Reads the test process's own link, and a child's, and finds none for a
+  // process ID that no process has.
+  func testExecutablePaths() throws {
+    let own = try ProcessID.current.executablePath()
+    XCTAssertEqual(own, try FilePath("/proc/self/exe").readSymbolicLink())
+    XCTAssertTrue(own.isAbsolute, "\(own)")
+    let child = ChildProcess(taking: try spawnWaitingChild())
+    let shellPath = try child.id.executablePath()
+    XCTAssertTrue(shellPath.isAbsolute, "\(shellPath)")
+    XCTAssertEqual(try shellPath.stat().type, .regular)
+    XCTAssertThrowsError(try ProcessID(rawValue: .max).executablePath()) {
+      XCTAssertEqual($0 as? Errno, .noSuchFileOrDirectory)
+    }
+  }
+
   func testASignalDescriptorReceivesBlockedSignals() throws {
     let previous = PThread.blockSignals([.userDefined1])
     defer { PThread.setCurrentSignalMask(previous) }

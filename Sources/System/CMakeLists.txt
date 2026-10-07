@@ -241,6 +241,7 @@ target_sources(SystemPackage PRIVATE
   Processes/Credentials.swift
   Processes/ExitStatus.swift
   Processes/ProcessDescriptor.swift
+  Processes/ProcessExecutablePath.swift
   Processes/ProcessGroups.swift
   Processes/ProcessWait.swift
   Processes/ResourceLimits.swift
