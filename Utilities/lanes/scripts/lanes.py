@@ -150,8 +150,12 @@ def worktrees(main, base, timeout):
 
 
 def trial_conflicts(g, common, ours, theirs):
-    """Files `git merge-tree` finds conflicting in a merge of theirs into
-    ours, with every object it writes in a temporary directory."""
+    """(files, how): the files `git merge-tree` finds conflicting in a merge
+    of theirs into ours, with every object it writes in a temporary
+    directory, and how they were found. `write-tree` is git's own list
+    (`--write-tree`, git 2.38 and later). A git too old for it prints its
+    usage; the three-argument form, the trivial merge, is used instead
+    (`trivial`), which writes nothing: see trivial_conflicts."""
     tmp = tempfile.mkdtemp(prefix="lanes-merge-tree-")
     try:
         alternates = [os.path.join(common, "objects")]
@@ -160,11 +164,61 @@ def trial_conflicts(g, common, ours, theirs):
             with open(info) as f:
                 alternates += [a.strip() for a in f if a.strip() and not a.startswith("#")]
         env = dict(ENV, GIT_OBJECT_DIRECTORY=tmp, GIT_ALTERNATE_OBJECT_DIRECTORIES=os.pathsep.join(alternates))
-        p = g("merge-tree", "--write-tree", "--name-only", "--no-messages", ours, theirs, ok=(0, 1), env=env)
-        lines = [x for x in p.stdout.split("\n")[1:] if x.strip()]
-        return len(lines) if p.returncode == 1 else 0
+        p = g("merge-tree", "--write-tree", "--name-only", "--no-messages", ours, theirs, ok=(0, 1, 128, 129),
+              env=env)
+        if p.returncode in (0, 1):
+            lines = [x for x in p.stdout.split("\n")[1:] if x.strip()]
+            return (len(lines) if p.returncode == 1 else 0), "write-tree"
+        if not NO_WRITE_TREE.search(p.stderr):
+            raise RuntimeError(f"git merge-tree --write-tree: {p.stderr.strip()[:300]}")
+        base = g.out("merge-base", ours, theirs, ok=(0, 1)).strip()
+        if not base:
+            raise RuntimeError(f"no merge base of {ours} and {theirs} for a trial merge")
+        return trivial_conflicts(g.out("merge-tree", base, ours, theirs)), "trivial"
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+
+
+# What a git without `merge-tree --write-tree` says: its usage, which names
+# only the three-argument form, or an unknown option.
+NO_WRITE_TREE = re.compile(r"usage: git merge-tree <base-tree>|unknown option|unrecognized argument", re.I)
+TRIVIAL_SECTION = re.compile(r"^(changed in both|added in both|removed in local|removed in remote|added in local|"
+                             r"added in remote|merged)$")
+TRIVIAL_ENTRY = re.compile(r"^  (base|our|their) +\d+ ([0-9a-f]+) (.+)$")
+
+
+def trivial_conflicts(text):
+    """How many files a trivial merge's output (`git merge-tree BASE OURS
+    THEIRS`) conflicts in: those whose merged text has git's conflict
+    markers (`+<<<<<<< .our`), and those one side removed and the other
+    changed. It can't follow renames, so a conflict that `--write-tree`
+    finds through one is missed."""
+    files = set()
+    section, entries, in_diff = None, {}, False
+
+    def close():
+        if section in ("removed in local", "removed in remote"):
+            kept = entries.get("their" if section == "removed in local" else "our")
+            if kept and entries.get("base") and kept[0] != entries["base"][0]:
+                files.add(kept[1])
+
+    for line in text.split("\n"):
+        if TRIVIAL_SECTION.match(line):
+            close()
+            section, entries, in_diff = line, {}, False
+            continue
+        if section is None:
+            continue
+        if line.startswith("@@"):
+            in_diff = True
+            continue
+        m = TRIVIAL_ENTRY.match(line) if not in_diff else None
+        if m:
+            entries[m.group(1)] = (m.group(2), m.group(3))
+        elif in_diff and line.rstrip() == "+<<<<<<< .our" and entries:
+            files.add(next(iter(entries.values()))[1])
+    close()
+    return len(files)
 
 
 # ---------------------------------------------------------------- reports, logs, sessions
@@ -323,7 +377,7 @@ def git_lane(lane, base, args):
             counts = g.out("rev-list", "--left-right", "--count", f"{base_ref}...HEAD").split()
             lane["behind"], lane["ahead"] = int(counts[0]), int(counts[1])
             if lane["ahead"] and lane["behind"] and not args.no_merge_tree:
-                lane["conflicts"] = trial_conflicts(g, common, base_ref, "HEAD")
+                lane["conflicts"], lane["conflictsBy"] = trial_conflicts(g, common, base_ref, "HEAD")
             elif not args.no_merge_tree:
                 lane["conflicts"] = 0
             mb = g.out("merge-base", base_ref, "HEAD", ok=(0, 1)).strip()
@@ -492,11 +546,18 @@ def markdown(doc):
             else:
                 rel = short_time(x.get("headTime"))
             conflicts = x.get("conflicts")
+            if conflicts is not None and x.get("conflictsBy") == "trivial":
+                conflicts = f"{conflicts}*"
             w(f"| `{x['name']}` | `{cell(x.get('branch'))}` | {head} | {rel} | {x.get('uncommitted', '')} | "
               f"{', '.join(x.get('inProgress') or []) or '—'} | {'—' if conflicts is None else conflicts} | "
               f"{report_cell(x)} | {cell((x.get('report') or {}).get('resume'), 110)} | {log_cell(x)} | "
               f"{session_cell(x)} |")
         w("")
+        if any(x.get("conflictsBy") == "trivial" for x in rows):
+            w("\\* Counted from a trivial merge (`git merge-tree BASE OURS THEIRS`): this git has no "
+              "`merge-tree --write-tree` (git 2.38). Files with conflict markers, and files one side deleted and "
+              "the other changed; a conflict through a rename isn't seen.")
+            w("")
     skipped = [x for x in doc["lanes"] if x.get("skipped")]
     if skipped:
         w("Skipped as slow: " + ", ".join(f"`{x['name']}` ({x['skipped']})" for x in skipped) + ".")
