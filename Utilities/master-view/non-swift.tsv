@@ -1,0 +1,15 @@
+# Repositories with no Swift code, for those not cloned here: a clone is
+# checked for .swift files other than package manifests instead. Hand-kept,
+# for update-checkout's C and C++ projects. Columns: GitHub repository, why.
+google/boringssl	C: Google's fork of OpenSSL
+google/brotli	C: the Brotli compressor
+KitWare/CMake	C++: the CMake build system
+curl/curl	C: the URL transfer library
+gnome/libxml2	C: the XML library
+swiftlang/llvm-project	C++: LLVM, Clang and LLDB
+microsoft/mimalloc	C: the mimalloc allocator
+ninja-build/ninja	C++: the Ninja build tool
+swiftlang/swift-corelibs-blocksruntime	C: the blocks runtime
+swiftlang/swift-docc-render-artifact	JavaScript: DocC's renderer, prebuilt
+WebAssembly/wasi-libc	C: WASI's C library
+madler/zlib	C: the zlib compressor
