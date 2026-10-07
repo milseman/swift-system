@@ -52,6 +52,8 @@ extension TerminalDescriptor {
     }
 
     /// The number of rows, or lines of text.
+    ///
+    /// The corresponding C field is `ws_row`.
     @_alwaysEmitIntoClient
     public var rows: UInt16 {
       get { rawValue.ws_row }
@@ -59,6 +61,8 @@ extension TerminalDescriptor {
     }
 
     /// The number of columns, or characters per line.
+    ///
+    /// The corresponding C field is `ws_col`.
     @_alwaysEmitIntoClient
     public var columns: UInt16 {
       get { rawValue.ws_col }
