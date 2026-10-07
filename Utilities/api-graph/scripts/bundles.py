@@ -187,12 +187,12 @@ def adopters_md(w, data, adopters, full=False, owners=None, mine=None, nodes=Non
     owners (a pitch bundle's), each hunk says what else it uses, and which
     pitch has it."""
     meta = adopters["meta"]
-    branch = meta["branch"]
+    branch = reach.branch_words(meta)
     info = {p["key"]: p for p in adopters["packages"]}
     n_migrated = sum(1 for p in adopters["packages"] if p["adopted"])
     n_data = sum(1 for p in adopters["packages"] if p["benefit"])
     pk = data["packages"]
-    w(f"{len(data['using'])} of the {n_migrated} packages migrated on `{branch}` use this carve-out's "
+    w(f"{len(data['using'])} of the {n_migrated} packages read on their {branch} use this carve-out's "
       f"declarations, and {len(data['benefiting'])} of the {n_data} packages with C interface data call C "
       "interfaces it newly wraps."
       + ("" if full else " `adopters.md` lists every site and quotes every hunk."))
@@ -211,7 +211,7 @@ def adopters_md(w, data, adopters, full=False, owners=None, mine=None, nodes=Non
     w("")
     if not pk:
         return
-    w(f"| Package | Uses on `{branch}` | Declarations used | Would benefit | C interfaces |")
+    w("| Package | Uses on the branch read | Declarations used | Would benefit | C interfaces |")
     w("|---|---:|---:|---:|---|")
     for p in pk:
         ad, be = p.get("adopted"), p.get("benefit")
@@ -241,8 +241,10 @@ def adopters_md(w, data, adopters, full=False, owners=None, mine=None, nodes=Non
                                     f"({(pinfo.get('build') or {}).get('reason') or ''}); lexical where it has no record",
                    "lexical": "lexical matching: the build didn't run or failed "
                               f"({(pinfo.get('build') or {}).get('reason') or ''})"}.get(ad["resolution"], ad["resolution"])
-            w(f"**Adopted** on `{ad['branch']}` @ `{(ad['commit'] or '')[:10]}` ({pinfo.get('commits', '?')} "
-              f"commit{'s' if pinfo.get('commits') != 1 else ''} past `{ad['mainRef']}` @ `{(ad['base'] or '')[:10]}`): "
+            since = ("all its own: the examples, written on System" if pinfo.get("examples") else
+                     f"{pinfo.get('commits', '?')} commit{'s' if pinfo.get('commits') != 1 else ''} past "
+                     f"`{ad['mainRef']}` @ `{(ad['base'] or '')[:10]}`")
+            w(f"**Adopted** on `{ad['branch']}` @ `{(ad['commit'] or '')[:10]}` ({since}): "
               f"{plural(len(ad['sites']), 'site')} using {plural(len(ad['declarationsUsed']), 'declaration')}, "
               f"resolved by {how}"
               + (f"; {ad['qualifiers']} more only name a type to qualify a nested one" if ad["qualifiers"] else "")
@@ -563,7 +565,7 @@ def main():
         if adopters:
             ad = data["adopters"]
             pname = {p["key"]: p["name"] for p in adopters["packages"]}
-            w(f"| Adopters | {len(ad['using'])} using it on `{adopters['meta']['branch']}`"
+            w(f"| Adopters | {len(ad['using'])} using it on their {reach.branch_words(adopters['meta'])}"
               + (f" ({', '.join(pname.get(k, k) for k in ad['using'])})" if ad["using"] else "")
               + f"; {len(ad['benefiting'])} would benefit"
               + (f" ({', '.join(pname.get(k, k) for k in ad['benefiting'][:8])}"

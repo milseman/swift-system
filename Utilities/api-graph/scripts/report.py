@@ -210,7 +210,7 @@ def reach_section(w, adopters, cands, units, md):
     """## Adopter reach: the packages, the carve-outs by reach, and each
     package's carve-outs."""
     am = adopters["meta"]
-    branch = am["branch"]
+    branch = reach.branch_words(am)
     pk = adopters["packages"]
     name = {p["key"]: p["name"] for p in pk}
 
@@ -218,7 +218,7 @@ def reach_section(w, adopters, cands, units, md):
         return ", ".join(name.get(k, k) for k in keys)
     w("## Adopter reach")
     w("")
-    w(f"Which packages use each carve-out's declarations on their `{branch}` branch (*using*), and which call "
+    w(f"Which packages use each carve-out's declarations on their {branch} (*using*), and which call "
       "C interfaces it newly wraps (*would benefit*). A carve-out's reach is the number of packages that do "
       "either. Adopted sites are the migration's uses, precise where the compiler's index of a build of the "
       "branch against this head resolved them and lexical elsewhere; would-benefit sites are the coverage "
@@ -234,7 +234,7 @@ def reach_section(w, adopters, cands, units, md):
     w(f"Found in `{am['adopters']}` and `{am['ecosystem']}`; a clone of a new package in either is picked up "
       "by the next run.")
     w("")
-    w(f"| Package | `{branch}` | Resolution | Adopted sites | Carve-outs using | Interface data | "
+    w(f"| Package | Branch read | Resolution | Adopted sites | Carve-outs using | Interface data | "
       "Would-benefit sites | Carve-outs it would benefit from |")
     w("|---|---|---|---:|---:|---|---:|---:|")
     for p in pk:
@@ -243,7 +243,9 @@ def reach_section(w, adopters, cands, units, md):
         benefiting = [x for x in cands if p["key"] in x["adopters"]["benefiting"]]
         if ad:
             b = ad["build"] or {}
-            mig = f"`{ad['commit'][:10]}`, {ad['commits']} commit{'s' if ad['commits'] != 1 else ''}"
+            mig = (f"`{ad['branch']}` `{ad['commit'][:10]}`, "
+                   + ("the examples, written on System" if ad.get("examples") else
+                      f"{ad['commits']} commit{'s' if ad['commits'] != 1 else ''}"))
             res = {"index": "index", "partial index": "partial index", "lexical": "lexical"}[ad["resolution"]]
             if b.get("status") not in ("indexed",) and b.get("reason"):
                 res += f" ({md(b['reason'][:90])})"
@@ -414,7 +416,8 @@ def main():
         used = [x for x in cands if x["adopters"]["using"]]
         ben = [x for x in cands if x["adopters"]["benefiting"]]
         n_used = len({s["node"] for s in adopters["adoptedSites"] if not s["qualifier"]})
-        w(f"- **Adopters**: {len(mig)} packages have a migration on `{am['branch']}`, and together use "
+        w(f"- **Adopters**: {len(mig)} packages have a migration (each read on its {reach.branch_words(am)}), "
+          "and together use "
           f"{n_used} of the new declarations, in {len(used)} of the {len(cands)} carve-outs; "
           f"{sum(1 for p in mig if p['adopted']['resolution'] == 'index')} of them were resolved by the index of "
           f"a build against this head. {len(dat)} packages have C interface data, and {len(ben)} carve-outs wrap "

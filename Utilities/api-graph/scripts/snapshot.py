@@ -249,6 +249,8 @@ def build(a):
             nodes["package:" + p["key"]] = {"kind": "package", "key": p["key"], "name": p["name"],
                                             "remote": p["remote"], "adopted": p["adopted"], "benefit": p["benefit"],
                                             "adoptersClone": p.get("adoptersClone")}
+            if p.get("role"):
+                nodes["package:" + p["key"]]["role"] = p["role"]
         by_use = collections.defaultdict(list)
         for s in ad["adoptedSites"]:
             by_use[(s["node"], s["package"])].append({k: s[k] for k in ("file", "line", "column", "resolution", "how",

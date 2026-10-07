@@ -3,11 +3,17 @@
 
 Two kinds of use sites, for every node of graph.json:
 
-  adopted        Packages migrated onto System on a branch (migrate-darwin)
-                 of a clone in ADOPTERS: the files and lines of the branch
+  adopted        Packages migrated onto System on a branch of a clone in
+                 ADOPTERS, each read at its newest migration branch (the
+                 first of --branches it has: migrate-all, else migrate-unix,
+                 else migrate-darwin): the files and lines of the branch
                  that use each declaration, with the diff hunk, against the
                  branch's merge base with the package's main, that
-                 introduced the use.
+                 introduced the use. The examples' repository (--examples,
+                 at its main) is read the same way, as a package written on
+                 System from the start: its Sources are all its own, so
+                 there are no hunks, and the lexical pass reads every line
+                 of them the Darwin build doesn't compile.
                  - Precise where the compiler resolves the use. The branch's
                    commit is exported, its path dependency on swift-system
                    pointed at an export of the head commit (and a path
@@ -56,8 +62,12 @@ Usage: adopters.py --graph graph.json --repo DIR --head COMMIT
                    [--symbolgraphs DIR] [--validate declarations|interface|tree]
                    [--builds-dir DIR] [--jobs 4]
                    [--adopters DIR] [--ecosystem DIR] [--coverage-results DIR]
-                   [--branch migrate-darwin] [--builds build|reuse|none]
+                   [--examples DIR] [--examples-ref main]
+                   [--branches migrate-all,migrate-unix,migrate-darwin]
+                   [--builds build|reuse|none]
                    [--rebuild] [--min-free-gb 15] [--only KEY,...]
+  --branches is newest first: each clone is read at the first it has
+  (--branch B is --branches B).
   --symbolgraphs is api-delta's symbol graphs of the head commit
   (symbolgraphs/head), what cached indexes are revalidated against.
   --builds-dir keeps a build directory per migration, and System's export,
@@ -101,6 +111,15 @@ READER_VERSION = "1"
 SYSTEM_MODULES = ("13SystemPackage", "13SystemSockets")
 ROLE_IMPLICIT = 1 << 8
 SWIFT_VERSION = (6, 2)   # for compiler(>=...) conditions; replaced from `swift --version`
+# The migration branches, newest first (status.py's PLATFORM_BRANCHES): a
+# clone is read at the first of them it has.
+MIGRATION_BRANCHES = ("migrate-all", "migrate-unix", "migrate-darwin")
+# The index's symbol kinds that are types (indexstore.h: enum, struct,
+# class, protocol, union, type alias). Only a type named right before
+# another reference is a qualifier (`PThread` in `PThread.Mutex`); a
+# property or method before one is a use (`ProcessID.current` in
+# `ProcessID.current.rawValue`).
+TYPE_SYMBOL_KINDS = {5, 6, 7, 8, 10, 11}
 
 # Member names too common to match lexically: a use of one could be any
 # type's. Names declared on the base commit, and names the package declares
@@ -377,8 +396,23 @@ def common_dir(path):
     return os.path.realpath(out.strip()) if out else None
 
 
-def discover(adopters_dir, ecosystem_dir, branch, repo):
-    """Every package clone: {key: {key, name, remote, adopters, ecosystem}}."""
+def newest_branch(path, branches):
+    """(branch, commit) of the first of `branches`, newest first, that the
+    clone has as a local branch, or (None, None)."""
+    for b in branches:
+        c = rev(path, f"refs/heads/{b}")
+        if c:
+            return b, c
+    return None, None
+
+
+def discover(adopters_dir, ecosystem_dir, branches, repo, examples=None):
+    """Every package clone: {key: {key, name, remote, adopters, ecosystem}}.
+    An adopters clone is read at its newest migration branch, the first of
+    `branches` it has (its info's `branch`; `branches` lists every one it
+    has). `examples` is (directory, ref): the examples' repository, read at
+    that ref as a package written on System from the start, with no merge
+    base (`examples` in its info, and `role` in its entry)."""
     own = common_dir(repo)
     pkgs = {}
     for role, parent in (("adopters", adopters_dir), ("ecosystem", ecosystem_dir)):
@@ -398,8 +432,9 @@ def discover(adopters_dir, ecosystem_dir, branch, repo):
             e = pkgs.setdefault(key, {"key": key, "name": name, "remote": remote, "adopters": None, "ecosystem": None})
             info = {"path": path, "dir": d, "head": head}
             if role == "adopters":
-                tip = rev(path, branch)
-                info["branch"] = branch if tip else None
+                branch, tip = newest_branch(path, branches)
+                info["branch"] = branch
+                info["branches"] = {b: c for b in branches for c in [rev(path, f"refs/heads/{b}")] if c}
                 if tip:
                     main_ref = next((r for r in MAIN_REFS if rev(path, r)), None)
                     base = git(path, "merge-base", tip, main_ref, check=False) if main_ref else None
@@ -414,6 +449,23 @@ def discover(adopters_dir, ecosystem_dir, branch, repo):
             else:
                 info.update({"commit": head, "subject": git(path, "log", "-1", "--format=%s", head).strip()})
             e[role] = info
+    if examples and examples[0] and os.path.isdir(examples[0]):
+        path, ref = os.path.realpath(examples[0]), examples[1]
+        tip = rev(path, f"refs/heads/{ref}") or rev(path, ref)
+        remote, name = remote_identity(path)
+        key = name.lower()
+        if toplevel(path) != path or not tip or git(path, "cat-file", "-e", f"{tip}:Package.swift", check=False) is None:
+            say(f"adopters: the examples, {path}: no Swift package at {ref}; left out")
+        elif key in pkgs:
+            say(f"adopters: the examples, {path}: another clone is {key} too; left out")
+        else:
+            pkgs[key] = {"key": key, "name": name, "remote": remote, "role": "examples", "ecosystem": None,
+                         "adopters": {"path": path, "dir": os.path.basename(path), "head": rev(path, "HEAD"),
+                                      "branch": ref, "branches": {ref: tip}, "commit": tip,
+                                      "subject": git(path, "log", "-1", "--format=%s", tip).strip(),
+                                      "mainRef": None, "mainCommit": None, "base": None, "baseSubject": None,
+                                      "commits": int(git(path, "rev-list", "--count", tip).strip()),
+                                      "migrated": True, "examples": True}}
     return pkgs
 
 
@@ -617,7 +669,7 @@ class Builder:
                     continue
                 top = toplevel(target) if os.path.isdir(target) else None
                 if top:
-                    c = rev(top, self.a.branch) or rev(top, "HEAD")
+                    c = newest_branch(top, self.a.branches)[1] or rev(top, "HEAD")
                     keys.append(f"{os.path.basename(target)}@{c}")
                     if (top, c) not in seen:
                         seen.add((top, c))
@@ -628,8 +680,8 @@ class Builder:
 
     def rewrite(self, export_dir, checkout, deps_dir, seen, notes):
         """Point the export's path dependencies at commits: swift-system at the
-        head commit's export, another clone at an export of its migration
-        branch (or its HEAD). Returns the keys the build depends on; `seen`
+        head commit's export, another clone at an export of its newest
+        migration branch (or its HEAD). Returns the keys the build depends on; `seen`
         gets the exports it made."""
         keys = []
         for manifest in sorted(glob.glob(os.path.join(export_dir, "Package*.swift"))):
@@ -643,7 +695,7 @@ class Builder:
                     return m.group(1) + json.dumps(self.system())
                 top = toplevel(target) if os.path.isdir(target) else None
                 if top:
-                    commit = rev(top, self.a.branch) or rev(top, "HEAD")
+                    commit = newest_branch(top, self.a.branches)[1] or rev(top, "HEAD")
                     dest = os.path.join(deps_dir, os.path.basename(target.rstrip("/")))
                     keys.append(f"{os.path.basename(target)}@{commit}")
                     if dest not in seen:
@@ -1557,16 +1609,31 @@ def lexical_interfaces(commit_obj, kinds, library):
 
 # ---------------------------------------------------------------- adopted sites
 
-def migration_sites(key, p, idx, branch, usr_node, matcher, conds):
+def own_sources(co):
+    """The examples' diff stand-in: every Swift file under Sources at the
+    commit, each line of it added, with no hunks (there's no merge base to
+    diff against: all of it is the package's own)."""
+    listing = git(co.repo, "ls-tree", "-r", "--name-only", co.commit, "--", "Sources") or ""
+    return {f: {"old": f, "status": "A", "hunks": [], "added": set(range(1, len(co.lines(f)) + 1))}
+            for f in listing.split("\n") if f.endswith(".swift")}
+
+
+def migration_sites(key, p, idx, usr_node, matcher, conds):
     """One migration's adopted sites, from its index and lexically, with
     the hunks they cite: {sites, hunks, adopted}. `conds` is the caller's
-    own, since its parser keeps state."""
+    own, since its parser keeps state. The examples (`examples` in the
+    info) have no merge base: every line of their Sources counts as theirs,
+    so the lexical pass reads all the lines the Darwin build doesn't
+    compile, and no site cites a hunk."""
     info = p["adopters"]
     repo, commit, base = info["path"], info["commit"], info["base"]
     co = Commit(repo, commit)
-    diff_text = git(repo, "-c", "core.quotePath=false", "diff", "--no-ext-diff", "--no-textconv", "--no-color",
-                    "--src-prefix=a/", "--dst-prefix=b/", "--find-renames", "-U3", base, commit) if base else ""
-    diff = parse_diff(diff_text)
+    if info.get("examples"):
+        diff = own_sources(co)
+    else:
+        diff_text = git(repo, "-c", "core.quotePath=false", "diff", "--no-ext-diff", "--no-textconv", "--no-color",
+                        "--src-prefix=a/", "--dst-prefix=b/", "--find-renames", "-U3", base, commit) if base else ""
+        diff = parse_diff(diff_text)
     swift_changed = sorted(f for f in diff if f.endswith(".swift"))
     indexed = set(idx["files"])
     symbols = idx["symbols"]
@@ -1609,7 +1676,9 @@ def migration_sites(key, p, idx, branch, usr_node, matcher, conds):
     # Precise: the index's references to the nodes' USRs. A type named
     # only to qualify another reference right after it (`PThread` in
     # `PThread.Mutex`) is recorded as a qualifier, and implicit
-    # references (accessors a property use calls) are dropped.
+    # references (accessors a property use calls) are dropped. Only a
+    # type is a qualifier: a property or method before another reference
+    # (`ProcessID.current` in `ProcessID.current.rawValue`) is a use.
     for rel, fdata in sorted(idx["files"].items()):
         refs = fdata["references"]
         at_col = {(l_, c_) for l_, c_, _u, _f in refs}
@@ -1620,10 +1689,11 @@ def migration_sites(key, p, idx, branch, usr_node, matcher, conds):
             nid = usr_node.get(usr)
             if not nid:
                 continue
-            name = re.sub(r"\(.*$", "", symbols.get(usr, {}).get("name", ""))
+            sym = symbols.get(usr, {})
+            name = re.sub(r"\(.*$", "", sym.get("name", ""))
             text = lines[line - 1] if 0 < line <= len(lines) else ""
             qual = False
-            if name and text[col - 1:col - 1 + len(name)] == name:
+            if name and sym.get("kind") in TYPE_SYMBOL_KINDS and text[col - 1:col - 1 + len(name)] == name:
                 after = col + len(name)
                 if text[after - 1:after] == "." and (line, after + 1) in at_col:
                     qual = True
@@ -1655,7 +1725,8 @@ def migration_sites(key, p, idx, branch, usr_node, matcher, conds):
 
     resolution = {"indexed": "index", "partial": "partial index"}.get(idx["status"], "lexical")
     adopted = {
-        "path": info["path"], "dir": info["dir"], "branch": branch, "commit": commit,
+        "path": info["path"], "dir": info["dir"], "branch": info["branch"], "commit": commit,
+        "branches": info.get("branches") or {}, "examples": bool(info.get("examples")),
         "subject": info["subject"], "mainRef": info["mainRef"], "mainCommit": info["mainCommit"],
         "base": base, "baseSubject": info["baseSubject"], "commits": info["commits"],
         "swiftFilesChanged": len(swift_changed), "indexedFilesChanged": len([f for f in swift_changed
@@ -1685,7 +1756,11 @@ def main():
     ap.add_argument("--adopters")
     ap.add_argument("--ecosystem")
     ap.add_argument("--coverage-results")
-    ap.add_argument("--branch", default="migrate-darwin")
+    ap.add_argument("--branches", default=",".join(MIGRATION_BRANCHES), metavar="BRANCH,...",
+                    help="the migration branches, newest first: each clone is read at the first it has")
+    ap.add_argument("--branch", help="one migration branch, for --branches")
+    ap.add_argument("--examples", help="the examples' repository: a package written on System, read at --examples-ref")
+    ap.add_argument("--examples-ref", default="main")
     ap.add_argument("--builds", choices=("build", "reuse", "none"), default="build")
     ap.add_argument("--rebuild", action="store_true")
     ap.add_argument("--symbolgraphs", help="api-delta's symbol graphs of the head commit (symbolgraphs/head)")
@@ -1696,6 +1771,7 @@ def main():
     ap.add_argument("--only", default="")
     a = ap.parse_args()
     a.work, a.cache = os.path.abspath(a.work), os.path.abspath(a.cache)
+    a.branches = [a.branch] if a.branch else [b for b in a.branches.split(",") if b]
     a.builds_dir = os.path.abspath(a.builds_dir) if a.builds_dir and a.builds == "build" else None
     t_start = time.time()
 
@@ -1706,7 +1782,7 @@ def main():
     if mv:
         SWIFT_VERSION = (int(mv.group(1)), int(mv.group(2)))
 
-    pkgs = discover(a.adopters, a.ecosystem, a.branch, a.repo)
+    pkgs = discover(a.adopters, a.ecosystem, a.branches, a.repo, (a.examples, a.examples_ref) if a.examples else None)
     only = set(x for x in a.only.split(",") if x)
     if only:
         pkgs = {k: v for k, v in pkgs.items() if k in only}
@@ -1733,12 +1809,14 @@ def main():
     for key in sorted(pkgs):
         p = pkgs[key]
         rec = {"key": key, "name": p["name"], "remote": p["remote"], "adopted": None, "benefit": None}
+        if p.get("role"):
+            rec["role"] = p["role"]
         pkg_out.append(rec)
         info = p["adopters"]
         if info and not info.get("migrated"):
             rec["adoptersClone"] = {"path": info["path"], "branch": info.get("branch"),
                                     "note": "no commits past the merge base" if info.get("branch") else
-                                    f"no {a.branch} branch"}
+                                    f"no {' or '.join(a.branches)} branch"}
     recs = {r["key"]: r for r in pkg_out}
 
     # The builds, API_GRAPH_ADOPTER_JOBS at a time, longest first (by the
@@ -1768,7 +1846,7 @@ def main():
     def work(key):
         t0 = time.time()
         idx = builder.index(pkgs[key], plans[key])
-        out = migration_sites(key, pkgs[key], idx, a.branch, usr_node, matcher, Conditions())
+        out = migration_sites(key, pkgs[key], idx, usr_node, matcher, Conditions())
         out["adopted"]["seconds"] = round(time.time() - t0)
         b, n = idx["build"], out["adopted"]["sites"]
         info = pkgs[key]["adopters"]
@@ -1776,7 +1854,7 @@ def main():
             f"({b.get('status')}{': ' + b['reason'] if b.get('reason') else ''}"
             f"{'; ' + b['start'] if not b.get('cached') and b.get('start') else ''}); "
             f"{n['precise']} precise and {n['lexical']} lexical sites, {n['qualifier']} qualifiers; "
-            f"{out['adopted']['seconds']} s ({a.branch} at {info['commit'][:10]}, {info['commits']} commits)")
+            f"{out['adopted']['seconds']} s ({info['branch']} at {info['commit'][:10]}, {info['commits']} commits)")
         return out
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as pool:
@@ -1906,7 +1984,9 @@ def main():
         print(f"adopters: build directories in {a.builds_dir}: {build_dirs['totalMB'] / 1024:.1f} GB for {len(per)} "
               f"packages (the largest: {', '.join(f'{k} {v / 1024:.1f} GB' for v, k in top)})", flush=True)
     json.dump({
-        "meta": {"branch": a.branch, "adopters": a.adopters, "ecosystem": a.ecosystem,
+        "meta": {"branch": a.branches[0] if len(a.branches) == 1 else None, "branches": a.branches,
+                 "examples": a.examples, "examplesRef": a.examples_ref if a.examples else None,
+                 "adopters": a.adopters, "ecosystem": a.ecosystem,
                  "coverageResults": a.coverage_results, "headCommit": a.head, "systemTree": builder.system_tree,
                  "systemManifest": builder.system_manifest, "validate": a.validate,
                  "systemDeclarations": len(decls.fingerprint) if decls else None,
