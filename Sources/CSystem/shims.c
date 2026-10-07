@@ -633,6 +633,25 @@ extern int csystem_posix_spawn_file_actions_has_addclosefrom(void) {
   #endif
 }
 
+#if defined(__GLIBC__)
+// sigabbrev_np, from glibc 2.32, looked up as it's called, as
+// addclosefrom_np is.
+typedef const char *(*csystem_sigabbrev_np_t)(int);
+
+static csystem_sigabbrev_np_t csystem_find_sigabbrev_np(void) {
+  return (csystem_sigabbrev_np_t)dlsym(RTLD_DEFAULT, "sigabbrev_np");
+}
+
+extern const char *csystem_sigabbrev_np(int signal) {
+  csystem_sigabbrev_np_t sigabbrev = csystem_find_sigabbrev_np();
+  return sigabbrev ? sigabbrev(signal) : 0;
+}
+
+extern int csystem_has_sigabbrev_np(void) {
+  return csystem_find_sigabbrev_np() != 0;
+}
+#endif
+
 #if defined(__ANDROID__)
 // Bionic has these from API level 28, and below it doesn't declare them.
 #if __ANDROID_API__ >= 28

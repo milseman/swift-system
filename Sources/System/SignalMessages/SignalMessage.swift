@@ -28,4 +28,39 @@ extension Signal {
   }
 }
 
+@available(System 199, *)
+extension Signal {
+  /// The signal's name in the C library's table, such as `SIGINT`,
+  /// or `nil` for a number that the table has no name for.
+  ///
+  /// The C library names every signal its system defines,
+  /// so this names some that ``description`` gives as numbers,
+  /// such as Linux's `SIGSTKFLT`. Real-time signals have no names.
+  /// Where the C library has no table, on Musl and before glibc 2.32,
+  /// this is the name ``description`` gives, if it gives one.
+  ///
+  /// The corresponding C global variable is `sys_signame`,
+  /// on Darwin, the BSDs, and Android.
+  /// On Linux, the corresponding C function is `sigabbrev_np`,
+  /// from glibc 2.32.
+  @_alwaysEmitIntoClient
+  public var name: String? { _name }
+
+  @usableFromInline
+  internal var _name: String? {
+    #if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD) || os(Android)
+    guard let name = system_sys_signame(rawValue) else { return nil }
+    return "SIG" + String(platformString: name).uppercased()
+    #else
+    #if os(Linux) && canImport(Glibc)
+    if let abbreviation = system_sigabbrev_np(rawValue) {
+      return "SIG" + String(platformString: abbreviation)
+    }
+    if system_has_sigabbrev_np() { return nil }
+    #endif
+    return Signal._names.first { $0.0 == self }.map { $0.1.description }
+    #endif
+  }
+}
+
 #endif // !os(Windows) && !os(WASI)

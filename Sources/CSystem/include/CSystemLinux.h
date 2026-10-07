@@ -337,6 +337,12 @@ extern void csystem_get_mallinfo2(struct csystem_mallinfo2 *info);
 // module doesn't include (Musl has neither); see shims.c.
 extern int csystem_backtrace(void **buffer, int size);
 extern char **csystem_backtrace_symbols(void *const *buffer, int size);
+
+// A signal's abbreviation, from sigabbrev_np, which glibc has from 2.32 and
+// declares only with _GNU_SOURCE, and which shims.c looks up as it's
+// called: NULL for a signal without one, or where glibc has none.
+extern const char *csystem_sigabbrev_np(int signal);
+extern int csystem_has_sigabbrev_np(void);
 #endif // defined(__linux__) && defined(__GLIBC__)
 
 #ifdef __ANDROID__
