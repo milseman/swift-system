@@ -384,7 +384,11 @@ extension SpawnFileAction {
   /// to keep the child from inheriting any others,
   /// even one that another thread opens at the same time
   /// without close-on-exec.
-  /// `spawn` throws ``Errno/noFunction`` where the C library lacks it.
+  /// `spawn` throws ``Errno/noFunction`` where the C library lacks it;
+  /// check ``supportsCloseAll`` to leave it out there instead.
+  /// On Linux, System finds glibc's function as the process runs,
+  /// so it works with glibc 2.34 or later
+  /// whichever glibc System was built with.
   ///
   /// The corresponding C function is
   /// `posix_spawn_file_actions_addclosefrom_np`.
@@ -394,6 +398,25 @@ extension SpawnFileAction {
   @_alwaysEmitIntoClient
   public static func closeAll(from descriptor: FileDescriptor) -> SpawnFileAction {
     SpawnFileAction(.closeAll(descriptor))
+  }
+
+  /// Whether ``closeAll(from:)`` works in this process:
+  /// whether the C library it runs with
+  /// has the function that action needs.
+  ///
+  /// It's `true` on Linux with glibc 2.34 or later,
+  /// and on FreeBSD 13.1 or later.
+  ///
+  /// The corresponding C function is
+  /// `posix_spawn_file_actions_addclosefrom_np`, which this looks for.
+  ///
+  /// - Note: Only available on Linux and FreeBSD.
+  @_alwaysEmitIntoClient
+  public static var supportsCloseAll: Bool { _supportsCloseAll }
+
+  @usableFromInline
+  internal static var _supportsCloseAll: Bool {
+    system_posix_spawn_file_actions_has_addclosefrom()
   }
   #endif
 }

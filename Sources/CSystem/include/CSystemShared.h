@@ -92,6 +92,8 @@ extern void csystem_sigaction_set_handler(void *action, void *handler);
 extern int csystem_posix_spawn_file_actions_addchdir(void *actions, const char *path);
 extern int csystem_posix_spawn_file_actions_addfchdir(void *actions, int fd);
 extern int csystem_posix_spawn_file_actions_addclosefrom(void *actions, int from);
+// Whether the C library the process runs with has addclosefrom_np.
+extern int csystem_posix_spawn_file_actions_has_addclosefrom(void);
 
 #if defined(__ANDROID__)
 // posix_spawn, posix_spawnp, and the attribute and file action calls that

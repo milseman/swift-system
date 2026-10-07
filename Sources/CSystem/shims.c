@@ -590,11 +590,16 @@ extern int csystem_posix_spawn_file_actions_addfchdir(void *actions, int fd) {
 #pragma clang diagnostic pop
 #endif
 
-// glibc has addclosefrom_np from 2.34, and FreeBSD from 13.1.
+// glibc has addclosefrom_np from 2.34, and FreeBSD from 13.1. glibc's is
+// looked up when it's needed, so that a System built against an older glibc
+// uses it where the running glibc has it, and one built against a newer
+// glibc still loads where it doesn't.
 #if defined(__GLIBC__)
-#if __GLIBC_PREREQ(2, 34)
-#define CSYSTEM_HAVE_SPAWN_CLOSEFROM_NP 1
-#endif
+typedef int (*csystem_addclosefrom_np)(posix_spawn_file_actions_t *, int);
+
+static csystem_addclosefrom_np csystem_find_addclosefrom_np(void) {
+  return (csystem_addclosefrom_np)dlsym(RTLD_DEFAULT, "posix_spawn_file_actions_addclosefrom_np");
+}
 #elif defined(__FreeBSD__)
 #include <sys/param.h>
 #if __FreeBSD_version >= 1301000
@@ -603,12 +608,28 @@ extern int csystem_posix_spawn_file_actions_addfchdir(void *actions, int fd) {
 #endif
 
 extern int csystem_posix_spawn_file_actions_addclosefrom(void *actions, int from) {
-  #if defined(CSYSTEM_HAVE_SPAWN_CLOSEFROM_NP)
+  #if defined(__GLIBC__)
+  csystem_addclosefrom_np addclosefrom = csystem_find_addclosefrom_np();
+  if (addclosefrom) {
+    return addclosefrom(actions, from);
+  }
+  return ENOSYS;
+  #elif defined(CSYSTEM_HAVE_SPAWN_CLOSEFROM_NP)
   return posix_spawn_file_actions_addclosefrom_np(actions, from);
   #else
   (void)actions;
   (void)from;
   return ENOSYS;
+  #endif
+}
+
+extern int csystem_posix_spawn_file_actions_has_addclosefrom(void) {
+  #if defined(__GLIBC__)
+  return csystem_find_addclosefrom_np() != 0;
+  #elif defined(CSYSTEM_HAVE_SPAWN_CLOSEFROM_NP)
+  return 1;
+  #else
+  return 0;
   #endif
 }
 
