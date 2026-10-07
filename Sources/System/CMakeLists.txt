@@ -191,6 +191,9 @@ target_sources(SystemPackage PRIVATE
   Limits/CompileTimeLimits+Pipes.swift
   Limits/CompileTimeLimits.swift)
 target_sources(SystemPackage PRIVATE
+  Internals/Syscalls+LoadAverage.swift
+  LoadAverage/LoadAverage.swift)
+target_sources(SystemPackage PRIVATE
   MachCPU/MachCPUType.swift)
 target_sources(SystemPackage PRIVATE
   Internals/Syscalls+MachTime.swift
