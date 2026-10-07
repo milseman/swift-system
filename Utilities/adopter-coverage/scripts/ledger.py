@@ -417,10 +417,10 @@ NOT_C = set("""true false nil init self Self super some any index time data valu
 count length key id events description hash round log random select signal wait link remove rename
 access open close read write send recv bind listen connect accept shutdown socket poll sync truncate
 exit abort sleep kill pipe dup stat lock unlock free alarm pause fork clock times raise system
-signal environ optarg optind group Duration Handle _reserved I""".split())
+signal environ optarg optind group Duration Handle _reserved I label timeout""".split())
 CALL_ONLY = set("""index time round log random select signal wait link remove rename access open close read
 write send recv bind listen connect accept shutdown socket poll sync truncate exit abort sleep kill pipe dup
-stat lock unlock free alarm pause fork clock times raise system""".split())
+stat lock unlock free alarm pause fork clock times raise system timeout""".split())
 DECLARES = re.compile(r"\b(?:func|var|let|typealias|struct|class|enum|protocol|case|actor|associatedtype)\s+"
                       r"`?([A-Za-z_]\w*)")
 IDENT = re.compile(r"(?<![\w$])([A-Za-z_]\w*)")

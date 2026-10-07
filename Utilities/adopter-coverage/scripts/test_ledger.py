@@ -477,6 +477,24 @@ D_SWIFT = """#if os(Android)
 import stdlib_h
 #endif
 """
+E_SWIFT = """#if canImport(Glibc)
+import Glibc
+#endif
+
+func wait(label: String, timeout: Int) -> Int32 {
+    let deadline = timeout + 1
+    print(label, deadline)
+    return fsync(3)
+}
+
+#if objectFormat(MachO)
+// SYSTEM-GAP: getsectiondata
+func sections() {}
+#elseif objectFormat(ELF)
+// SYSTEM-GAP: dl_iterate_phdr
+func headers() {}
+#endif
+"""
 
 
 class ScanTests(unittest.TestCase):
@@ -518,6 +536,21 @@ class ScanTests(unittest.TestCase):
         marker = by[("Tests/PkgTests/C.swift", 1)]
         self.assertEqual((marker["type"], marker["kind"]), ("marker", "tests"))
         self.assertEqual(set(by[("Sources/Pkg/D.swift", 2)]["platforms"]), {"Android"})
+
+    def test_swift_words_and_object_formats(self):
+        # `label` and `timeout` are parameter names here, not C's; and a
+        # marker under objectFormat() is compiled only where the format is.
+        commit = commit_files(self.repo, {"Sources/Pkg/E.swift": E_SWIFT}, "fixtures")
+        modules = ledger.Modules(MODULES)
+        vocab = ledger.Vocabulary({"Darwin.POSIX.unistd": {"fsync": [32768, 1], "label": [32768, 1],
+                                                           "timeout": [32768, 1]}}, modules, coverage())
+        sites, _ = ledger.scan_repository("pkg", self.repo, commit, None, modules, vocab,
+                                          ledger.qualified_re(modules))
+        by = {(s["file"], s["line"]): s for s in sites}
+        self.assertEqual(set(by[("Sources/Pkg/E.swift", 2)]["names"]), {"fsync"})
+        self.assertEqual(set(by[("Sources/Pkg/E.swift", 12)]["platforms"]), {"Darwin"})
+        self.assertEqual(set(by[("Sources/Pkg/E.swift", 15)]["platforms"]),
+                         {"Linux", "Musl", "Android", "FreeBSD", "OpenBSD"})
 
     def test_markers_at_the_newest_branch(self):
         commit_files(self.repo, {"Sources/Pkg/A.swift": "// SYSTEM-GAP: getloadavg\nfunc a() {}\n"}, "base")
