@@ -10,7 +10,7 @@
 // PROTOTYPE: tests for thread names. Each test names a thread of its own,
 // since swift-testing runs tests on threads that other tests share.
 
-#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD)
+#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD)
 
 import Testing
 
@@ -71,6 +71,19 @@ private struct PThreadNameTests {
     #expect(try name.get() == "fé€")
   }
 
+  #if os(OpenBSD)
+  // OpenBSD keeps a long name's first 23 bytes.
+  @available(System 199, *)
+  @Test func longNameIsTruncated() throws {
+    let name = try onNewThread {
+      Result { () throws(Errno) in
+        try PThread.setCurrentName(String(repeating: "x", count: 30))
+        return try PThread.ID.current.name()
+      }
+    }
+    #expect(try name.get() == String(repeating: "x", count: 23))
+  }
+  #else
   @available(System 199, *)
   @Test func nameTooLong() throws {
     #if SYSTEM_PACKAGE_DARWIN
@@ -92,6 +105,7 @@ private struct PThreadNameTests {
     #expect(throws: error) { try results.0.get() }
     #expect(try results.1.get() == fits)
   }
+  #endif
 
   @available(System 199, *)
   @Test func nameWithNUL() throws {
@@ -101,7 +115,7 @@ private struct PThreadNameTests {
     #expect(throws: Errno.invalidArgument) { try result.get() }
   }
 
-  #if os(Linux) || os(Android) || os(FreeBSD)
+  #if os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD)
   @available(System 199, *)
   @Test func setNameOfAnotherThread() throws {
     let release = Latch()
@@ -113,4 +127,4 @@ private struct PThreadNameTests {
   #endif
 }
 
-#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD)
+#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD)

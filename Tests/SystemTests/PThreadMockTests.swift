@@ -160,7 +160,7 @@ final class PThreadMockTests: XCTestCase {
     ]
     #endif
 
-    #if os(Linux) || os(Android) || os(FreeBSD)
+    #if os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD)
     syscallTestCases += [
       MockTestCase(name: "pthread_setname_np", .noInterrupt, id.rawValue, "worker") { _ in
         try id.setName("worker")

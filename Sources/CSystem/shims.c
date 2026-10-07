@@ -150,6 +150,19 @@ char *csystem_readpassphrase(const char *prompt, char *buffer,
 
 #endif
 
+#if defined(__OpenBSD__)
+#include <pthread_np.h>
+
+// OpenBSD names threads with these; neither reports an error.
+void csystem_pthread_set_name_np(void *thread, const char *name) {
+  pthread_set_name_np((pthread_t)thread, name);
+}
+
+void csystem_pthread_get_name_np(void *thread, char *name, unsigned long length) {
+  pthread_get_name_np((pthread_t)thread, name, length);
+}
+#endif
+
 #if defined(_WIN32)
 #include <CSystemWindows.h>
 #endif
