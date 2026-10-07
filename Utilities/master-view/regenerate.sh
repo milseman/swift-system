@@ -1,13 +1,14 @@
 #!/bin/bash
 # Regenerates the master view: Prototype/MasterView/master.html, one
-# self-contained page of what system-next adds over main, by API and by
-# package, with three burn-down charts; Utilities/master-view/universe.tsv,
-# the packages it covers; and Prototype/MasterView/history.tsv, the charts'
+# self-contained page whose top counts where system-next's API meets real
+# users (the adopters, by cluster, and the examples), over an explorer of all
+# of it, by API and by package; Utilities/master-view/universe.tsv, the
+# packages it covers; and Prototype/MasterView/history.tsv, the figures'
 # points, which each run adds today's to. See README.md in this directory.
 #
 #   Utilities/master-view/regenerate.sh            # everything, then the check
 #   Utilities/master-view/regenerate.sh --check    # reconcile the last run's page; non-zero on a mismatch
-#   Utilities/master-view/regenerate.sh --shots    # also the report's three screenshots
+#   Utilities/master-view/regenerate.sh --shots    # also the report's screenshots
 #   Utilities/master-view/regenerate.sh MASTER_VIEW_STATUS=.build/status   # settings as arguments, too
 #
 # Environment (or NAME=value arguments):
@@ -151,7 +152,7 @@ mkdir -p "$(dirname "$HISTORY")" "$(dirname "$PAGE")"
 python3 "$S/assemble.py" --repo "$REPO" --universe "$UNIVERSE" --burndown "$BURNDOWN" --graph-cache "$CACHE" \
   --ledger-json "$STATUS_DIR/ledger.json" --status-md "$STATUS_DIR/STATUS.md" --adopters "$ADOPTERS" \
   --ecosystem "$ECOSYSTEM" --examples "$EXAMPLES" --coverage-results "$COVERAGE" --history "$HISTORY" \
-  --today "$TODAY" --out "$OUT/master.json" 2>&1 | tee "$OUT/logs/assemble.log"
+  --set-aside "$TOOL/set-aside.tsv" --today "$TODAY" --out "$OUT/master.json" 2>&1 | tee "$OUT/logs/assemble.log"
 [ "${PIPESTATUS[0]}" = 0 ] || fail "assemble.py failed" "$OUT/logs/assemble.log"
 python3 "$S/page.py" "$OUT/master.json" "$PAGE"
 log "check"
@@ -170,9 +171,9 @@ types = {"swift.struct", "swift.enum", "swift.class", "swift.protocol", "swift.a
 i = max(range(len(d)), key=lambda i: (len(d[i]["usedBy"]) if d[i]["kind"] not in types else -1, d[i]["state"] == 2, -i))
 n = sum(1 for x in d[:i + 1] if (x["module"], x["path"]) == (d[i]["module"], d[i]["path"]))
 print(d[i]["module"] + ":" + d[i]["path"] + ("~%d" % n if n > 1 else ""))' "$OUT/master.json")"
-  "$OUT/snapshot" "$PAGE" "$dir/shot-charts.png" --width 1440 --height 700
+  "$OUT/snapshot" "$PAGE" "$dir/shot-top.png" --width 1440 --height 660
+  "$OUT/snapshot" "$PAGE" "$dir/shot-top-dark.png" --width 1440 --height 660 --dark
   "$OUT/snapshot" "$PAGE" "$dir/shot-used-by.png" --width 1440 --height 1300 --js "location.hash='decl=$decl'"
-  "$OUT/snapshot" "$PAGE" "$dir/shot-package.png" --width 1440 --height 1500 --js "location.hash='pkg=swift-nio'"
-  "$OUT/snapshot" "$PAGE" "$OUT/shot-dark.png" --width 1440 --height 1500 --dark
+  "$OUT/snapshot" "$PAGE" "$dir/shot-package.png" --width 1440 --height 1500 --js "location.hash='pkg=swift-log'"
 fi
 log "done in $((SECONDS - START)) s: $PAGE"

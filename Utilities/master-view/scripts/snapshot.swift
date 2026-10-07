@@ -142,7 +142,8 @@ let loader = Loader { ok in
 }
 view.navigationDelegate = loader
 view.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
-DispatchQueue.main.asyncAfter(deadline: .now() + 60) {
+// A long package detail (swift-nio's) takes 40 s to render under a load of 120.
+DispatchQueue.main.asyncAfter(deadline: .now() + 240) {
   FileHandle.standardError.write("snapshot: timed out\n".data(using: .utf8)!)
   finish(1)
 }

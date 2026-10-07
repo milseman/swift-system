@@ -1,13 +1,15 @@
-// The master view's page: charts, filters, and the two views (By API and By
-// package) over Model's data. Everything the data supplies goes into the DOM
-// as text (textContent), never as markup.
+// The master view's page: the headline (what real users need of the new API,
+// and what the adopters still use from C), filters, and the two views (By API
+// and By package) over Model's data. Everything the data supplies goes into
+// the DOM as text (textContent), never as markup.
 "use strict";
 (function () {
   var PD = JSON.parse(document.getElementById("data").textContent);
   var M = Model.build(PD);
   var meta = M.meta, L = meta.labels, notes = M.notes;
-  var CL = ["update-checkout", "swiftlang and apple", "ecosystem", "Unix tools"];
-  var KD = ["migrated", "scanned", "not-scanned", "no-swift"];
+  var CL = Model.CLUSTERS;
+  var KD = ["migrated", "on-system", "scanned", "not-scanned", "no-swift"];
+  var SPLIT = Model.SPLIT;
   var CATS = ["unexplained", "System gap", "queued", "exception", "undecided", "not System's", "standard library"];
   var F = Model.defaults();
   var tab = "api";
@@ -83,21 +85,22 @@
 
   // ---------------------------------------------------------------- the lede
 
+  var GROUPS = ["update-checkout", "swiftlang and apple", "ecosystem", "the examples"];
+  var I = H.intersection, U = I.use;
+
   function lede() {
     var p = document.getElementById("lede");
     p.textContent = "";
-    var used = H.used, users = H.users;
-    var mig = M.pkgs.filter(function (x) { return x.k === 0; }).length;
-    add(p, ["system-next adds ", el("b", {text: fmt(H.declarations)}), " public declarations to Swift System on top of main (",
-            fmt(H.mainCount), " counted below; the rest are renaming stubs and the like). ",
-            el("b", {text: fmt(used)}), " of them are used by the ", fmt(users), " packages whose migrations to System were read, of ",
-            fmt(mig), " migrated. Pick an API to see who uses it, or a package to see all the System API it uses and what it still needs from C."]);
-    if (!H.byState[3] && !H.byState[4] && !H.byState[5]) add(p, " Nothing is pitched yet, so every count below is still to do.");
+    add(p, ["system-next adds ", el("b", {text: fmt(H.declarations)}), " public declarations to Swift System over main. ",
+            "That's the whole universe of API it could ship; what matters is where it meets real users: the packages ",
+            "migrating onto System, in three clusters, and the examples' Unix tools. The figures at the top count only that meeting point. ",
+            "Below them, every declaration and every package, to explore."]);
     var g = meta.graph || {};
     if (!g.matchesHead && g.withoutNode) add(p, " The newest " + fmt(g.withoutNode) + " declarations were added after uses were last read, so they show none yet.");
+    if (U.aside.length) add(p, [" ", el("span", {cls: "hint", text: "Set aside, and in none of the figures: " + U.aside.join(", ") + " (About says why)."})]);
   }
 
-  // ---------------------------------------------------------------- charts
+  // ---------------------------------------------------------------- the headline
 
   var tip = document.getElementById("tip");
   function showTip(evt, nodes) {
@@ -113,181 +116,249 @@
   }
   function hideTip() { tip.hidden = true; }
 
-  function niceMax(v) {
-    if (v <= 4) return 4;
-    var p = Math.pow(10, Math.floor(Math.log10(v)));
-    var steps = [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10];
-    for (var i = 0; i < steps.length; i++) if (steps[i] * p >= v) return steps[i] * p;
-    return 10 * p;
+  function signed(n) { return (n > 0 ? "+" : n < 0 ? "−" : "±") + fmt(Math.abs(n)); }
+  function lastTwo(chart) {
+    var s = M.charts[chart] || [];
+    return {last: s[s.length - 1], prev: s.length > 1 ? s[s.length - 2] : null, n: s.length};
+  }
+  function asideNames() {
+    var o = {};
+    U.aside.forEach(function (n) { o[n] = 1; });
+    return o;
+  }
+  // The C uses left in update-checkout on a day, set-aside packages left out.
+  function ucTotal(r) {
+    var per = (r.detail || {}).perRepo, out = 0, aside = asideNames();
+    if (!per) return r.count;
+    for (var k in per) if (!aside[k]) out += per[k];
+    return out;
   }
 
-  function moveText(chart, r) {
-    var out = [];
-    var d = r.detail || {};
-    if (chart === "cuses") {
-      var ch = d.changes || {};
-      var keys = Object.keys(ch).sort(function (a, b) { return Math.abs(ch[b]) - Math.abs(ch[a]); });
-      if (keys.length) out.push(keys.map(function (k) { return k + " " + (ch[k] > 0 ? "+" : "") + fmt(ch[k]); }).join(", "));
-      if (d.newRepos && d.newRepos.length) out.push("newly read: " + d.newRepos.join(", "));
-      var nm = d.newlyMarked || {};
-      var mk = Object.keys(nm).sort(function (a, b) { return nm[b] - nm[a]; });
-      if (mk.length) out.push("newly marked (SYSTEM-GAP markers): " + mk.map(function (k) { return k + " +" + fmt(nm[k]); }).join(", "));
-    } else {
-      Object.keys(d).forEach(function (k) { if (d[k]) out.push(k + ": " + fmt(d[k])); });
-    }
-    return out.join("; ");
-  }
-
-  function drawChart(card, chart, series, opts) {
-    var W = 360, Hh = 150, ml = 40, mr = 44, mt = 12, mb = 22;
-    var pw = W - ml - mr, ph = Hh - mt - mb;
-    var s = svg("svg", {viewBox: "0 0 " + W + " " + Hh, role: "img", "aria-label": opts.aria});
-    if (!series.length) { card.appendChild(el("p", {cls: "hint", text: "No points yet."})); return; }
-    // Each day is a band; a point's count holds across its band, until the next point.
-    var d0 = dayNum(series[0].date), d1 = dayNum(series[series.length - 1].date);
-    var span = d1 - d0 + 1, bw = pw / span;
-    var top = 0;
-    series.forEach(function (r, i) {
-      top = Math.max(top, r.count);
-      if (i > 0 && r.scopeAdded) top = Math.max(top, series[i - 1].count + r.scopeAdded);
-    });
-    var ymax = niceMax(Math.max(top, 1) * 1.05);
-    var X = function (d) { return ml + (dayNum(d) - d0) * bw; };
-    var Y = function (v) { return mt + ph - v / ymax * ph; };
-    [0, ymax / 2, ymax].forEach(function (t) {
-      s.appendChild(svg("line", {x1: ml, x2: ml + pw, y1: Y(t), y2: Y(t), "class": t === 0 ? "base" : "grid"}));
-      s.appendChild(svg("text", {x: ml - 6, y: Y(t) + 4, "text-anchor": "end", "class": "tick", text: fmt(t)}));
-    });
-    s.appendChild(svg("text", {x: ml, y: Hh - 6, "text-anchor": "start", text: dayLabel(series[0].date)}));
-    if (d1 > d0) s.appendChild(svg("text", {x: ml + pw, y: Hh - 6, "text-anchor": "end", text: dayLabel(series[series.length - 1].date)}));
-    // The step line: each point holds until the next.
-    var dpath = "M" + X(series[0].date) + "," + Y(series[0].count);
-    for (var i = 1; i < series.length; i++) {
-      dpath += " H" + X(series[i].date) + " V" + Y(series[i].count);
-    }
-    var last = series[series.length - 1];
-    var xEnd = X(last.date) + bw;
-    dpath += " H" + xEnd;
-    var wash = dpath + " V" + Y(0) + " H" + X(series[0].date) + " Z";
-    s.appendChild(svg("path", {d: wash, "class": "wash"}));
-    s.appendChild(svg("path", {d: dpath, "class": "line"}));
-    // Scope added: an orange riser of its size, from the day before's count.
-    var risers = [];
-    for (i = 1; i < series.length; i++) {
-      var r = series[i];
-      if (r.scopeAdded > 0) {
-        var x = X(r.date), yb = Y(series[i - 1].count), yt = Y(series[i - 1].count + r.scopeAdded);
-        s.appendChild(svg("line", {x1: x, x2: x, y1: yb, y2: yt, "class": "scope"}));
-        risers.push({x: x, y: yt, n: r.scopeAdded});
-      }
-    }
-    risers.sort(function (a, b) { return b.n - a.n; }).slice(0, 2).forEach(function (rz, k) {
-      if (rz.n < ymax * 0.06) return;
-      s.appendChild(svg("text", {x: rz.x - 4, y: rz.y + 10, "text-anchor": "end", "class": "lbl",
-                                 text: "+" + fmt(rz.n) + (k === 0 ? " scope added" : "")}));
-    });
-    // The largest rise that isn't scope: labeled too, so that it can't pass for progress.
-    var rise = null;
-    for (i = 1; i < series.length; i++) {
-      var net = series[i].count - series[i - 1].count - (series[i].scopeAdded || 0);
-      if (net > 0 && (!rise || net > rise.n)) rise = {n: net, x: X(series[i].date), y: Y(series[i].count)};
-    }
-    if (rise && rise.n >= ymax * 0.04) {
-      s.appendChild(svg("text", {x: rise.x - 4, y: rise.y - 5, "text-anchor": "end", "class": "lbl",
-                                 text: "+" + fmt(rise.n) + ", not new scope"}));
-    }
-    s.appendChild(svg("circle", {cx: xEnd, cy: Y(last.count), r: 4, "class": "dot"}));
-    s.appendChild(svg("text", {x: xEnd + 6, y: Y(last.count) + 4, "class": "lbl", text: fmt(last.count)}));
-    // Hover: a crosshair at the nearest day, every point's numbers.
-    var cross = svg("line", {x1: 0, x2: 0, y1: mt, y2: mt + ph, "class": "cross", visibility: "hidden"});
-    s.appendChild(cross);
-    var hit = svg("rect", {x: ml - 6, y: mt - 6, width: pw + 12, height: ph + 12, "class": "hit", tabindex: 0});
-    function at(evt) {
-      var box = s.getBoundingClientRect();
-      var px = (evt.clientX - box.left) / box.width * W;
-      var day = Math.floor(d0 + (px - ml) / bw);
-      day = Math.max(d0, Math.min(d1, day));
-      var k = 0;
-      for (var j = 0; j < series.length; j++) if (dayNum(series[j].date) <= day) k = j;
-      return {k: k, day: day};
-    }
-    function tipFor(k, day) {
-      var r = series[k], prev = series[k - 1];
-      var exact = dayNum(r.date) === day;
-      var date = new Date(day * 86400000).toISOString().slice(0, 10);
-      var out = [el("div", {cls: "tr", text: dayLabel(date) + (exact ? "" : " (not measured; " + dayLabel(r.date) + "'s count)")}),
-                 el("div", {cls: "tv", text: fmt(r.count)})];
-      if (exact && k === 0) out.push(el("div", {cls: "tr", text: "the first day: everything here is the starting scope"}));
-      if (exact && k > 0) {
-        var delta = r.count - prev.count;
-        out.push(el("div", {cls: "tr", text: (delta >= 0 ? "+" : "") + fmt(delta) + " since " + dayLabel(prev.date)}));
-        if (r.scopeAdded) out.push(el("div", null, el("span", {cls: "tk scope"}), "+" + fmt(r.scopeAdded) + " scope added"));
-        var mt_ = moveText(chart, r);
-        if (mt_) out.push(el("div", {cls: "tr", text: mt_}));
-      }
+  // What moved since the run before, in words: work, and what isn't work
+  // (a package read for the first time, a marker over C it already used).
+  function since(chart) {
+    var t = lastTwo(chart), out = el("p", {cls: "since"});
+    if (!t.last) return out;
+    if (!t.prev) {
+      out.textContent = "First counted " + dayLabel(t.last.date) + "; each run after says what moved, and why.";
       return out;
     }
-    hit.addEventListener("pointermove", function (evt) {
-      var a = at(evt);
-      var x = ml + (a.day - d0 + 0.5) * bw;
-      cross.setAttribute("x1", x); cross.setAttribute("x2", x); cross.setAttribute("visibility", "visible");
-      showTip(evt, tipFor(a.k, a.day));
-    });
-    hit.addEventListener("pointerleave", function () { cross.setAttribute("visibility", "hidden"); hideTip(); });
-    hit.addEventListener("focus", function () {
-      var b = s.getBoundingClientRect();
-      showTip({clientX: b.right - 40, clientY: b.top + 20}, tipFor(series.length - 1, d1));
-    });
-    hit.addEventListener("blur", hideTip);
-    s.appendChild(hit);
-    card.appendChild(s);
-    var lg = el("div", {cls: "legend"}, el("span", null, el("span", {cls: "key"}), opts.lineLabel));
-    if (risers.length) lg.appendChild(el("span", null, el("span", {cls: "key scope"}), "scope added: " + opts.scopeLabel));
-    card.appendChild(lg);
-    // The table view.
-    var tb = el("table", {cls: "nums"}, el("tr", null, el("th", {text: "Day"}), el("th", {text: "Count"}),
-                                          el("th", {text: "Scope added"}), el("th", {text: "Other changes"})));
-    series.slice().reverse().forEach(function (r) {
-      tb.appendChild(el("tr", null, el("td", {text: r.date}), el("td", {text: fmt(r.count)}),
-                        el("td", {text: r.scopeAdded ? "+" + fmt(r.scopeAdded) : ""}),
-                        el("td", {cls: "l", text: moveText(chart, r) + (r.source && r.source !== "run" ? " (" + r.source + ")" : "")})));
-    });
-    card.appendChild(el("details", null, el("summary", {text: "Show the numbers"}), tb));
+    var d = t.last.detail || {}, words = [];
+    var when = "Since " + dayLabel(t.prev.date) + ": ";
+    if (chart === "used") {
+      var ch = d.changes || {};
+      var keys = Object.keys(ch).sort(function (a, b) { return Math.abs(ch[b][0]) - Math.abs(ch[a][0]); });
+      words = keys.slice(0, 4).map(function (k) { return k + " " + signed(ch[k][0]) + " (" + ch[k][1] + ")"; });
+      if (keys.length > 4) words.push("and " + pl(keys.length - 4, "more package"));
+      out.textContent = when + (t.last.count === t.prev.count && !keys.length ? "no change." :
+        signed(t.last.count - t.prev.count) + (words.length ? ": " + words.join("; ") : "") + ".");
+    } else if (chart === "unpitched-used") {
+      var a = (t.prev.detail || {}).byState || {}, b = d.byState || {};
+      ["2", "3", "4", "5"].forEach(function (k) {
+        var n = (b[k] || 0) - (a[k] || 0);
+        if (n) words.push(signed(n) + " " + L.states[k]);
+      });
+      out.textContent = when + (t.last.count === t.prev.count && !words.length ? "no change." :
+        signed(t.last.count - t.prev.count) + " not in a pitch" + (words.length ? "; " + words.join(", ") : "") + ".");
+    } else {
+      var aside = asideNames(), c = d.changes || {}, nm = d.newlyMarked || {};
+      var moved = Object.keys(c).filter(function (k) { return !aside[k]; }).sort(function (x, y) { return Math.abs(c[y]) - Math.abs(c[x]); });
+      var work = moved.reduce(function (n, k) { return n + c[k]; }, 0);
+      var fresh = (d.newRepos || []).filter(function (k) { return !aside[k]; });
+      var freshN = fresh.reduce(function (n, k) { return n + ((d.perRepo || {})[k] || 0); }, 0);
+      var marked = Object.keys(nm).filter(function (k) { return !aside[k]; });
+      var markedN = marked.reduce(function (n, k) { return n + nm[k]; }, 0);
+      if (moved.length) words.push(signed(work) + " in update-checkout's code (" +
+        moved.slice(0, 4).map(function (k) { return k + " " + signed(c[k]); }).join(", ") + (moved.length > 4 ? ", …" : "") + ")");
+      if (freshN) words.push(signed(freshN) + " newly counted, not new C: " + fresh.join(", ") + " read for the first time");
+      if (markedN) words.push(signed(markedN) + " newly counted, not new C: SYSTEM-GAP markers over C already used (" + marked.join(", ") + ")");
+      var total = ucTotal(t.last) - ucTotal(t.prev);
+      out.textContent = when + (total === 0 && !words.length ? "no change in update-checkout." :
+        signed(total) + " in update-checkout" + (words.length ? ": " + words.join("; ") : "") + ".");
+    }
+    return out;
   }
 
-  function charts() {
-    var box = document.getElementById("charts");
-    box.textContent = "";
-    var c = M.charts;
-    var draft = H.byState[2];
-    var outside = H.declarations - H.mainCount;
-    var led = meta.ledger || {};
-    var bc = led.byCategory || {};
-    var specs = [
-      {key: "unpitched", title: "New API not yet in a pitch", value: H.byState[1],
-       small: "of " + fmt(H.mainCount) + " new declarations",
-       sub: "Public declarations system-next adds over main that no pitch includes yet; " + fmt(draft) +
-            " are in pitch drafts. " + fmt(outside) + " renaming stubs and the like aren't counted.",
-       line: "not yet in a pitch", scope: "new API joined", aria: "New API not yet in a pitch, by day"},
-      {key: "pitched", title: "Pitched, not yet merged", value: H.byState[3] + H.byState[4],
-       small: fmt(H.byState[5]) + " merged",
-       sub: "Declarations in a pitch that's been posted, or has a PR open, until main has them. " +
-            "Flat at zero until the first pitch goes out.",
-       line: "pitched or in a PR", scope: "pitched straight away", aria: "Pitched API not yet merged, by day"},
-      {key: "cuses", title: "Platform C uses left in the toolchain's packages", value: led.total,
-       small: (bc.exception ? fmt(bc.exception) + " approved to stay" : ""),
-       sub: "Imports of a platform C module (and markers of a gap) left in the update-checkout cluster's packages, " +
-            "each counted once. Goes down as packages move onto System.",
-       line: "uses left", scope: "C uses newly marked, or a package read for the first time", aria: "Platform C uses left, by day"}
-    ];
-    specs.forEach(function (sp) {
-      var card = el("article", {cls: "card"},
-                    el("h2", {text: sp.title}),
-                    el("div", {cls: "fig"}, fmt(sp.value), sp.small ? el("small", {text: sp.small}) : null),
-                    el("p", {cls: "sub", text: sp.sub}));
-      drawChart(card, sp.key, c[sp.key] || [], {lineLabel: sp.line, scopeLabel: sp.scope, aria: sp.aria});
-      box.appendChild(card);
+  function card(title, figure, small, sub) {
+    return el("article", {cls: "card"}, el("h2", {text: title}),
+              figure !== null ? el("div", {cls: "fig"}, figure, small ? el("small", {text: small}) : null) : null,
+              el("p", {cls: "sub", text: sub}));
+  }
+
+  function useCard() {
+    var c = card("New API in use", fmt(U.any), "of the " + fmt(H.declarations) + " declarations system-next adds",
+                 "Used by the adopters' migrations onto System, or by the examples' tools: what real users need of the new API.");
+    var tb = el("table", {cls: "groups"});
+    CL.forEach(function (g, ci) {
+      var r = U.groups[g], who;
+      if (ci === Model.EXAMPLES) who = "in " + fmt(r.packages) + " of its " + fmt(r.inCluster) + " targets: the tools and their shared code";
+      else if (!r.migrated) who = "no package here has a migration yet, of " + pl(r.inCluster, "package");
+      else who = "by " + fmt(r.packages) + " of the " + fmt(r.migrated) + " migrated packages (" +
+        (r.migrated > r.read ? fmt(r.migrated - r.read) + " not read; " : "") + fmt(r.inCluster) + " in the cluster)";
+      tb.appendChild(el("tr", null, el("th", {text: GROUPS[ci]}),
+        el("td", {cls: "num", text: r.declarations ? fmt(r.declarations) : "none"}), el("td", {cls: "who", text: who})));
     });
+    c.appendChild(tb);
+    c.appendChild(el("p", {cls: "note", text: fmt(U.both) + " are used by both the adopters and the examples, " +
+      fmt(U.adoptersOnly) + " only by the adopters, and " + fmt(U.examplesOnly) + " only by the examples."}));
+    c.appendChild(since("used"));
+    c.appendChild(el("button", {type: "button", cls: "go", text: "See them in By API", onclick: function () { setFilters({use: "used"}); }}));
+    c.appendChild(down("By package", usersTable()));
+    return c;
+  }
+
+  function usersTable() {
+    var rows = M.pkgs.filter(function (p) { return p.uses.length && !p.a; })
+      .sort(function (a, b) { return b.uses.length - a.uses.length || (a.n < b.n ? -1 : 1); });
+    var tb = el("table", {cls: "nums"}, el("tr", null, el("th", {text: "Package"}), el("th", {text: "New API"}),
+      el("th", {text: "Sites"}), el("th", {text: "Read at"})));
+    rows.forEach(function (p) {
+      tb.appendChild(el("tr", null,
+        el("td", null, el("button", {type: "button", cls: "go", text: p.n, onclick: function () { openPkg(p.i); }})),
+        el("td", {text: fmt(p.uses.length)}), el("td", {text: fmt(p.newSites)}),
+        el("td", {cls: "l", text: p.use ? (p.use.b || "?") + " " + short(p.use.c) : ""})));
+    });
+    return el("div", {cls: "scroll small"}, tb);
+  }
+
+  function meter(part, whole, label) {
+    var pct = whole ? Math.round(part / whole * 1000) / 10 : 0;
+    var m = el("div", {cls: "meter", role: "img", "aria-label": label});
+    m.appendChild(el("span", {cls: "fill", style: "width: " + pct + "%"}));
+    return m;
+  }
+
+  function pitchCard() {
+    var pitchable = U.any - U.outside, inPitch = pitchable - U.unpitched;
+    var c = card("Used, not yet in a pitch", fmt(U.unpitched), "of the " + fmt(U.any) + " declarations in use",
+                 "In use, and in no pitch file yet: the pitch work that real users drive.");
+    c.appendChild(meter(inPitch, pitchable, fmt(inPitch) + " of " + fmt(pitchable) + " in a pitch"));
+    c.appendChild(el("p", {cls: "note", text: fmt(inPitch) + " of them are in a pitch: " +
+      [2, 3, 4, 5].map(function (k) { return fmt(U.byState[k]) + " " + (k === 2 ? "in a pitch draft" : L.states[k]); }).join(", ") +
+      (U.outside ? "; " + fmt(U.outside) + " more are deprecated, underscored or SPI, which pitches leave out" : "") + "."}));
+    var tb = el("table", {cls: "groups"});
+    [["used by the adopters", U.unpitchedAdopters, U.adopters], ["used by the examples", U.unpitchedExamples, U.examples]].forEach(function (r) {
+      tb.appendChild(el("tr", null, el("th", {text: r[0]}), el("td", {cls: "num", text: fmt(r[1])}),
+        el("td", {cls: "who", text: "of " + fmt(r[2]) + " not in a pitch"})));
+    });
+    c.appendChild(tb);
+    c.appendChild(since("unpitched-used"));
+    c.appendChild(el("button", {type: "button", cls: "go", text: "List them in By API", onclick: function () { setFilters({use: "used", state: "1"}); }}));
+    return c;
+  }
+
+  var UNITS = {sites: ["site", "imports of a platform C module, and gap markers, on every platform"],
+               files: ["file", "in library targets that import Darwin or use its C names (scanned "],
+               gaps: ["gap", "the examples list in GAPS.md"]};
+  function splitBar(g, row) {
+    var total = row.covers + row.lacks + row.other;
+    var bar = el("div", {cls: "bar", role: "img", "aria-label": g + ": " + SPLIT.map(function (b) { return fmt(row[b]) + " " + L.split[b]; }).join(", ")});
+    SPLIT.forEach(function (b) {
+      if (!row[b]) return;
+      var seg = el("span", {cls: "seg " + b, tabindex: 0, style: "flex-grow: " + row[b]});
+      var parts = Object.keys(row.parts).filter(function (k) { return (L.parts[b] || []).indexOf(k) >= 0; });
+      var words = [el("div", {cls: "tv", text: fmt(row[b]) + " " + (row[b] === 1 ? UNITS[row.unit][0] : UNITS[row.unit][0] + "s")}),
+                   el("div", {cls: "tr", text: L.split[b] + ", " + Math.round(row[b] / total * 100) + "% of " + g + "'s"})];
+      parts.forEach(function (k) { words.push(el("div", {cls: "tr", text: fmt(row.parts[k]) + " " + k})); });
+      seg.addEventListener("pointermove", function (e) { showTip(e, words); });
+      seg.addEventListener("pointerleave", hideTip);
+      seg.addEventListener("focus", function () { var r = seg.getBoundingClientRect(); showTip({clientX: r.left, clientY: r.bottom}, words); });
+      seg.addEventListener("blur", hideTip);
+      bar.appendChild(seg);
+    });
+    return bar;
+  }
+
+  function cusesCard() {
+    var c = card("Platform C uses left, and whose work they are", null, null,
+                 "What the adopters still use from C: the part System covers is the adopters' work to move; the part it lacks is System's work first.");
+    var lg = el("div", {cls: "legend"});
+    SPLIT.forEach(function (b) { lg.appendChild(el("span", null, el("span", {cls: "swatch " + b}), L.split[b] + (b === "covers" ? ": adopter work" : b === "lacks" ? ": System work" : ": neither yet"))); });
+    c.appendChild(lg);
+    var scanDate = ((meta.runs || [])[0] || {}).date || meta.survey.date || "?";
+    CL.forEach(function (g, ci) {
+      var row = I.cuses[g], total = row.covers + row.lacks + row.other, u = UNITS[row.unit];
+      var what = row.unit === "files" ? u[1] + scanDate + "), in " + fmt(row.withData) + " of " + pl(row.packages, "package") : u[1];
+      var box = el("div", {cls: "split-row"},
+        el("div", {cls: "split-head"}, el("b", {text: GROUPS[ci]}), " ", el("span", {cls: "n", text: fmt(total) + " " + (total === 1 ? u[0] : u[0] + "s")}),
+           el("span", {cls: "hint", text: " " + what})));
+      if (total) {
+        box.appendChild(splitBar(GROUPS[ci], row));
+        box.appendChild(el("div", {cls: "split-nums"}, SPLIT.map(function (b) {
+          return el("span", null, el("span", {cls: "swatch " + b}), fmt(row[b]) + " " + L.split[b]);
+        })));
+      } else {
+        box.appendChild(el("div", {cls: "hint", text: row.withData ? "none left" : "not scanned yet"}));
+      }
+      c.appendChild(box);
+    });
+    c.appendChild(since("cuses"));
+    c.appendChild(down("Show the numbers", cusesNumbers()));
+    return c;
+  }
+
+  function cusesNumbers() {
+    var box = el("div");
+    var tb = el("table", {cls: "nums"}, el("tr", null, el("th", {text: "Cluster"}), el("th", {text: "Part"}),
+      el("th", {text: "Count"})));
+    CL.forEach(function (g, ci) {
+      var row = I.cuses[g];
+      SPLIT.forEach(function (b) {
+        (L.parts[b] || []).forEach(function (k) {
+          if (!row.parts[k]) return;
+          tb.appendChild(el("tr", null, el("td", {text: GROUPS[ci]}), el("td", {cls: "l", text: L.split[b] + ": " + k}),
+            el("td", {text: fmt(row.parts[k])})));
+        });
+      });
+    });
+    box.appendChild(tb);
+    var uc = I.cuses["update-checkout"];
+    if (uc.aside) box.appendChild(el("p", {cls: "hint", text: fmt(uc.aside) + " more sites, in " + U.aside.join(" and ") +
+      ", are set aside and counted nowhere above."}));
+    var series = (M.charts.cuses || []).slice().reverse();
+    if (series.length) {
+      var hb = el("table", {cls: "nums"}, el("tr", null, el("th", {text: "Day"}), el("th", {text: "update-checkout"}),
+        el("th", {text: "What moved"})));
+      series.forEach(function (r) {
+        var d = r.detail || {}, moved = [];
+        var c = d.changes || {}, aside = asideNames();
+        var keys = Object.keys(c).filter(function (k) { return !aside[k]; }).sort(function (x, y) { return Math.abs(c[y]) - Math.abs(c[x]); });
+        if (keys.length) moved.push(keys.map(function (k) { return k + " " + signed(c[k]); }).join(", "));
+        if ((d.newRepos || []).length) moved.push("read for the first time: " + d.newRepos.filter(function (k) { return !aside[k]; }).join(", "));
+        var nm = d.newlyMarked || {};
+        var mk = Object.keys(nm).filter(function (k) { return !aside[k]; });
+        if (mk.length) moved.push("newly marked: " + mk.map(function (k) { return k + " +" + fmt(nm[k]); }).join(", "));
+        hb.appendChild(el("tr", null, el("td", {text: r.date}), el("td", {text: fmt(ucTotal(r))}),
+          el("td", {cls: "l", text: moved.join("; ") + (r.source && r.source !== "run" ? " (" + r.source + ")" : "")})));
+      });
+      box.appendChild(el("h3", {text: "update-checkout's C uses by day, set-aside packages left out"}));
+      box.appendChild(hb);
+    }
+    return box;
+  }
+
+  function headline() {
+    var box = document.getElementById("headline");
+    box.textContent = "";
+    box.appendChild(useCard());
+    box.appendChild(pitchCard());
+    box.appendChild(cusesCard());
+  }
+
+  function setFilters(o) {
+    F = Model.defaults();
+    for (var k in o) F[k] = o[k];
+    document.getElementById("q").value = "";
+    [["f-cluster", "cluster"], ["f-kind", "kind"], ["f-state", "state"], ["f-use", "use"]].forEach(function (p) {
+      document.getElementById(p[0]).value = F[p[1]];
+    });
+    showAll = {};
+    tab = "api";
+    document.getElementById("tab-api").setAttribute("aria-selected", true);
+    document.getElementById("tab-pkg").setAttribute("aria-selected", false);
+    render();
+    hash();
+    document.getElementById("tabs").scrollIntoView({block: "start"});
   }
 
   // ---------------------------------------------------------------- controls
@@ -305,8 +376,10 @@
     [1, 2, 3, 4, 5].forEach(function (n) { option(s, n, L.states[n]); });
     var u = document.getElementById("f-use");
     option(u, "all", "Used or not");
-    option(u, "used", "Used by a package");
-    option(u, "unused", "Not used yet");
+    option(u, "used", "Used by anyone");
+    option(u, "adopters", "Used by adopters");
+    option(u, "examples", "Used by the examples");
+    option(u, "none", "Used by no one");
     var q = document.getElementById("q");
     var timer = null;
     q.addEventListener("input", function () {
@@ -331,7 +404,6 @@
       if (modes[mode] === "auto") document.documentElement.removeAttribute("data-theme");
       else document.documentElement.setAttribute("data-theme", modes[mode]);
       th.textContent = "Theme: " + modes[mode];
-      charts();
     });
   }
 
@@ -509,7 +581,7 @@
       box.appendChild(el("p", {cls: "hint", text: "Used only by packages the filters leave out: " +
         d.uses.map(function (u) { return M.pkgs[u.p].n; }).join(", ") + "."}));
     } else {
-      box.appendChild(el("p", {cls: "hint", text: "No migration read so far uses it. Only migrated packages show uses: see About."}));
+      box.appendChild(el("p", {cls: "hint", text: "Nothing read so far uses it: no migration, and none of the examples' tools. About says what's read."}));
     }
     box.appendChild(down("More detail", facts([
       ["Module", d.module],
@@ -518,7 +590,8 @@
       ["Type", el("span", {cls: "mono", text: d.type})],
       ["Area", M.areas[d.area].name + " (" + M.areas[d.area].module + ")"],
       ["Listed by", Model.flag(d, "hidden") ? "api-delta's source scan (not in the macOS symbol graphs)" : "api-delta, from the macOS symbol graphs"],
-      ["Uses from", "api-graph at " + short(meta.graph.commit) + ", reading each package's " + (meta.graph.adopterBranch || "migration") + " branch"]
+      ["Uses from", "api-graph at " + short(meta.graph.commit) + ", reading each migrated package at its newest migration branch (" +
+        (meta.graph.adopterBranches || []).join(", else ") + ") and the examples at their main"]
     ])));
     return box;
   }
@@ -550,12 +623,13 @@
     if (!c) return "C use not scanned";
     if (c.src === "ledger") {
       if (c.notRead) return "not read: " + c.notRead;
-      return pl(c.sites.length, "C use") + " left";
+      var sp = splitOf(c.sites.map(function (s) { return s[11]; }));
+      return pl(c.sites.length, "C use") + " left" + (c.sites.length ? ": System covers " + fmt(sp[0]) + ", lacks " + fmt(sp[1]) : "");
     }
     if (c.src === "scan") {
       if (!c.files && !c.names.length) return "no Darwin import found";
-      var g = c.names.filter(function (x) { return S(x[1]) === "gap"; }).length;
-      return pl(c.files || 0, "file") + " import Darwin" + (g ? "; System lacks " + g : "");
+      var fs = splitOf((c.fb || []).map(function (x) { return x[1]; }));
+      return pl((c.fb || []).length, "file") + " use Darwin: System covers " + fmt(fs[0]) + ", lacks " + fmt(fs[1]);
     }
     if (c.src === "GAPS.md") return c.gaps.length ? pl(c.gaps.length, "gap") + " in GAPS.md" : "no gap in GAPS.md";
     return "";
@@ -588,7 +662,7 @@
       var kinds = {};
       g.forEach(function (i) { kinds[M.pkgs[i].k] = (kinds[M.pkgs[i].k] || 0) + 1; });
       root.appendChild(el("div", {cls: "cluster-head"}, L.clusters[CL[ci]],
-        el("small", {text: pl(g.length, "package") + ": " + KD.map(function (k, j) { return kinds[j] ? fmt(kinds[j]) + " " + L.kinds[k] : null; }).filter(Boolean).join(", ")})));
+        el("small", {text: pl(g.length, ci === Model.EXAMPLES ? "target" : "package") + ": " + KD.map(function (k, j) { return kinds[j] ? fmt(kinds[j]) + " " + L.kinds[k] : null; }).filter(Boolean).join(", ")})));
       g.forEach(function (i) { pkgRow(root, M.pkgs[i], v.pkgUses[i]); });
     });
     if (!v.pkgs.length) root.appendChild(el("p", {cls: "hint", text: "No package matches. Clear the search or the filters."}));
@@ -599,7 +673,7 @@
     var nm = p.use && p.use.main ? p.use.main.length : 0;
     var apiText = p.use ? fmt(uses.length) + " new · " + fmt(nm) + " already on main" : (p.k === 0 ? "use not read yet" : "—");
     var row = el("div", {cls: "row pkg-row" + (isOpen ? " open" : ""), role: "button", tabindex: 0, "aria-expanded": isOpen, "data-pkg": p.i},
-      el("span", {cls: "pn", text: p.n}),
+      el("span", {cls: "pn"}, p.n, p.a ? el("span", {cls: "aside-tag", title: "Set aside (" + p.a.by + "): " + p.a.why, text: "set aside"}) : null),
       el("span", {cls: "cl", text: L.clusters[CL[p.c]]}),
       el("span", {cls: "dk k" + p.k, text: L.kinds[KD[p.k]]}),
       el("span", {cls: "m", text: "System API: " + apiText}),
@@ -630,8 +704,16 @@
       .map(function (r) { return [r.date, r.detail.perRepo[name]]; });
   }
 
+  function splitOf(buckets) {
+    var n = [0, 0, 0];
+    buckets.forEach(function (b) { n[b]++; });
+    return n;
+  }
+
   function pkgDetail(p, uses) {
     var box = el("div", {cls: "detail pkg-detail"});
+    if (p.a) box.appendChild(el("p", {cls: "warn", text: "Set aside (" + p.a.by + "): " + p.a.why +
+      ". Shown here, and counted in none of the figures at the top."}));
     box.appendChild(facts([
       ["On GitHub", repoLink(p.r)],
       ["Cluster", L.clusters[CL[p.c]] + (p.c === 2 ? " (provisional)" : "")],
@@ -673,13 +755,14 @@
       if (main.length) mainCol.appendChild(ml);
       cols.appendChild(mainCol);
       box.appendChild(cols);
-      box.appendChild(el("p", {cls: "hint", text: p.mig && p.mig.nb !== p.use.b ?
+      box.appendChild(el("p", {cls: "hint", text: p.c === 3 ? "Read at swift-system-examples' main: the files under " + (p.sd || "its directory") +
+        ", written on System from the start." : p.mig && p.mig.nb !== p.use.b ?
         "Read from an earlier step of its migration: its newest work isn't counted here yet (More detail says which)." :
         "Read from its newest migration work."}));
     } else if (p.k === 0) {
-      box.appendChild(el("p", {cls: "warn", text: "Not read yet: its migration is at a later step than the one uses are read from (More detail)."}));
+      box.appendChild(el("p", {cls: "warn", text: "Not read: api-graph couldn't read its migration (About, Known limits, says why)."}));
     } else if (p.c === 3) {
-      box.appendChild(el("p", {cls: "hint", text: "Not scanned yet. The tool is written on System from the start, so all of its system calls go through System; nothing here reads which API it calls."}));
+      box.appendChild(el("p", {cls: "hint", text: "Not read: the API graph used here has no build of the examples."}));
     } else {
       box.appendChild(el("p", {cls: "hint", text: p.k === 3 ? "None: it has no Swift code." : "None yet: it has no migration branch, so there's no use of System to read."}));
     }
@@ -710,7 +793,8 @@
     var marked = ((lastPt.detail || {}).newlyMarked || {})[p.n];
     b.appendChild(el("p", null, el("b", {text: fmt(n)}), " " + (n === 1 ? "use" : "uses") + " of a platform C module left (an import, or a marker of a gap)",
       hist.length > 1 ? ["; by day: ", hist.map(function (x) { return dayLabel(x[0]) + " " + fmt(x[1]); }).join(", "), spark(hist)] : null, ".",
-      marked ? " On " + dayLabel(lastPt.date) + ", " + fmt(marked) + " of them were newly marked: SYSTEM-GAP markers its migration added over C it already used, counted from then on (scope added, not new C)." : null));
+      marked ? " On " + dayLabel(lastPt.date) + ", " + fmt(marked) + " of them were newly marked: SYSTEM-GAP markers its migration added over C it already used, counted from then on (not new C)." : null));
+    if (n) b.appendChild(splitLine(splitOf(c.sites.map(function (s) { return s[11]; })), "site"));
     var by = {};
     c.sites.forEach(function (s) { by[s[3]] = (by[s[3]] || 0) + 1; });
     var cats = el("div", {cls: "cats"});
@@ -725,9 +809,9 @@
     if (c.partial) b.appendChild(el("p", {cls: "hint", text: "Read in part: " + c.partial + "."}));
     if (!n) return b;
     var tb = el("table", {cls: "ledger"},
-      el("colgroup", null, [26, 10, 11, 13, 18, 22].map(function (w) { return el("col", {style: "width: " + w + "%"}); })),
+      el("colgroup", null, [22, 9, 10, 12, 12, 15, 20].map(function (w) { return el("col", {style: "width: " + w + "%"}); })),
       el("tr", null, el("th", {text: "Where"}), el("th", {text: "What"}), el("th", {text: "Platforms"}),
-         el("th", {text: "Category"}), el("th", {text: "C names it serves"}), el("th", {text: "Why"})));
+         el("th", {text: "Whose work"}), el("th", {text: "Category"}), el("th", {text: "C names it serves"}), el("th", {text: "Why"})));
     c.sites.forEach(function (s) {
       var f = S(s[0]);
       var what = S(s[9]) === "marker" ? "a gap marker" : (S(s[2]) ? "import " + S(s[2]) + (S(s[10]) && S(s[10]) !== "whole" ? " (" + S(s[10]) + ")" : "") : "");
@@ -735,6 +819,7 @@
         el("td", {cls: "at"}, ghLink(c.link, f, s[1], f + ":" + s[1])),
         el("td", {text: what}),
         el("td", {text: Model.platforms(s[4]).join(", ") || "none"}),
+        el("td", null, el("span", {cls: "swatch " + SPLIT[s[11]]}), L.split[SPLIT[s[11]]]),
         el("td", {text: L.categories[CATS[s[3]]]}),
         el("td", null, s[5].slice(0, 12).map(function (k, i) { return [i ? " " : "", code(S(k))]; }), s[5].length > 12 ? " …" : ""),
         el("td", {text: S(s[7])})));
@@ -744,10 +829,20 @@
     return b;
   }
 
+  // The split of a package's C uses, in words, with the page's swatches.
+  function splitLine(n, unit) {
+    return el("div", {cls: "split-nums"}, SPLIT.map(function (b, i) {
+      return el("span", null, el("span", {cls: "swatch " + b}), fmt(n[i]) + " " + L.split[b] +
+        (b === "covers" ? " (adopter work)" : b === "lacks" ? " (System work)" : ""));
+    }));
+  }
+
   function scanBlock(p, c) {
     var b = el("div");
     var files = c.files === null || c.files === undefined ? "?" : c.files;
-    b.appendChild(el("p", null, el("b", {text: fmt(files)}), " library " + (files === 1 ? "file imports" : "files import") + " Darwin."));
+    b.appendChild(el("p", null, el("b", {text: fmt(files)}), " library " + (files === 1 ? "file imports" : "files import") + " Darwin" +
+      ((c.fb || []).length !== files ? "; " + pl((c.fb || []).length, "file") + " import it or use its C names" : "") + "."));
+    if ((c.fb || []).length) b.appendChild(splitLine(splitOf(c.fb.map(function (x) { return x[1]; })), "file"));
     if (c.fileList && c.fileList.length) {
       var ul = el("ul", {cls: "sites"});
       c.fileList.forEach(function (k) { var f = S(k); ul.appendChild(el("li", null, ghLink(c.link, f, null, f))); });
@@ -796,11 +891,13 @@
     if (p.mig) {
       rows.push(["Migration branches", Object.keys(p.mig.br).map(function (b) { return b + " " + short(p.mig.br[b]); }).join(", ")]);
       rows.push(["Newest", p.mig.nb + " at " + short(p.mig.nc) + ", " + pl(p.mig.nn, "commit") + " past main" + (p.mig.ns ? ": " + p.mig.ns : "")]);
-      rows.push(["Use read at", p.mig.rb ? p.mig.rb + " at " + short(p.mig.rc) + " (" + (p.mig.rr || "?") + (p.mig.bs ? "; build " + p.mig.bs : "") + ")" : "not read (api-graph reads migrate-darwin only)"]);
+      rows.push(["Use read at", p.mig.rb ? p.mig.rb + " at " + short(p.mig.rc) + " (" + (p.mig.rr || "?") + (p.mig.bs ? "; build " + p.mig.bs : "") + ")" : "not read: api-graph couldn't read this clone (About, Known limits)"]);
     }
+    if (p.a) rows.push(["Set aside", p.a.by + ": " + p.a.why + " (Utilities/master-view/set-aside.tsv)"]);
     if (p.use) rows.push(["Uses from", "the API graph at " + short(meta.graph.commit) + ", reading " + (p.use.b || "?") + " at " + short(p.use.c) +
+      (p.sd ? ", the files under " + p.sd : "") +
       (p.use.cache ? "; API already on main from the same build's index (api-graph's adopter cache)" : "")]);
-    if (p.use) rows.push(["Links", p.use.link ? "to GitHub, where it has the commit" : "none: the migration's commits are only local"]);
+    if (p.use) rows.push(["Links", p.use.link ? "to GitHub, where it has the commit" : "none: the commit is only local"]);
     if (p.cu && p.cu.src === "ledger" && p.cu.where) rows.push(["C use from", "the ledger (status.sh's ledger.json), read at " + p.cu.where.replace(/`/g, "")]);
     if (p.cu && p.cu.src === "scan") rows.push(["C use from", "the ecosystem survey (" + (p.cu.date || "?") + ") at " + short(p.cu.commit) +
       (p.cu.run ? ", and the coverage tools' ecosystem run " + p.cu.run[0] + " of " + p.cu.run[1] + ", against System at " + short(p.cu.run[2]) : "")]);
@@ -830,22 +927,36 @@
     b.textContent = "";
     var led = meta.ledger || {};
     var uc = meta.universe.counts;
-    b.appendChild(el("h2", {text: "What the numbers mean"}));
+    var asideRows = M.pkgs.filter(function (p) { return p.a; });
+    b.appendChild(el("h2", {text: "What the figures at the top mean"}));
     var ul = el("ul");
     [
       ["New API: ", "a public declaration in SystemPackage or SystemSockets that system-next has and main doesn't, exactly as api-delta lists it as added: " +
         fmt(H.declarations) + " (" + fmt(meta.apiDelta.added) + " in the macOS symbol graphs and " + fmt(meta.apiDelta.hidden) +
-        " the source scan finds besides, compiled only on other platforms or renaming stubs). Overloads and per-platform variants count separately."],
-      ["Counted: ", fmt(H.mainCount) + " of them. Renaming stubs (unavailable declarations that point from a C name to the Swift one), deprecated, underscored and SPI declarations are listed but not counted, as api-burndown counts."],
-      ["Pitch states: ", "not in a pitch; in a pitch draft (a file in Prototype/Pitches includes it); pitched and PR open (dated in Prototype/Burndown/states.json); merged (main has it now)."],
-      ["Used by: ", "a package whose migration branch uses the declaration; a site is a file and line where it does, found by the compiler's index of the migration's build, or by name in code the build didn't compile. A type named only to qualify another name (PThread in PThread.Mutex) is a site “naming the type to qualify another name”."],
-      ["Already on main: ", "API main already has, used by a migrated package, from the same build's index. It counts toward nothing above: only the third chart counts what's left on C."],
-      ["C uses left: ", "for the update-checkout cluster, the ledger's sites: each import of a platform C module (Darwin, Glibc, WinSDK and the rest that modules.ini counts) at its file and line, or a SYSTEM-GAP marker over none, with excluded ones (test data, Apple's internal build) left out: " +
-        fmt(led.total) + " now, of which " + fmt((led.byCategory || {}).exception || 0) + " are approved to stay on C. Each has one category: " +
-        CATS.filter(function (k) { return (led.byCategory || {})[k]; }).map(function (k) { return L.categories[k] + " " + fmt(led.byCategory[k]); }).join(", ") + "."],
-      ["Scope added: ", "the part of a chart's rise that's new to what it counts: new API on system-next (charts 1 and 2); for chart 3, a package read for the first time, or SYSTEM-GAP markers a package's migration added over C it already used, which the ledger counts from then on. It's drawn as an orange riser of its own size, from the day before's count; the blue line is the count itself."]
+        " the source scan finds besides, compiled only on other platforms or renaming stubs). It's the universe of what System could ship, and only grows; it's context, not progress."],
+      ["In use: ", "a new declaration that a real user's code uses: an adopter (a package in one of the three library clusters, read at its newest migration branch: migrate-all, else migrate-unix, else migrate-darwin) or the examples (swift-system-examples' tools and their shared code, at its main). A use is a file and line, found by the compiler's index of a build against system-next, or by name where that build doesn't compile."],
+      ["Not yet in a pitch: ", "in use, and in no pitch file in Prototype/Pitches (deprecated, underscored and SPI declarations aside, which pitches leave out). In a pitch is a pitch draft, pitched, a PR open, or merged."],
+      ["Platform C uses left: ", "what each cluster's packages still use from a platform C module. In update-checkout, the ledger's sites (status.sh): each import of a platform C module that modules.ini counts, at its file and line, or a SYSTEM-GAP marker over none, on any platform, excluded ones aside: " +
+        fmt(led.total) + " now. In swiftlang and apple and in ecosystem, the library files that import Darwin or use its C names, from the coverage tools' scans (Darwin and library targets only, dated). For the examples, the gaps GAPS.md lists, each counted once however many tools need it."],
+      ["System covers it: ", "the adopter's work. System covers every C name the site or file uses (the ledger's unexplained sites whose names it all covers, and the scans' files that use only names System has)."],
+      ["System lacks it: ", "System's work first. A C name System lacks, a SYSTEM-GAP marker (the adopter's own note that System lacks something; the ledger can't tie most of them to a C name), work queued for System, or a gap in GAPS.md."],
+      ["Other: ", "neither yet: the standard library has it (the adopter's work, but not System's API), work queued for the adopter, approved to stay on C, undecided, not System's (a lane's verdict), another module or the package's own C shim has it, or no C name was found."],
+      ["Since: ", "each figure's change from the run before, in words: what moved, and why. A package read for the first time, or a SYSTEM-GAP marker over C a package already used, is newly counted, not new C."],
+      ["Set aside: ", asideRows.length ? asideRows.map(function (p) { return p.n + " (" + p.a.by + ": " + p.a.why + ")"; }).join("; ") +
+        ". They're shown in the explorer, and counted in none of the figures at the top. The list is Utilities/master-view/set-aside.tsv." : "nothing."]
     ].forEach(function (x) { ul.appendChild(el("li", null, el("b", {text: x[0]}), x[1])); });
     b.appendChild(ul);
+
+    b.appendChild(el("h2", {text: "The explorer"}));
+    var ex = el("ul");
+    [
+      ["By API: ", "area › type › declaration, every declaration system-next adds, with each user and site, and its pitch state."],
+      ["By package: ", "every package of the universe, by cluster: the System API it uses (new, and already on main), and what it still uses from C."],
+      ["Use: ", "used by anyone; by adopters (a package of the three library clusters); by the examples; or by no one: among the packages the other filters leave in."],
+      ["Data: ", L.kinds.migrated + " (a migration branch with commits); " + L.kinds["on-system"] + " (the examples' tools); " + L.kinds.scanned +
+        " (no migration, but a scan of what it uses from C); " + L.kinds["not-scanned"] + "; " + L.kinds["no-swift"] + "."]
+    ].forEach(function (x) { ex.appendChild(el("li", null, el("b", {text: x[0]}), x[1])); });
+    b.appendChild(ex);
 
     b.appendChild(el("h2", {text: "The packages"}));
     var pu = el("ul");
@@ -853,12 +964,9 @@
       [L.clusters[CL[0]] + " (" + fmt(uc[CL[0]]) + "): ", "the repositories swift's update-checkout clones for the main scheme (scheme-main.tsv), but swift-system itself. Those with no Swift code (C and C++ projects) are listed as such."],
       [L.clusters[CL[1]] + " (" + fmt(uc[CL[1]]) + "): ", "the swiftlang and apple GitHub organizations (their snapshots of 2026-10-01), less archived repositories, forks that update-checkout doesn't have, and anything already above. A repository with no clone here is “not scanned yet”, whatever its language."],
       [L.clusters[CL[2]] + " (" + fmt(uc[CL[2]]) + "): ", "the other clones under ../ecosystem: provisional, since no one has picked them."],
-      [L.clusters[CL[3]] + " (" + fmt(uc[CL[3]]) + "): ", "the tools of swift-system-examples, on its main."]
+      [L.clusters[CL[3]] + " (" + fmt(uc[CL[3]]) + "): ", "the tools of swift-system-examples, on its main, and the library target they share. Each row is one target's directory."]
     ].forEach(function (x) { pu.appendChild(el("li", null, el("b", {text: x[0]}), x[1])); });
     b.appendChild(pu);
-    b.appendChild(el("p", null, "Each package's data: ", el("b", {text: L.kinds.migrated}), " (it has a migration branch with commits: its use of System, and what's left on C at its newest branch, migrate-all, then migrate-unix, then migrate-darwin); ",
-      el("b", {text: L.kinds.scanned}), " (no migration: what it uses from C, where a scan exists); ", el("b", {text: L.kinds["not-scanned"]}), "; or ",
-      el("b", {text: L.kinds["no-swift"]}), "."));
     var left = (notes.leftOut || []);
     if (left.length) {
       var why = {};
@@ -869,15 +977,16 @@
 
     b.appendChild(el("h2", {text: "Where the data comes from"}));
     var src = [
-      ["New API, pitch states, charts 1 and 2", "api-burndown's burndown.json, from api-delta (" + (meta.base.ref || "main") + " " + short(meta.base.commit) + " → " +
-        (meta.head.ref || "system-next") + " " + short(meta.head.commit) + ") and its history, one point per day"],
-      ["Uses", "the API graph at " + short(meta.graph.commit) + " (" + (meta.graph.date || "") + "): its usedBy links, read on each package's " + (meta.graph.adopterBranch || "?") + " branch"],
-      ["API already on main", "the same migrations' build indexes, in api-graph's adopter cache" + (meta.graph.cache ? " (" + meta.graph.cache + ")" : "")],
-      ["C uses left", led.date ? "the ledger, run on " + led.date + " against System at " + short(led.system) + " (status.sh's ledger.json and its STATUS.md); earlier days from STATUS.md's history in git" : "not available"],
+      ["New API, pitch states", "api-burndown's burndown.json, from api-delta (" + (meta.base.ref || "main") + " " + short(meta.base.commit) + " → " +
+        (meta.head.ref || "system-next") + " " + short(meta.head.commit) + ")"],
+      ["Uses", "the API graph at " + short(meta.graph.commit) + " (" + (meta.graph.date || "") + "): its usedBy links, each migrated package read at its newest of " +
+        (meta.graph.adopterBranches || []).join(", ") + ", and swift-system-examples at its main"],
+      ["API already on main", "the same builds' indexes, in api-graph's adopter cache" + (meta.graph.cache ? " (" + meta.graph.cache + ")" : "")],
+      ["C uses left in update-checkout", led.date ? "the ledger, run on " + led.date + " against System at " + short(led.system) + " (status.sh's ledger.json and its STATUS.md); earlier days from STATUS.md's history in git" : "not available"],
       ["Other packages' C use", "the ecosystem survey" + (meta.survey.date ? " (" + meta.survey.date + ")" : "") + " and the coverage tools' newest ecosystem runs: " +
         (meta.runs || []).map(function (r) { return r.id + " (" + r.date + ")"; }).join(", ")],
-      ["The Unix tools' gaps", "swift-system-examples' GAPS.md, on main at " + short(meta.examples.commit)],
-      ["The packages", "Utilities/master-view/universe.tsv, from scheme-main.tsv, the organizations' snapshots and the clones here"],
+      ["The examples' gaps", "swift-system-examples' GAPS.md, on main at " + short(meta.examples.commit)],
+      ["The packages", "Utilities/master-view/universe.tsv, from scheme-main.tsv, the organizations' snapshots and the clones here; set-aside.tsv beside it"],
       ["This page", "Utilities/master-view/regenerate.sh, on " + meta.generated + ", from " + (meta.head.ref || "system-next") + " at " +
         short(meta.head.commit) + " and " + (meta.base.ref || "main") + " at " + short(meta.base.commit) + "; data digest " + String(PD.digest || "").slice(0, 12)]
     ];
@@ -885,18 +994,19 @@
 
     b.appendChild(el("h2", {text: "Known limits"}));
     var lim = el("ul");
+    var unread = (notes.migratedWithoutUsage || []).map(function (i) { return M.pkgs[i].n; });
     [
-      "Uses come only from migrate-darwin branches: api-graph reads no other. Most migrations have moved on to migrate-unix or migrate-all, so their newest uses aren't here yet (the list below), and swift-crypto, swift-stress-tester and swift-testing, migrated only on migrate-all, show none.",
-      "A migration's commits are only local, so its use sites have no web link; files at a clone's upstream commit link to GitHub.",
-      "API already on main is what the migration's Darwin build compiled, from its index; new API also has uses found by name outside the build.",
-      "Packages outside update-checkout were scanned only for Darwin imports in their library targets, and that scan is from " + ((meta.runs || [])[0] || {}).date + "; System has grown since.",
-      "The Unix tools' use of System isn't scanned; their gaps are GAPS.md's, kept by hand.",
-      "The C-use chart starts on the first day STATUS.md had the ledger; earlier days have no figure. Its counts move when adopters' branches move, not only when System grows."
-    ].forEach(function (t) { lim.appendChild(el("li", {text: t})); });
+      unread.length ? "Migrated, but with no use read: " + unread.join(", ") + ". api-graph reads a package whose manifest is at its clone's root; swift-stress-tester's is in a subdirectory." : null,
+      "A use is precise where a Darwin build's index resolved it, and found by name elsewhere: in files the build doesn't compile, in #if branches Darwin doesn't take, and in packages that don't build (swift-testing's migrate-all needs Swift tools 6.3; sourcekit-lsp's build fails in part). API already on main is the Darwin build's index only.",
+      "The examples' tests aren't read: only their tools' sources.",
+      "Packages outside update-checkout were scanned only for Darwin, in their library targets, on " + ((meta.runs || [])[0] || {}).date + "; System has grown since, and the scan isn't run again here.",
+      "The figures' history starts on " + ((M.charts.used || [])[0] || {}).date + " (the C uses in update-checkout, on the first day STATUS.md had the ledger). Their changes move with adopters' branches and System's API both.",
+      "A commit only local (a migration's, the examples') has no web link; files at a clone's upstream commit link to GitHub."
+    ].forEach(function (t) { if (t) lim.appendChild(el("li", {text: t})); });
     b.appendChild(lim);
 
     var bd = notes.branchDiffers || [];
-    b.appendChild(down("Packages whose newest branch isn't the one their use was read at: " + fmt(bd.length),
+    if (bd.length) b.appendChild(down("Packages whose newest branch isn't the one their use was read at: " + fmt(bd.length),
       (function () {
         var tb = el("table", {cls: "nums"}, el("tr", null, el("th", {text: "Package"}), el("th", {text: "Use read at"}), el("th", {text: "Newest branch"})));
         bd.forEach(function (x) {
@@ -913,17 +1023,15 @@
     var sharedUsed = shared.filter(function (d) { return M.decls[d.sameAs].uses.length; }).length;
     dis.appendChild(el("li", null, fmt(shared.length) + " declarations compiled only off Darwin (or stubs) share their name with a Darwin declaration; api-burndown gives each the Darwin one's uses. Here a use is counted once, under the Darwin declaration, so By API and By package agree; " +
       fmt(sharedUsed) + " of them have uses through their variant."));
-    var mw = (notes.migratedWithoutUsage || []).map(function (i) { return M.pkgs[i].n; });
-    dis.appendChild(el("li", {text: mw.length ? "Migrated, but with no use read (no migrate-darwin branch): " + mw.join(", ") + "." : "Every migrated package has its use read."}));
     var gp = notes.graphPackagesNotInUniverse || [];
     dis.appendChild(el("li", {text: gp.length ? "In the API graph but not in the universe: " + gp.join(", ") + "." : "Every package in the API graph is in the universe."}));
     var um = Object.keys(notes.usesOfPackagesNotInUniverse || {});
-    dis.appendChild(el("li", {text: um.length ? "Uses by packages not in the universe, left out of both views: " + um.join(", ") + "." : "Every use is by a package in the universe."}));
+    dis.appendChild(el("li", {text: um.length ? "Uses by packages not in the universe, left out of both views: " + um.join(", ") + "." : "Every use is by a package in the universe, and each of the examples' uses is in one of its rows' directories."}));
     var lr = notes.ledgerReposNotInUniverse || [];
     dis.appendChild(el("li", {text: lr.length ? "In the ledger but not in the universe: " + lr.join(", ") + "." : "Every repository the ledger reads is in the update-checkout cluster, and the reverse."}));
     var iv = notes.indexVersusGraph || [];
     dis.appendChild(el("li", {text: iv.length ? "Where a build's index and the graph disagree about new API: " + iv.map(function (x) { return M.pkgs[x.package].n + " (" + x.indexOnly + " only in the index, " + x.graphOnly + " only in the graph)"; }).join("; ") + "." :
-      "Each migration's build index references exactly the new declarations the graph says it uses."}));
+      "Each build's index references exactly the new declarations the graph says its package uses."}));
     if ((meta.problems || []).length) dis.appendChild(el("li", {text: "Inputs missing: " + meta.problems.join("; ")}));
     b.appendChild(dis);
   }
@@ -971,11 +1079,10 @@
   }
 
   lede();
-  charts();
+  headline();
   controls();
   about();
   foot();
   route();
   window.addEventListener("hashchange", function () { route(); });
-  if (window.matchMedia) window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", charts);
 })();

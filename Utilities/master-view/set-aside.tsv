@@ -1,0 +1,4 @@
+# Packages the page shows but keeps out of every headline figure (hand-kept):
+# the repository on GitHub, who set it aside and when, and why, in their words.
+swiftlang/swift-corelibs-foundation	Michael, 10-07	likely superseded by swift-foundation; to revisit
+swiftlang/swift-corelibs-xctest	Michael, 10-07	likely superseded by swift-foundation; to revisit

@@ -17,10 +17,15 @@ Reads (nothing here is recomputed; README.md in this directory lists each):
   the coverage tools' scans     survey-popular.json and the newest ecosystem
                                 runs: other packages' Darwin C use
   the examples' GAPS.md         what the Unix tools still need
-  the tracked history file      every earlier run's chart points
+  set-aside.tsv                 packages shown, but kept out of the headline
+  the tracked history file      every earlier run's figures
 
-Writes master.json (meta, declarations, packages, charts, notes) and the
-updated history file. Usage: assemble.py --help.
+The examples' repository is one package of the graph (api-graph reads it at
+its main); its uses are split among the universe's rows for its tools and
+their shared target, by directory.
+
+Writes master.json (meta, headline, declarations, packages, charts, notes)
+and the updated history file. Usage: assemble.py --help.
 """
 
 import sys
@@ -43,13 +48,16 @@ UTILITIES = os.path.normpath(os.path.join(HERE, "..", ".."))
 sys.path.insert(0, HERE)
 import universe as uv  # noqa: E402
 
-SCHEMA = "master-view/1"
+SCHEMA = "master-view/2"
 CLUSTERS = uv.CLUSTERS
 CLUSTER_LABELS = {"update-checkout": "update-checkout", "swiftlang and apple": "swiftlang and apple",
-                  "ecosystem": "ecosystem (not yet picked)", "Unix tools": "Unix tools"}
-KINDS = ("migrated", "scanned", "not-scanned", "no-swift")
-KIND_LABELS = {"migrated": "migrated: real usage", "scanned": "scanned: C use only",
-               "not-scanned": "not scanned yet", "no-swift": "no Swift code"}
+                  "ecosystem": "ecosystem (not yet picked)", "Unix tools": "the examples: Unix tools"}
+# The adopter universe is the three library clusters; the examples are the other user.
+ADOPTER_CLUSTERS = CLUSTERS[:3]
+EXAMPLES_CLUSTER = CLUSTERS[3]
+KINDS = ("migrated", "on-system", "scanned", "not-scanned", "no-swift")
+KIND_LABELS = {"migrated": "migrated: real usage", "on-system": "written on System: real usage",
+               "scanned": "scanned: C use only", "not-scanned": "not scanned yet", "no-swift": "no Swift code"}
 STATE_LABELS = {1: "not in a pitch", 2: "in a pitch draft", 3: "pitched", 4: "PR open", 5: "merged"}
 TYPE_KINDS = {"swift.struct", "swift.enum", "swift.class", "swift.protocol", "swift.actor"}
 TYPE_KWS = {"struct", "enum", "class", "protocol", "actor"}
@@ -63,7 +71,13 @@ CATEGORY_LABELS = {"unexplained": "unexplained: System may cover it already",
                    "undecided": "undecided", "not System's": "not System's (a lane's verdict)",
                    "standard library": "the standard library has it"}
 ROLE_IMPLICIT = 1 << 8   # an index reference the compiler made, not the source (adopters.py)
-CHARTS = ("unpitched", "pitched", "cuses")
+# The history's figures: those the page shows, then the earlier page's two
+# burn-down charts, whose rows stay in the file but get no new points.
+CHARTS = ("used", "unpitched-used", "cuses")
+OLD_CHARTS = ("unpitched", "pitched")
+# The C-use split: what the adopter can do now, what System has to add, the rest.
+SPLIT = ("covers", "lacks", "other")
+SPLIT_LABELS = {"covers": "System covers it", "lacks": "System lacks it", "other": "other"}
 HISTORY_COLUMNS = ("date", "chart", "count", "scope_added", "source", "commit", "detail")
 STATUS_PATH = "Prototype/Status/STATUS.md"
 CATEGORY_SENTENCE = re.compile(r"Categories, by .*?`: (.*?); (\d+) excluded\.", re.S)
@@ -274,14 +288,17 @@ def adopter_cache_file(cache_dir, node):
     return best if best else (None, None)
 
 
-def main_usage(cache, main, changed, head):
+def main_usage(cache, main, changed, head, prefix=None):
     """From a migration's cached index references: {USR: [sites]} of the API
     already on main it uses, and {USR: count} of new declarations it
     references (for the cross-check with the graph). Implicit references
-    (accessors a property use calls) are left out, as api-graph leaves them."""
+    (accessors a property use calls) are left out, as api-graph leaves them.
+    With prefix, only the files under it (one target of the package)."""
     on_main = collections.defaultdict(list)
     new_refs = collections.Counter()
     for rel, fd in sorted((cache.get("files") or {}).items()):
+        if prefix and not rel.startswith(prefix):
+            continue
         for line, col, usr, flags in fd.get("references") or []:
             if flags & ROLE_IMPLICIT:
                 continue
@@ -290,6 +307,113 @@ def main_usage(cache, main, changed, head):
             elif usr in head:
                 new_refs[usr] += 1
     return on_main, new_refs
+
+
+def load_set_aside(path):
+    """{lowercased remote: {by, why}} from set-aside.tsv: packages the page
+    shows, but keeps out of every headline figure."""
+    out = {}
+    if path and os.path.exists(path):
+        for row in uv.read_tsv(path):
+            if row and row[0].strip():
+                out[row[0].strip().lower()] = {"by": (row[1].strip() if len(row) > 1 else ""),
+                                               "why": (row[2].strip() if len(row) > 2 else "")}
+    return out
+
+
+def subdir_rows(pkgs):
+    """{lowercased remote: [(directory + "/", package index)]}, longest
+    first: the rows that each cover one directory of a clone (the examples'
+    tools and their shared target)."""
+    out = collections.defaultdict(list)
+    for i, r in enumerate(pkgs):
+        if r.get("subdir"):
+            out[(r.get("remote") or "").lower()].append((r["subdir"].rstrip("/") + "/", i))
+    for v in out.values():
+        v.sort(key=lambda x: -len(x[0]))
+    return dict(out)
+
+
+def row_of_file(rows, path):
+    """The row of [(directory + "/", index)] whose directory holds path, or None."""
+    return next((i for prefix, i in rows if path.startswith(prefix)), None)
+
+
+def group_of(p):
+    """A package's user group in the headline: its library cluster, or the examples."""
+    return p["cluster"]
+
+
+def intersection(decls, pkgs, gaps_rows):
+    """The headline: how much of the new API real users use (the adopters
+    by cluster, the examples), how much of that is in no pitch, and what
+    the adopters still use from C, split into what System covers (adopter
+    work), what it lacks (System work) and the rest. Set-aside packages
+    count in none of it. The page's model recounts all of it (check.py)."""
+    counted = [i for i, p in enumerate(pkgs) if not p.get("aside")]
+    users = {g: set() for g in CLUSTERS}          # group -> declaration indexes
+    sites = collections.Counter()
+    using = {g: set() for g in CLUSTERS}          # group -> package indexes with a use
+    for i in counted:
+        p = pkgs[i]
+        for di, ss in (p.get("usage") or {}).get("new") or []:
+            users[group_of(p)].add(di)
+            using[group_of(p)].add(i)
+            sites[group_of(p)] += len(ss)
+    adopters = set().union(*(users[g] for g in ADOPTER_CLUSTERS))
+    examples = users[EXAMPLES_CLUSTER]
+    anyone = adopters | examples
+
+    def state_counts(ds):
+        c = collections.Counter(decls[d]["state"] for d in ds if not decls[d]["excluded"])
+        return {str(k): c.get(k, 0) for k in range(1, 6)}
+
+    def unpitched(ds):
+        return sum(1 for d in ds if decls[d]["state"] == 1 and not decls[d]["excluded"])
+
+    # Read: a package whose use of System was read (a migration's branch, or
+    # the examples' main); a migrated package api-graph can't read isn't.
+    read = {g: sum(1 for i in counted if pkgs[i]["cluster"] == g and pkgs[i].get("usage")) for g in CLUSTERS}
+    migrated = {g: sum(1 for i in counted if pkgs[i]["cluster"] == g and pkgs[i]["kind"] == "migrated")
+                for g in CLUSTERS}
+    use = {"groups": {g: {"declarations": len(users[g]), "packages": len(using[g]), "read": read[g],
+                          "migrated": migrated[g],
+                          "sites": sites[g], "unpitched": unpitched(users[g]),
+                          "inCluster": sum(1 for i in counted if pkgs[i]["cluster"] == g)} for g in CLUSTERS},
+           "adopters": len(adopters), "examples": len(examples), "any": len(anyone),
+           "both": len(adopters & examples), "adoptersOnly": len(adopters - examples),
+           "examplesOnly": len(examples - adopters), "byState": state_counts(anyone),
+           "unpitched": unpitched(anyone), "unpitchedAdopters": unpitched(adopters),
+           "unpitchedExamples": unpitched(examples),
+           "outside": sum(1 for d in anyone if decls[d]["excluded"]),
+           "aside": [pkgs[i]["name"] for i in range(len(pkgs)) if pkgs[i].get("aside")]}
+    cuses = {}
+    for g in CLUSTERS:
+        row = {"covers": 0, "lacks": 0, "other": 0, "parts": collections.Counter(), "packages": 0,
+               "withData": 0, "aside": 0}
+        for i, p in enumerate(pkgs):
+            if p["cluster"] != g:
+                continue
+            sp = (p.get("cUse") or {}).get("split")
+            if p.get("aside"):
+                row["aside"] += sum(sp[b] for b in SPLIT) if sp else 0
+                continue
+            row["packages"] += 1
+            if not sp:
+                continue
+            row["withData"] += 1
+            for b in SPLIT:
+                row[b] += sp[b]
+            row["parts"].update(sp["parts"])
+        row["parts"] = dict(row["parts"])
+        row["unit"] = {"update-checkout": "sites", EXAMPLES_CLUSTER: "gaps"}.get(g, "files")
+        cuses[g] = row
+    if gaps_rows is not None:
+        # A gap GAPS.md lists for several tools is one thing System lacks:
+        # the cluster's figure counts it once (each tool's lists it).
+        n = sum(1 for r in gaps_rows if r["tools"])
+        cuses[EXAMPLES_CLUSTER].update(lacks=n, parts={"a gap in GAPS.md": n} if n else {})
+    return {"use": use, "cuses": cuses}
 
 
 # ------------------------------------------------------------------ the ledger
@@ -364,7 +488,8 @@ def marker_runs(cell):
 
 
 def ledger_from_json(led):
-    """The ledger's sites, excluded ones aside, by repository, and its totals."""
+    """The ledger's sites, excluded ones aside, by repository, its totals,
+    and whose work each queued entry is (System's or the adopter's)."""
     sites = [s for s in led.get("sites") or [] if s["category"] != "excluded"]
     by_repo = collections.defaultdict(list)
     for s in sites:
@@ -375,6 +500,7 @@ def ledger_from_json(led):
             "excluded": sum(1 for s in led.get("sites") or [] if s["category"] == "excluded"),
             "read": {r["repository"]: r for r in led.get("read") or []},
             "notRead": {r["repository"]: r["why"] for r in led.get("notRead") or []},
+            "work": {e["id"]: e.get("work") for e in led.get("entries") or [] if e.get("kind") == "queued"},
             "floor": led.get("floor") or {}, "meta": led.get("meta") or {}}
 
 
@@ -395,14 +521,84 @@ def status_history(repo, rel=STATUS_PATH):
     return [by_day[d] for d in sorted(by_day)]
 
 
-def site_record(s):
-    """A ledger site as the page shows it."""
+def site_record(s, work=None):
+    """A ledger site as the page shows it, with its part of the split."""
     names = sorted(s.get("names") or {})
     lacks = sorted({n for h in s.get("holders") or [] if h["category"] == "System gap" for n in h["names"]})
+    bucket, part = ledger_bucket(s, work or {})
     return {"file": s["file"], "line": s["line"], "module": s.get("module"), "type": s.get("type"),
             "importKind": s.get("importKind"), "category": s["category"], "reason": s.get("reason") or "",
             "platforms": [p for p in PLATFORMS if (s.get("platforms") or {}).get(p)],
-            "names": names, "lacks": lacks, "kind": s.get("kind"), "text": (s.get("text") or "")[:160]}
+            "names": names, "lacks": lacks, "kind": s.get("kind"), "text": (s.get("text") or "")[:160],
+            "bucket": bucket, "part": part}
+
+
+# The parts of the split, in plain words, in the order the page lists them.
+PARTS = {
+    "covers": ("System covers every C name it uses",),
+    "lacks": ("System lacks a C name it uses", "a SYSTEM-GAP marker: the adopter says System lacks it",
+              "work queued for System", "a gap in GAPS.md"),
+    "other": ("the standard library has it", "work queued for the adopter", "approved to stay on C", "undecided",
+              "not System's (a lane's verdict)", "another module has it", "its own C shim",
+              "no build compiles it", "no C name found"),
+}
+
+
+def ledger_bucket(s, work):
+    """(covers, lacks or other; the part) for a ledger site. The ledger's
+    unexplained sites whose C names System all covers are adopter work; its
+    System gaps, the queued work that's System's, and the SYSTEM-GAP markers
+    it can't tie to a C name (the marker is the adopter saying System lacks
+    something) are System work; the rest is neither yet."""
+    cat, reason = s["category"], s.get("reason") or ""
+    if cat == "System gap":
+        return "lacks", "System lacks a C name it uses"
+    if cat == "queued":
+        owners = {work.get(h) for h in s.get("holder") or []}
+        return ("lacks", "work queued for System") if "System" in owners else ("other", "work queued for the adopter")
+    if cat == "unexplained":
+        if reason.startswith("System covers every C name") or "; System covers it" in reason:
+            return "covers", "System covers every C name it uses"
+        if s.get("type") == "marker":
+            return "lacks", "a SYSTEM-GAP marker: the adopter says System lacks it"
+        if reason.startswith("no platform's build compiles it"):
+            return "other", "no build compiles it"
+        return "other", "no C name found"
+    return "other", {"standard library": "the standard library has it", "exception": "approved to stay on C",
+                     "undecided": "undecided", "not System's": "not System's (a lane's verdict)"}.get(cat, cat)
+
+
+def scan_split(du):
+    """The split of a scanned package's Darwin C use, by library file: a
+    file that imports Darwin, or uses a Darwin C name the scan found. A file
+    goes as the ledger takes a site: System lacks it if any name it uses is
+    a gap; else the standard library's, another module's or its own shim's,
+    if any name is; else System covers it, when it uses a name at all."""
+    kinds = collections.defaultdict(set)
+    for x in du.get("names") or []:
+        for f in x.get("files") or []:
+            kinds[f].add(x["kind"])
+    files = sorted(set(du.get("fileList") or []) | set(kinds))
+    out = {"covers": 0, "lacks": 0, "other": 0, "parts": collections.Counter(), "files": {}}
+    for f in files:
+        ks = kinds.get(f, set())
+        if "gap" in ks:
+            b, part = "lacks", "System lacks a C name it uses"
+        elif "standard library" in ks:
+            b, part = "other", "the standard library has it"
+        elif "other module" in ks:
+            b, part = "other", "another module has it"
+        elif "shim" in ks:
+            b, part = "other", "its own C shim"
+        elif ks:
+            b, part = "covers", "System covers every C name it uses"
+        else:
+            b, part = "other", "no C name found"
+        out[b] += 1
+        out["parts"][part] += 1
+        out["files"][f] = [b, part]
+    out["parts"] = dict(out["parts"])
+    return out
 
 
 # ------------------------------------------------------------------ other scans
@@ -520,69 +716,6 @@ def examples_gaps(examples, tools):
 
 # ------------------------------------------------------------------ charts
 
-def codes_chart(days, count_codes, prev_codes_scope):
-    """One point per day from api-burndown's per-day codes: {day, count,
-    scopeAdded, ...}: count is the declarations whose code is in
-    count_codes; scope added is those that entered from no state at all or
-    from outside the main count (a new declaration)."""
-    pts = []
-    prev = None
-    for d in days:
-        codes = d.get("codes")
-        if codes is None:
-            continue
-        cnt = sum(1 for ch in codes if ch in count_codes)
-        p = {"day": d["day"], "count": cnt, "commit": d.get("commit"), "method": d.get("method")}
-        if prev is None:
-            p.update(scopeAdded=cnt, moved=collections.Counter())
-        else:
-            moved = collections.Counter()
-            scope = 0
-            for i, ch in enumerate(codes):
-                was = prev[i] if i < len(prev) else "."
-                if (ch in count_codes) == (was in count_codes):
-                    continue
-                if ch in count_codes:
-                    if was in prev_codes_scope:
-                        scope += 1
-                    else:
-                        moved["in from " + was] += 1
-                else:
-                    moved["out to " + ch] += 1
-            p.update(scopeAdded=scope, moved=moved)
-        pts.append(p)
-        prev = codes
-    return pts
-
-
-STATE_WORDS = {"1": "not in a pitch", "2": "a pitch draft", "3": "pitched", "4": "PR open", "5": "merged"}
-
-
-def describe_moves(moved, chart):
-    """Plain words for a day's moves into or out of a chart's count (scope
-    added aside): {"into a pitch draft": 171, ...}."""
-    out = collections.Counter()
-    for k, n in moved.items():
-        code = k[-1]
-        if k.startswith("in from "):
-            if chart == "pitched" and code in "12":
-                out["newly pitched"] += n
-            else:
-                out["back from " + STATE_WORDS.get(code, "outside the count")] += n
-        else:
-            if code == ".":
-                out["gone from system-next"] += n
-            elif code in "abcde":
-                out["now outside the count"] += n
-            elif chart == "pitched" and code == "5":
-                out["merged"] += n
-            elif chart == "pitched":
-                out["back to " + STATE_WORDS[code]] += n
-            else:
-                out["into " + STATE_WORDS[code]] += n
-    return dict(out)
-
-
 def cuses_points(hist, today_ledger, today):
     """Chart 3's points before they're merged with the history file: each
     STATUS.md day, then today's ledger run, with each repository's count
@@ -658,10 +791,12 @@ def read_history(path):
 def write_history(path, rows):
     tmp = path + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
-        f.write("# The master view's chart points, one per chart per day; Utilities/master-view/regenerate.sh\n")
+        f.write("# The master view's figures, one row per figure per day; Utilities/master-view/regenerate.sh\n")
         f.write("# adds today's on each run and back-fills earlier days it has no point for (README.md).\n")
         f.write("\t".join(HISTORY_COLUMNS) + "\n")
-        for r in sorted(rows, key=lambda r: (r["date"], CHARTS.index(r["chart"]))):
+        order = OLD_CHARTS + CHARTS   # an earlier day's rows keep the order they were written in
+        for r in sorted(rows, key=lambda r: (r["date"], order.index(r["chart"]) if r["chart"] in order else 99,
+                                             r["chart"])):
             f.write("\t".join([r["date"], r["chart"], str(r["count"]), str(r["scope_added"]), r["source"],
                                r.get("commit") or "",
                                json.dumps(r.get("detail") or {}, sort_keys=True, separators=(",", ":"))]) + "\n")
@@ -686,19 +821,58 @@ def merge_history(rows, computed, today):
     return out
 
 
-def history_rows(unp, pit, cus, today):
-    rows = []
-    for chart, pts in (("unpitched", unp), ("pitched", pit)):
-        for p in pts:
-            src = "run" if p["day"] == today else f"back-fill: api-burndown's history ({p.get('method')})"
-            rows.append({"date": p["day"], "chart": chart, "count": p["count"], "scope_added": p["scopeAdded"],
-                         "source": src, "commit": p.get("commit") or "",
-                         "detail": describe_moves(p["moved"], chart)})
+def history_rows(headline, pkgs, cus, today, head):
+    """The history file's rows this run computes: today's headline figures
+    (the new API real users use, and how much of it is in no pitch), and the
+    C uses left in update-checkout, each STATUS.md day and today, with each
+    repository's count (and today, the split by cluster and the set-aside
+    packages' counts)."""
+    u = headline["use"]
+    used_by = {p["name"]: [len(p["usage"]["new"]), (p["usage"].get("commit") or "")[:10]]
+               for p in pkgs if p.get("usage") and not p.get("aside")}
+    rows = [{"date": today, "chart": "used", "count": u["any"], "scope_added": 0, "source": "run", "commit": head or "",
+             "detail": {"groups": {g: u["groups"][g]["declarations"] for g in CLUSTERS}, "adopters": u["adopters"],
+                        "examples": u["examples"], "both": u["both"], "packages": used_by}},
+            {"date": today, "chart": "unpitched-used", "count": u["unpitched"], "scope_added": 0, "source": "run",
+             "commit": head or "", "detail": {"byState": u["byState"],
+                                              "groups": {g: u["groups"][g]["unpitched"] for g in CLUSTERS}}}]
+    aside = {p["name"]: len((p.get("cUse") or {}).get("sites") or []) for p in pkgs
+             if p.get("aside") and p["cluster"] == "update-checkout"}
     for p in cus:
-        src = "run" if p["source"] == "run" else "back-fill: STATUS.md"
+        det = {"perRepo": p["perRepo"], "markers": p.get("markers") or {}}
+        if p["source"] == "run":
+            det["split"] = {g: {b: headline["cuses"][g][b] for b in SPLIT} for g in CLUSTERS}
+            det["aside"] = aside
         rows.append({"date": p["day"], "chart": "cuses", "count": p["count"], "scope_added": 0,
-                     "source": src, "commit": p.get("commit") or "",
-                     "detail": {"perRepo": p["perRepo"], "markers": p.get("markers") or {}}})
+                     "source": "run" if p["source"] == "run" else "back-fill: STATUS.md", "commit": p.get("commit") or "",
+                     "detail": det})
+    return rows
+
+
+def derive_used(rows):
+    """Each "used" point's changes from the one before, by package: how
+    many more or fewer new declarations it uses, and why it can have moved:
+    its branch moved (adopter work), it's read for the first time, or
+    neither (System changed under it, or how it's read did)."""
+    prev = None
+    for r in sorted((r for r in rows if r["chart"] == "used"), key=lambda r: r["date"]):
+        det = dict(r.get("detail") or {})
+        det.pop("changes", None)
+        now = det.get("packages")
+        if prev is not None and now is not None:
+            ch = {}
+            for name in sorted(set(now) | set(prev)):
+                a_, b_ = prev.get(name), now.get(name)
+                n = (b_[0] if b_ else 0) - (a_[0] if a_ else 0)
+                if not n:
+                    continue
+                why = "read for the first time" if a_ is None else ("no longer read" if b_ is None else
+                                                                   "its branch moved" if a_[1] != b_[1] else
+                                                                   "same commit: System or the reading changed")
+                ch[name] = [n, why]
+            det["changes"] = ch
+        r["detail"] = det
+        prev = now if now is not None else prev
     return rows
 
 
@@ -723,6 +897,7 @@ def assemble(a):
     rows = uv.read(a.universe)
     pkgs = [r for r in rows if r["cluster"] in CLUSTERS]
     left_out = [r for r in rows if r["cluster"] == "excluded"]
+    aside = load_set_aside(a.set_aside)
 
     bd = load_json(os.path.join(a.burndown, "burndown.json"))
     delta_dir = os.path.join(a.burndown, "api-delta")
@@ -744,15 +919,21 @@ def assemble(a):
     for nid, n in gpkgs.items():
         if n.get("remote"):
             by_remote.setdefault(n["remote"].lower(), nid)
-    index = {}
+    # A package node is one row's, or, for a clone whose rows each cover a
+    # directory (the examples' tools), split among them by each site's file.
+    node_pkg, node_split = {}, {}
+    split_rows = subdir_rows(pkgs)
     for i, r in enumerate(pkgs):
-        index.setdefault(r["name"], i)
-    node_pkg = {}
-    for i, r in enumerate(pkgs):
-        nid = by_remote.get((r.get("remote") or "").lower())
-        if nid and r["cluster"] != "Unix tools":
+        key = (r.get("remote") or "").lower()
+        nid = by_remote.get(key)
+        if not nid:
+            continue
+        if key in split_rows:
+            node_split[nid] = split_rows[key]
+        else:
             node_pkg.setdefault(nid, i)
-    graph_not_in_universe = sorted(n["name"] for nid, n in gpkgs.items() if nid not in node_pkg)
+    graph_not_in_universe = sorted(n["name"] for nid, n in gpkgs.items() if nid not in node_pkg and
+                                   nid not in node_split)
 
     # By API: every added declaration, with its owner's uses.
     decls = []
@@ -765,9 +946,20 @@ def assemble(a):
     for nid, uid in own.items():
         di = uid_index[uid]
         for ln in used.get(nid, ()):
-            pi = node_pkg.get(ln["to"])
             sites = [site_tuple(s) for s in ln.get("sites") or []]
             sites.sort(key=lambda s: (s[0], s[1], s[2]))
+            if ln["to"] in node_split:
+                by_row = collections.defaultdict(list)
+                for st in sites:
+                    pi = row_of_file(node_split[ln["to"]], st[0])
+                    if pi is None:
+                        used_missing[f"{gpkgs[ln['to']].get('name')} (outside its rows' directories)"] += 1
+                    else:
+                        by_row[pi].append(st)
+                for pi, ss in sorted(by_row.items()):
+                    used_by[di].append([pi, ss])
+                continue
+            pi = node_pkg.get(ln["to"])
             if pi is None:
                 used_missing[(gpkgs.get(ln["to"]) or {}).get("name") or ln["to"]] += len(sites)
                 continue
@@ -819,9 +1011,12 @@ def assemble(a):
         clone = os.path.normpath(os.path.join(a.repo, r["clone"])) if r["clone"] not in ("", "none") else None
         rec = {"name": r["name"], "cluster": r["cluster"], "source": r["source"], "remote": r.get("remote") or "",
                "clone": r["clone"] if clone else None, "swift": r.get("swift") or "?", "note": r.get("note") or "",
-               "migration": None, "usage": None, "cUse": None}
-        nid = next((n for n, pi in node_pkg.items() if pi == i), None)
+               "subdir": r.get("subdir") or None, "migration": None, "usage": None, "cUse": None,
+               "aside": aside.get((r.get("remote") or "").lower())}
+        nid = next((n for n, pi in node_pkg.items() if pi == i), None) or \
+            next((n for n, rs in node_split.items() if any(pi == i for _, pi in rs)), None)
         gnode = gpkgs.get(nid) if nid else None
+        prefix = (r["subdir"].rstrip("/") + "/") if r.get("subdir") else None
         # The migration, if its clone is a migrated one.
         if clone and r["cluster"] != "Unix tools" and os.path.isdir(clone) and \
                 realpath(clone).startswith(realpath(a.adopters) + os.sep):
@@ -845,7 +1040,7 @@ def assemble(a):
         if gnode and gnode.get("adopted"):
             cache_file, cache = adopter_cache_file(a.graph_cache, gnode)
             if cache:
-                om, refs = main_usage(cache, main, changed, head_usrs)
+                om, refs = main_usage(cache, main, changed, head_usrs, prefix)
                 for usr, sites in om.items():
                     name = main.get(usr) or changed.get(usr) or usr
                     on_main.append({"usr": usr, "path": name, "changed": usr in changed and usr not in main,
@@ -874,12 +1069,14 @@ def assemble(a):
         if r["cluster"] == "update-checkout" and led:
             read = led["read"].get(r["name"])
             if read:
-                ss = [site_record(s) for s in led["sites"].get(r["name"], [])]
+                ss = [site_record(s, led["work"]) for s in led["sites"].get(r["name"], [])]
                 ss.sort(key=lambda s: (s["file"], s["line"]))
                 lacks = sorted({n for s in ss for n in s["lacks"]})
                 rec["cUse"] = {"source": "ledger", "where": read.get("where"), "commit": read.get("commit"),
                                "scope": read.get("scope"), "sites": ss, "lacks": lacks,
                                "byCategory": dict(collections.Counter(s["category"] for s in ss)),
+                               "split": dict({b: sum(1 for x in ss if x["bucket"] == b) for b in SPLIT},
+                                             parts=dict(collections.Counter(x["part"] for x in ss))),
                                "link": links.base(clone if clone else None, read.get("commit"), r.get("remote"))}
                 if r["name"] in led["notRead"]:
                     rec["cUse"]["partial"] = led["notRead"][r["name"]]
@@ -891,16 +1088,24 @@ def assemble(a):
                 du["source"] = "scan"
                 du["surveyDate"] = sv_date
                 du["link"] = links.base(clone, du.get("commit"), r.get("remote"))
+                sp = scan_split(du)
+                du["split"] = {b: sp[b] for b in SPLIT}
+                du["split"]["parts"] = sp["parts"]
+                du["fileBuckets"] = sp["files"]
                 rec["cUse"] = du
         elif r["cluster"] == "Unix tools" and gaps is not None:
             mine = [g for g in gaps if r["name"] in g["tools"]]
             rec["cUse"] = {"source": "GAPS.md", "gaps": mine,
+                           "split": {"covers": 0, "lacks": len(mine), "other": 0,
+                                     "parts": {"a gap in GAPS.md": len(mine)} if mine else {}},
                            "commit": rev(a.examples, "main")}
         # The kind of data it has.
         if rec["swift"] == "no":
             kind = "no-swift"
         elif rec["migration"] and rec["migration"]["newest"]["commits"]:
             kind = "migrated"
+        elif r["cluster"] == "Unix tools" and rec["usage"]:
+            kind = "on-system"
         elif rec["cUse"] and rec["cUse"].get("source") in ("ledger", "scan") and not rec["cUse"].get("notRead"):
             kind = "scanned"
         else:
@@ -908,14 +1113,14 @@ def assemble(a):
         rec["kind"] = kind
         out_pkgs.append(rec)
 
-    # The charts: today's points and the back-fill, merged with the history file.
-    unp = codes_chart(bd["history"]["days"], "1", ".abcde")
-    pit = codes_chart(bd["history"]["days"], "34", ".abcde")
+    # The headline, and its figures over time: today's, the C uses' back-fill
+    # from STATUS.md's history, merged with the history file.
+    headline = intersection(out_decls, out_pkgs, gaps)
     hist = status_history(a.repo) if not a.no_status_history else []
     cus = cuses_points(hist, led, today)
-    computed = history_rows(unp, pit, cus, today)
+    computed = history_rows(headline, out_pkgs, cus, today, bd["meta"].get("headCommit"))
     rows_before = read_history(a.history)
-    merged = derive_cuses(merge_history(rows_before, computed, today))
+    merged = derive_used(derive_cuses(merge_history(rows_before, computed, today)))
     charts = {c: chart_series(merged, c) for c in CHARTS}
 
     # Where the two ways in, and the inputs, disagree.
@@ -951,7 +1156,8 @@ def assemble(a):
                   "matchesHead": (doc.get("meta") or {}).get("headCommit") == bm.get("headCommit"),
                   "behind": commits_between(a.repo, (doc.get("meta") or {}).get("headCommit"), bm.get("headCommit")),
                   "withoutNode": sum(1 for d in out_decls if "nograph" in d["flags"]),
-                  "adopterBranch": ((doc.get("meta") or {}).get("adopterMeta") or {}).get("branch"),
+                  "adopterBranches": (((doc.get("meta") or {}).get("adopterMeta") or {}).get("branches") or
+                                      [((doc.get("meta") or {}).get("adopterMeta") or {}).get("branch")]),
                   "cache": os.path.relpath(a.graph_cache, a.repo) if a.graph_cache else None},
         "ledger": ({"json": os.path.abspath(a.ledger_json), "statusMd": os.path.abspath(a.status_md)
                     if a.status_md else None, "date": led["meta"].get("date"), "system": led["meta"].get("system"),
@@ -969,10 +1175,11 @@ def assemble(a):
         "problems": problems,
         "typeTags": type_tags(out_decls, main_types, nodes),
         "labels": {"clusters": CLUSTER_LABELS, "kinds": KIND_LABELS, "states": STATE_LABELS,
-                   "categories": CATEGORY_LABELS, "queueKinds": QUEUE_KIND_LABELS},
+                   "categories": CATEGORY_LABELS, "queueKinds": QUEUE_KIND_LABELS, "split": SPLIT_LABELS,
+                   "parts": PARTS},
     }
-    result = {"schema": SCHEMA, "meta": meta, "declarations": out_decls, "packages": out_pkgs,
-              "charts": charts, "notes": notes}
+    result = {"schema": SCHEMA, "meta": meta, "headline": headline, "declarations": out_decls,
+              "packages": out_pkgs, "charts": charts, "notes": notes}
     return result, merged
 
 
@@ -1003,6 +1210,7 @@ def main():
     ap.add_argument("--examples", required=True)
     ap.add_argument("--coverage-results")
     ap.add_argument("--history", help="the tracked history file, read and rewritten")
+    ap.add_argument("--set-aside", help="set-aside.tsv: packages kept out of the headline")
     ap.add_argument("--no-status-history", action="store_true", help="don't back-fill chart 3 from git")
     ap.add_argument("--today")
     ap.add_argument("--out", required=True)

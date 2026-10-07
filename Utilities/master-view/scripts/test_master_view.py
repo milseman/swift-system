@@ -115,7 +115,10 @@ class UniverseTests(Temp):
         make_repo(os.path.join(adopt, "swift-nio"), {"Sources/A.swift": "import Darwin\n"}, remote="apple/swift-nio",
                   branches=("migrate-darwin",))
         make_repo(ex, {"Package.swift": 'let tools: [(command: String, target: String)] = [\n  ("cat", "Cat"),\n'
-                                        '  ("ls", "Ls"),\n]\n'}, remote="someone/swift-system-examples")
+                                        '  ("ls", "Ls"),\n]\nlet t = [\n  .target(\n    name: "ExamplesSupport",\n'
+                                        '    dependencies: [system]),\n  .testTarget(name: "ToolTests",\n'
+                                        '    dependencies: tools.map { .target(name: $0.target) }),\n]\n'},
+                  remote="someone/swift-system-examples")
         non = self.write("non-swift.tsv", "# comment\ngoogle/boringssl\tC: a library\n")
         a = argparse.Namespace(repo=os.path.join(self.tmp, "repo"), ecosystem=eco, adopters=adopt, examples=ex,
                                non_swift=non)
@@ -138,7 +141,8 @@ class UniverseTests(Temp):
         # repositories get their owners' names.
         self.assertEqual(sorted(org), ["apple/.github", "swiftlang/.github", "swiftly"])
         self.assertEqual([r["name"] for r in rows if r["cluster"] == "ecosystem"], ["vapor"])
-        self.assertEqual([r["name"] for r in rows if r["cluster"] == "Unix tools"], ["cat", "ls"])
+        self.assertEqual([(r["name"], r.get("subdir")) for r in rows if r["cluster"] == "Unix tools"],
+                         [("cat", "Sources/Cat"), ("ls", "Sources/Ls"), ("ExamplesSupport", "Sources/ExamplesSupport")])
         ex = {r["name"]: r["note"] for r in rows if r["cluster"] == "excluded"}
         self.assertEqual(ex["old-thing"], "archived")
         self.assertEqual(ex["publicsuffix-list"], "a fork that update-checkout doesn't have")
@@ -213,6 +217,8 @@ class LedgerTests(Temp):
     def test_ledger_from_json(self):
         led = asm.ledger_from_json({
             "meta": {"date": "2026-10-06", "head": "abc"},
+            "entries": [{"id": "N1", "kind": "queued", "work": "adopter"}, {"id": "N2", "kind": "queued", "work": "System"},
+                        {"id": "E1", "kind": "exception"}],
             "read": [{"repository": "swift-nio", "where": "w", "commit": "c"}],
             "notRead": [{"repository": "zlib", "why": "not cloned"}],
             "sites": [{"repository": "swift-nio", "category": "System gap", "file": "a", "line": 1},
@@ -222,6 +228,7 @@ class LedgerTests(Temp):
         self.assertEqual(led["excluded"], 1)
         self.assertEqual(led["byCategory"], {"System gap": 1, "unexplained": 1})
         self.assertEqual(led["notRead"], {"zlib": "not cloned"})
+        self.assertEqual(led["work"], {"N1": "adopter", "N2": "System"})
 
     def test_site_record(self):
         s = asm.site_record({"file": "f.swift", "line": 3, "module": "Glibc", "type": "import", "importKind": "whole",
@@ -232,32 +239,56 @@ class LedgerTests(Temp):
         self.assertEqual(s["platforms"], ["Linux", "Windows"])
         self.assertEqual(s["names"], ["a", "b"])
         self.assertEqual(s["lacks"], ["b"])
+        self.assertEqual((s["bucket"], s["part"]), ("lacks", "System lacks a C name it uses"))
+
+    def test_ledger_bucket(self):
+        work = {"N1": "adopter", "N2": "System"}
+        cases = [({"category": "System gap"}, ("lacks", "System lacks a C name it uses")),
+                 ({"category": "queued", "holder": ["N2"]}, ("lacks", "work queued for System")),
+                 ({"category": "queued", "holder": ["N1"]}, ("other", "work queued for the adopter")),
+                 ({"category": "unexplained", "reason": "System covers every C name it serves there: getpid"},
+                  ("covers", "System covers every C name it uses")),
+                 ({"category": "unexplained", "type": "marker", "reason": "the marker names no C interface; System covers it as X"},
+                  ("covers", "System covers every C name it uses")),
+                 ({"category": "unexplained", "type": "marker", "reason": "the marker names no C interface (SystemSockets on FreeBSD)"},
+                  ("lacks", "a SYSTEM-GAP marker: the adopter says System lacks it")),
+                 ({"category": "unexplained", "reason": "no C name it serves was found on its platforms"}, ("other", "no C name found")),
+                 ({"category": "unexplained", "reason": "no platform's build compiles it (a branch none takes)"},
+                  ("other", "no build compiles it")),
+                 ({"category": "exception"}, ("other", "approved to stay on C")),
+                 ({"category": "standard library"}, ("other", "the standard library has it")),
+                 ({"category": "undecided"}, ("other", "undecided"))]
+        for site, want in cases:
+            self.assertEqual(asm.ledger_bucket(site, work), want, site)
+            self.assertIn(want[1], asm.PARTS[want[0]])
+
+    def test_scan_split(self):
+        du = {"fileList": ["a.swift", "b.swift", "c.swift", "d.swift"],
+              "names": [{"name": "open", "kind": "covered", "files": ["a.swift", "b.swift", "e.swift"]},
+                        {"name": "fts_open", "kind": "gap", "files": ["b.swift"]},
+                        {"name": "strlen", "kind": "standard library", "files": ["c.swift"]}]}
+        sp = asm.scan_split(du)
+        # a and e use only what System covers; b a gap; c the standard library's; d no name.
+        self.assertEqual((sp["covers"], sp["lacks"], sp["other"]), (2, 1, 2))
+        self.assertEqual(sp["files"]["b.swift"], ["lacks", "System lacks a C name it uses"])
+        self.assertEqual(sp["parts"], {"System covers every C name it uses": 2, "System lacks a C name it uses": 1,
+                                       "the standard library has it": 1, "no C name found": 1})
 
 
 # ---------------------------------------------------------------- charts and history
 
-def day(d, codes, commit="c"):
-    return {"day": d, "codes": codes, "commit": commit, "method": "scan"}
-
-
 class ChartTests(Temp):
-    def test_codes_chart(self):
-        days = [day("2026-09-22", "11..."), day("2026-09-23", "121a."), day("2026-09-24", "31111"),
-                {"day": "2026-09-25", "codes": None}]
-        pts = asm.codes_chart(days, "1", ".abcde")
-        self.assertEqual([p["count"] for p in pts], [2, 2, 4])
-        self.assertEqual(pts[0]["scopeAdded"], 2)              # the first day is all scope
-        self.assertEqual(pts[1]["scopeAdded"], 1)              # unit 3 is new
-        self.assertEqual(pts[1]["moved"], {"out to 2": 1})     # unit 2 went into a draft
-        self.assertEqual(pts[2]["scopeAdded"], 2)              # unit 4 from outside, unit 5 new
-        self.assertEqual(pts[2]["moved"], {"in from 2": 1, "out to 3": 1})
-        self.assertEqual(asm.describe_moves(pts[2]["moved"], "unpitched"),
-                         {"back from a pitch draft": 1, "into pitched": 1})
-        self.assertEqual(asm.describe_moves(pts[1]["moved"], "unpitched"), {"into a pitch draft": 1})
-        pit = asm.codes_chart(days, "34", ".abcde")
-        self.assertEqual([p["count"] for p in pit], [0, 0, 1])
-        self.assertEqual(pit[2]["scopeAdded"], 0)               # pitched from not in a pitch: not scope
-        self.assertEqual(asm.describe_moves(pit[2]["moved"], "pitched"), {"newly pitched": 1})
+    def test_derive_used(self):
+        rows = [{"date": "2026-10-07", "chart": "used", "count": 3, "scope_added": 0, "source": "run", "commit": "",
+                 "detail": {"packages": {"a": [2, "c1"], "b": [1, "c2"], "gone": [1, "c3"]}}},
+                {"date": "2026-10-08", "chart": "used", "count": 6, "scope_added": 0, "source": "run", "commit": "",
+                 "detail": {"packages": {"a": [3, "c9"], "b": [2, "c2"], "new": [1, "c4"]}}}]
+        asm.derive_used(rows)
+        self.assertNotIn("changes", rows[0]["detail"])
+        self.assertEqual(rows[1]["detail"]["changes"], {"a": [1, "its branch moved"],
+                                                        "b": [1, "same commit: System or the reading changed"],
+                                                        "gone": [-1, "no longer read"],
+                                                        "new": [1, "read for the first time"]})
 
     def test_cuses_scope(self):
         rows = [{"date": "2026-10-05", "chart": "cuses", "count": 5, "scope_added": 0, "source": "s", "commit": "",
@@ -367,48 +398,82 @@ class UseTests(Temp):
 # ---------------------------------------------------------------- the page and the check
 
 def fixture_master():
-    """A small, consistent master.json: two new declarations, one used by a
-    migrated package at two sites; a ledger with three sites."""
+    """A small, consistent master.json: three new declarations; a migrated
+    package using one at two sites, with three C uses left; a set-aside
+    package with one; and one of the examples' tools using two, with a gap
+    in GAPS.md."""
     decls = []
-    for i, (path, kind) in enumerate((("T", "swift.struct"), ("T.f()", "swift.method"))):
+    for i, (path, kind, state) in enumerate((("T", "swift.struct", 1), ("T.f()", "swift.method", 2),
+                                             ("T.g()", "swift.method", 1))):
         decls.append({"id": f"M|{path}|x", "module": "SystemPackage", "path": path, "title": path, "kind": kind,
                       "kindName": "Structure" if i == 0 else "Instance Method", "area": "System/Thing", "type": "T",
-                      "state": 1 if i == 0 else 2, "pitch": None if i == 0 else "p", "pitches": [], "flags": [],
+                      "state": state, "pitch": "p" if state == 2 else None, "pitches": [], "flags": [],
                       "excluded": False, "file": "Sources/System/T.swift", "line": 10 + i, "platforms": ["Darwin"],
                       "availability": "System 199", "decl": "struct T </script>", "doc": "", "cName": None,
                       "header": None, "origin": "graph", "hiddenClass": None, "usedBy": [], "sameAs": None})
     sites = [["Sources/A.swift", 3, 7, "p", "T.f()"], ["Sources/B.swift", 9, 1, "l", "x.f() /*UI*/"]]
-    decls[1]["usedBy"] = [[0, sites]]
-    ledger_sites = [{"file": "Sources/A.swift", "line": 1, "module": "Glibc", "type": "import", "importKind": "whole",
-                     "category": c, "reason": "r", "platforms": ["Linux"], "names": ["read"], "lacks": [], "kind": "library",
-                     "text": "import Glibc"} for c in ("System gap", "unexplained", "exception")]
+    tool_f = [["Sources/Cat/Cat.swift", 4, 2, "p", "x.f()"]]
+    tool_g = [["Sources/Cat/Cat.swift", 5, 2, "p", "x.g()"]]
+    decls[1]["usedBy"] = [[0, sites], [2, tool_f]]
+    decls[2]["usedBy"] = [[2, tool_g]]
+
+    def ledger_site(c, reason=""):
+        s = {"file": "Sources/A.swift", "line": 1, "module": "Glibc", "type": "import", "importKind": "whole",
+             "category": c, "reason": reason, "platforms": ["Linux"], "names": ["read"], "lacks": [], "kind": "library",
+             "text": "import Glibc"}
+        s["bucket"], s["part"] = asm.ledger_bucket(s, {})
+        return s
+
+    def split(ss):
+        return dict({b: sum(1 for x in ss if x["bucket"] == b) for b in asm.SPLIT},
+                    parts={k: sum(1 for x in ss if x["part"] == k) for k in {x["part"] for x in ss}})
+    ledger_sites = [ledger_site(c) for c in ("System gap", "unexplained", "exception")]
+    aside_sites = [ledger_site("undecided")]
+    gaps = [{"what": "`x`", "names": ["x"], "tools": ["cat"], "where": "`cat -v`", "platforms": "all", "note": "n"}]
     pkgs = [{"name": "pkg", "cluster": "update-checkout", "source": "scheme-main.tsv", "remote": "o/pkg", "clone": "../adopters/pkg",
-             "swift": "yes", "note": "", "kind": "migrated",
-             "migration": {"branches": {"migrate-darwin": "c1"}, "newest": {"branch": "migrate-darwin", "commit": "c1",
+             "swift": "yes", "note": "", "subdir": None, "aside": None, "kind": "migrated",
+             "migration": {"branches": {"migrate-all": "c1"}, "newest": {"branch": "migrate-all", "commit": "c1",
                            "base": "b", "commits": 1, "subject": "s"},
-                           "readAt": {"branch": "migrate-darwin", "commit": "c1", "resolution": "index", "subject": "s",
+                           "readAt": {"branch": "migrate-all", "commit": "c1", "resolution": "index", "subject": "s",
                                       "build": "indexed"}},
              "usage": {"new": [[1, sites]], "main": [{"usr": "s:m", "path": "FilePath", "changed": False,
                                                        "sites": [["Sources/A.swift", 2, 1]]}],
-                       "branch": "migrate-darwin", "commit": "c1", "resolution": "index", "cache": "x", "link": None},
+                       "branch": "migrate-all", "commit": "c1", "resolution": "index", "cache": "x", "link": None},
              "cUse": {"source": "ledger", "where": "w", "commit": "c1", "scope": None, "sites": ledger_sites,
-                      "lacks": [], "byCategory": {}, "link": None}},
-            {"name": "cat", "cluster": "Unix tools", "source": "swift-system-examples main", "remote": "", "clone": None,
-             "swift": "yes", "note": "", "kind": "not-scanned", "migration": None, "usage": None,
-             "cUse": {"source": "GAPS.md", "gaps": [{"what": "`x`", "names": ["x"], "tools": ["cat"], "where": "`cat -v`",
-                                                     "platforms": "all", "note": "n"}], "commit": "e"}}]
-    charts = {"unpitched": [{"date": "2026-10-06", "count": 1, "scopeAdded": 1, "detail": {}, "source": "run", "commit": "h"}],
-              "pitched": [{"date": "2026-10-06", "count": 0, "scopeAdded": 0, "detail": {}, "source": "run", "commit": "h"}],
-              "cuses": [{"date": "2026-10-06", "count": 3, "scopeAdded": 3, "detail": {"perRepo": {"pkg": 3}},
-                         "source": "run", "commit": "h"}]}
-    meta = {"generated": "2026-10-06", "head": {"ref": "system-next", "commit": "h"}, "base": {"ref": "main", "commit": "b"},
-            "apiDelta": {"added": 2, "hidden": 0}, "graph": {"path": None, "commit": "h"},
-            "ledger": {"total": 3, "byCategory": {"System gap": 1, "unexplained": 1, "exception": 1}, "excluded": 0},
+                      "lacks": [], "byCategory": {}, "split": split(ledger_sites), "link": None}},
+            {"name": "old", "cluster": "update-checkout", "source": "scheme-main.tsv", "remote": "o/old", "clone": "../ecosystem/old",
+             "swift": "yes", "note": "", "subdir": None, "aside": {"by": "Michael, 10-07", "why": "superseded"},
+             "kind": "scanned", "migration": None, "usage": None,
+             "cUse": {"source": "ledger", "where": "w", "commit": "c2", "scope": None, "sites": aside_sites,
+                      "lacks": [], "byCategory": {}, "split": split(aside_sites), "link": None}},
+            {"name": "cat", "cluster": "Unix tools", "source": "swift-system-examples main", "remote": "someone/ex",
+             "clone": "../ex", "swift": "yes", "note": "target Cat, Sources/Cat", "subdir": "Sources/Cat", "aside": None,
+             "kind": "on-system", "migration": None,
+             "usage": {"new": [[1, tool_f], [2, tool_g]], "main": [], "branch": "main", "commit": "e", "resolution": "index",
+                       "cache": None, "link": None},
+             "cUse": {"source": "GAPS.md", "gaps": gaps,
+                      "split": {"covers": 0, "lacks": 1, "other": 0, "parts": {"a gap in GAPS.md": 1}}, "commit": "e"}}]
+    headline = asm.intersection(decls, pkgs, gaps)
+    point = lambda count, detail: [{"date": "2026-10-07", "count": count, "scopeAdded": 0, "detail": detail,  # noqa: E731
+                                    "source": "run", "commit": "h"}]
+    charts = {"used": point(headline["use"]["any"], {}), "unpitched-used": point(headline["use"]["unpitched"], {}),
+              "cuses": point(4, {"perRepo": {"pkg": 3, "old": 1}})}
+    meta = {"generated": "2026-10-07", "head": {"ref": "system-next", "commit": "h"}, "base": {"ref": "main", "commit": "b"},
+            "apiDelta": {"added": 3, "hidden": 0}, "graph": {"path": None, "commit": "h"},
+            "ledger": {"total": 4, "byCategory": {"System gap": 1, "unexplained": 1, "exception": 1, "undecided": 1},
+                       "excluded": 0},
             "survey": {}, "runs": [], "examples": {"commit": "e"}, "universe": {"counts": {}}, "problems": [],
             "typeTags": {}, "labels": {"clusters": asm.CLUSTER_LABELS, "kinds": asm.KIND_LABELS, "states": asm.STATE_LABELS,
-                                       "categories": asm.CATEGORY_LABELS, "queueKinds": asm.QUEUE_KIND_LABELS}}
-    m = {"schema": asm.SCHEMA, "meta": meta, "declarations": decls, "packages": pkgs, "charts": charts, "notes": {}}
+                                       "categories": asm.CATEGORY_LABELS, "queueKinds": asm.QUEUE_KIND_LABELS,
+                                       "split": asm.SPLIT_LABELS, "parts": asm.PARTS}}
+    m = {"schema": asm.SCHEMA, "meta": meta, "headline": headline, "declarations": decls, "packages": pkgs,
+         "charts": charts, "notes": {}}
     m["digest"] = asm.digest(m)
+    return m
+
+
+def redigest(m):
+    m["digest"] = asm.digest({k: v for k, v in m.items() if k != "digest"})
     return m
 
 
@@ -416,25 +481,34 @@ def fixture_inputs(t, master):
     delta = {"meta": {}, "entries": [{"status": "added", "module": d["module"], "path": d["path"], "file": d["file"],
                                       "line": d["line"]} for d in master["declarations"]],
              "hiddenFromGraphs": {"added": []}}
-    ledger = {"meta": {}, "read": [{"repository": "pkg"}], "notRead": [],
-              "sites": [{"repository": "pkg", "category": s["category"], "file": s["file"], "line": s["line"]}
-                        for s in master["packages"][0]["cUse"]["sites"]] +
+    ledger = {"meta": {}, "read": [{"repository": "pkg"}, {"repository": "old"}], "notRead": [],
+              "sites": [{"repository": p["name"], "category": s["category"], "file": s["file"], "line": s["line"],
+                         "reason": s["reason"], "type": s["type"]}
+                        for p in master["packages"] if (p.get("cUse") or {}).get("source") == "ledger"
+                        for s in p["cUse"]["sites"]] +
                        [{"repository": "pkg", "category": "excluded", "file": "z", "line": 1}]}
     status = STATUS_MD.replace("3 unexplained, 2 System gap, 1 exception; 2 excluded",
-                               "1 unexplained, 1 System gap, 1 exception; 1 excluded")
-    graph = {"nodes": {"s:f": {"kind": "declaration", "origin": "head"},
-                       "package:pkg": {"kind": "package", "name": "pkg", "remote": "o/pkg"}},
-             "links": [{"kind": "usedBy", "from": "s:f", "to": "package:pkg", "sites": [{}, {}]}]}
+                               "1 unexplained, 1 System gap, 1 exception, 1 undecided; 1 excluded")
+    # The graph: the migrated package's two sites, and the examples' three,
+    # one of them outside the tool's directory (the page leaves it out).
+    graph = {"nodes": {"s:f": {"kind": "declaration", "origin": "head"}, "s:g": {"kind": "declaration", "origin": "head"},
+                       "package:pkg": {"kind": "package", "name": "pkg", "remote": "o/pkg"},
+                       "package:ex": {"kind": "package", "name": "ex", "remote": "someone/ex", "role": "examples"}},
+             "links": [{"kind": "usedBy", "from": "s:f", "to": "package:pkg", "sites": [{}, {}]},
+                       {"kind": "usedBy", "from": "s:f", "to": "package:ex",
+                        "sites": [{"file": "Sources/Cat/Cat.swift"}, {"file": "Tests/T.swift"}]},
+                       {"kind": "usedBy", "from": "s:g", "to": "package:ex", "sites": [{"file": "Sources/Cat/Cat.swift"}]}]}
     gpath = os.path.join(t.tmp, "graph.json.gz")
     with gzip.open(gpath, "wt", encoding="utf-8") as f:
         json.dump(graph, f)
-    rows = [{"date": "2026-10-06", "chart": k, "count": master["charts"][k][-1]["count"], "scope_added": 0,
+    rows = [{"date": "2026-10-07", "chart": k, "count": master["charts"][k][-1]["count"], "scope_added": 0,
              "source": "run", "commit": "h", "detail": {}} for k in asm.CHARTS]
     hist = os.path.join(t.tmp, "history.tsv")
     asm.write_history(hist, rows)
     uni = os.path.join(t.tmp, "universe.tsv")
     uv.write([{"name": p["name"], "cluster": p["cluster"], "source": p["source"], "clone": p["clone"] or "none",
-               "remote": p["remote"], "swift": p["swift"], "note": ""} for p in master["packages"]], uni)
+               "remote": p["remote"], "swift": p["swift"], "note": "", "subdir": p.get("subdir") or ""}
+              for p in master["packages"]], uni)
     return {"delta": t.write("api-delta.json", delta), "ledger": t.write("ledger.json", ledger),
             "status": t.write("STATUS.md", status), "graph": gpath, "history": hist, "universe": uni}
 
@@ -455,12 +529,41 @@ class PageAndCheckTests(Temp):
     def test_encode(self):
         m = fixture_master()
         pd = pg.encode(m)
-        self.assertEqual(len(pd["D"]), 2)
+        self.assertEqual(len(pd["D"]), 3)
         self.assertEqual(pd["D"][1][7], 1)                         # Darwin's bit
-        self.assertEqual(pd["U"], [[1, 0, [[pd["S"].index("Sources/A.swift"), 3, 7, 0, pd["S"].index("T.f()")],
-                                           [pd["S"].index("Sources/B.swift"), 9, 1, 1, pd["S"].index("x.f() /*UI*/")]]]])
-        self.assertEqual(pd["P"][0]["cu"]["sites"][0][3], pg.CATEGORIES.index("System gap"))
+        self.assertEqual(pd["U"][0], [1, 0, [[pd["S"].index("Sources/A.swift"), 3, 7, 0, pd["S"].index("T.f()")],
+                                             [pd["S"].index("Sources/B.swift"), 9, 1, 1, pd["S"].index("x.f() /*UI*/")]]])
+        site = pd["P"][0]["cu"]["sites"][0]
+        self.assertEqual((site[3], site[11], pd["S"][site[12]]),
+                         (pg.CATEGORIES.index("System gap"), pg.SPLIT.index("lacks"), "System lacks a C name it uses"))
+        self.assertEqual((pd["P"][1]["a"]["by"], pd["P"][2]["sd"], pd["P"][2]["k"]),
+                         ("Michael, 10-07", "Sources/Cat", pg.KINDS.index("on-system")))
+        self.assertEqual(pd["H"], m["headline"])
         self.assertNotIn("</script>", pg.script_json(pd))
+
+    def test_intersection(self):
+        h = fixture_master()["headline"]
+        u = h["use"]
+        self.assertEqual((u["any"], u["adopters"], u["examples"], u["both"], u["examplesOnly"]), (2, 1, 2, 1, 1))
+        self.assertEqual((u["unpitched"], u["unpitchedAdopters"], u["unpitchedExamples"]), (1, 0, 1))
+        self.assertEqual(u["byState"], {"1": 1, "2": 1, "3": 0, "4": 0, "5": 0})
+        uc = u["groups"]["update-checkout"]
+        # The set-aside package counts nowhere: not in the cluster, not migrated.
+        self.assertEqual((uc["declarations"], uc["packages"], uc["migrated"], uc["read"], uc["inCluster"]), (1, 1, 1, 1, 1))
+        self.assertEqual(u["aside"], ["old"])
+        c = h["cuses"]["update-checkout"]
+        self.assertEqual((c["covers"], c["lacks"], c["other"], c["aside"], c["unit"]), (0, 1, 2, 1, "sites"))
+        self.assertEqual(c["parts"], {"System lacks a C name it uses": 1, "no C name found": 1, "approved to stay on C": 1})
+        self.assertEqual((h["cuses"]["Unix tools"]["lacks"], h["cuses"]["Unix tools"]["unit"]), (1, "gaps"))
+
+    def test_rows_by_directory(self):
+        pkgs = [{"remote": "o/ex", "subdir": "Sources/Cat"}, {"remote": "o/ex", "subdir": "Sources/CatSupport/"},
+                {"remote": "o/pkg", "subdir": None}]
+        rows = asm.subdir_rows(pkgs)
+        self.assertEqual(sorted(rows), ["o/ex"])
+        self.assertEqual(asm.row_of_file(rows["o/ex"], "Sources/Cat/Cat.swift"), 0)
+        self.assertEqual(asm.row_of_file(rows["o/ex"], "Sources/CatSupport/A.swift"), 1)   # not Cat's
+        self.assertIsNone(asm.row_of_file(rows["o/ex"], "Tests/T.swift"))
 
     def test_render_one_pass(self):
         page = pg.render(fixture_master())
@@ -484,16 +587,41 @@ class PageAndCheckTests(Temp):
     def test_check_finds_a_use_missing_from_one_view(self):
         m = fixture_master()
         m["packages"][0]["usage"]["new"][0][1] = m["packages"][0]["usage"]["new"][0][1][:1]
-        m["digest"] = asm.digest({k: v for k, v in m.items() if k != "digest"})
+        redigest(m)
         c = self.run_check(m, node="")
         self.assertTrue(any("the two ways in" in p for p in c.problems), c.problems)
 
     def test_check_finds_a_wrong_ledger_total(self):
         m = fixture_master()
-        m["meta"]["ledger"]["total"] = 4
-        m["digest"] = asm.digest({k: v for k, v in m.items() if k != "digest"})
+        m["meta"]["ledger"]["total"] = 5
+        redigest(m)
         c = self.run_check(m, node="")
         self.assertTrue(any(p.startswith("C uses: master.json's total") for p in c.problems), c.problems)
+
+    def test_check_finds_a_headline_the_views_dont_have(self):
+        # A headline that says more than the declarations' users show, and
+        # a split that puts a site where the ledger doesn't.
+        m = fixture_master()
+        m["headline"]["use"]["any"] += 1
+        m["headline"]["cuses"]["update-checkout"]["covers"] += 1
+        m["headline"]["cuses"]["update-checkout"]["other"] -= 1
+        m["charts"]["used"][-1]["count"] += 1
+        redigest(m)
+        c = self.run_check(m)
+        self.assertTrue(any(p.startswith("headline: in use, from By API's side") for p in c.problems), c.problems)
+        self.assertTrue(any(p.startswith("headline: update-checkout's split, recounted") for p in c.problems), c.problems)
+        if shutil.which("node"):
+            self.assertTrue(any("the headline's use isn't master.json's" in p for p in c.problems), c.problems)
+
+    def test_check_finds_an_examples_site_outside_its_rows(self):
+        # The page put the examples' test file's site under the tool.
+        m = fixture_master()
+        m["declarations"][1]["usedBy"][1][1] = m["declarations"][1]["usedBy"][1][1] + [["Tests/T.swift", 1, 1, "p", ""]]
+        m["packages"][2]["usage"]["new"][0][1] = m["declarations"][1]["usedBy"][1][1]
+        redigest(m)
+        c = self.run_check(m, node="")
+        self.assertTrue(any(p.startswith("the two ways in: master.json's sites = the API graph's") for p in c.problems),
+                        c.problems)
 
     def test_check_finds_a_declaration_api_delta_lacks(self):
         m = fixture_master()
