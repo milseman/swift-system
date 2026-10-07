@@ -40,7 +40,7 @@ final class ProvisionalStdioTest: XCTestCase {
     defer { buffer.deallocate() }
 
     // A stream doesn't retry: it can have written some of a buffer.
-    let syscallTestCases: Array<MockTestCase> = [
+    var syscallTestCases: Array<MockTestCase> = [
       MockTestCase(name: "fopen", .noInterrupt, "a path", "r") { _ in
         _ = try FileStream.open("a path", mode: "r")
       },
@@ -96,7 +96,77 @@ final class ProvisionalStdioTest: XCTestCase {
         try stream.setBuffering(.full, buffer: buffer)
       },
     ]
+    #if !os(WASI)
+    syscallTestCases.append(MockTestCase(name: "tmpfile", .noInterrupt) { _ in
+      _ = try FileStream.openTemporaryFile()
+    })
+    #endif
+    #if !os(Android)
+    syscallTestCases += [
+      MockTestCase(name: "fmemopen", .noInterrupt, Optional(buffer.baseAddress!), 8, "r+") { _ in
+        _ = try FileStream.open(memory: buffer, mode: "r+")
+      },
+      MockTestCase(name: "fmemopen", .noInterrupt, Optional<UnsafeMutableRawPointer>.none, 16, "w+") { _ in
+        _ = try FileStream.open(memoryCapacity: 16, mode: "w+")
+      },
+    ]
+    #endif
     syscallTestCases.forEach { $0.runAllTests() }
+  }
+  #endif
+
+  #if !os(WASI)
+  // tmpfile makes its own file in the system's temporary directory, which
+  // it removes as it makes it; closing the stream frees it.
+  func testATemporaryFile() throws {
+    let stream = try FileStream.openTemporaryFile()
+    defer { try? stream.close() }
+    // The file has no name left.
+    XCTAssertEqual(try stream.fileDescriptor().stat().linkCount, 0)
+    try stream.write("scratch")
+    try stream.seek(offset: 0, from: .start)
+    XCTAssertEqual(try stream.readLine(), "scratch")
+  }
+  #endif
+
+  #if !os(Android)
+  func testAStreamOnMemory() throws {
+    let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 16, alignment: 1)
+    defer { buffer.deallocate() }
+    let bytes = UnsafeMutableRawBufferPointer.allocate(byteCount: 16, alignment: 1)
+    defer { bytes.deallocate() }
+
+    // What the stream writes lands in the buffer once it's flushed.
+    let output = try FileStream.open(memory: buffer, mode: "w+")
+    try output.write("hello")
+    try output.flush()
+    XCTAssertEqual(String(decoding: buffer[..<5], as: UTF8.self), "hello")
+    try output.seek(offset: 0, from: .start)
+    var count = try output.read(into: bytes)
+    XCTAssertEqual(String(decoding: bytes[..<count], as: UTF8.self), "hello")
+    try output.close()
+
+    // Reading reads the whole buffer, and then the stream is at its end.
+    buffer.copyBytes(from: "abcdefghijklmnop".utf8)
+    let input = try FileStream.open(memory: buffer, mode: "r")
+    count = try input.read(into: UnsafeMutableRawBufferPointer(rebasing: bytes[..<6]))
+    XCTAssertEqual(String(decoding: bytes[..<count], as: UTF8.self), "abcdef")
+    count = try input.read(into: bytes)
+    XCTAssertEqual(String(decoding: bytes[..<count], as: UTF8.self), "ghijklmnop")
+    XCTAssertTrue(input.isAtEnd)
+    try input.close()
+
+    // Memory the stream allocates holds what it writes, until it's closed.
+    let scratch = try FileStream.open(memoryCapacity: 8, mode: "w+")
+    try scratch.write("abc")
+    try scratch.seek(offset: 0, from: .start)
+    count = try scratch.read(into: bytes)
+    XCTAssertEqual(String(decoding: bytes[..<count], as: UTF8.self), "abc")
+    try scratch.close()
+
+    XCTAssertThrowsError(try FileStream.open(memoryCapacity: 8, mode: "zz")) {
+      XCTAssertEqual($0 as? Errno, .invalidArgument)
+    }
   }
   #endif
 

@@ -174,6 +174,30 @@ internal func system_fdopen(
   return fdopen(fd, mode)
 }
 
+// tmpfile. wasi-libc leaves it out.
+#if !os(WASI)
+internal func system_tmpfile() -> _CFilePointer? {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mockStreamResult(_mock()) }
+#endif
+  return tmpfile()
+}
+#endif
+
+// fmemopen, from macOS 10.13 and its siblings on Darwin. Bionic has it only
+// from API level 23.
+#if !os(Android)
+@available(macOS 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *)
+internal func system_fmemopen(
+  _ buffer: UnsafeMutableRawPointer?, _ size: Int, _ mode: UnsafePointer<CChar>
+) -> _CFilePointer? {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mockStreamResult(_mock(buffer, size, String(cString: mode))) }
+#endif
+  return fmemopen(buffer, size, mode)
+}
+#endif
+
 // fclose
 internal func system_fclose(_ stream: _CFilePointer) -> CInt {
 #if ENABLE_MOCKING
