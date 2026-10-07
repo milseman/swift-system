@@ -103,6 +103,19 @@ internal func system_strlcpy(
 #endif
 }
 
+// strings.h's comparisons that ignore case, by the current locale. They
+// can't fail.
+
+internal func system_strcasecmp(_ a: UnsafePointer<CChar>, _ b: UnsafePointer<CChar>) -> CInt {
+  strcasecmp(a, b)
+}
+
+internal func system_strncasecmp(
+  _ a: UnsafePointer<CChar>, _ b: UnsafePointer<CChar>, _ count: Int
+) -> CInt {
+  strncasecmp(a, b, count)
+}
+
 // MARK: - ctype.h
 
 // None of them can fail.
