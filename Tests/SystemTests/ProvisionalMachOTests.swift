@@ -144,6 +144,8 @@ private struct ProvisionalMachOTests {
     var runPaths: [String] = []
     var uuids: [[UInt8]] = []
     var buildVersions: [CInterop.BuildVersionCommand] = []
+    var symbolTables = 0
+    var entryPoints = 0
     var offset = 0
     try commands.withUnsafeBytes { raw in
       for _ in 0..<header.loadCommandCount {
@@ -189,6 +191,12 @@ private struct ProvisionalMachOTests {
           #expect(size == MemoryLayout<CInterop.BuildVersionCommand>.size
             + Int(version.toolCount) * 8)
           buildVersions.append(version)
+        case MachOFile.LoadCommandType.symbolTable:
+          // A symtab_command: the command, then four UInt32s.
+          #expect(size == MemoryLayout<CInterop.LoadCommand>.size + 16)
+          symbolTables += 1
+        case MachOFile.LoadCommandType.entryPoint:
+          entryPoints += 1
         default:
           break
         }
@@ -228,6 +236,9 @@ private struct ProvisionalMachOTests {
     #expect(build.targetPlatform == 1)  // PLATFORM_MACOS
     #expect(build.minimumOSVersion >= 10 << 16)  // 10.0.0
     #expect(build.sdkVersion >= build.minimumOSVersion || build.sdkVersion == 0)
+    // A bundle has a symbol table, and no entry point: only an executable does.
+    #expect(symbolTables == 1)
+    #expect(entryPoints == 0)
   }
 
   /// A fat header and its architectures, big-endian, laid over bytes built
@@ -419,10 +430,10 @@ private struct ProvisionalMachOTests {
       Command.segment64, Command.uuid, Command.rpath, Command.reexportDylib,
       Command.lazyLoadDylib, Command.loadUpwardDylib, Command.versionMinMacOS,
       Command.versionMinIOS, Command.versionMinTVOS, Command.versionMinWatchOS,
-      Command.buildVersion,
+      Command.buildVersion, Command.symbolTable, Command.entryPoint,
     ] == [
       0x1, 0xc, 0xd, 0x8000_0018, 0x19, 0x1b, 0x8000_001c, 0x8000_001f, 0x20, 0x8000_0023,
-      0x24, 0x25, 0x2f, 0x30, 0x32,
+      0x24, 0x25, 0x2f, 0x30, 0x32, 0x2, 0x8000_0028,
     ])
     #expect(MachOFile.ArchiveMemberName.symbolTable == "__.SYMDEF")
     #expect(MachOFile.ArchiveMemberName.sortedSymbolTable == "__.SYMDEF SORTED")
