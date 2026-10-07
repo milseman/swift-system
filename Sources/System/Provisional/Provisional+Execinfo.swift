@@ -14,12 +14,12 @@
 // runtime has a backtracer of its own, which is where these would belong.
 // Until then, code that reports its own call stack, as Foundation's
 // Thread.callStackReturnAddresses and callStackSymbols do, can do it
-// without importing the C library. Darwin only for now: glibc has them
-// too, and musl doesn't.
+// without importing the C library. On Darwin and on Linux with glibc;
+// Musl has none, Bionic has them from API level 33, and the BSDs' are in
+// libexecinfo, which System doesn't link. Darwin also has backtrace_async,
+// which follows a Swift task's frames across its suspension points.
 
-#if SYSTEM_PACKAGE_DARWIN
-
-import Darwin
+#if SYSTEM_PACKAGE_DARWIN || (os(Linux) && canImport(Glibc))
 
 /// A namespace for the C library's call-stack functions:
 /// the return addresses of the calling thread's frames, and their symbols.
@@ -28,7 +28,7 @@ import Darwin
 ///     for line in try CallStack.symbols(for: addresses) { print(line) }
 ///
 /// - Note: Provisional: call-stack functions may move to the Swift standard library.
-/// - Note: Only available on Darwin.
+/// - Note: Only available on Darwin, and on Linux with glibc.
 @available(System 199, *)
 public enum CallStack {}
 
@@ -41,6 +41,9 @@ extension CallStack {
   ///   The default is 128.
   /// - Returns: An address in each frame's code, from this method's own
   ///   frame outward, for up to `maxCount` frames.
+  ///
+  /// On Darwin, see ``asyncReturnAddresses(maxCount:)``
+  /// for the frames of a Swift task.
   ///
   /// The corresponding C function is `backtrace`.
   ///
@@ -84,4 +87,40 @@ extension CallStack {
   }
 }
 
-#endif // SYSTEM_PACKAGE_DARWIN
+#if SYSTEM_PACKAGE_DARWIN
+@available(System 199, *)
+@available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
+extension CallStack {
+  /// Returns the return addresses of the calling thread's stack frames,
+  /// innermost first, and in a Swift task,
+  /// those of the async functions it was called from.
+  ///
+  /// - Parameter maxCount: The most frames to return.
+  ///   The default is 128.
+  /// - Returns: An address in each frame's code, from this method's own
+  ///   frame outward, for up to `maxCount` frames.
+  ///
+  /// In a task, the frames past an async function's
+  /// are those of the async functions that awaited it,
+  /// not of the thread's code that resumed it,
+  /// which ``returnAddresses(maxCount:)`` reports instead.
+  /// Elsewhere, the two return the same frames.
+  ///
+  /// The corresponding C function is `backtrace_async`.
+  ///
+  /// - Note: Provisional: call-stack functions may move to the Swift standard library.
+  /// - Note: Only available on Darwin.
+  @inline(never)
+  public static func asyncReturnAddresses(maxCount: Int = 128) -> [UnsafeRawPointer] {
+    precondition(maxCount >= 0, "CallStack.asyncReturnAddresses(maxCount:): 'maxCount' must not be negative")
+    let buffer = UnsafeMutablePointer<UnsafeMutableRawPointer?>.allocate(capacity: maxCount)
+    defer { buffer.deallocate() }
+    let found = system_backtrace_async(buffer, maxCount)
+    return UnsafeBufferPointer(start: buffer, count: max(found, 0)).compactMap {
+      $0.map(UnsafeRawPointer.init)
+    }
+  }
+}
+#endif
+
+#endif // SYSTEM_PACKAGE_DARWIN || (os(Linux) && canImport(Glibc))

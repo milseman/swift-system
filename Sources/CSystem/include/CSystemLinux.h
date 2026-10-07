@@ -332,6 +332,11 @@ extern void csystem_get_mallinfo2(struct csystem_mallinfo2 *info);
 #define CSYSTEM_M_PERTURB (-6)
 #define CSYSTEM_M_ARENA_TEST (-7)
 #define CSYSTEM_M_ARENA_MAX (-8)
+
+// backtrace and backtrace_symbols, from <execinfo.h>, which glibc's Swift
+// module doesn't include (Musl has neither); see shims.c.
+extern int csystem_backtrace(void **buffer, int size);
+extern char **csystem_backtrace_symbols(void *const *buffer, int size);
 #endif // defined(__linux__) && defined(__GLIBC__)
 
 #ifdef __ANDROID__

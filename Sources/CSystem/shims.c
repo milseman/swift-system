@@ -925,6 +925,18 @@ extern void csystem_get_mallinfo2(struct csystem_mallinfo2 *info) {
   info->keepcost = CSYSTEM_MALLINFO_FIELD(keepcost);
   #undef CSYSTEM_MALLINFO_FIELD
 }
+
+// MARK: - The call stack
+
+#include <execinfo.h>
+
+extern int csystem_backtrace(void **buffer, int size) {
+  return backtrace(buffer, size);
+}
+
+extern char **csystem_backtrace_symbols(void *const *buffer, int size) {
+  return backtrace_symbols(buffer, size);
+}
 #endif // defined(__linux__) && defined(__GLIBC__)
 
 #if defined(__FreeBSD__)

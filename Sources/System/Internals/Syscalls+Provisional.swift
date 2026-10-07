@@ -20,6 +20,7 @@
 #if SYSTEM_PACKAGE_DARWIN
 import Darwin
 #elseif canImport(Glibc)
+import CSystem
 import Glibc
 #elseif canImport(Musl)
 import Musl
@@ -137,18 +138,38 @@ internal func system_toupper(_ c: CInt) -> CInt { toupper(c) }
 
 // MARK: - execinfo.h
 
-#if SYSTEM_PACKAGE_DARWIN
+#if SYSTEM_PACKAGE_DARWIN || (os(Linux) && canImport(Glibc))
 // Neither sets errno; backtrace_symbols returns NULL when it can't allocate.
+// glibc's Swift module doesn't include <execinfo.h>, so there they're CSystem
+// shims.
 internal func system_backtrace(
   _ buffer: UnsafeMutablePointer<UnsafeMutableRawPointer?>, _ count: CInt
 ) -> CInt {
+  #if SYSTEM_PACKAGE_DARWIN
   backtrace(buffer, count)
+  #else
+  csystem_backtrace(buffer, count)
+  #endif
 }
 
 internal func system_backtrace_symbols(
   _ addresses: UnsafePointer<UnsafeMutableRawPointer?>, _ count: CInt
 ) -> UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>? {
+  #if SYSTEM_PACKAGE_DARWIN
   backtrace_symbols(addresses, count)
+  #else
+  csystem_backtrace_symbols(addresses, count)
+  #endif
+}
+#endif
+
+#if SYSTEM_PACKAGE_DARWIN
+// From macOS 12 and its siblings. It can't fail.
+@available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
+internal func system_backtrace_async(
+  _ buffer: UnsafeMutablePointer<UnsafeMutableRawPointer?>, _ count: Int
+) -> Int {
+  backtrace_async(buffer, count, nil)
 }
 #endif
 
