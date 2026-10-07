@@ -707,7 +707,7 @@ internal func _valueOrNil(_ body: () -> Int) -> Result<Int?, Errno> {
   system_errno = 0
   let value = body()
   guard value == -1 else { return .success(value) }
-  return system_errno == 0 ? .success(nil) : .failure(.current)
+  return system_errno == 0 ? .success(nil) : .failure(._current)
 }
 
 #endif // !os(Windows)

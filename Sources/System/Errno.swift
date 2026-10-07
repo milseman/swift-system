@@ -1465,6 +1465,7 @@ extension Errno {
   ///
   /// The corresponding C error is `ENOTCAPABLE`.
   @_alwaysEmitIntoClient
+  @available(System 199, *)
   public static var notCapable: Errno { .init(rawValue: _ENOTCAPABLE) }
 
   @_alwaysEmitIntoClient
@@ -1525,10 +1526,19 @@ extension Errno {
 
 @available(System 0.0.1, *)
 extension Errno {
+  // The calling thread's errno, for System's own code, which reads it
+  // wherever that code is available. The public `current` below is new API.
+  @_alwaysEmitIntoClient
+  internal static var _current: Errno {
+    get { Errno(rawValue: _errnoValue) }
+    set { _errnoValue = newValue.rawValue }
+  }
+}
+
+@available(System 199, *)
+extension Errno {
   // PROTOTYPE: public access to errno, which needs a release barrier to be
   // safe. Whether to offer it is still open; see Prototype/PosixMore.
-  // It's emitted into clients, and so it has no symbol, which lets it keep
-  // this extension's availability, as System's own uses of it need.
 
   /// The calling thread's error value, which C functions set when they fail.
   ///
@@ -1557,8 +1567,8 @@ extension Errno {
   /// The corresponding C global variable is `errno`.
   @_alwaysEmitIntoClient
   public static var current: Errno {
-    get { Errno(rawValue: _errnoValue) }
-    set { _errnoValue = newValue.rawValue }
+    get { _current }
+    set { _current = newValue }
   }
 }
 
