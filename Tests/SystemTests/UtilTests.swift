@@ -99,7 +99,7 @@ class UtilTests: XCTestCase {
 
     // A nonzero return is the error, and errno is ignored.
     calls = 0
-    Errno.current = .notPermitted
+    Errno._current = .notPermitted
     XCTAssertThrowsError(try nothingOrReturnedErrno(retryOnInterrupt: true) {
       calls += 1
       return Errno.permissionDenied.rawValue

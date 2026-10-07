@@ -205,10 +205,6 @@ final class ErrnoTest: XCTestCase {
     XCTAssert(EOWNERDEAD == Errno.previousOwnerDied.rawValue)
 #endif
 
-#if SYSTEM_PACKAGE_DARWIN && canImport(Darwin, _version: 346) || os(FreeBSD)
-    XCTAssert(ENOTCAPABLE == Errno.notCapable.rawValue)
-#endif
-
 #if os(FreeBSD)
     XCTAssert(ECAPMODE == Errno.capabilityMode.rawValue)
     XCTAssert(EINTEGRITY == Errno.integrityCheckFailed.rawValue)
@@ -219,6 +215,14 @@ final class ErrnoTest: XCTestCase {
     XCTAssert(ELAST == Errno.lastErrnoValue.rawValue)
 #endif
   }
+
+#if SYSTEM_PACKAGE_DARWIN && canImport(Darwin, _version: 346) || os(FreeBSD)
+  // New on Darwin, so System 199 there.
+  @available(System 199, *)
+  func testNotCapable() {
+    XCTAssert(ENOTCAPABLE == Errno.notCapable.rawValue)
+  }
+#endif
 
   func testPatternMatching() {
     func throwsEPERM() throws {

@@ -32,6 +32,7 @@ import Android
 private struct ErrnoAccessTests {
   private let missing = "/nonexistent-\(getpid())/file"
 
+  @available(System 199, *)
   @Test func currentGetsAndSets() {
     Errno.current = .fileExists
     #expect(Errno.current == .fileExists)
@@ -39,6 +40,7 @@ private struct ErrnoAccessTests {
     #expect(Errno.current.rawValue == 0)
   }
 
+  @available(System 199, *)
   @Test func currentAfterAFailingCall() {
     // Read errno before anything else runs, #expect included.
     let result = close(-1)
@@ -49,6 +51,7 @@ private struct ErrnoAccessTests {
 
   /// The hazard that `current`'s documentation describes: a release between
   /// the call and the read runs a deinitializer that changes errno.
+  @available(System 199, *)
   @Test func aReleaseBeforeTheReadCanChangeErrno() {
     var object: ClosesOnDeinit? = ClosesOnDeinit()
     let result = open(missing, O_RDONLY)
