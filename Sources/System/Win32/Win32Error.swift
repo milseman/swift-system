@@ -444,6 +444,12 @@ extension Win32.Error {
   @_alwaysEmitIntoClient
   public static var failOnInterrupt24: Win32.Error { Win32.Error(rawValue: 83) }
 
+  /// Another process has the disk in use or locked.
+  ///
+  /// The corresponding C constant is `ERROR_DRIVE_LOCKED`.
+  @_alwaysEmitIntoClient
+  public static var driveLocked: Win32.Error { Win32.Error(rawValue: 108) }
+
   /// A buffer is too small for the data.
   ///
   /// `GetAdaptersAddresses` reports a buffer too small for the adapters this
@@ -672,6 +678,7 @@ extension Win32.Error {
     case 82: return "ERROR_CANNOT_MAKE"
     case 83: return "ERROR_FAIL_I24"
     case 87: return "ERROR_INVALID_PARAMETER"
+    case 108: return "ERROR_DRIVE_LOCKED"
     case 109: return "ERROR_BROKEN_PIPE"
     case 111: return "ERROR_BUFFER_OVERFLOW"
     case 112: return "ERROR_DISK_FULL"

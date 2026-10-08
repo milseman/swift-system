@@ -596,6 +596,10 @@ def parse_item(item, members=False):
 
     if not words:
         return [], None, "prose", False
+    # `.sync` in `OpenOptions.dataSync and .sync on WASI`: a Swift member, as an
+    # implicit member expression spells it, not C's sync.
+    if re.match(r"^`?\.[A-Za-z_]", words[0]):
+        return [], None, "prose", False
     # members of sockaddr_storage (ss_family) under MemberImportVisibility
     m = re.match(r"^members of (\w+)\b(?!-)", core)
     if m and is_c(m.group(1)) and m.group(1) != "System":

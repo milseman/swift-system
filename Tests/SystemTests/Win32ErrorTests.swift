@@ -80,6 +80,7 @@ final class Win32ErrorTests: XCTestCase {
       (.badNetworkName, DWORD(WinSDK.ERROR_BAD_NET_NAME)),
       (.cannotCreate, DWORD(WinSDK.ERROR_CANNOT_MAKE)),
       (.failOnInterrupt24, DWORD(WinSDK.ERROR_FAIL_I24)),
+      (.driveLocked, DWORD(WinSDK.ERROR_DRIVE_LOCKED)),
       (.bufferOverflow, DWORD(WinSDK.ERROR_BUFFER_OVERFLOW)),
       (.invalidTargetHandle, DWORD(WinSDK.ERROR_INVALID_TARGET_HANDLE)),
       (.seekOnDevice, DWORD(WinSDK.ERROR_SEEK_ON_DEVICE)),
