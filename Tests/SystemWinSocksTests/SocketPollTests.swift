@@ -70,9 +70,12 @@ private struct SocketPollTests {
   @available(System 199, *)
   @Test func readinessOfAConnection() throws {
     let (listener, client, server) = try Self.connection()
+    // The client is closed once, below or here: a second close could close
+    // a socket that another test has since been given the same handle.
+    var clientIsOpen = true
     defer {
       try? server.close()
-      try? client.close()
+      if clientIsOpen { try? client.close() }
       try? listener.close()
     }
     #expect(try client.poll(for: .writable, timeout: .seconds(5)).contains(.writable))
@@ -86,6 +89,7 @@ private struct SocketPollTests {
     _ = try withUnsafeMutableBytes(of: &byte) { buffer throws(Win32.Error) in
       try server.receive(into: buffer)
     }
+    clientIsOpen = false
     try client.close()
     let events = try server.poll(for: .readableNormalData, timeout: .seconds(5))
     #expect(!events.isDisjoint(with: [.hangUp, .readableNormalData]))

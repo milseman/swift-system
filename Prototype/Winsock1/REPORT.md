@@ -15,7 +15,8 @@ manifest and CMake hooks, the harness and its model, Winsock's error codes as `W
 `WSAPoll` (`56851b2`); messages, with `WSASendMsg` and `WSARecvMsg` looked up once per process, SystemSockets'
 ancillary messages, and the IP control messages (`f26f4c6`); completion ports, with overlapped `WSASend` and
 `WSARecv` (`9d94aa0`); the stream extension functions, `AcceptEx`, `ConnectEx` and `TransmitFile` (`54ca343`); and
-Unix domain sockets (`c151d0e`). Then name resolution, over `GetAddrInfoW` and `GetNameInfoW` (this commit).
+Unix domain sockets (`c151d0e`). Then name resolution, over `GetAddrInfoW` and `GetNameInfoW` (`495e1f2`), and
+SystemSockets' `writeAll` and `closeAfter` (this commit).
 Section 5 has what each adopter would change, row by row; every socket row has System API now.
 - **Next** (section 8): the Windows box's first run, which needs `Package.swift` to leave SystemSockets out on
   Windows (section 7), and then the fixes it calls for; the tools' module lists (section 7).
@@ -56,6 +57,7 @@ os(Windows)`. Its files mirror SystemSockets' layout:
 | `Internals/RawBuffer.swift` | SystemSockets' copy-on-write buffer, copied |
 | `Sockets/SocketAddress+Unix.swift` | `UnixAddress` over `SOCKADDR_UN` (`afunix.h`), and `SocketAddress(unix:)` and `.unix`; `CInterop.SockAddrUn` and its accessors are in the `CInterop` files |
 | `Sockets/SocketAddress+Resolution.swift` | `SocketAddress.resolve(hostname:service:hints:)` (`GetAddrInfoW`, `FreeAddrInfoW`), `reverseLookup(flags:)` (`GetNameInfoW`), `AddressResolutionError`, the hints and flags, and `CInterop.AddrInfo` (`ADDRINFOW`) |
+| `Sockets/SocketHelpers.swift` | `writeAll(_:)` (`send` in a loop) and `closeAfter(_:)` (`closesocket`), which SystemSockets has over `fileDescriptor` |
 | `Sockets/SocketStreamExtensions.swift` | `accept(into:addresses:overlapped:)` (`AcceptEx`) and `updateAcceptContext(listener:)`, `connect(to:overlapped:)` (`ConnectEx`) and `updateConnectContext()`, `transmitFile(_:byteCount:fromAbsoluteOffset:options:overlapped:)` (`TransmitFile`) with `TransmitFileOptions` |
 | `Sockets/SocketOverlappedIO.swift` | `Win32.CompletionPort.associate(_:key:)` for a socket; overlapped `send(_:flags:overlapped:)` (`WSASend`) and `receive(into:flags:overlapped:)` (`WSARecv`), `result(of:wait:)` (`WSAGetOverlappedResult`), `cancel(_:)` and `cancelAll()` (`CancelIoEx`) |
 
@@ -65,7 +67,8 @@ for them, and SystemPackage's for `iovec`.
 The parts, in order: the module, the socket types, `open`, `close` and `shutdown` (`e7c4d48`); addresses
 (`5f3381d`); connections, transfers and names (`1dea80c`); options (`13c9a37`); nonblocking mode and open options
 (`a4f6883`). P2: polling (`56851b2`); messages (`f26f4c6`); completion ports (`9d94aa0`); the stream extension
-functions (`54ca343`); Unix domain sockets (`c151d0e`). Then name resolution (this commit).
+functions (`54ca343`); Unix domain sockets (`c151d0e`). Then name resolution (`495e1f2`) and the helpers (this
+commit).
 
 ## 2. Design calls, with the alternatives rejected
 
@@ -291,8 +294,11 @@ What each file checks, and what it can reach:
   sockets aren't inherited; that a stream receive leaves the sender empty; a UDP round trip with the sender's
   address; a datagram larger than the buffer throwing `messageTooLong` after filling it; a refused connection to a
   port a socket holds without listening; the names of an unbound and unconnected socket; a second bind of an address
-  in use. Every address is 127.0.0.1 or `::1`, with a port the system picks, so nothing reaches beyond the host or
-  listens where the firewall would ask; every socket is the test's own and closed by a `defer`.
+  in use; `writeAll` of 16 KiB inside `closeAfter`, received whole, then the end of the stream that the close
+  makes. Every address is 127.0.0.1 or `::1`, with a port the system picks, so nothing reaches beyond the host or
+  listens where the firewall would ask; every socket is the test's own and closed once, by a `defer` or by the code
+  under test, never twice: swift-testing runs tests in parallel, and a second close could close a socket another
+  test has since been given the same handle (`SocketPollTests` keeps a flag for the one it closes itself).
 - `SocketOptionsTests`: every option name against the SDK; socket and TCP options, the keepalive times among them;
   `exclusiveAddressUse`; the time-outs' milliseconds and rounding; a receive that times out with `timedOut`; linger
   and its rounding; IPv4 and IPv6 options (Windows' `true` default for `isIPv6Only`); and a multicast datagram on

@@ -26,6 +26,7 @@ add_library(SystemWinSocks
   Sockets/SocketAddress+Unix.swift
   Sockets/SocketAddress.swift
   Sockets/SocketDescriptor.swift
+  Sockets/SocketHelpers.swift
   Sockets/SocketMessages+IP.swift
   Sockets/SocketMessages.swift
   Sockets/SocketOpenOptions.swift

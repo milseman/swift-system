@@ -223,6 +223,33 @@ private struct SocketOperationsTests {
   }
 
   @available(System 199, *)
+  @Test func writeAllAndCloseAfter() throws {
+    let (listener, _, client) = try Self.connectedPair()
+    defer { try? listener.close() }
+    let server = try listener.accept()
+    defer { try? server.close() }
+
+    // Sixteen KiB, which loopback's buffers hold without a reader.
+    let message = (0 ..< 16384).map { UInt8(truncatingIfNeeded: $0) }
+    let written = try client.closeAfter {
+      try client.writeAll(message)
+    }
+    #expect(written == message.count)
+    var received = [UInt8](repeating: 0, count: message.count)
+    let count = try received.withUnsafeMutableBytes { buffer throws(Win32.Error) in
+      try server.receive(into: buffer, flags: .waitForAll)
+    }
+    #expect(count == message.count && received == message)
+    // closeAfter closed the client, which ends the stream. (Closing it
+    // again would close whatever socket another test has since been given
+    // the same handle.)
+    let end = try received.withUnsafeMutableBytes { buffer throws(Win32.Error) in
+      try server.receive(into: buffer)
+    }
+    #expect(end == 0)
+  }
+
+  @available(System 199, *)
   @Test func bindingAnAddressInUseFails() throws {
     let first = try SocketDescriptor.open(.ipv4, .stream)
     defer { try? first.close() }
