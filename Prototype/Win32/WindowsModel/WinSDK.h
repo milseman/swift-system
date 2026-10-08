@@ -600,6 +600,46 @@ typedef const WCHAR *LPCWCH;
 // SecureZeroMemory as a macro for it.
 PVOID RtlSecureZeroMemory(PVOID ptr, SIZE_T cnt);
 
+// winbase.h: the local heap's allocation, which LocalFree frees.
+HLOCAL LocalAlloc(UINT uFlags, SIZE_T uBytes);
+
+// guiddef.h, knownfolders.h, shlobj_core.h and combaseapi.h: known folders.
+// Data1 is an unsigned long, 32 bits on Windows.
+typedef struct _GUID {
+  unsigned int Data1;
+  unsigned short Data2;
+  unsigned short Data3;
+  unsigned char Data4[8];
+} GUID;
+typedef GUID KNOWNFOLDERID;
+typedef const KNOWNFOLDERID *REFKNOWNFOLDERID;
+typedef enum KNOWN_FOLDER_FLAG : int {
+  KF_FLAG_DEFAULT = 0x00000000,
+  KF_FLAG_CREATE = 0x00008000,
+  KF_FLAG_DONT_VERIFY = 0x00004000,
+  KF_FLAG_NO_ALIAS = 0x00001000,
+  KF_FLAG_DEFAULT_PATH = 0x00000400,
+} KNOWN_FOLDER_FLAG;
+extern const KNOWNFOLDERID FOLDERID_ProgramFiles;
+extern const KNOWNFOLDERID FOLDERID_ProgramFilesX86;
+extern const KNOWNFOLDERID FOLDERID_UserProgramFiles;
+extern const KNOWNFOLDERID FOLDERID_ProgramData;
+extern const KNOWNFOLDERID FOLDERID_System;
+extern const KNOWNFOLDERID FOLDERID_Windows;
+extern const KNOWNFOLDERID FOLDERID_LocalAppData;
+extern const KNOWNFOLDERID FOLDERID_RoamingAppData;
+extern const KNOWNFOLDERID FOLDERID_Profile;
+extern const KNOWNFOLDERID FOLDERID_UserProfiles;
+extern const KNOWNFOLDERID FOLDERID_Desktop;
+extern const KNOWNFOLDERID FOLDERID_Documents;
+extern const KNOWNFOLDERID FOLDERID_Downloads;
+extern const KNOWNFOLDERID FOLDERID_Music;
+extern const KNOWNFOLDERID FOLDERID_Pictures;
+extern const KNOWNFOLDERID FOLDERID_Videos;
+extern const KNOWNFOLDERID FOLDERID_Public;
+HRESULT SHGetKnownFolderPath(REFKNOWNFOLDERID rfid, DWORD dwFlags, HANDLE hToken, PWSTR *ppszPath);
+void CoTaskMemFree(LPVOID pv);
+
 struct _PROC_THREAD_ATTRIBUTE_LIST;
 typedef struct _PROC_THREAD_ATTRIBUTE_LIST *PPROC_THREAD_ATTRIBUTE_LIST,
     *LPPROC_THREAD_ATTRIBUTE_LIST;

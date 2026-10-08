@@ -393,6 +393,8 @@ target_sources(SystemPackage PRIVATE
   Win32/Win32HResult.swift
   Win32/Win32HandleOperations.swift
   Win32/Win32Jobs.swift
+  Win32/Win32KnownFolders.swift
+  Win32/Win32LocalMemory.swift
   Win32/Win32Locking.swift
   Win32/Win32LongPaths.swift
   Win32/Win32NTStatus.swift

@@ -505,7 +505,7 @@ extension Win32.FileHandle {
   /// and restores the file pointer, this resizes in one call.
   ///
   /// The corresponding C function is `SetFileInformationByHandle` with
-  /// `FileEndOfFileInfo`.
+  /// `FileEndOfFileInfo` and a `FILE_END_OF_FILE_INFO`.
   @_alwaysEmitIntoClient
   public func resize(to newSize: Int64) throws(Win32.Error) {
     guard newSize >= 0 else { throw .invalidParameter }

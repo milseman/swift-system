@@ -138,7 +138,8 @@ extension DynamicLibrary {
   /// Throws ``Win32/Error/moduleNotFound`` if the loader can't find the
   /// library or a library it depends on.
   ///
-  /// The corresponding C function is `LoadLibraryExW`.
+  /// The corresponding C function is `LoadLibraryExW`, or `LoadLibraryW`,
+  /// which is `LoadLibraryExW` without options.
   @_alwaysEmitIntoClient
   public init(_ path: FilePath, options: LoadOptions = []) throws(Win32.Error) {
     self.init(
@@ -150,7 +151,8 @@ extension DynamicLibrary {
   ///
   /// See ``init(_:options:)-(FilePath,_)``.
   ///
-  /// The corresponding C function is `LoadLibraryExW`.
+  /// The corresponding C function is `LoadLibraryExW`, or `LoadLibraryW`,
+  /// which is `LoadLibraryExW` without options.
   @_alwaysEmitIntoClient
   public init(
     _ path: UnsafePointer<CInterop.PlatformChar>, options: LoadOptions = []
@@ -167,7 +169,8 @@ extension DynamicLibrary {
   /// Throws ``Win32/Error/moduleNotFound`` if no such library is loaded.
   /// The reference keeps the library loaded until this value frees it.
   ///
-  /// The corresponding C function is `GetModuleHandleExW`.
+  /// The corresponding C function is `GetModuleHandleExW`, or
+  /// `GetModuleHandleW` and `GetModuleHandleA`, which take no reference.
   @_alwaysEmitIntoClient
   public init(alreadyLoaded name: FilePath) throws(Win32.Error) {
     self.init(
@@ -180,8 +183,8 @@ extension DynamicLibrary {
   /// Unlike the other platforms' main program, a lookup here doesn't search
   /// the libraries the program loaded.
   ///
-  /// The corresponding C function is `GetModuleHandleExW`, with a null
-  /// module name.
+  /// The corresponding C function is `GetModuleHandleExW`, or
+  /// `GetModuleHandleW`, which takes no reference, with a null module name.
   @_alwaysEmitIntoClient
   public static func mainProgram() throws(Win32.Error) -> DynamicLibrary {
     DynamicLibrary(taking: try _loadedModule(nil).get())

@@ -667,7 +667,9 @@ extension Win32 {
   /// file at `path`. Like ``FileHandle/open(_:access:shareMode:disposition:attributes:flags:inheritable:securityDescriptor:templateFile:)``,
   /// this resolves and canonicalizes `path` first.
   ///
-  /// The corresponding C function is `GetFileAttributesW`.
+  /// The corresponding C function is `GetFileAttributesW`, with
+  /// `INVALID_FILE_ATTRIBUTES` as its failure, which this throws as the last
+  /// error.
   @_alwaysEmitIntoClient
   public static func fileAttributes(of path: FilePath) throws(Win32.Error) -> FileAttributes {
     FileAttributes(rawValue: try _fileAttributes(path).get())

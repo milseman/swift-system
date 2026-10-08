@@ -96,7 +96,8 @@ extension Win32.FileHandle {
   /// its bounds.
   ///
   /// The corresponding C function is `DeviceIoControl`, with
-  /// `FSCTL_GET_REPARSE_POINT`.
+  /// `FSCTL_GET_REPARSE_POINT` and a buffer of
+  /// `MAXIMUM_REPARSE_DATA_BUFFER_SIZE` bytes.
   @_alwaysEmitIntoClient
   public func reparsePoint() throws(Win32.Error) -> Win32.ReparsePoint {
     try Win32._reparsePoint(_handle).get()
@@ -119,7 +120,8 @@ extension Win32.DirectoryHandle {
   /// its bounds.
   ///
   /// The corresponding C function is `DeviceIoControl`, with
-  /// `FSCTL_GET_REPARSE_POINT`.
+  /// `FSCTL_GET_REPARSE_POINT` and a buffer of
+  /// `MAXIMUM_REPARSE_DATA_BUFFER_SIZE` bytes.
   @_alwaysEmitIntoClient
   public func reparsePoint() throws(Win32.Error) -> Win32.ReparsePoint {
     try Win32._reparsePoint(_handle).get()

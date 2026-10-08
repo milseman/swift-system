@@ -142,7 +142,8 @@ extension Win32.EventHandle {
   ///
   /// This method blocks the thread.
   ///
-  /// The corresponding C function is `WaitForSingleObject`.
+  /// The corresponding C function is `WaitForSingleObject`, with its results
+  /// `WAIT_OBJECT_0` and `WAIT_TIMEOUT`, which this returns as true and false.
   @_alwaysEmitIntoClient
   @discardableResult
   public func wait(timeout: Duration? = nil) throws(Win32.Error) -> Bool {

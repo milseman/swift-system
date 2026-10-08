@@ -366,7 +366,8 @@ extension Win32.ThreadHandle {
   ///
   /// Needs ``Win32/ThreadAccess/synchronize``.
   ///
-  /// The corresponding C function is `WaitForSingleObject`.
+  /// The corresponding C function is `WaitForSingleObject`, with its results
+  /// `WAIT_OBJECT_0` and `WAIT_TIMEOUT`, which this returns as true and false.
   @_alwaysEmitIntoClient
   public func waitForExit(timeout: Duration) throws(Win32.Error) -> Bool {
     try Win32._wait(_handle, timeout: timeout).get()

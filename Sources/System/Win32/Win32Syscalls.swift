@@ -803,6 +803,19 @@ internal func system__strdup(_ string: UnsafePointer<CChar>) -> UnsafeMutablePoi
   return _strdup(string)
 }
 
+// MARK: - Known folders
+
+internal func system_SHGetKnownFolderPath(
+  _ rfid: UnsafePointer<KNOWNFOLDERID>, _ dwFlags: DWORD, _ hToken: HANDLE?,
+  _ ppszPath: UnsafeMutablePointer<PWSTR?>
+) -> HRESULT {
+  SHGetKnownFolderPath(rfid, dwFlags, hToken, ppszPath)
+}
+
+internal func system_CoTaskMemFree(_ pv: UnsafeMutableRawPointer?) {
+  CoTaskMemFree(pv)
+}
+
 // MARK: - Signals
 
 // The C runtime reports a number that names no signal to its invalid
