@@ -87,6 +87,12 @@ extension CInterop {
   ///
   /// The corresponding C type is `WSACMSGHDR`.
   public typealias CMsgHdr = WSACMSGHDR
+
+  /// Address info structure for `GetAddrInfoW`, the wide form of
+  /// `getaddrinfo`, whose canonical name is UTF-16.
+  ///
+  /// The corresponding C type is `ADDRINFOW`.
+  public typealias AddrInfo = ADDRINFOW
 }
 
 #endif // os(Windows)

@@ -233,6 +233,37 @@ internal func system_SetHandleInformation(_ handle: HANDLE, _ mask: DWORD, _ fla
   SetHandleInformation(handle, mask, flags)
 }
 
+// MARK: - Name resolution
+
+// The wide forms, which take UTF-16 names, where getaddrinfo's are in the
+// ANSI code page. They return their error code, which they also leave in
+// WSAGetLastError.
+
+internal func system_GetAddrInfoW(
+  _ node: UnsafePointer<WCHAR>?,
+  _ service: UnsafePointer<WCHAR>?,
+  _ hints: UnsafePointer<ADDRINFOW>?,
+  _ result: UnsafeMutablePointer<UnsafeMutablePointer<ADDRINFOW>?>
+) -> CInt {
+  GetAddrInfoW(node, service, hints, result)
+}
+
+internal func system_FreeAddrInfoW(_ info: UnsafeMutablePointer<ADDRINFOW>?) {
+  FreeAddrInfoW(info)
+}
+
+internal func system_GetNameInfoW(
+  _ address: UnsafePointer<SOCKADDR>,
+  _ length: CInt,
+  _ node: UnsafeMutablePointer<WCHAR>,
+  _ nodeLength: DWORD,
+  _ service: UnsafeMutablePointer<WCHAR>,
+  _ serviceLength: DWORD,
+  _ flags: CInt
+) -> CInt {
+  GetNameInfoW(address, length, node, nodeLength, service, serviceLength, flags)
+}
+
 // MARK: - Address conversion
 
 // Windows Vista and later. System calls these without starting Winsock:
