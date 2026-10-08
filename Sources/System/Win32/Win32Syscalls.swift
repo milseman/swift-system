@@ -803,6 +803,19 @@ internal func system__strdup(_ string: UnsafePointer<CChar>) -> UnsafeMutablePoi
   return _strdup(string)
 }
 
+// MARK: - Signals
+
+// The C runtime reports a number that names no signal to its invalid
+// parameter handler, which ends the process by default.
+internal func system_raise(_ signal: CInt) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(signal) }
+#endif
+  return _withReturningInvalidParameterHandler { raise(signal) }
+}
+
+// MARK: - Paths
+
 internal func system__wremove(_ path: UnsafePointer<WCHAR>) -> CInt {
 #if ENABLE_MOCKING
   if mockingEnabled { return _mock(path: path) }

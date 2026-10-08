@@ -116,6 +116,18 @@ size_t strftime(char *_Buffer, size_t _SizeInBytes, const char *_Format, const t
 #define ERANGE 34
 #define EOVERFLOW 132
 
+// signal.h
+#define SIGINT 2
+#define SIGILL 4
+#define SIGFPE 8
+#define SIGSEGV 11
+#define SIGTERM 15
+#define SIGBREAK 21
+#define SIGABRT 22
+typedef void (*_crt_signal_t)(int);
+_crt_signal_t signal(int _Signal, _crt_signal_t _Function);
+int raise(int _Signal);
+
 // stdlib.h and process.h: ending the process. _exit, abort and exit don't
 // return.
 #define EXIT_SUCCESS 0

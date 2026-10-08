@@ -375,6 +375,7 @@ target_sources(SystemPackage PRIVATE
   Win32/ProcessEnvironmentWindows.swift
   Win32/ProcessExitWindows.swift
   Win32/ProcessIDWindows.swift
+  Win32/SignalWindows.swift
   Win32/Win32.swift
   Win32/Win32AccessToken.swift
   Win32/Win32CommandLine.swift
