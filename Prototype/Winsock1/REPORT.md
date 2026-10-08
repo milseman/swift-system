@@ -7,12 +7,12 @@ signatures over Winsock (section 29's P0, its second form). Base: system-next at
 runs real Windows: the code is written from the Winsock documentation, compiled on macOS against a model of the SDK
 by `Prototype/Win32/check-winsock.sh`, and kept inside `#if os(Windows)`; its tests are Windows-only and haven't run.
 
-**Resume here:** P1's first three parts are done (section 1): the module, its manifest and CMake hooks, the harness
+**Resume here:** P1's first four parts are done (section 1): the module, its manifest and CMake hooks, the harness
 and its model, Winsock's error codes as `Win32.Error`, the socket types, `open` (`WSASocketW`, starting Winsock
-lazily), `close` and `shutdown` (`e7c4d48`); addresses, with `inet_pton` and `inet_ntop` (`5f3381d`); and binding,
-listening, accepting, connecting, sending and receiving, and the socket names (this commit).
-- **Next**, in order: options (levels, socket, TCP, IPv4, IPv6 and multicast options, timeouts, linger); then
-  nonblocking (`ioctlsocket(FIONBIO)`) and open options; then P2.
+lazily), `close` and `shutdown` (`e7c4d48`); addresses, with `inet_pton` and `inet_ntop` (`5f3381d`); binding,
+listening, accepting, connecting, sending and receiving, and the socket names (`1dea80c`); and options (this commit).
+- **Next**, in order: nonblocking (`ioctlsocket(FIONBIO)`) and open options, which finish P1; then P2: `WSAPoll`,
+  the extension functions and `WSASendMsg`/`WSARecvMsg`, completion ports, Unix domain sockets.
 - **Check** with `Prototype/Win32/check-winsock.sh` after each change; `swift build` and `swift test` on macOS, which
   compile none of it; `Utilities/lint/lint.sh cmake api`.
 
@@ -35,9 +35,12 @@ os(Windows)`. Its files mirror SystemSockets' layout:
 | `Sockets/SocketAddress*.swift` | `SocketAddress` and `Family`, `IPv4Address`, `IPv6Address`, their `Host`s and text forms |
 | `Internals/CInterop+WinSocks.swift` | `CInterop.SockAddr` (`SOCKADDR`), `SockLen`, `SAFamily`, `SockAddrIn`, `InAddr`, `In6Addr`, `SockAddrIn6`, `SockAddrStorage`, `Linger` |
 | `Internals/CInterop+WinSockAccessors.swift` | SystemSockets' Swift-named accessors for those structures |
+| `Sockets/SocketOptions.swift` | `OptionLevel`, `SocketOption`, `TCPOption`, `getOption`/`setOption` (`getsockopt`, `setsockopt`) and their conveniences |
+| `Sockets/SocketOptions+IP.swift` | `IPOption`, `IPv6Option`, their typed options, multicast membership |
+| `Sockets/SocketOptions+Timeouts.swift` | send and receive time-outs, linger |
 
 The parts, in order: the module, the socket types, `open`, `close` and `shutdown` (`e7c4d48`); addresses
-(`5f3381d`); connections, transfers and names (this commit).
+(`5f3381d`); connections, transfers and names (`1dea80c`); options (this commit).
 
 ## 2. Design calls, with the alternatives rejected
 
@@ -105,6 +108,18 @@ The parts, in order: the module, the socket types, `open`, `close` and `shutdown
   SystemSockets' callers expect.
 - **Lengths are clamped to `Int32.max`**, since Winsock's `send` and `recv` take an `int`: a stream sends or receives
   less, as it may anyway, and no datagram is that long.
+- **Options keep SystemSockets' signatures; Winsock's value types are inside them**: the time-outs are `DWORD`
+  milliseconds, so `setReceiveTimeout` rounds up to a millisecond where SystemSockets rounds to a microsecond, and a
+  time-out throws `timedOut`, not `wouldBlock`, and leaves the socket in a state Winsock says not to use; `linger`'s
+  fields are `u_short`, so `setLinger` clamps to 65,535 seconds; the IPv4 multicast loop and time-to-live are
+  `DWORD`s, where POSIX's are bytes. Winsock writes some boolean options (`TCP_NODELAY`) as one byte, which the zeroed
+  `CInt` that `_flag` and `getOption` read from still reads right.
+- **Option names Winsock has, and only those**: no `reusePort` (Winsock has no `SO_REUSEPORT`), no low-water marks (its
+  providers fail them), no `noSigPipe` or `timestamp`; `receivePacketInfo` is `IP_PKTINFO` and `IPV6_PKTINFO`, as
+  Linux's IPv4 one is, since Winsock has no `IPV6_RECVPKTINFO`. Two Windows options under Windows names:
+  `exclusiveAddressUse` (`SO_EXCLUSIVEADDRUSE`), since Windows' `reuseAddress` lets a socket take an address another
+  socket is bound to, which its documentation now says, and `reuseUnicastPort` (`SO_REUSE_UNICASTPORT`), which NIO
+  imports. *Rejected*: making `reuseAddress` mean POSIX's on Windows, which Winsock has no option for.
 - **The address conversions don't start Winsock**: their documentation lists no `WSANOTINITIALISED`, and
   swift-certificates already calls `inet_pton` without starting it. An exit test checks it in a fresh process.
   *Rejected*: starting Winsock for them, which would load Winsock's providers into a process that only parses
@@ -161,6 +176,11 @@ What each file checks, and what it can reach:
   port a socket holds without listening; the names of an unbound and unconnected socket; a second bind of an address
   in use. Every address is 127.0.0.1 or `::1`, with a port the system picks, so nothing reaches beyond the host or
   listens where the firewall would ask; every socket is the test's own and closed by a `defer`.
+- `SocketOptionsTests`: every option name against the SDK; socket and TCP options, the keepalive times among them;
+  `exclusiveAddressUse`; the time-outs' milliseconds and rounding; a receive that times out with `timedOut`; linger
+  and its rounding; IPv4 and IPv6 options (Windows' `true` default for `isIPv6Only`); and a multicast datagram on
+  loopback, a group joined on the loopback interface by a socket bound to 127.0.0.1 and sent to from the loopback
+  interface, so that neither the datagram nor the membership report leaves the host.
 
 None deletes, moves or changes the permissions of anything, signals anything, or reaches the network.
 

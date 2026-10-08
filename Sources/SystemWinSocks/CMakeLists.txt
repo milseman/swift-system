@@ -23,6 +23,9 @@ add_library(SystemWinSocks
   Sockets/SocketAddress.swift
   Sockets/SocketDescriptor.swift
   Sockets/SocketOperations.swift
+  Sockets/SocketOptions+IP.swift
+  Sockets/SocketOptions+Timeouts.swift
+  Sockets/SocketOptions.swift
   Util.swift
   Win32Error+Winsock.swift)
 set_target_properties(SystemWinSocks PROPERTIES

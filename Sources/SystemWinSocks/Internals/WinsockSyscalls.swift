@@ -133,6 +133,28 @@ internal func system_getpeername(
   getpeername(s, addr, len)
 }
 
+// MARK: - Socket options
+
+internal func system_getsockopt(
+  _ s: SOCKET,
+  _ level: CInt,
+  _ option: CInt,
+  _ value: UnsafeMutableRawPointer?,
+  _ length: UnsafeMutablePointer<CInt>?
+) -> CInt {
+  getsockopt(s, level, option, value?.assumingMemoryBound(to: CChar.self), length)
+}
+
+internal func system_setsockopt(
+  _ s: SOCKET,
+  _ level: CInt,
+  _ option: CInt,
+  _ value: UnsafeRawPointer?,
+  _ length: CInt
+) -> CInt {
+  setsockopt(s, level, option, value?.assumingMemoryBound(to: CChar.self), length)
+}
+
 // MARK: - Handles
 
 internal func system_SetHandleInformation(_ handle: HANDLE, _ mask: DWORD, _ flags: DWORD) -> Bool {
