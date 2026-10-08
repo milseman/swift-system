@@ -22,6 +22,7 @@ add_library(SystemWinSocks
   Sockets/SocketAddress+IPv6.swift
   Sockets/SocketAddress.swift
   Sockets/SocketDescriptor.swift
+  Sockets/SocketOpenOptions.swift
   Sockets/SocketOperations.swift
   Sockets/SocketOptions+IP.swift
   Sockets/SocketOptions+Timeouts.swift

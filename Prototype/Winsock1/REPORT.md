@@ -7,12 +7,17 @@ signatures over Winsock (section 29's P0, its second form). Base: system-next at
 runs real Windows: the code is written from the Winsock documentation, compiled on macOS against a model of the SDK
 by `Prototype/Win32/check-winsock.sh`, and kept inside `#if os(Windows)`; its tests are Windows-only and haven't run.
 
-**Resume here:** P1's first four parts are done (section 1): the module, its manifest and CMake hooks, the harness
-and its model, Winsock's error codes as `Win32.Error`, the socket types, `open` (`WSASocketW`, starting Winsock
-lazily), `close` and `shutdown` (`e7c4d48`); addresses, with `inet_pton` and `inet_ntop` (`5f3381d`); binding,
-listening, accepting, connecting, sending and receiving, and the socket names (`1dea80c`); and options (this commit).
-- **Next**, in order: nonblocking (`ioctlsocket(FIONBIO)`) and open options, which finish P1; then P2: `WSAPoll`,
-  the extension functions and `WSASendMsg`/`WSARecvMsg`, completion ports, Unix domain sockets.
+**Resume here:** P1 is done (section 1), in five parts: the module, its manifest and CMake hooks, the harness and
+its model, Winsock's error codes as `Win32.Error`, the socket types, `open` (`WSASocketW`, starting Winsock lazily),
+`close` and `shutdown` (`e7c4d48`); addresses, with `inet_pton` and `inet_ntop` (`5f3381d`); binding, listening,
+accepting, connecting, sending and receiving, and the socket names (`1dea80c`); options (`13c9a37`); and nonblocking
+mode with open options (this commit). Section 5 has what each adopter would change, row by row.
+- **Next**, P2 in order: `WSAPoll`; the extension functions, cached once per process, with `WSASendMsg` and
+  `WSARecvMsg` (and SystemSockets' message API: `CInterop.MsgHdr` as `WSAMSG`, ancillary messages); completion
+  ports (associating a socket, overlapped `WSASend`/`WSARecv`); Unix domain sockets as Windows has them.
+- **Open questions for Michael** (section 2): the manifest's form (host-conditional, or declared everywhere and empty
+  elsewhere), and the module's name, which adopters that qualify names (`SystemSockets.SocketAddress`) spell per
+  platform.
 - **Check** with `Prototype/Win32/check-winsock.sh` after each change; `swift build` and `swift test` on macOS, which
   compile none of it; `Utilities/lint/lint.sh cmake api`.
 
@@ -38,9 +43,11 @@ os(Windows)`. Its files mirror SystemSockets' layout:
 | `Sockets/SocketOptions.swift` | `OptionLevel`, `SocketOption`, `TCPOption`, `getOption`/`setOption` (`getsockopt`, `setsockopt`) and their conveniences |
 | `Sockets/SocketOptions+IP.swift` | `IPOption`, `IPv6Option`, their typed options, multicast membership |
 | `Sockets/SocketOptions+Timeouts.swift` | send and receive time-outs, linger |
+| `Sockets/SocketOpenOptions.swift` | `OpenOptions.nonBlocking`, `open(options:)`, `accept(options:)`, and `setNonBlocking(_:)` (`ioctlsocket(FIONBIO)`) |
 
 The parts, in order: the module, the socket types, `open`, `close` and `shutdown` (`e7c4d48`); addresses
-(`5f3381d`); connections, transfers and names (`1dea80c`); options (this commit).
+(`5f3381d`); connections, transfers and names (`1dea80c`); options (`13c9a37`); nonblocking mode and open options
+(this commit).
 
 ## 2. Design calls, with the alternatives rejected
 
@@ -61,6 +68,13 @@ The parts, in order: the module, the socket types, `open`, `close` and `shutdown
   dependencies"). With the default, an adopter wraps its dependency in `#if os(Windows)`, which a cross-compiling
   build (manifest on one host, Windows the target) gets wrong. **Open question for Michael**; switching is a few
   lines of `Package.swift`.
+- **The module's name is Michael's working name, `SystemWinSocks`.** Code that qualifies a name with its module then
+  spells it per platform. NIO does, since NIOCore has a `SocketAddress` of its own: its Darwin branches say
+  `SystemSockets.SocketAddress.Family.ipv4` (`NIOCore/BSDSocketAPI.swift` near line 230), which on Windows would be
+  `SystemWinSocks.SocketAddress.Family.ipv4`. **Open question for Michael**: the alternatives are naming the Windows
+  module `SystemSockets` too, with a host-conditional `path:` in the manifest (the same module name on every platform,
+  each with its own sources), or leaving each adopter to alias the module (SwiftPM's `moduleAliases` on the product
+  dependency).
 - **Errors are `Win32.Error`** (section 29's proposal 4). Winsock's codes are system error codes, which `FormatMessageW`
   describes. Each code is named as `Errno` names the POSIX code it stands for (`wouldBlock`, `connectionReset`,
   `socketNotConnected`, `nowInProgress`, `notSupportedOnSocket`), so that a typed `catch .wouldBlock` reads the same
@@ -120,6 +134,13 @@ The parts, in order: the module, the socket types, `open`, `close` and `shutdown
   `exclusiveAddressUse` (`SO_EXCLUSIVEADDRUSE`), since Windows' `reuseAddress` lets a socket take an address another
   socket is bound to, which its documentation now says, and `reuseUnicastPort` (`SO_REUSE_UNICASTPORT`), which NIO
   imports. *Rejected*: making `reuseAddress` mean POSIX's on Windows, which Winsock has no option for.
+- **Nonblocking mode**: `OpenOptions.nonBlocking` for `open` and `accept`, set with `ioctlsocket(FIONBIO)` right after
+  the call, as SystemSockets sets it with `fcntl` on Darwin, and `accept(options:)` sets the new socket's mode exactly,
+  since Winsock's `accept` passes the listener's on. Winsock can set the mode but not report it, so the Windows-only
+  addition is a setter, `setNonBlocking(_ enabled: Bool = true)`, named as `setReuseAddress` and `setNoDelay` are, for
+  what POSIX does with `FileDescriptor.setStatusFlags`. There's no `OpenOptions.closeOnExec`: Windows has no `exec`, and
+  System's sockets are never inherited. *Rejected*: a `closeOnExec` that does nothing, which would compile shared code
+  that means something Windows can't; and a getter, which Winsock can't implement.
 - **The address conversions don't start Winsock**: their documentation lists no `WSANOTINITIALISED`, and
   swift-certificates already calls `inet_pton` without starting it. An exit test checks it in a fresh process.
   *Rejected*: starting Winsock for them, which would load Winsock's providers into a process that only parses
@@ -181,12 +202,50 @@ What each file checks, and what it can reach:
   and its rounding; IPv4 and IPv6 options (Windows' `true` default for `isIPv6Only`); and a multicast datagram on
   loopback, a group joined on the loopback interface by a socket bound to 127.0.0.1 and sent to from the loopback
   interface, so that neither the datagram nor the membership report leaves the host.
+- `SocketNonBlockingTests`: `FIONBIO` against the SDK; `accept` with no connection and `receive` with nothing to read
+  throwing `wouldBlock`, and blocking again after `setNonBlocking(false)`; `accept(options:)` setting the new socket's
+  mode whatever the listener's (told apart by what an empty receive throws: `wouldBlock` at once, or `timedOut` after a
+  50 ms time-out); and a nonblocking connect, which throws `wouldBlock` or finishes, then has no error once accepted.
 
 None deletes, moves or changes the permissions of anything, signals anything, or reaches the network.
 
 ## 5. For the adopters
 
-Filled in as the API lands; see section 8.
+What each of STATUS.md section 5's socket rows would change in swift-nio (`../adopters/swift-nio`, `migrate-darwin` at
+`e1623fbf`) and swift-certificates (`../adopters/swift-certificates`, `migrate-all` at `c310582c`), and what's still
+missing. Neither is changed here.
+
+The common change: both already use SystemSockets' names on the platforms that have it, behind `#if canImport(Darwin)`
+(NIO) or `#if canImport(SystemSockets)` (certificates), with WinSDK's C names in the other branch. With SystemWinSocks
+those branches widen to Windows (`|| os(Windows)`, `|| canImport(SystemWinSocks)`), importing SystemWinSocks there, and
+the WinSDK branch and its `import let WinSDK.X` lines go. Their manifests add the product for Windows: inside `#if
+os(Windows)` with this lane's default, or as `.when(platforms: [.windows])` with the alternative (section 2). NIO's
+module-qualified names (`SystemSockets.SocketAddress`) need the naming decision.
+
+| Row | Where | With SystemWinSocks | Still missing |
+|---|---|---|---|
+| [address families] | NIO `NIOCore/BSDSocketAPI.swift:36-42` and the families at 228-303; `NIOCore/SocketAddresses.swift:18-19`; `NIOCore/Interfaces.swift:34-35`; `NIOCore/Utilities.swift:34`; `NIOPosix/GetaddrinfoResolver.swift:45-46`. Certificates `ServerIdentityPolicy.swift:26`, `URIConstraints.swift:21` | `SocketAddress.Family` and `SocketDescriptor.Domain`, as the Darwin branches use them | the module qualifier |
+| [protocol levels] | `BSDSocketAPI.swift:18-21`, 321-421 | `SocketDescriptor.OptionLevel` (`IPPROTO_IPV6.rawValue` and the rest go) | — |
+| [socket options] | `BSDSocketAPI.swift:44-53`, 620-701; `BSDSocketAPIWindows.swift:61-69`, and `getsockopt`/`setsockopt` at 264-280 and 429-445 through CNIOWindows' shims | `SocketDescriptor.SocketOption`; `SocketDescriptor(rawValue:).getOption`/`setOption`, which take raw pointers' worth of `T` | NIO's raw-pointer form of the option calls (it passes `UnsafeRawPointer` and a length), which no platform's System has |
+| [SO_RCVTIMEO and SO_TIMESTAMP] | `BSDSocketAPI.swift:49`, 673-679; `BSDSocketAPIWindows.swift:65` | `SocketOption.receiveTimeout`, and `receiveTimeout()`, whose value is milliseconds on Windows | `SO_TIMESTAMP`, which Winsock lacks |
+| [multicast] | `BSDSocketAPI.swift:23-33`, 425-543; `NIOPosix/SocketChannel.swift:46-49` (`INADDR_ANY`, `ip_mreq`, `ipv6_mreq`) and the joins at 1285-1420; `BSDSocketAPIWindows.swift:38-48` | the option names, and `changeMembership` (`SocketChannel.swift` near 1391), the Darwin branch, which `joinMulticastGroup`/`leaveMulticastGroup` serve | — |
+| [IPV6_V6ONLY and IP_HDRINCL] | `BSDSocketAPI.swift:25`, 34, 481-486, 545-550; `BSDSocketAPIWindows.swift:49` | `IPv6Option.v6Only`, `IPOption.headerIncluded` | — |
+| [TCP_NODELAY] | `BSDSocketAPI.swift:55`, 558-563; `BSDSocketAPIWindows.swift:55` | `TCPOption.noDelay` | — |
+| [ECN, TOS and packet info] | `NIOPosix/BSDSocketAPICommon.swift:29-30`; `NIOPosix/System.swift:116` | the option names (`receiveTypeOfService`, `receiveTrafficClass`, `packetInfo`) | the values, which arrive as control messages: P2 |
+| [socket types] | `BSDSocketAPICommon.swift:32-34` | `SocketDescriptor.ConnectionType` | — |
+| [shutdown] | `BSDSocketAPIWindows.swift:57-59`, 177-188, 448-452 | `shutdown(_:)` with `ShutdownKind`, which takes Winsock's `SD_*` values | — |
+| [Winsock sockets] | `BSDSocketAPIWindows.swift:26`, 32, 74, 80, 84, the close at 220-225 and `setNonBlocking` at 618-629; `BSDSocketAPICommon.swift:27`; `NIOPosix/Windows.swift:19` | `close()`, and `setNonBlocking()`, whose `invalidArgument` NIO turns into `NIOFcntlFailedError` | `INVALID_SOCKET`: System names no invalid socket on any platform, and NIO keeps its own sentinel |
+| [socket], [bind], [listen], [accept], [connect], [send and receive], [getsockname and getpeername] | `BSDSocketAPIWindows.swift:192-262`, 283-300, 401-412, 454-465 | `open`, `bind(to:)`, `listen(backlog:)`, `accept`, `connect(to:)`, `send`, `receive`, `getLocalAddress`, `getPeerAddress`; NIO's `nil` from `accept` and `false` from `connect` on `WSAEWOULDBLOCK` become a `catch .wouldBlock` | as on Darwin: NIO passes raw `sockaddr` pointers, where System takes a `SocketAddress`, a copy |
+| [Winsock addresses], [sockaddr types], [sockaddr_storage] | `BSDSocketAPIWindows.swift:99-124` (NIO's aliases of WinSDK's types to POSIX names); `SocketAddresses.swift:28-37`; `Interfaces.swift:40-48`; `GetaddrinfoResolver.swift:52-55`; certificates' `in_addr` and `in6_addr` | `CInterop.SockAddr` and the rest, and the Swift-named accessors, which NIO's Darwin code already reads (`groupAddress.address.address`); NIO's aliases go | `SOCKADDR_UN`: P2 |
+| [INADDR_ANY] | `SocketChannel.swift:46`; `BSDSocketAPIWindows.swift:28-29`; `SocketAddresses.swift:21-22`; `Interfaces.swift:37-38` | `IPv4Address.Host.any`; each host type's `descriptionCapacity`, which is Windows' 22 and 65 | — |
+| [inet_ntop and inet_pton] | `BSDSocketAPI.swift:59-60` and the conversions at 733-800; certificates `ServerIdentityPolicy.swift:170-195` (`inet_pton` into `in_addr`), 260-275, 380-390 (`memcmp`), and `URIConstraints.swift:71-74` (`InetPtonW`) | the Darwin branch's `IPv4Address.Host(cString:)` and `description(into:)`, which on Windows throws `invalidParameter` for a short buffer; certificates' `canImport(SystemSockets)` branches, whose `Host(string)` and `==` replace `inet_pton` and `memcmp` | — |
+| [Winsock errors] | every `IOError(winsock: WSAGetLastError(), ...)` in `BSDSocketAPIWindows.swift`; `SelectorWSAPoll.swift:376` | errors arrive as `Win32.Error`; `IOError(winsock: CInt(bitPattern: error.rawValue), reason:)` keeps NIO's error type | — |
+| [linger] | `NIOCore/SocketOptionProvider.swift:37`, 182-219 | `CInterop.Linger` and its accessors; the `setSoLinger(_: CInterop.Linger)` overload, which NIO has for Darwin, widened | — |
+| [Winsock startup] | CNIOWindows' `WSAStartup.c`, a C runtime initializer | none needed: `open` starts Winsock | — |
+| [Winsock messages] | `BSDSocketAPIWindows.swift:110-113`, 146-166, 302-399, 414-426, 467-524, 703-855 | — | P2: `WSASendMsg`, `WSARecvMsg`, `WSABUF`, the `WSA_CMSG_*` walk |
+| [poll] | `NIOPosix/SelectorWSAPoll.swift`, `NIOPosix/SelectorGeneric.swift:24` | — | P2: `WSAPoll` |
+| [Windows name resolution] | `GetaddrinfoResolver.swift:44-55`, 145; `SocketAddresses.swift:24-29` | — | `GetAddrInfoW`, `FreeAddrInfoW`, `ADDRINFOW`: SystemSockets' `SocketAddress.resolve` over them, not started |
+| [sendfile] | `BSDSocketAPIWindows.swift:76`, 90, 578-608 | — | `TransmitFile`, an extension function: P2 |
 
 ## 6. Where sharing SystemSockets' code would have saved work
 

@@ -30,6 +30,10 @@ internal var _WSA_FLAG_OVERLAPPED: DWORD { 0x01 }
 @_alwaysEmitIntoClient
 internal var _WSA_FLAG_NO_HANDLE_INHERIT: DWORD { 0x80 }
 
+// _IOW('f', 126, u_long), which the SDK computes with function-like macros.
+@_alwaysEmitIntoClient
+internal var _FIONBIO: CInt { CInt(bitPattern: 0x8004_667E) }
+
 // MAKEWORD(2, 2): Winsock 2.2, the version since Windows 95's Winsock 2.
 @_alwaysEmitIntoClient
 internal var _WINSOCK_VERSION: WORD { 0x0202 }

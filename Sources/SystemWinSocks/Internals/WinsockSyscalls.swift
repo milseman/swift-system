@@ -43,6 +43,10 @@ internal func system_shutdown(_ s: SOCKET, _ how: CInt) -> CInt {
   shutdown(s, how)
 }
 
+internal func system_ioctlsocket(_ s: SOCKET, _ command: CInt, _ argument: UnsafeMutablePointer<u_long>) -> CInt {
+  ioctlsocket(s, command, argument)
+}
+
 // MARK: - Connection operations
 
 internal func system_bind(
