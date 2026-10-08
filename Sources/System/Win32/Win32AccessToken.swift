@@ -293,7 +293,8 @@ extension Win32 {
   /// That's the user of the thread's token, if it's impersonating one, and
   /// otherwise its process's.
   ///
-  /// The corresponding C function is `GetUserNameW`.
+  /// The corresponding C function is `GetUserNameW`, with a buffer of
+  /// `UNLEN` + 1 characters, which grows if the name needs more.
   @_alwaysEmitIntoClient
   public static func userName() throws(Win32.Error) -> String {
     try _userName().get()
