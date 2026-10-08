@@ -10,9 +10,17 @@ See https://swift.org/LICENSE.txt for license information
 # Winsock, Windows' sockets; Sources/CMakeLists.txt adds this directory only
 # when building for Windows.
 add_library(SystemWinSocks
+  Internals/CInterop+WinSockAccessors.swift
+  Internals/CInterop+WinSocks.swift
   Internals/WinsockConstants.swift
   Internals/WinsockStartup.swift
   Internals/WinsockSyscalls.swift
+  Sockets/SocketAddress+Family.swift
+  Sockets/SocketAddress+Host.swift
+  Sockets/SocketAddress+HostText.swift
+  Sockets/SocketAddress+IPv4.swift
+  Sockets/SocketAddress+IPv6.swift
+  Sockets/SocketAddress.swift
   Sockets/SocketDescriptor.swift
   Sockets/SocketOperations.swift
   Util.swift

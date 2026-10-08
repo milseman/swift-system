@@ -160,7 +160,9 @@ for file in "$root"/Sources/System/Win32/*.swift; do
   sed 's|^#if os(Windows)$|#if true // os(Windows)|' "$file" > "$work/system/$(basename "$file")"
 done
 while IFS= read -r file; do
-  sed 's|^#if os(Windows)$|#if true // os(Windows)|' "$file" > "$work/src/$(basename "$file")"
+  relative=${file#"$root/Sources/SystemWinSocks/"}
+  mkdir -p "$work/src/$(dirname "$relative")"
+  sed 's|^#if os(Windows)$|#if true // os(Windows)|' "$file" > "$work/src/$relative"
 done < <(find "$root/Sources/SystemWinSocks" -name '*.swift' | sort)
 for file in "$root"/Tests/SystemWinSocksTests/*.swift; do
   [ -e "$file" ] || continue

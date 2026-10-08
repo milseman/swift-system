@@ -47,4 +47,33 @@ internal func system_SetHandleInformation(_ handle: HANDLE, _ mask: DWORD, _ fla
   SetHandleInformation(handle, mask, flags)
 }
 
+// MARK: - Address conversion
+
+// Windows Vista and later. System calls these without starting Winsock:
+// their documentation lists no WSANOTINITIALISED, and swift-certificates
+// parses addresses with inet_pton without starting it (an exit test in
+// SocketAddressTests checks it). inet_ntop reports its failures through
+// WSAGetLastError, and takes the buffer's size as a size_t.
+
+@available(System 199, *)
+@usableFromInline
+internal func system_inet_pton(
+  _ af: CInt,
+  _ src: UnsafePointer<CChar>,
+  _ dst: UnsafeMutableRawPointer
+) -> CInt {
+  inet_pton(af, src, dst)
+}
+
+@available(System 199, *)
+@usableFromInline
+internal func system_inet_ntop(
+  _ af: CInt,
+  _ src: UnsafeRawPointer,
+  _ dst: UnsafeMutablePointer<CChar>,
+  _ size: Int
+) -> UnsafePointer<CChar>? {
+  inet_ntop(af, src, dst, size)
+}
+
 #endif // os(Windows)

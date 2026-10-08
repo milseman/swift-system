@@ -7,12 +7,12 @@ signatures over Winsock (section 29's P0, its second form). Base: system-next at
 runs real Windows: the code is written from the Winsock documentation, compiled on macOS against a model of the SDK
 by `Prototype/Win32/check-winsock.sh`, and kept inside `#if os(Windows)`; its tests are Windows-only and haven't run.
 
-**Resume here:** P1's first part is done (section 1): the module, its manifest and CMake hooks, the harness and its
-model, Winsock's error codes as `Win32.Error`, the socket types (`Domain`, `ConnectionType`, `ProtocolID`,
-`MessageFlags`, `ShutdownKind`), and `open` (`WSASocketW`, starting Winsock lazily), `close` and `shutdown`.
-- **Next**, in order: addresses (`SocketAddress`, `IPv4Address`, `IPv6Address`, their `Host`s, `inet_pton` and
-  `inet_ntop`, the `CInterop` aliases and their accessors); then binding, listening, accepting, connecting, sending
-  and receiving, and the local and peer names; then options; then nonblocking (`ioctlsocket(FIONBIO)`); then P2.
+**Resume here:** P1's first two parts are done (section 1): the module, its manifest and CMake hooks, the harness
+and its model, Winsock's error codes as `Win32.Error`, the socket types, `open` (`WSASocketW`, starting Winsock
+lazily), `close` and `shutdown` (`e7c4d48`); then addresses: `SocketAddress`, `IPv4Address`, `IPv6Address`, their
+`Host`s and text forms (`inet_pton`, `inet_ntop`), and the `CInterop` aliases with their accessors (this commit).
+- **Next**, in order: binding, listening, accepting, connecting, sending and receiving, and the local and peer names;
+  then options; then nonblocking (`ioctlsocket(FIONBIO)`) and open options; then P2.
 - **Check** with `Prototype/Win32/check-winsock.sh` after each change; `swift build` and `swift test` on macOS, which
   compile none of it; `Utilities/lint/lint.sh cmake api`.
 
@@ -32,6 +32,12 @@ os(Windows)`. Its files mirror SystemSockets' layout:
 | `Internals/WinsockSyscalls.swift` | the `system_` layer, the only callers of Winsock's functions |
 | `Internals/WinsockConstants.swift` | internal constants, as values |
 | `Util.swift` | `valueOrWinsockError` and its kin, `_buildDescription` |
+| `Sockets/SocketAddress*.swift` | `SocketAddress` and `Family`, `IPv4Address`, `IPv6Address`, their `Host`s and text forms |
+| `Internals/CInterop+WinSocks.swift` | `CInterop.SockAddr` (`SOCKADDR`), `SockLen`, `SAFamily`, `SockAddrIn`, `InAddr`, `In6Addr`, `SockAddrIn6`, `SockAddrStorage`, `Linger` |
+| `Internals/CInterop+WinSockAccessors.swift` | SystemSockets' Swift-named accessors for those structures |
+
+The parts, in order: the module, the socket types, `open`, `close` and `shutdown` (`e7c4d48`); addresses (this
+commit).
 
 ## 2. Design calls, with the alternatives rejected
 
@@ -74,8 +80,22 @@ os(Windows)`. Its files mirror SystemSockets' layout:
   constant, and `@_alwaysEmitIntoClient`. The tests hold each to the SDK's macro on Windows; on macOS the harness
   holds them to the model's values, and the model's to Rust's bindings where those have them (section 3).
 - **What Winsock lacks is left out** (proposal 2), not faked: `fileDescriptor` and the initializers from a
-  `FileDescriptor` (a Winsock socket isn't a C runtime descriptor), `MessageFlags.endOfRecord` and `.noSignal`, and
-  `Domain.routing` and `.keyManagement`.
+  `FileDescriptor` (a Winsock socket isn't a C runtime descriptor), `MessageFlags.endOfRecord` and `.noSignal`,
+  `Domain.routing` and `.keyManagement`, and `CInterop.InAddrT` and `.InPort` (Winsock has no `in_addr_t` or
+  `in_port_t`).
+- **Addresses keep SystemSockets' API**, with what Winsock spells differently hidden behind the Swift-named
+  accessors: `in_addr`'s `s_addr` and `in6_addr`'s `s6_addr` are macros for union members on Windows
+  (`S_un.S_addr`, `u.Byte`), which Swift can't import, and Winsock's structures have no length field. The
+  differences that show: `descriptionCapacity` is Windows' `INET_ADDRSTRLEN` and `INET6_ADDRSTRLEN`, 22 and 65,
+  where POSIX's are 16 and 46; `description(into:)` throws `invalidParameter` for a buffer too small, which is what
+  Windows' `inet_ntop` reports, where POSIX's reports `ENOSPC`; and `SocketAddress(address:length:)` treats a
+  negative length as 0, since Winsock's `socklen_t` is a signed `int`.
+- **The address conversions don't start Winsock**: their documentation lists no `WSANOTINITIALISED`, and
+  swift-certificates already calls `inet_pton` without starting it. An exit test checks it in a fresh process.
+  *Rejected*: starting Winsock for them, which would load Winsock's providers into a process that only parses
+  certificates.
+- **`in6addr_any` and `in6addr_loopback` are built in Swift**, from their bytes: the SDK declares them as data that
+  `ws2_32.dll` exports, which a Swift client would reach through a DLL import for sixteen fixed bytes.
 
 ## 3. The model, and what it can't catch
 
@@ -114,6 +134,11 @@ What each file checks, and what it can reach:
 - `SocketDescriptorTests`: opening and closing TCP, UDP and IPv6 sockets; that they aren't inherited; that an unknown
   family, closing `INVALID_SOCKET`, and shutting down an unconnected socket throw the codes the documentation gives.
   Nothing binds or connects.
+- `SocketAddressTests`: the address families and text capacities against the SDK; parsing and formatting IPv4 and
+  IPv6 addresses (strict dotted-decimal, no scopes); host addresses' bytes in network order; `SocketAddress`
+  conversions and lengths; `description(into:)` and its `invalidParameter`; parsing C strings; the accessors against
+  the C fields; and, in an exit test (a child process of swift-testing's own, which runs only the closure), that
+  the conversions work before Winsock starts. No sockets.
 
 None deletes, moves or changes the permissions of anything, signals anything, or reaches the network.
 
