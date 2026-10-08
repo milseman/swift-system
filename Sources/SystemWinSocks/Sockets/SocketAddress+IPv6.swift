@@ -196,7 +196,9 @@ extension SocketAddress {
   public var ipv6: IPv6Address? {
     guard family == .ipv6 else { return nil }
     return Swift.withUnsafeBytes(of: _storage) { buffer in
-      IPv6Address(buffer.loadUnaligned(as: CInterop.SockAddrIn6.self))
+      buffer.baseAddress!.withMemoryRebound(to: CInterop.SockAddrIn6.self, capacity: 1) { ptr in
+        IPv6Address(ptr.pointee)
+      }
     }
   }
 }

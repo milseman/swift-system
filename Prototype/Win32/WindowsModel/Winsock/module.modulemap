@@ -1,15 +1,17 @@
 // The Winsock model, for Prototype/Win32/check-winsock.sh. On Windows these
 // declarations are the WinSock2 submodule of the WinSDK Clang module
 // (stdlib/public/Platform/winsdk_um.modulemap: WinSock2.h, WS2tcpip.h,
-// MSWSock.h and afunix.h, linking WS2_32.Lib). Clang won't add a submodule
-// to WindowsModel's WinSDK from a second module map (its build of WinSDK
-// reads only the map that defines it), so the model is a module of its own,
-// which WinSDK+Winsock.swift re-exports from the WinSDK overlay model:
-// `import WinSDK` and `WinSDK.socket` then work as on Windows. Code must
-// never import WinSock2Model itself; check-winsock.sh fails if it does.
+// MSWSock.h and afunix.h, linking WS2_32.Lib), which the model's headers of
+// those names stand in for. Clang won't add a submodule to WindowsModel's
+// WinSDK from a second module map (its build of WinSDK reads only the map
+// that defines it), so the model is a module of its own, which
+// WinSDK+Winsock.swift re-exports from the WinSDK overlay model: `import
+// WinSDK` and `WinSDK.socket` then work as on Windows. Code must never
+// import WinSock2Model itself; check-winsock.sh fails if it does.
 module WinSock2Model {
   header "winsock2.h"
   header "ws2tcpip.h"
   header "mswsock.h"
+  header "afunix.h"
   export *
 }

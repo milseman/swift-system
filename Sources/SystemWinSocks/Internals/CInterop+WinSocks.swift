@@ -55,6 +55,11 @@ extension CInterop {
   /// The corresponding C type is `SOCKADDR_IN6`.
   public typealias SockAddrIn6 = SOCKADDR_IN6
 
+  /// Unix domain socket address structure.
+  ///
+  /// The corresponding C type is `SOCKADDR_UN`.
+  public typealias SockAddrUn = SOCKADDR_UN
+
   /// Socket address storage, large enough and aligned for any address family.
   ///
   /// The corresponding C type is `SOCKADDR_STORAGE`.

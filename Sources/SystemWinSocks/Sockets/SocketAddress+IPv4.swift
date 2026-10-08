@@ -168,7 +168,9 @@ extension SocketAddress {
   public var ipv4: IPv4Address? {
     guard family == .ipv4 else { return nil }
     return Swift.withUnsafeBytes(of: _storage) { buffer in
-      IPv4Address(buffer.loadUnaligned(as: CInterop.SockAddrIn.self))
+      buffer.baseAddress!.withMemoryRebound(to: CInterop.SockAddrIn.self, capacity: 1) { ptr in
+        IPv4Address(ptr.pointee)
+      }
     }
   }
 }

@@ -355,6 +355,71 @@ extension CInterop.SockAddrIn6 {
   }
 }
 
+// MARK: - sockaddr_un
+
+@available(System 199, *)
+extension CInterop.SockAddrUn {
+  /// Creates a Unix-domain socket address from its fields,
+  /// by default all zero.
+  ///
+  /// A usable address has the family ``SocketDescriptor/Domain/local``.
+  /// ``UnixAddress`` is the Swift type for these addresses.
+  ///
+  /// The corresponding C fields are `sun_family` and `sun_path`.
+  @_alwaysEmitIntoClient
+  public init(
+    family: SocketDescriptor.Domain = SocketDescriptor.Domain(rawValue: 0),
+    path: FilePath = FilePath()
+  ) {
+    self = CInterop.SockAddrUn()
+    self.family = family
+    self.path = path
+  }
+
+  /// The number of bytes a path can have, not counting its terminating
+  /// null character: 107 on Windows, whose `UNIX_PATH_MAX` is 108.
+  ///
+  /// The corresponding C field is `sun_path`, whose size this is,
+  /// less the null character.
+  @_alwaysEmitIntoClient
+  public static var pathCapacity: Int {
+    MemoryLayout.size(ofValue: CInterop.SockAddrUn().sun_path) - 1
+  }
+
+  /// The address's family.
+  ///
+  /// The corresponding C field is `sun_family`.
+  @_alwaysEmitIntoClient
+  public var family: SocketDescriptor.Domain {
+    get { SocketDescriptor.Domain(rawValue: CInt(sun_family)) }
+    set { sun_family = .init(newValue.rawValue) }
+  }
+
+  /// The socket's path, up to the first null character, which the field
+  /// holds as UTF-8.
+  ///
+  /// Setting a path whose UTF-8 is longer than ``pathCapacity`` bytes is a
+  /// precondition failure; the rest of the field is set to zero.
+  ///
+  /// The corresponding C field is `sun_path`.
+  public var path: FilePath {
+    get {
+      withUnsafeBytes(of: sun_path) { bytes in
+        FilePath(String(decoding: bytes.prefix { $0 != 0 }, as: UTF8.self))
+      }
+    }
+    set {
+      let capacity = Self.pathCapacity
+      let utf8 = Array(newValue.string.utf8)
+      precondition(utf8.count <= capacity, "sockaddr_un path longer than \(capacity) bytes")
+      withUnsafeMutableBytes(of: &sun_path) { field in
+        field.initializeMemory(as: UInt8.self, repeating: 0)
+        field.copyBytes(from: utf8)
+      }
+    }
+  }
+}
+
 // MARK: - sockaddr_storage
 
 @available(System 199, *)

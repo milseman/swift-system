@@ -15,7 +15,7 @@ import WinSDK
 /// An opaque type representing a socket address.
 ///
 /// `SocketAddress` is a type-erased container that can hold any socket address,
-/// including IPv4 and IPv6 addresses. It provides a unified
+/// including IPv4, IPv6, and Unix domain addresses. It provides a unified
 /// interface for socket operations that work with different address families.
 ///
 /// To create a socket address for a specific family, use one of the convenience
@@ -27,6 +27,9 @@ import WinSDK
 ///
 /// // IPv6 address
 /// let ipv6 = SocketAddress(ipv6: IPv6Address.loopback(port: 80))
+///
+/// // Unix domain socket
+/// let local = SocketAddress(unix: UnixAddress(#"C:\Temp\socket.sock"#)!)
 /// ```
 ///
 /// `SocketAddress` uses `SOCKADDR_STORAGE` internally, which is large enough
@@ -194,6 +197,10 @@ extension SocketAddress: CustomStringConvertible {
     case .ipv6:
       if let ipv6 = self.ipv6 {
         return "SocketAddress(\(ipv6))"
+      }
+    case .local:
+      if let unix = self.unix {
+        return "SocketAddress(\(unix))"
       }
     default:
       break

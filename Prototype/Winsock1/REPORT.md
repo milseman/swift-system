@@ -7,18 +7,17 @@ signatures over Winsock (section 29's P0, its second form). Base: system-next at
 runs real Windows: the code is written from the Winsock documentation, compiled on macOS against a model of the SDK
 by `Prototype/Win32/check-winsock.sh`, and kept inside `#if os(Windows)`; its tests are Windows-only and haven't run.
 
-**Resume here:** P1 is done (section 1), in five parts: the module, its manifest and CMake hooks, the harness and
-its model, Winsock's error codes as `Win32.Error`, the socket types, `open` (`WSASocketW`, starting Winsock lazily),
-`close` and `shutdown` (`e7c4d48`); addresses, with `inet_pton` and `inet_ntop` (`5f3381d`); binding, listening,
-accepting, connecting, sending and receiving, and the socket names (`1dea80c`); options (`13c9a37`); and nonblocking
-mode with open options (`a4f6883`). P2's first four parts are done: polling, with `WSAPoll` (`56851b2`); messages,
-with `WSASendMsg` and `WSARecvMsg` looked up once per process, SystemSockets' ancillary messages, and the IP control
-messages (`f26f4c6`); completion ports, with overlapped `WSASend` and `WSARecv` (`9d94aa0`); and the stream extension
-functions, `AcceptEx`, `ConnectEx` and `TransmitFile` (this commit). Section 5 has what each adopter would change,
-row by row.
-- **Next**, the last of P2: Unix domain sockets as Windows has them (`SOCKADDR_UN`, `UnixAddress`, stream only, and
-  their files, which are reparse points); then, beyond P2, Windows name resolution (`GetAddrInfoW`), which the
-  [Windows name resolution] row needs.
+**Resume here:** P1 and P2 are done (section 1). P1, in five parts: the module, its manifest and CMake hooks, the
+harness and its model, Winsock's error codes as `Win32.Error`, the socket types, `open` (`WSASocketW`, starting
+Winsock lazily), `close` and `shutdown` (`e7c4d48`); addresses, with `inet_pton` and `inet_ntop` (`5f3381d`); binding,
+listening, accepting, connecting, sending and receiving, and the socket names (`1dea80c`); options (`13c9a37`); and
+nonblocking mode with open options (`a4f6883`). P2, in five: polling, with `WSAPoll` (`56851b2`); messages, with
+`WSASendMsg` and `WSARecvMsg` looked up once per process, SystemSockets' ancillary messages, and the IP control
+messages (`f26f4c6`); completion ports, with overlapped `WSASend` and `WSARecv` (`9d94aa0`); the stream extension
+functions, `AcceptEx`, `ConnectEx` and `TransmitFile` (`54ca343`); and Unix domain sockets (this commit). Section 5
+has what each adopter would change, row by row.
+- **Next** (section 8): Windows name resolution (`GetAddrInfoW`), the one socket row left with nothing; then the
+  Windows box's first run, which needs `Package.swift` to leave SystemSockets out on Windows (section 7).
 - **Open questions for Michael** (section 2): the manifest's form (host-conditional, or declared everywhere and empty
   elsewhere), and the module's name, which adopters that qualify names (`SystemSockets.SocketAddress`) spell per
   platform.
@@ -54,6 +53,7 @@ os(Windows)`. Its files mirror SystemSockets' layout:
 | `Sockets/SocketMessages+IP.swift` | `IPv4PacketInfo` (`IN_PKTINFO`), `IPv6PacketInfo`, `ExplicitCongestionNotification`, the messages' `typeOfService`, `trafficClass` and packet info, and `appendTypeOfService`/`appendTrafficClass` |
 | `Sockets/SocketOperations+Messages.swift` | `sendMessage` and `receiveMessage` (`WSASendMsg`, `WSARecvMsg`), in the span forms and the header forms |
 | `Internals/RawBuffer.swift` | SystemSockets' copy-on-write buffer, copied |
+| `Sockets/SocketAddress+Unix.swift` | `UnixAddress` over `SOCKADDR_UN` (`afunix.h`), and `SocketAddress(unix:)` and `.unix`; `CInterop.SockAddrUn` and its accessors are in the `CInterop` files |
 | `Sockets/SocketStreamExtensions.swift` | `accept(into:addresses:overlapped:)` (`AcceptEx`) and `updateAcceptContext(listener:)`, `connect(to:overlapped:)` (`ConnectEx`) and `updateConnectContext()`, `transmitFile(_:byteCount:fromAbsoluteOffset:options:overlapped:)` (`TransmitFile`) with `TransmitFileOptions` |
 | `Sockets/SocketOverlappedIO.swift` | `Win32.CompletionPort.associate(_:key:)` for a socket; overlapped `send(_:flags:overlapped:)` (`WSASend`) and `receive(into:flags:overlapped:)` (`WSARecv`), `result(of:wait:)` (`WSAGetOverlappedResult`), `cancel(_:)` and `cancelAll()` (`CancelIoEx`) |
 
@@ -63,7 +63,7 @@ for them, and SystemPackage's for `iovec`.
 The parts, in order: the module, the socket types, `open`, `close` and `shutdown` (`e7c4d48`); addresses
 (`5f3381d`); connections, transfers and names (`1dea80c`); options (`13c9a37`); nonblocking mode and open options
 (`a4f6883`). P2: polling (`56851b2`); messages (`f26f4c6`); completion ports (`9d94aa0`); the stream extension
-functions (this commit).
+functions (`54ca343`); Unix domain sockets (this commit).
 
 ## 2. Design calls, with the alternatives rejected
 
@@ -215,6 +215,14 @@ functions (this commit).
   `AcceptEx` and `ConnectEx` can carry; `transmitFile` takes a borrowed raw `HANDLE`, which a C runtime descriptor's
   `withWin32HandleIfAvailable` gives, and no head or tail buffers. *Rejected*: taking a `Win32.FileHandle`, which a
   caller with a descriptor, as NIO is, can't make without taking ownership.
+- **Unix domain sockets as Windows has them** (P2): `UnixAddress` and `CInterop.SockAddrUn` with SystemSockets' API,
+  over `afunix.h`'s `SOCKADDR_UN` (a 108-byte path), and `SocketAddress`'s `unix` conversions. Windows 10 version 1803
+  and later have them as streams only: no datagrams, no `socketpair`, no `SCM_RIGHTS`, no abstract names, which the
+  documentation says, and nothing fakes. The path is held as UTF-8, as SystemSockets holds it, and as NIO, Go and Python
+  write it on Windows; a Windows run with a non-ASCII path checks that Windows reads it so. The socket's file is a
+  reparse point, `Win32.ReparseTag.unixDomainSocket` in SystemPackage, which `Win32.deleteFile(_:)` removes.
+  *Rejected*: a helper that removes a socket's file after checking its tag, as NIO's `cleanupUnixDomainSocket`
+  does, which SystemPackage's reparse-point API and `deleteFile` already make three calls.
 - **The address conversions don't start Winsock**: their documentation lists no `WSANOTINITIALISED`, and
   swift-certificates already calls `inet_pton` without starting it. An exit test checks it in a fresh process.
   *Rejected*: starting Winsock for them, which would load Winsock's providers into a process that only parses
@@ -244,6 +252,10 @@ so `Win32.Error` is the real one. It takes about ten seconds.
   metadata generates, where they have it, which is about two thirds; the overlay stand-ins match the real overlay,
   read from `../ecosystem/swift` (`SWIFT_SOURCE`); and every SystemWinSocks constant whose doc names its C constant has
   the model's value. A wrong value in either place fails the run (tried).
+- **What the model makes the code avoid**: inlinable `loadUnaligned(as:)` of one of the model's structs can stop a
+  client's compile (Swift 6.2: "Conformance of '_tag' to 'BitwiseCopyable' not found in referenced module", reproduced
+  with a plain Clang module of two structs, and not with Darwin's), so the address conversions rebind memory instead,
+  as SystemSockets' do. Whether Windows' WinSDK module has the problem is unknown.
 - **It can't catch** where the model differs from the SDK in a way Swift sees: a macro that doesn't import on
   Windows, a type the importer gives differently, a structure's layout (the model's `SCOPE_ID` has no bit-fields, and
   `WSAPROTOCOL_INFOW` is incomplete); runtime behavior; or the constants Rust's bindings lack (the IP and IPv6
@@ -299,6 +311,10 @@ What each file checks, and what it can reach:
   of 100, reported through a port and received whole. The file is the test's own: a random name in
   `FilePath.temporaryDirectory()`, created with `createNew` (so it can't open another file), shared with no one, and
   opened with `deleteOnClose`, so the system deletes it when its handle closes, even if the test crashes.
+- `UnixSocketTests`: `SOCKADDR_UN`'s size and capacity against the SDK; addresses, their limit of 107 UTF-8 bytes, a
+  non-ASCII path, and the accessors; a stream round trip over a socket file at a random name in
+  `FilePath.temporaryDirectory()`, which the test deletes only after its own bind created it; and no datagrams. The
+  only file it touches is that one.
 
 None deletes, moves or changes the permissions of anything, signals anything, or reaches the network.
 
@@ -329,7 +345,7 @@ module-qualified names (`SystemSockets.SocketAddress`) need the naming decision.
 | [shutdown] | `BSDSocketAPIWindows.swift:57-59`, 177-188, 448-452 | `shutdown(_:)` with `ShutdownKind`, which takes Winsock's `SD_*` values | — |
 | [Winsock sockets] | `BSDSocketAPIWindows.swift:26`, 32, 74, 80, 84, the close at 220-225 and `setNonBlocking` at 618-629; `BSDSocketAPICommon.swift:27`; `NIOPosix/Windows.swift:19` | `close()`, and `setNonBlocking()`, whose `invalidArgument` NIO turns into `NIOFcntlFailedError` | `INVALID_SOCKET`: System names no invalid socket on any platform, and NIO keeps its own sentinel |
 | [socket], [bind], [listen], [accept], [connect], [send and receive], [getsockname and getpeername] | `BSDSocketAPIWindows.swift:192-262`, 283-300, 401-412, 454-465 | `open`, `bind(to:)`, `listen(backlog:)`, `accept`, `connect(to:)`, `send`, `receive`, `getLocalAddress`, `getPeerAddress`; NIO's `nil` from `accept` and `false` from `connect` on `WSAEWOULDBLOCK` become a `catch .wouldBlock` | as on Darwin: NIO passes raw `sockaddr` pointers, where System takes a `SocketAddress`, a copy |
-| [Winsock addresses], [sockaddr types], [sockaddr_storage] | `BSDSocketAPIWindows.swift:99-124` (NIO's aliases of WinSDK's types to POSIX names); `SocketAddresses.swift:28-37`; `Interfaces.swift:40-48`; `GetaddrinfoResolver.swift:52-55`; certificates' `in_addr` and `in6_addr` | `CInterop.SockAddr` and the rest, and the Swift-named accessors, which NIO's Darwin code already reads (`groupAddress.address.address`); NIO's aliases go | `SOCKADDR_UN`: P2 |
+| [Winsock addresses], [sockaddr types], [sockaddr_storage] | `BSDSocketAPIWindows.swift:99-124` (NIO's aliases of WinSDK's types to POSIX names); `SocketAddresses.swift:28-37`; `Interfaces.swift:40-48`; `GetaddrinfoResolver.swift:52-55`; certificates' `in_addr` and `in6_addr`; NIO's Unix sockets, `SelectorWSAPoll.swift:105-140` (the wakeup pair's `sockaddr_un`) and `BSDSocketAPIWindows.swift:631-700` (removing a socket's file through its reparse point) | `CInterop.SockAddr` and the rest, and the Swift-named accessors, which NIO's Darwin code already reads (`groupAddress.address.address`); NIO's aliases go. `UnixAddress` and `CInterop.SockAddrUn` for the wakeup pair; SystemPackage's reparse-point API, `Win32.ReparseTag.unixDomainSocket` and `Win32.deleteFile` (or a disposition) for the cleanup | — |
 | [INADDR_ANY] | `SocketChannel.swift:46`; `BSDSocketAPIWindows.swift:28-29`; `SocketAddresses.swift:21-22`; `Interfaces.swift:37-38` | `IPv4Address.Host.any`; each host type's `descriptionCapacity`, which is Windows' 22 and 65 | — |
 | [inet_ntop and inet_pton] | `BSDSocketAPI.swift:59-60` and the conversions at 733-800; certificates `ServerIdentityPolicy.swift:170-195` (`inet_pton` into `in_addr`), 260-275, 380-390 (`memcmp`), and `URIConstraints.swift:71-74` (`InetPtonW`) | the Darwin branch's `IPv4Address.Host(cString:)` and `description(into:)`, which on Windows throws `invalidParameter` for a short buffer; certificates' `canImport(SystemSockets)` branches, whose `Host(string)` and `==` replace `inet_pton` and `memcmp` | — |
 | [Winsock errors] | every `IOError(winsock: WSAGetLastError(), ...)` in `BSDSocketAPIWindows.swift`; `SelectorWSAPoll.swift:376` | errors arrive as `Win32.Error`; `IOError(winsock: CInt(bitPattern: error.rawValue), reason:)` keeps NIO's error type | — |
