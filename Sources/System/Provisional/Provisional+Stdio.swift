@@ -194,6 +194,30 @@ extension FileStream {
     }
   }
 
+  #if !os(WASI)
+  /// Opens a new temporary file to read and write,
+  /// which the system deletes when the stream is closed
+  /// or the process exits.
+  ///
+  /// The C library removes the file's name as it creates it,
+  /// in the system's temporary directory,
+  /// so no other process can open it.
+  ///
+  /// The corresponding C function is `tmpfile`.
+  ///
+  /// - Note: Not available on WASI.
+  @_alwaysEmitIntoClient
+  public static func openTemporaryFile() throws(Errno) -> FileStream {
+    try _openTemporaryFile().get()
+  }
+
+  @usableFromInline
+  internal static func _openTemporaryFile() -> Result<FileStream, Errno> {
+    guard let stream = system_tmpfile() else { return .failure(.current) }
+    return .success(FileStream(rawValue: stream))
+  }
+  #endif
+
   /// Flushes the stream and closes it, and its file descriptor.
   ///
   /// The stream can't be used afterward, even if this method throws.
@@ -228,6 +252,73 @@ extension FileStream {
 }
 
 // MARK: - Reading and writing
+
+// Streams over memory: fmemopen, from macOS 10.13 and its siblings, so this
+// extension carries that floor with System 199. Bionic has fmemopen only
+// from API level 23, so Android is left out.
+#if !os(Android)
+@available(System 199, *)
+@available(macOS 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *)
+extension FileStream {
+  /// Opens a stream on a buffer, which it reads and writes
+  /// as a file's contents.
+  ///
+  /// - Parameters:
+  ///   - buffer: The memory the stream reads and writes,
+  ///     which must stay valid until the stream is closed.
+  ///     Its size is the most the stream can hold.
+  ///   - mode: How to open it, as C spells it:
+  ///     `"r"` to read the whole buffer; `"w"` to write,
+  ///     which empties the stream by storing a null byte at the start;
+  ///     `"a"` to write after the buffer's first null byte;
+  ///     and `"r+"`, `"w+"`, or `"a+"` to read and write.
+  ///
+  /// Writing past the end of the buffer fails,
+  /// and reading stops there.
+  /// Bytes written can wait in the stream's own buffer
+  /// until it's flushed or closed.
+  ///
+  /// The corresponding C function is `fmemopen`.
+  ///
+  /// - Note: Not available on Android.
+  @_alwaysEmitIntoClient
+  public static func open(
+    memory buffer: UnsafeMutableRawBufferPointer, mode: String
+  ) throws(Errno) -> FileStream {
+    try _open(memory: buffer.baseAddress, capacity: buffer.count, mode: mode).get()
+  }
+
+  /// Opens a stream on memory that it allocates,
+  /// and frees when it's closed.
+  ///
+  /// - Parameters:
+  ///   - capacity: The size of the memory, in bytes,
+  ///     which is the most the stream can hold.
+  ///   - mode: How to open it, as C spells it,
+  ///     with a `"+"`, such as `"w+"`,
+  ///     so that the stream can read what it writes.
+  ///     See ``open(memory:mode:)``.
+  ///
+  /// The corresponding C function is `fmemopen`, with a null buffer.
+  ///
+  /// - Note: Not available on Android.
+  @_alwaysEmitIntoClient
+  public static func open(memoryCapacity capacity: Int, mode: String) throws(Errno) -> FileStream {
+    try _open(memory: nil, capacity: capacity, mode: mode).get()
+  }
+
+  @usableFromInline
+  internal static func _open(
+    memory buffer: UnsafeMutableRawPointer?, capacity: Int, mode: String
+  ) -> Result<FileStream, Errno> {
+    precondition(capacity >= 0, "FileStream.open(memoryCapacity:mode:): 'capacity' must not be negative")
+    return mode.withCString { mode in
+      guard let stream = system_fmemopen(buffer, capacity, mode) else { return .failure(.current) }
+      return .success(FileStream(rawValue: stream))
+    }
+  }
+}
+#endif
 
 @available(System 199, *)
 extension FileStream {

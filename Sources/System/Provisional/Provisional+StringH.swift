@@ -224,6 +224,77 @@ extension CString {
     return Int(strncmp(string, other, maxLength))
   }
 
+  /// Compares two C strings by their bytes, ignoring case.
+  ///
+  /// - Parameters:
+  ///   - string: A null-terminated C string.
+  ///   - other: Another null-terminated C string.
+  /// - Returns: A negative number if `string` orders before `other`,
+  ///   zero if they're equal but for case,
+  ///   and a positive number if it orders after.
+  ///
+  /// The C library compares the strings' bytes as lowercase,
+  /// by the current locale's character classes:
+  /// in the POSIX locale, which a program has
+  /// until it sets another with `setlocale`,
+  /// only the ASCII letters have case.
+  /// To ignore case by a locale of your choosing,
+  /// call ``CLocale/compareIgnoringCase(_:_:maxByteCount:)``.
+  ///
+  /// The corresponding C function is `strcasecmp`.
+  ///
+  /// - Note: Provisional: C string functions may move to the Swift standard library.
+  @_alwaysEmitIntoClient
+  public static func compareIgnoringCase(
+    _ string: UnsafePointer<CChar>, _ other: UnsafePointer<CChar>
+  ) -> Int {
+    _compareIgnoringCase(string, other)
+  }
+
+  @usableFromInline
+  internal static func _compareIgnoringCase(
+    _ string: UnsafePointer<CChar>, _ other: UnsafePointer<CChar>
+  ) -> Int {
+    Int(system_strcasecmp(string, other))
+  }
+
+  /// Compares at most a number of bytes of two C strings,
+  /// by their bytes, ignoring case.
+  ///
+  /// - Parameters:
+  ///   - string: The start of a C string.
+  ///   - other: The start of another C string.
+  ///   - maxLength: The most bytes to compare.
+  /// - Returns: A negative number if `string` orders before `other`,
+  ///   zero if their first `maxLength` bytes are equal but for case,
+  ///   or if they're equal but for case up to a null byte,
+  ///   and a positive number if it orders after.
+  ///
+  /// This method stops at a null byte,
+  /// so `compareIgnoringCase(buffer, "utf-8", maxLength: 5) == 0`
+  /// says that `buffer` starts with `utf-8` in any case.
+  /// Case is the current locale's,
+  /// as ``compareIgnoringCase(_:_:)`` describes.
+  ///
+  /// The corresponding C function is `strncasecmp`.
+  ///
+  /// - Note: Provisional: C string functions may move to the Swift standard library.
+  @_alwaysEmitIntoClient
+  public static func compareIgnoringCase(
+    _ string: UnsafePointer<CChar>, _ other: UnsafePointer<CChar>, maxLength: Int
+  ) -> Int {
+    _compareIgnoringCase(string, other, maxLength: maxLength)
+  }
+
+  @usableFromInline
+  internal static func _compareIgnoringCase(
+    _ string: UnsafePointer<CChar>, _ other: UnsafePointer<CChar>, maxLength: Int
+  ) -> Int {
+    precondition(
+      maxLength >= 0, "CString.compareIgnoringCase(_:_:maxLength:): 'maxLength' must not be negative")
+    return Int(system_strncasecmp(string, other, maxLength))
+  }
+
   /// Copies a C string into a buffer, truncating it to fit,
   /// and ends the copy with a null byte.
   ///

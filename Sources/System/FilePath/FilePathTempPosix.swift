@@ -53,7 +53,7 @@ internal func _recursiveRemove(
   var entries: [(name: FilePath.Component, isDirectory: Bool)] = []
   let dirfd = try FileDescriptor.open(path, .readOnly, options: .directory)
   guard let dir = system_fdopendir(dirfd.rawValue) else {
-    let error = Errno.current
+    let error = Errno._current
     try? dirfd.close()
     throw error
   }
@@ -75,14 +75,14 @@ internal func _recursiveRemove(
     } else {
       try child.withPlatformString {
         if system_unlink($0) != 0 {
-          throw Errno.current
+          throw Errno._current
         }
       }
     }
   }
   try path.withPlatformString {
     if system_rmdir($0) != 0 {
-      throw Errno.current
+      throw Errno._current
     }
   }
 }
@@ -105,7 +105,7 @@ internal func _recursiveRemove(
 
   try path.withPlatformString {
     if system_rmdir($0) != 0 {
-      throw Errno.current
+      throw Errno._current
     }
   }
 }
@@ -147,7 +147,7 @@ fileprivate func forEachFile(
   _ body: (system_dirent) throws -> ()
 ) throws {
   guard let dir = impl_opendirat(dirfd, subdir) else {
-    throw Errno.current
+    throw Errno._current
   }
   defer {
     _ = system_closedir(dir)
@@ -187,7 +187,7 @@ fileprivate func removeContents(of dirfd: CInt) throws {
             | FileDescriptor.OpenOptions.directory.rawValue
             | FileDescriptor.OpenOptions.noFollow.rawValue)
         if subdirfd < 0 {
-          throw Errno.current
+          throw Errno._current
         }
         defer {
           _ = system_close(subdirfd)
@@ -215,7 +215,7 @@ fileprivate func removeContents(of dirfd: CInt) throws {
     }
 
     if result != 0 {
-      throw Errno.current
+      throw Errno._current
     }
   }
 }

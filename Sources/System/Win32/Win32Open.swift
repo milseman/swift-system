@@ -214,7 +214,9 @@ extension Win32 {
   /// modes: an open whose access or share mode conflicts with another open
   /// of the file fails with ``Win32/Error/sharingViolation``.
   ///
-  /// The corresponding C parameter of `CreateFileW` is `dwShareMode`.
+  /// `CreateFileW` takes a share mode in its `dwShareMode` parameter.
+  ///
+  /// The corresponding C type is `DWORD`.
   @frozen
   public struct ShareMode: OptionSet, Sendable, Hashable, Codable {
     /// The raw C share mode.
@@ -254,8 +256,9 @@ extension Win32 {
   /// The dispositions are mutually exclusive, unlike POSIX `open`'s
   /// `O_CREAT`, `O_EXCL`, and `O_TRUNC` bits.
   ///
-  /// The corresponding C parameter of `CreateFileW` is
-  /// `dwCreationDisposition`.
+  /// `CreateFileW` takes one in its `dwCreationDisposition` parameter.
+  ///
+  /// The corresponding C type is `DWORD`.
   @frozen
   public struct CreationDisposition: RawRepresentable, Sendable, Hashable, Codable {
     /// The raw C creation disposition.
@@ -316,8 +319,10 @@ extension Win32 {
   /// which are properties of the file. `CreateFileW` takes both in one
   /// parameter.
   ///
-  /// The corresponding C parameter of `CreateFileW` is the `FILE_FLAG_*`
-  /// part of `dwFlagsAndAttributes`.
+  /// `CreateFileW` takes these in the `FILE_FLAG_*` part of its
+  /// `dwFlagsAndAttributes` parameter.
+  ///
+  /// The corresponding C type is `DWORD`.
   @frozen
   public struct FileFlags: OptionSet, Sendable, Hashable, Codable {
     /// The raw C flags.
@@ -426,8 +431,10 @@ extension Win32 {
   /// ``encrypted``. The others, such as ``directory`` and
   /// ``reparsePoint``, describe a file that exists.
   ///
-  /// The corresponding C parameter of `CreateFileW` is the
-  /// `FILE_ATTRIBUTE_*` part of `dwFlagsAndAttributes`.
+  /// `CreateFileW` takes these in the `FILE_ATTRIBUTE_*` part of its
+  /// `dwFlagsAndAttributes` parameter.
+  ///
+  /// The corresponding C type is `DWORD`.
   @frozen
   public struct FileAttributes: OptionSet, Sendable, Hashable, Codable {
     /// The raw C attributes.

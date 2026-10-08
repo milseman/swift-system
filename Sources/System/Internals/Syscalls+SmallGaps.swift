@@ -115,4 +115,24 @@ internal func system_strsignal(_ signal: CInt) -> UnsafeMutablePointer<CChar>? {
   strsignal(signal)
 }
 
+// The C library's table of signal names: sys_signame, which Swift imports as
+// a tuple of NSIG names, lowercase and without SIG; and glibc's
+// sigabbrev_np, uppercase. Neither can fail, so they have no mock hooks.
+#if SYSTEM_PACKAGE_DARWIN || os(FreeBSD) || os(OpenBSD) || os(Android)
+internal func system_sys_signame(_ signal: CInt) -> UnsafePointer<CChar>? {
+  withUnsafeBytes(of: sys_signame) { table in
+    let names = table.assumingMemoryBound(to: UnsafePointer<CChar>?.self)
+    return signal > 0 && Int(signal) < names.count ? names[Int(signal)] : nil
+  }
+}
+#elseif os(Linux) && canImport(Glibc)
+internal func system_sigabbrev_np(_ signal: CInt) -> UnsafePointer<CChar>? {
+  csystem_sigabbrev_np(signal)
+}
+
+internal func system_has_sigabbrev_np() -> Bool {
+  csystem_has_sigabbrev_np() != 0
+}
+#endif
+
 #endif // !os(Windows) && !os(WASI)

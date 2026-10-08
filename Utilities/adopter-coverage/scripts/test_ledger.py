@@ -370,6 +370,31 @@ class CategoryTests(unittest.TestCase):
         s = self.categorize(site(kind="marker", markers=[marker], platforms={"Linux": "T", "WASI": "T"}))
         self.assertEqual((s["category"], s["holder"]), ("System gap", ["[statfs]"]))
 
+    def test_marker_names_where_they_are_missing(self):
+        # Each name is answered on the platforms the marker names right after
+        # it, of those the site compiles on: fsync is System's on Linux.
+        def categorize(text, platforms=("Linux", "Windows")):
+            marker = {"line": 2, "text": text, "imported": []}
+            return self.categorize(site(kind="marker", markers=[marker], platforms={p: "M" for p in platforms}))
+        s = categorize("unistd.h fsync on Linux: FileDescriptor.synchronize()")
+        self.assertEqual(s["category"], "unexplained")
+        s = categorize("sys/vfs.h statfs on Windows, and unistd.h fsync on Linux")
+        self.assertEqual((s["category"], s["holder"]), ("System gap", ["[statfs]"]))
+        self.assertEqual(s["holders"][0]["platforms"], ["Windows"])
+        s = categorize("unistd.h fsync (and fdatasync), on Linux")
+        self.assertEqual(s["category"], "unexplained")
+        # A word that isn't a platform names none; nor does a platform the
+        # site isn't compiled on.
+        s = categorize("unistd.h fsync in Embedded Swift")
+        self.assertEqual(s["holders"][0]["platforms"], ["Windows"])
+        s = categorize("unistd.h fsync on OpenBSD")
+        self.assertEqual(s["holders"][0]["platforms"], ["Windows"])
+        self.assertEqual(ledger.named_platforms("backtrace on Linux, Android, FreeBSD and OpenBSD, and "
+                                                "backtrace_async on Darwin", "backtrace"),
+                         {"Linux", "Android", "FreeBSD", "OpenBSD"})
+        self.assertEqual(ledger.named_platforms("backtrace on Linux, and backtrace_async on Darwin",
+                                                "backtrace_async"), {"Darwin"})
+
 
 class MarkerParserTests(unittest.TestCase):
     """status.py's marker parser, which the ledger reads markers with."""
@@ -477,6 +502,24 @@ D_SWIFT = """#if os(Android)
 import stdlib_h
 #endif
 """
+E_SWIFT = """#if canImport(Glibc)
+import Glibc
+#endif
+
+func wait(label: String, timeout: Int) -> Int32 {
+    let deadline = timeout + 1
+    print(label, deadline)
+    return fsync(3)
+}
+
+#if objectFormat(MachO)
+// SYSTEM-GAP: getsectiondata
+func sections() {}
+#elseif objectFormat(ELF)
+// SYSTEM-GAP: dl_iterate_phdr
+func headers() {}
+#endif
+"""
 
 
 class ScanTests(unittest.TestCase):
@@ -518,6 +561,21 @@ class ScanTests(unittest.TestCase):
         marker = by[("Tests/PkgTests/C.swift", 1)]
         self.assertEqual((marker["type"], marker["kind"]), ("marker", "tests"))
         self.assertEqual(set(by[("Sources/Pkg/D.swift", 2)]["platforms"]), {"Android"})
+
+    def test_swift_words_and_object_formats(self):
+        # `label` and `timeout` are parameter names here, not C's; and a
+        # marker under objectFormat() is compiled only where the format is.
+        commit = commit_files(self.repo, {"Sources/Pkg/E.swift": E_SWIFT}, "fixtures")
+        modules = ledger.Modules(MODULES)
+        vocab = ledger.Vocabulary({"Darwin.POSIX.unistd": {"fsync": [32768, 1], "label": [32768, 1],
+                                                           "timeout": [32768, 1]}}, modules, coverage())
+        sites, _ = ledger.scan_repository("pkg", self.repo, commit, None, modules, vocab,
+                                          ledger.qualified_re(modules))
+        by = {(s["file"], s["line"]): s for s in sites}
+        self.assertEqual(set(by[("Sources/Pkg/E.swift", 2)]["names"]), {"fsync"})
+        self.assertEqual(set(by[("Sources/Pkg/E.swift", 12)]["platforms"]), {"Darwin"})
+        self.assertEqual(set(by[("Sources/Pkg/E.swift", 15)]["platforms"]),
+                         {"Linux", "Musl", "Android", "FreeBSD", "OpenBSD"})
 
     def test_markers_at_the_newest_branch(self):
         commit_files(self.repo, {"Sources/Pkg/A.swift": "// SYSTEM-GAP: getloadavg\nfunc a() {}\n"}, "base")

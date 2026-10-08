@@ -33,6 +33,15 @@ extern char *csystem_readpassphrase(const char *prompt, char *buffer,
 #include <ar.h>
 #endif
 
+#if defined(__OpenBSD__)
+// pthread_set_name_np and pthread_get_name_np, from <pthread_np.h>, which
+// OpenBSD's Swift module may not include; shims.c does. `thread` is a
+// pthread_t, a pointer there, untyped so that this header needn't include
+// <pthread.h>, and the length is a size_t.
+extern void csystem_pthread_set_name_np(void *thread, const char *name);
+extern void csystem_pthread_get_name_np(void *thread, char *name, unsigned long length);
+#endif
+
 #if !defined(_WIN32) && !defined(__wasi__) && !defined(__ANDROID__)
 // shm_open, which is variadic, so Swift can't import it.
 extern int csystem_shm_open(const char *name, int oflag, unsigned int mode);
@@ -83,6 +92,8 @@ extern void csystem_sigaction_set_handler(void *action, void *handler);
 extern int csystem_posix_spawn_file_actions_addchdir(void *actions, const char *path);
 extern int csystem_posix_spawn_file_actions_addfchdir(void *actions, int fd);
 extern int csystem_posix_spawn_file_actions_addclosefrom(void *actions, int from);
+// Whether the C library the process runs with has addclosefrom_np.
+extern int csystem_posix_spawn_file_actions_has_addclosefrom(void);
 
 #if defined(__ANDROID__)
 // posix_spawn, posix_spawnp, and the attribute and file action calls that

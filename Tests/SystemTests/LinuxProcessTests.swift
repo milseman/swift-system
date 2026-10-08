@@ -67,6 +67,45 @@ final class LinuxProcessTests: XCTestCase {
   }
   #endif
 
+  #if os(Linux)
+  // The child gets a pipe's read end, which isn't close-on-exec, and
+  // closeAll(from:) closes it there: the child's shell finds it in
+  // /proc/self/fd only without the action. The pipe and the children are
+  // the test's own.
+  func testClosingTheRestOfAChildsDescriptors() throws {
+    // glibc 2.34 or later, as every image build.sh runs has.
+    XCTAssertTrue(SpawnFileAction.supportsCloseAll)
+    let (readEnd, writeEnd) = try FileDescriptor.pipe()
+    defer {
+      try? readEnd.close()
+      try? writeEnd.close()
+    }
+    let check = ["sh", "-c", "test -e /proc/self/fd/\(readEnd.rawValue)"]
+    let inherits = try ChildProcess.spawn(shell, arguments: check)
+    let inherited = try inherits.wait()
+    XCTAssertEqual(inherited, .exited(0))
+    let closes = try ChildProcess.spawn(
+      shell, arguments: check, fileActions: [.closeAll(from: readEnd)])
+    let closed = try closes.wait()
+    XCTAssertEqual(closed, .exited(1))
+  }
+  #endif
+
+  // Reads the test process's own link, and a child's, and finds none for a
+  // process ID that no process has.
+  func testExecutablePaths() throws {
+    let own = try ProcessID.current.executablePath()
+    XCTAssertEqual(own, try FilePath("/proc/self/exe").readSymbolicLink())
+    XCTAssertTrue(own.isAbsolute, "\(own)")
+    let child = ChildProcess(taking: try spawnWaitingChild())
+    let shellPath = try child.id.executablePath()
+    XCTAssertTrue(shellPath.isAbsolute, "\(shellPath)")
+    XCTAssertEqual(try shellPath.stat().type, .regular)
+    XCTAssertThrowsError(try ProcessID(rawValue: .max).executablePath()) {
+      XCTAssertEqual($0 as? Errno, .noSuchFileOrDirectory)
+    }
+  }
+
   func testASignalDescriptorReceivesBlockedSignals() throws {
     let previous = PThread.blockSignals([.userDefined1])
     defer { PThread.setCurrentSignalMask(previous) }

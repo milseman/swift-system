@@ -402,6 +402,9 @@ extension CInterop.SockAddrUn {
 
   /// The number of bytes a path can have, not counting its terminating
   /// null character: 103 on Darwin and 107 on Linux.
+  ///
+  /// The corresponding C field is `sun_path`, whose size this is,
+  /// less the null character.
   @_alwaysEmitIntoClient
   public static var pathCapacity: Int {
     MemoryLayout.size(ofValue: CInterop.SockAddrUn().sun_path) - 1

@@ -113,6 +113,8 @@ extension CInterop.TimeSpec {
   }
 
   /// The time as a duration.
+  ///
+  /// The corresponding C fields are `tv_sec` and `tv_nsec`.
   @_alwaysEmitIntoClient
   public var duration: Duration {
     get { .seconds(seconds) + .nanoseconds(nanoseconds) }
@@ -222,6 +224,8 @@ extension CInterop.TimeVal {
   }
 
   /// The time as a duration.
+  ///
+  /// The corresponding C fields are `tv_sec` and `tv_usec`.
   @_alwaysEmitIntoClient
   public var duration: Duration {
     get { .seconds(seconds) + .microseconds(microseconds) }

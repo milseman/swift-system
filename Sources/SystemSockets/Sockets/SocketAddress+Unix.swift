@@ -51,6 +51,8 @@ public struct UnixAddress: Sendable, Equatable, Hashable {
   ///
   /// - Parameter path: The filesystem path for the socket.
   /// - Returns: `nil` if the path is too long.
+  ///
+  /// The corresponding C type is `sockaddr_un`, with `AF_UNIX`.
   @_alwaysEmitIntoClient
   public init?(_ path: String) {
     var addr = sockaddr_un()

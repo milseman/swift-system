@@ -25,15 +25,15 @@ extension Win32 {
     ///
     /// A volume with no label reports the empty string.
     ///
-    /// The corresponding C parameter of `GetVolumeInformationByHandleW` is
-    /// `lpVolumeNameBuffer`.
+    /// `GetVolumeInformationByHandleW` writes it to its `lpVolumeNameBuffer`
+    /// parameter.
     public var name: String
 
     /// The name of the file system, such as `NTFS`, `ReFS`, `exFAT`, or
     /// `FAT32`.
     ///
-    /// The corresponding C parameter of `GetVolumeInformationByHandleW` is
-    /// `lpFileSystemNameBuffer`.
+    /// `GetVolumeInformationByHandleW` writes it to its
+    /// `lpFileSystemNameBuffer` parameter.
     public var fileSystemName: String
 
     /// The volume serial number assigned when the volume was formatted.
@@ -42,20 +42,20 @@ extension Win32 {
     /// not guaranteed to be unique across machines. A network redirector may
     /// report 0.
     ///
-    /// The corresponding C parameter of `GetVolumeInformationByHandleW` is
-    /// `lpVolumeSerialNumber`.
+    /// `GetVolumeInformationByHandleW` writes it to its
+    /// `lpVolumeSerialNumber` parameter.
     public var serialNumber: UInt32
 
     /// The maximum length, in characters, of a single path component.
     ///
-    /// The corresponding C parameter of `GetVolumeInformationByHandleW` is
-    /// `lpMaximumComponentLength`.
+    /// `GetVolumeInformationByHandleW` writes it to its
+    /// `lpMaximumComponentLength` parameter.
     public var maximumComponentLength: Int
 
     /// The features this file system supports.
     ///
-    /// The corresponding C parameter of `GetVolumeInformationByHandleW` is
-    /// `lpFileSystemFlags`.
+    /// `GetVolumeInformationByHandleW` writes them to its `lpFileSystemFlags`
+    /// parameter.
     public var flags: FileSystemFlags
 
     internal init(
@@ -78,8 +78,10 @@ extension Win32 {
   /// The members cover every flag `WinNT.h` defines, in bit order. `rawValue`
   /// can carry any flag Windows adds later.
   ///
-  /// The corresponding C parameter of `GetVolumeInformationByHandleW` is
-  /// `lpFileSystemFlags`.
+  /// `GetVolumeInformationByHandleW` writes them to its `lpFileSystemFlags`
+  /// parameter.
+  ///
+  /// The corresponding C type is `DWORD`.
   @frozen
   public struct FileSystemFlags: OptionSet, Sendable, Hashable, Codable {
     /// The raw C flags.

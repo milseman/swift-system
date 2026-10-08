@@ -42,4 +42,9 @@ internal var __CS_DARWIN_USER_TEMP_DIR: CInt { CInt(_CS_DARWIN_USER_TEMP_DIR) }
 @_alwaysEmitIntoClient
 internal var __CS_DARWIN_USER_CACHE_DIR: CInt { CInt(_CS_DARWIN_USER_CACHE_DIR) }
 #endif // SYSTEM_PACKAGE_DARWIN
+
+#if os(Linux) && canImport(Glibc)
+@_alwaysEmitIntoClient
+internal var __CS_GNU_LIBC_VERSION: CInt { CInt(_CS_GNU_LIBC_VERSION) }
+#endif
 #endif // !os(Windows) && !os(WASI) && !os(Android)

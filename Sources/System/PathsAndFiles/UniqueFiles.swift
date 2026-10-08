@@ -207,7 +207,7 @@ internal func _retryingTemplate<T>(
     _ = saved.initialize(from: original)
     while true {
       if let value = call() { return .success(value) }
-      let error = Errno.current
+      let error = Errno._current
       guard retryOnInterrupt && error == .interrupted else { return .failure(error) }
       _ = UnsafeMutableBufferPointer(start: template, count: saved.count).update(fromContentsOf: saved)
     }

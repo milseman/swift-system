@@ -94,6 +94,33 @@ private struct ProvisionalStringTests {
     }
   }
 
+  // The test process doesn't call setlocale, so case is the POSIX locale's:
+  // only the ASCII letters have it.
+  @available(System 199, *)
+  @Test func comparisonsIgnoringCase() {
+    #expect(CString.compareIgnoringCase("UTF-8", "utf-8") == 0)
+    #expect(CString.compareIgnoringCase("abc", "ABD") < 0)
+    #expect(CString.compareIgnoringCase("B", "a") > 0)
+    #expect(CString.compareIgnoringCase("ab", "ABC") < 0)
+    #expect(CString.compareIgnoringCase("", "") == 0)
+    // Case is folded before comparing: "_" (0x5F) orders after "A" (0x41)
+    // but before "a" (0x61), which "A" becomes.
+    #expect(CString.compareIgnoringCase("_", "A") < 0)
+    // Bytes outside ASCII have no case here.
+    #expect(CString.compareIgnoringCase("É", "é") != 0)
+
+    #expect(CString.compareIgnoringCase("+INFINITY", "+infinity", maxLength: 9) == 0)
+    #expect(CString.compareIgnoringCase("0X1F", "0x", maxLength: 2) == 0)
+    #expect(CString.compareIgnoringCase("abc", "ABD", maxLength: 2) == 0)
+    #expect(CString.compareIgnoringCase("abc", "ABD", maxLength: 3) < 0)
+    #expect(CString.compareIgnoringCase("abc", "xyz", maxLength: 0) == 0)
+    // The comparison stops at a null byte, whatever the limit.
+    #expect(CString.compareIgnoringCase("Ab", "aB", maxLength: 100) == 0)
+    withBytes(Array("ABCD".utf8)) { unterminated in
+      #expect(CString.compareIgnoringCase(unterminated, "abcz", maxLength: 3) == 0)
+    }
+  }
+
   @available(System 199, *)
   @Test func copies() {
     var buffer = [CChar](repeating: 0x7f, count: 4)

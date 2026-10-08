@@ -107,6 +107,12 @@ internal var _LC_VERSION_MIN_TVOS: UInt32 { UInt32(LC_VERSION_MIN_TVOS) }
 @_alwaysEmitIntoClient
 internal var _LC_VERSION_MIN_WATCHOS: UInt32 { UInt32(LC_VERSION_MIN_WATCHOS) }
 
+@_alwaysEmitIntoClient
+internal var _LC_SYMTAB: UInt32 { UInt32(LC_SYMTAB) }
+
+@_alwaysEmitIntoClient
+internal var _LC_MAIN: UInt32 { UInt32(LC_MAIN) }
+
 // MARK: - Static library tables of contents
 
 @_alwaysEmitIntoClient

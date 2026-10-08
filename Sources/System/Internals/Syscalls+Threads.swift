@@ -202,9 +202,33 @@ internal func system_pthread_setname_np(
   return csystem_pthread_setname_np(thread, name)
   #endif
 }
+#elseif os(OpenBSD)
+// OpenBSD's spelling, which can't fail: it truncates a long name.
+internal func system_pthread_setname_np(
+  _ thread: pthread_t, _ name: UnsafePointer<CChar>
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled {
+    return _mockReturningErrno(thread, String(_errorCorrectingPlatformString: name))
+  }
+#endif
+  csystem_pthread_set_name_np(UnsafeMutableRawPointer(thread), name)
+  return 0
+}
 #endif
 
-#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD)
+#if os(OpenBSD)
+// OpenBSD's spelling, which can't fail either.
+internal func system_pthread_getname_np(
+  _ thread: pthread_t, _ buffer: UnsafeMutablePointer<CChar>, _ length: Int
+) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mockReturningErrno(thread, buffer, length) }
+#endif
+  csystem_pthread_get_name_np(UnsafeMutableRawPointer(thread), buffer, UInt(length))
+  return 0
+}
+#elseif SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD)
 internal func system_pthread_getname_np(
   _ thread: pthread_t, _ buffer: UnsafeMutablePointer<CChar>, _ length: Int
 ) -> CInt {

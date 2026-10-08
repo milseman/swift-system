@@ -66,7 +66,7 @@ private struct StatTests {
       #if !os(WASI) // WASI's files have no permissions
       // The creation mask can clear some of those permissions, such as
       // with a umask of 077, so set them outright.
-      try #require(fchmod(fileFD.rawValue, 0o644) == 0, "\(Errno.current)")
+      try #require(fchmod(fileFD.rawValue, 0o644) == 0, "\(Errno._current)")
       #endif
       try fileFD.writeAll("Hello, world!".utf8)
 
@@ -101,7 +101,7 @@ private struct StatTests {
 
       try targetFilePath.withPlatformString { targetPtr in
         try symlinkPath.withPlatformString { symlinkPtr in
-          try #require(symlink(targetPtr, symlinkPtr) == 0, "\(Errno.current)")
+          try #require(symlink(targetPtr, symlinkPtr) == 0, "\(Errno._current)")
         }
       }
 
@@ -205,7 +205,7 @@ private struct StatTests {
       let fd = try FileDescriptor.open(testFile, .writeOnly, options: .create, permissions: [.ownerReadWrite, .groupRead, .otherRead])
       // The creation mask can clear some of those permissions, so set them
       // outright.
-      try #require(fchmod(fd.rawValue, 0o644) == 0, "\(Errno.current)")
+      try #require(fchmod(fd.rawValue, 0o644) == 0, "\(Errno._current)")
       try fd.close()
 
       let stat = try testFile.stat()
@@ -215,7 +215,7 @@ private struct StatTests {
       var newMode = stat.mode
       newMode.permissions.insert(.ownerExecute)
       try testFile.withPlatformString { pathPtr in
-        try #require(chmod(pathPtr, newMode.permissions.rawValue) == 0, "\(Errno.current)")
+        try #require(chmod(pathPtr, newMode.permissions.rawValue) == 0, "\(Errno._current)")
       }
 
       let updatedStat = try testFile.stat()
@@ -223,7 +223,7 @@ private struct StatTests {
 
       newMode.permissions.remove(.ownerWriteExecute)
       try testFile.withPlatformString { pathPtr in
-        try #require(chmod(pathPtr, newMode.permissions.rawValue) == 0, "\(Errno.current)")
+        try #require(chmod(pathPtr, newMode.permissions.rawValue) == 0, "\(Errno._current)")
       }
 
       let readOnlyStat = try testFile.stat()
@@ -241,7 +241,7 @@ private struct StatTests {
     // in order to have a comfortable margin.
     let timestampSleep: useconds_t = 50_000
     var start = timespec()
-    try #require(clock_gettime(CLOCK_REALTIME, &start) == 0, "\(Errno.current)")
+    try #require(clock_gettime(CLOCK_REALTIME, &start) == 0, "\(Errno._current)")
     start.tv_sec -= 1 // A little wiggle room
     try withTemporaryFilePath(basename: "Stat_times") { tempDir in
       var dirStat = try tempDir.stat()
@@ -255,7 +255,7 @@ private struct StatTests {
       // The directory was made between the clock reading before it and
       // this one.
       var startUpperBound = timespec()
-      try #require(clock_gettime(CLOCK_REALTIME, &startUpperBound) == 0, "\(Errno.current)")
+      try #require(clock_gettime(CLOCK_REALTIME, &startUpperBound) == 0, "\(Errno._current)")
       startUpperBound.tv_sec += 1 // As much wiggle room
       #expect(dirAccessTime0 >= start)
       #expect(dirAccessTime0 < startUpperBound)
@@ -302,7 +302,7 @@ private struct StatTests {
         var newMode = dirStat.mode
         // tempDir only starts with .ownerReadWriteExecute
         newMode.permissions.insert(.groupReadWriteExecute)
-        try #require(chmod(pathPtr, newMode.rawValue) == 0, "\(Errno.current)")
+        try #require(chmod(pathPtr, newMode.rawValue) == 0, "\(Errno._current)")
       }
 
       dirStat = try tempDir.stat()
@@ -403,14 +403,14 @@ private struct StatTests {
 
       flags.insert(userSettableFlags)
       // On FreeBSD, the second argument of `fchflags` requires `UInt` instead of`UInt32`.
-      try #require(fchflags(fd.rawValue, .init(flags.rawValue)) == 0, "\(Errno.current)")
+      try #require(fchflags(fd.rawValue, .init(flags.rawValue)) == 0, "\(Errno._current)")
 
       stat = try fd.stat()
       #expect(stat.flags == flags)
 
       flags.remove(userSettableFlags)
       // On FreeBSD, the second argument of `fchflags` requires `UInt` instead of`UInt32`.
-      try #require(fchflags(fd.rawValue, .init(flags.rawValue)) == 0, "\(Errno.current)")
+      try #require(fchflags(fd.rawValue, .init(flags.rawValue)) == 0, "\(Errno._current)")
 
       stat = try fd.stat()
       #expect(stat.flags == flags)

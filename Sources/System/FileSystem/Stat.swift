@@ -81,6 +81,7 @@ public struct Stat: RawRepresentable, Sendable {
     /// The corresponding C constant is `AT_REALDEV`.
     /// - Note: Only available on Darwin.
     @_alwaysEmitIntoClient
+    @available(System 199, *)
     public static var realDevice: Flags { Flags(rawValue: _AT_REALDEV) }
 
     /// Use only the directory descriptor, and ignore the path:
@@ -89,6 +90,7 @@ public struct Stat: RawRepresentable, Sendable {
     /// The corresponding C constant is `AT_FDONLY`.
     /// - Note: Only available on Darwin.
     @_alwaysEmitIntoClient
+    @available(System 199, *)
     public static var descriptorOnly: Flags { Flags(rawValue: _AT_FDONLY) }
     #endif
 

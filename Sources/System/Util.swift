@@ -12,7 +12,7 @@
 private func valueOrErrno<I: FixedWidthInteger>(
   _ i: I
 ) -> Result<I, Errno> {
-  i == -1 ? .failure(Errno.current) : .success(i)
+  i == -1 ? .failure(Errno._current) : .success(i)
 }
 
 @available(System 0.0.1, *)

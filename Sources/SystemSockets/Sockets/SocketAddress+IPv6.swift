@@ -46,6 +46,8 @@ public struct IPv6Address: Sendable, Hashable {
   ///   - address: The IPv6 address string (e.g., "::1" or "2001:db8::1").
   ///   - port: The port number in host byte order.
   /// - Returns: `nil` if the address string is invalid.
+  ///
+  /// The corresponding C function is `inet_pton`, with `AF_INET6`.
   @_alwaysEmitIntoClient
   public init?(_ address: String, port: UInt16) {
     var addr = sockaddr_in6()
@@ -117,6 +119,8 @@ extension IPv6Address {
   }
 
   /// The IP address as a string.
+  ///
+  /// The corresponding C function is `inet_ntop`, with `AF_INET6`.
   public var addressString: String {
     var buffer = [CChar](repeating: 0, count: Int(INET6_ADDRSTRLEN))
     var addr = _storage.sin6_addr

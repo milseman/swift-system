@@ -26,7 +26,7 @@ extension Memory {
   /// ``Memory/free(_:)`` and ``Memory/reallocate(_:byteCount:)``
   /// find the zone of any block, and so work on a zone's blocks too.
   ///
-  /// The corresponding C type is `malloc_zone_t *`.
+  /// The corresponding C type is a pointer to `malloc_zone_t`.
   /// - Note: Only available on Darwin.
   @frozen
   public struct Zone: RawRepresentable, Hashable, @unchecked Sendable {

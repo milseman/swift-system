@@ -191,6 +191,9 @@ target_sources(SystemPackage PRIVATE
   Limits/CompileTimeLimits+Pipes.swift
   Limits/CompileTimeLimits.swift)
 target_sources(SystemPackage PRIVATE
+  Internals/Syscalls+LoadAverage.swift
+  LoadAverage/LoadAverage.swift)
+target_sources(SystemPackage PRIVATE
   MachCPU/MachCPUType.swift)
 target_sources(SystemPackage PRIVATE
   Internals/Syscalls+MachTime.swift
@@ -238,6 +241,7 @@ target_sources(SystemPackage PRIVATE
   Processes/Credentials.swift
   Processes/ExitStatus.swift
   Processes/ProcessDescriptor.swift
+  Processes/ProcessExecutablePath.swift
   Processes/ProcessGroups.swift
   Processes/ProcessWait.swift
   Processes/ResourceLimits.swift

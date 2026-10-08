@@ -440,6 +440,12 @@ internal func system_posix_spawn_file_actions_addclosefrom(
   csystem_posix_spawn_file_actions_addclosefrom(actions, fd)
 }
 
+// Whether the running C library has posix_spawn_file_actions_addclosefrom_np:
+// glibc's is looked up at run time. Not a call that can fail, so no mock hook.
+internal func system_posix_spawn_file_actions_has_addclosefrom() -> Bool {
+  csystem_posix_spawn_file_actions_has_addclosefrom() != 0
+}
+
 #if SYSTEM_PACKAGE_DARWIN
 internal func system_posix_spawn_file_actions_addinherit_np(
   _ actions: UnsafeMutablePointer<_SpawnFileActionsStorage>, _ fd: CInt

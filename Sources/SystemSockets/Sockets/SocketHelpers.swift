@@ -21,8 +21,14 @@ extension SocketDescriptor {
   @discardableResult
   public func writeAll<S: Sequence>(
     _ sequence: S
-  ) throws -> Int where S.Element == UInt8 {
-    try fileDescriptor.writeAll(sequence)
+  ) throws(Errno) -> Int where S.Element == UInt8 {
+    do {
+      return try fileDescriptor.writeAll(sequence)
+    } catch {
+      // FileDescriptor.writeAll(_:) throws untyped, as System's older API
+      // does, but every error it throws is an Errno.
+      throw error as! Errno
+    }
   }
 
   /// Runs a closure and then closes the socket, even if an error occurs.

@@ -444,6 +444,21 @@ extension MachOFile.LoadCommandType {
   /// The corresponding C constant is `LC_VERSION_MIN_WATCHOS`.
   @_alwaysEmitIntoClient
   public static var versionMinWatchOS: UInt32 { _LC_VERSION_MIN_WATCHOS }
+
+  /// The file's symbol table: where its symbols and their names are,
+  /// in a `symtab_command`, which System doesn't wrap.
+  ///
+  /// The corresponding C constant is `LC_SYMTAB`.
+  @_alwaysEmitIntoClient
+  public static var symbolTable: UInt32 { _LC_SYMTAB }
+
+  /// A program's entry point and the size of its main thread's stack,
+  /// in an `entry_point_command`, which System doesn't wrap.
+  /// Only an executable has one.
+  ///
+  /// The corresponding C constant is `LC_MAIN`.
+  @_alwaysEmitIntoClient
+  public static var entryPoint: UInt32 { _LC_MAIN }
 }
 
 @available(System 199, *)

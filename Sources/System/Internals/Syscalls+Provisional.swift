@@ -20,6 +20,7 @@
 #if SYSTEM_PACKAGE_DARWIN
 import Darwin
 #elseif canImport(Glibc)
+import CSystem
 import Glibc
 #elseif canImport(Musl)
 import Musl
@@ -103,6 +104,19 @@ internal func system_strlcpy(
 #endif
 }
 
+// strings.h's comparisons that ignore case, by the current locale. They
+// can't fail.
+
+internal func system_strcasecmp(_ a: UnsafePointer<CChar>, _ b: UnsafePointer<CChar>) -> CInt {
+  strcasecmp(a, b)
+}
+
+internal func system_strncasecmp(
+  _ a: UnsafePointer<CChar>, _ b: UnsafePointer<CChar>, _ count: Int
+) -> CInt {
+  strncasecmp(a, b, count)
+}
+
 // MARK: - ctype.h
 
 // None of them can fail.
@@ -124,18 +138,38 @@ internal func system_toupper(_ c: CInt) -> CInt { toupper(c) }
 
 // MARK: - execinfo.h
 
-#if SYSTEM_PACKAGE_DARWIN
+#if SYSTEM_PACKAGE_DARWIN || (os(Linux) && canImport(Glibc))
 // Neither sets errno; backtrace_symbols returns NULL when it can't allocate.
+// glibc's Swift module doesn't include <execinfo.h>, so there they're CSystem
+// shims.
 internal func system_backtrace(
   _ buffer: UnsafeMutablePointer<UnsafeMutableRawPointer?>, _ count: CInt
 ) -> CInt {
+  #if SYSTEM_PACKAGE_DARWIN
   backtrace(buffer, count)
+  #else
+  csystem_backtrace(buffer, count)
+  #endif
 }
 
 internal func system_backtrace_symbols(
   _ addresses: UnsafePointer<UnsafeMutableRawPointer?>, _ count: CInt
 ) -> UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>? {
+  #if SYSTEM_PACKAGE_DARWIN
   backtrace_symbols(addresses, count)
+  #else
+  csystem_backtrace_symbols(addresses, count)
+  #endif
+}
+#endif
+
+#if SYSTEM_PACKAGE_DARWIN
+// From macOS 12 and its siblings. It can't fail.
+@available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
+internal func system_backtrace_async(
+  _ buffer: UnsafeMutablePointer<UnsafeMutableRawPointer?>, _ count: Int
+) -> Int {
+  backtrace_async(buffer, count, nil)
 }
 #endif
 
@@ -160,6 +194,30 @@ internal func system_fdopen(
 #endif
   return fdopen(fd, mode)
 }
+
+// tmpfile. wasi-libc leaves it out.
+#if !os(WASI)
+internal func system_tmpfile() -> _CFilePointer? {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mockStreamResult(_mock()) }
+#endif
+  return tmpfile()
+}
+#endif
+
+// fmemopen, from macOS 10.13 and its siblings on Darwin. Bionic has it only
+// from API level 23.
+#if !os(Android)
+@available(macOS 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *)
+internal func system_fmemopen(
+  _ buffer: UnsafeMutableRawPointer?, _ size: Int, _ mode: UnsafePointer<CChar>
+) -> _CFilePointer? {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mockStreamResult(_mock(buffer, size, String(cString: mode))) }
+#endif
+  return fmemopen(buffer, size, mode)
+}
+#endif
 
 // fclose
 internal func system_fclose(_ stream: _CFilePointer) -> CInt {

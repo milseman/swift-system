@@ -67,7 +67,9 @@ extension DynamicLibrary {
   /// the directories they name, which leaves out the current directory and
   /// `PATH`, where another user may be able to plant a library.
   ///
-  /// The corresponding C parameter of `LoadLibraryExW` is `dwFlags`.
+  /// `LoadLibraryExW` takes these options in its `dwFlags` parameter.
+  ///
+  /// The corresponding C type is `DWORD`.
   @frozen
   public struct LoadOptions: OptionSet, Sendable, Hashable, Codable {
     /// The raw C flags.

@@ -71,6 +71,11 @@ for _env in list(SWIFT_ENV.values()) + [DARWIN_BUILD]:
     _env.setdefault("flags", {})
     _env.setdefault("compiler", COMPILER_VERSION)
 
+# objectFormat() by the platform's OS: Apple's are Mach-O, Windows' COFF,
+# WASI's Wasm, and the others' ELF.
+OBJECT_FORMATS = {"macOS": "MachO", "iOS": "MachO", "tvOS": "MachO", "watchOS": "MachO", "visionOS": "MachO",
+                  "Windows": "COFF", "WASI": "Wasm"}
+
 # Flags that are M everywhere unless the manifest says otherwise: debug-only
 # code. The Darwin build is a debug build, so DEBUG is T there. (SwiftPM
 # defines DEBUG in debug builds; flags such as NIO's ENABLE_MOCKING come
@@ -141,6 +146,9 @@ def swift_atom(tok, env, build):
             return T if arg == "_64" else F
         if fn == "targetEnvironment":
             return F
+        if fn == "objectFormat":
+            formats = {OBJECT_FORMATS.get(o, "ELF") for o in env["os"]}
+            return T if formats == {arg} else M if arg in formats else F
         if fn == "_endian":
             return T if arg == "little" else F
         if fn == "hasFeature" and arg in FALSE_FEATURES:

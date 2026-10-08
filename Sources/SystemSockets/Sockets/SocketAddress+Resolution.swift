@@ -87,8 +87,12 @@ extension SocketAddress {
   /// Flags for address resolution.
   @frozen
   public struct ResolutionFlags: OptionSet, Sendable {
+    /// The raw C flags.
+    @_alwaysEmitIntoClient
     public var rawValue: CInt
 
+    /// Creates a strongly-typed set of flags from raw C flags.
+    @_alwaysEmitIntoClient
     public init(rawValue: CInt) {
       self.rawValue = rawValue
     }
@@ -96,36 +100,43 @@ extension SocketAddress {
     /// Use passive socket for binding.
     ///
     /// The corresponding C constant is `AI_PASSIVE`.
+    @_alwaysEmitIntoClient
     public static var passive: ResolutionFlags { ResolutionFlags(rawValue: AI_PASSIVE) }
 
     /// Return canonical name.
     ///
     /// The corresponding C constant is `AI_CANONNAME`.
+    @_alwaysEmitIntoClient
     public static var canonicalName: ResolutionFlags { ResolutionFlags(rawValue: AI_CANONNAME) }
 
     /// Address must be numeric.
     ///
     /// The corresponding C constant is `AI_NUMERICHOST`.
+    @_alwaysEmitIntoClient
     public static var numericHost: ResolutionFlags { ResolutionFlags(rawValue: AI_NUMERICHOST) }
 
     /// Service must be numeric.
     ///
     /// The corresponding C constant is `AI_NUMERICSERV`.
+    @_alwaysEmitIntoClient
     public static var numericService: ResolutionFlags { ResolutionFlags(rawValue: AI_NUMERICSERV) }
 
     /// Return IPv4-mapped IPv6 addresses.
     ///
     /// The corresponding C constant is `AI_V4MAPPED`.
+    @_alwaysEmitIntoClient
     public static var v4Mapped: ResolutionFlags { ResolutionFlags(rawValue: AI_V4MAPPED) }
 
     /// Return both IPv4 and IPv6 addresses.
     ///
     /// The corresponding C constant is `AI_ALL`.
+    @_alwaysEmitIntoClient
     public static var all: ResolutionFlags { ResolutionFlags(rawValue: AI_ALL) }
 
     /// Return addresses only if configured.
     ///
     /// The corresponding C constant is `AI_ADDRCONFIG`.
+    @_alwaysEmitIntoClient
     public static var addressConfigured: ResolutionFlags { ResolutionFlags(rawValue: AI_ADDRCONFIG) }
   }
 }
@@ -178,7 +189,7 @@ extension SocketAddress {
   ///   - service: The service name or port number, or `nil`.
   ///   - hints: Hints to narrow the search.
   /// - Returns: An array of resolved addresses.
-  /// - Throws: `AddressResolutionError` if resolution fails.
+  /// - Throws: ``AddressResolutionError`` if resolution fails.
   ///
   /// This method copies the C library's list of results, and frees it.
   ///
@@ -187,7 +198,7 @@ extension SocketAddress {
     hostname: String? = nil,
     service: String? = nil,
     hints: ResolutionHints = ResolutionHints()
-  ) throws -> [ResolvedAddress] {
+  ) throws(AddressResolutionError) -> [ResolvedAddress] {
     var hintsStruct = addrinfo()
     hintsStruct.ai_flags = hints.flags.rawValue
     if let family = hints.family {
@@ -261,8 +272,12 @@ extension SocketAddress {
   /// Flags for reverse resolution.
   @frozen
   public struct ReverseResolutionFlags: OptionSet, Sendable {
+    /// The raw C flags.
+    @_alwaysEmitIntoClient
     public var rawValue: CInt
 
+    /// Creates a strongly-typed set of flags from raw C flags.
+    @_alwaysEmitIntoClient
     public init(rawValue: CInt) {
       self.rawValue = rawValue
     }
@@ -270,26 +285,31 @@ extension SocketAddress {
     /// Return numeric host.
     ///
     /// The corresponding C constant is `NI_NUMERICHOST`.
+    @_alwaysEmitIntoClient
     public static var numericHost: ReverseResolutionFlags { ReverseResolutionFlags(rawValue: NI_NUMERICHOST) }
 
     /// Return numeric service.
     ///
     /// The corresponding C constant is `NI_NUMERICSERV`.
+    @_alwaysEmitIntoClient
     public static var numericService: ReverseResolutionFlags { ReverseResolutionFlags(rawValue: NI_NUMERICSERV) }
 
     /// Look up datagram service.
     ///
     /// The corresponding C constant is `NI_DGRAM`.
+    @_alwaysEmitIntoClient
     public static var datagram: ReverseResolutionFlags { ReverseResolutionFlags(rawValue: NI_DGRAM) }
 
     /// Return only the hostname part of FQDN.
     ///
     /// The corresponding C constant is `NI_NOFQDN`.
+    @_alwaysEmitIntoClient
     public static var noFullyQualified: ReverseResolutionFlags { ReverseResolutionFlags(rawValue: NI_NOFQDN) }
 
     /// Fail if name cannot be determined.
     ///
     /// The corresponding C constant is `NI_NAMEREQD`.
+    @_alwaysEmitIntoClient
     public static var nameRequired: ReverseResolutionFlags { ReverseResolutionFlags(rawValue: NI_NAMEREQD) }
   }
 
@@ -306,7 +326,7 @@ extension SocketAddress {
   ///
   /// - Parameter flags: Flags controlling the resolution.
   /// - Returns: The hostname and service.
-  /// - Throws: `AddressResolutionError` if resolution fails.
+  /// - Throws: ``AddressResolutionError`` if resolution fails.
   ///
   /// The names can be as long as the C library's limits,
   /// the sizes of the buffers this method passes;
@@ -315,7 +335,7 @@ extension SocketAddress {
   /// The corresponding C function is `getnameinfo`.
   public func reverseLookup(
     flags: ReverseResolutionFlags = []
-  ) throws -> ReverseLookupResult {
+  ) throws(AddressResolutionError) -> ReverseLookupResult {
     var hostname = [CChar](repeating: 0, count: Int(NI_MAXHOST))
     var service = [CChar](repeating: 0, count: Int(NI_MAXSERV))
 

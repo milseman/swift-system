@@ -244,6 +244,33 @@ private struct MemoryFunctionTests {
     #expect(Memory.firstIndex(of: 0, in: UnsafeRawBufferPointer(start: nil, count: 0)) == nil)
   }
 
+  #if !os(WASI)
+  @available(System 199, *)
+  @Test func firstRangeFindsTheFirstMatch() {
+    func find(_ needle: String, in haystack: String) -> Range<Int>? {
+      Array(needle.utf8).withUnsafeBytes { needle in
+        Array(haystack.utf8).withUnsafeBytes { Memory.firstRange(of: needle, in: $0) }
+      }
+    }
+    let record = #"{"kind": "test", "version": "1.2", "other": "version"}"#
+    #expect(find(#""version": ""#, in: record) == 17..<29)
+    #expect(find("version", in: record) == 18..<25)
+    #expect(find(#""missing""#, in: record) == nil)
+    #expect(find("{", in: record) == 0..<1)
+    #expect(find("}", in: record) == 53..<54)
+    // Bytes longer than the buffer, or an empty buffer, contain no match.
+    #expect(find("abcd", in: "abc") == nil)
+    #expect(find("a", in: "") == nil)
+    // Empty bytes are found at the start, of any buffer.
+    #expect(find("", in: "abc") == 0..<0)
+    #expect(find("", in: "") == 0..<0)
+    // A match that ends the buffer, and a partial match before it.
+    #expect(find("abab", in: "abaabab") == 3..<7)
+    let empty = UnsafeRawBufferPointer(start: nil, count: 0)
+    #expect(Memory.firstRange(of: empty, in: empty) == 0..<0)
+  }
+  #endif
+
   @available(System 199, *)
   @Test func secureZeroClearsTheBuffer() {
     var secret = [UInt8](repeating: 0xAB, count: 100)
@@ -264,6 +291,11 @@ private struct MemoryFunctionTests {
     #expect(Memory.compare(RawSpan(_elements: abc.span), RawSpan(_elements: ab.span)) == 1)
     #expect(Memory.firstIndex(of: UInt8(ascii: "c"), in: RawSpan(_elements: abc.span)) == 2)
     #expect(Memory.firstIndex(of: UInt8(ascii: "z"), in: RawSpan(_elements: abc.span)) == nil)
+    #if !os(WASI)
+    #expect(Memory.firstRange(of: RawSpan(_elements: ContiguousArray("bc".utf8).span),
+                              in: RawSpan(_elements: abc.span)) == 1..<3)
+    #expect(Memory.firstRange(of: RawSpan(_elements: abd.span), in: RawSpan(_elements: abc.span)) == nil)
+    #endif
 
     var key = ContiguousArray<UInt8>(repeating: 0x5A, count: 32)
     do {
