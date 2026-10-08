@@ -325,6 +325,7 @@ target_sources(SystemPackage PRIVATE
   Terminal/TerminalFlags.swift
   Terminal/TerminalJobControl.swift
   Terminal/TerminalOperations.swift
+  Terminal/TerminalWASI.swift
   Terminal/TerminalWindowSize.swift)
 target_sources(SystemPackage PRIVATE
   Internals/Constants+Threads.swift

@@ -34,6 +34,9 @@ static inline int32_t _getConst_O_EXCL(void) { return O_EXCL; }
 static inline int32_t _getConst_O_NONBLOCK(void) { return O_NONBLOCK; }
 static inline int32_t _getConst_O_TRUNC(void) { return O_TRUNC; }
 static inline int32_t _getConst_O_WRONLY(void) { return O_WRONLY; }
+static inline int32_t _getConst_O_SYNC(void) { return O_SYNC; }
+static inline int32_t _getConst_O_DSYNC(void) { return O_DSYNC; }
+static inline int32_t _getConst_O_RSYNC(void) { return O_RSYNC; }
 
 static inline int32_t _getConst_EWOULDBLOCK(void) { return EWOULDBLOCK; }
 static inline int32_t _getConst_EOPNOTSUPP(void) { return EOPNOTSUPP; }
@@ -69,6 +72,10 @@ struct _system_dirent {
 // malloc_usable_size, which wasi-libc declares in <malloc.h>, which its
 // Swift module doesn't include; see shims.c.
 extern size_t csystem_malloc_usable_size(const void *pointer);
+
+// MAXSYMLINKS, from <sys/param.h>, which WASILibc's module doesn't include;
+// see shims.c.
+extern int _system_get_MAXSYMLINKS(void);
 
 // memmem, which wasi-libc defines, and whose <string.h> declares only with
 // _GNU_SOURCE, which Swift's import of WASILibc doesn't define; see shims.c.

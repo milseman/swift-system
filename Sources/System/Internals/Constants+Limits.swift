@@ -9,9 +9,9 @@
 
 // The C library's compile-time limits on names, paths and arguments.
 
-#if !os(Windows) && !os(WASI)
+#if !os(Windows)
 
-#if os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD)
+#if os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD) || os(WASI)
 import CSystem
 #endif
 #if SYSTEM_PACKAGE_DARWIN
@@ -20,6 +20,8 @@ import Darwin
 import Glibc
 #elseif canImport(Musl)
 import Musl
+#elseif canImport(WASILibc)
+import WASILibc
 #elseif canImport(Android)
 import Android
 #else
@@ -60,10 +62,10 @@ internal var _MAXSYMLINKS: CInt { _system_get_MAXSYMLINKS() }
 
 @_alwaysEmitIntoClient
 internal var _XATTR_MAXNAMELEN: CInt { _system_get_XATTR_NAME_MAX() }
-#elseif os(FreeBSD) || os(OpenBSD)
+#elseif os(FreeBSD) || os(OpenBSD) || os(WASI)
 // MAXSYMLINKS is in <sys/param.h>; shims.c returns it.
 @_alwaysEmitIntoClient
 internal var _MAXSYMLINKS: CInt { _system_get_MAXSYMLINKS() }
 #endif
 
-#endif // !os(Windows) && !os(WASI)
+#endif // !os(Windows)

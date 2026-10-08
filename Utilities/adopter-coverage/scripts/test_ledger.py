@@ -506,9 +506,9 @@ E_SWIFT = """#if canImport(Glibc)
 import Glibc
 #endif
 
-func wait(label: String, timeout: Int) -> Int32 {
+func wait(label: String, timeout: Int, overwrite: Int) -> Int32 {
     let deadline = timeout + 1
-    print(label, deadline)
+    print(label, deadline, overwrite, [1].map { raw in raw }, [2].map { buf in buf })
     return fsync(3)
 }
 
@@ -563,12 +563,15 @@ class ScanTests(unittest.TestCase):
         self.assertEqual(set(by[("Sources/Pkg/D.swift", 2)]["platforms"]), {"Android"})
 
     def test_swift_words_and_object_formats(self):
-        # `label` and `timeout` are parameter names here, not C's; and a
-        # marker under objectFormat() is compiled only where the format is.
+        # `label`, `timeout` and `overwrite` are parameter names here, and
+        # `raw` and `buf` a closure's, not C's; and a marker under
+        # objectFormat() is compiled only where the format is.
         commit = commit_files(self.repo, {"Sources/Pkg/E.swift": E_SWIFT}, "fixtures")
         modules = ledger.Modules(MODULES)
         vocab = ledger.Vocabulary({"Darwin.POSIX.unistd": {"fsync": [32768, 1], "label": [32768, 1],
-                                                           "timeout": [32768, 1]}}, modules, coverage())
+                                                           "timeout": [32768, 1], "overwrite": [32768, 1],
+                                                           "raw": [32768, 1], "buf": [32768, 1]}},
+                                  modules, coverage())
         sites, _ = ledger.scan_repository("pkg", self.repo, commit, None, modules, vocab,
                                           ledger.qualified_re(modules))
         by = {(s["file"], s["line"]): s for s in sites}

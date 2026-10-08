@@ -32,7 +32,6 @@ internal var _EXIT_SUCCESS: CInt { EXIT_SUCCESS }
 @_alwaysEmitIntoClient
 internal var _EXIT_FAILURE: CInt { EXIT_FAILURE }
 
-#if !os(WASI)
 @_alwaysEmitIntoClient
 internal var _EX_USAGE: CInt { EX_USAGE }
 
@@ -77,6 +76,5 @@ internal var _EX_NOPERM: CInt { EX_NOPERM }
 
 @_alwaysEmitIntoClient
 internal var _EX_CONFIG: CInt { EX_CONFIG }
-#endif // !os(WASI)
 
 #endif // !os(Windows)

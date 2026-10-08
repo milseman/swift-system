@@ -7,9 +7,9 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-// Synchronized I/O on Darwin, Linux, Android, FreeBSD and OpenBSD: O_SYNC
-// and O_DSYNC, which open() takes and F_GETFL reports, and on Darwin F_SETFL
-// changes. (FreeBSD's OpenOptions has .sync already, in FileDescriptor.swift.)
+// Synchronized I/O on Darwin, Linux, Android, FreeBSD, OpenBSD and WASI:
+// O_SYNC and O_DSYNC, which open() takes and F_GETFL reports, and on Darwin
+// and WASI F_SETFL changes. (FreeBSD's OpenOptions has .sync already, in FileDescriptor.swift.)
 // FreeBSD has O_DSYNC from 13.0; OpenBSD's O_DSYNC is O_SYNC.
 //
 // O_RSYNC is here where the headers declare it, and all of them make it
@@ -17,15 +17,19 @@
 // apart from writes, and OpenBSD, whose synchronized I/O is all or
 // nothing. Darwin's headers don't declare it, nor FreeBSD's ("XXX missing
 // O_RSYNC"). WASI's fdflags have O_DSYNC, O_RSYNC and O_SYNC, each its own
-// flag, but System has none of them on WASI.
+// flag, which CSystem's accessors read, since wasi-libc spells them in a
+// way that Swift doesn't import.
 
-#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD)
+#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD) || os(WASI)
 #if SYSTEM_PACKAGE_DARWIN
 import Darwin
 #elseif canImport(Glibc)
 import Glibc
 #elseif canImport(Musl)
 import Musl
+#elseif canImport(WASILibc)
+import CSystem
+import WASILibc
 #elseif canImport(Android)
 import Android
 #endif
@@ -43,8 +47,8 @@ extension FileDescriptor.OpenOptions {
   ///
   /// The corresponding C constant is `O_SYNC`.
   ///
-  /// - Note: Only available on Darwin, Linux, Android, and OpenBSD here;
-  ///   FreeBSD has its own.
+  /// - Note: Only available on Darwin, Linux, Android, OpenBSD, and WASI
+  ///   here; FreeBSD has its own.
   @_alwaysEmitIntoClient
   public static var sync: Self { Self(rawValue: _O_SYNC) }
 
@@ -61,7 +65,8 @@ extension FileDescriptor.OpenOptions {
   ///
   /// The corresponding C constant is `O_DSYNC`.
   ///
-  /// - Note: Only available on Darwin, Linux, Android, FreeBSD, and OpenBSD.
+  /// - Note: Only available on Darwin, Linux, Android, FreeBSD, OpenBSD,
+  ///   and WASI.
   @_alwaysEmitIntoClient
   public static var dataSync: Self { Self(rawValue: _O_DSYNC) }
 
@@ -69,7 +74,7 @@ extension FileDescriptor.OpenOptions {
   @available(*, unavailable, renamed: "dataSync")
   public static var O_DSYNC: Self { dataSync }
 
-  #if os(Linux) || os(Android) || os(OpenBSD)
+  #if os(Linux) || os(Android) || os(OpenBSD) || os(WASI)
   /// Makes each read wait, with ``sync`` or ``dataSync``,
   /// until writes still pending for the data it reads
   /// are written to the storage device, as that flag makes writes wait.
@@ -77,10 +82,12 @@ extension FileDescriptor.OpenOptions {
   /// On Linux, Android and OpenBSD it's the same flag as ``sync``,
   /// so it makes each write wait as ``sync`` does,
   /// and does nothing more for reads.
+  /// On WASI it's a flag of its own, which a runtime that doesn't
+  /// synchronize reads can refuse.
   ///
   /// The corresponding C constant is `O_RSYNC`.
   ///
-  /// - Note: Only available on Linux, Android, and OpenBSD.
+  /// - Note: Only available on Linux, Android, OpenBSD, and WASI.
   @_alwaysEmitIntoClient
   public static var readSync: Self { Self(rawValue: _O_RSYNC) }
 
@@ -100,7 +107,8 @@ extension FileDescriptor.StatusFlags {
   ///
   /// The corresponding C constant is `O_SYNC`.
   ///
-  /// - Note: Only available on Darwin, Linux, Android, FreeBSD, and OpenBSD.
+  /// - Note: Only available on Darwin, Linux, Android, FreeBSD, OpenBSD,
+  ///   and WASI.
   @_alwaysEmitIntoClient
   public static var sync: Self { Self(rawValue: _O_SYNC) }
 
@@ -116,7 +124,8 @@ extension FileDescriptor.StatusFlags {
   ///
   /// The corresponding C constant is `O_DSYNC`.
   ///
-  /// - Note: Only available on Darwin, Linux, Android, FreeBSD, and OpenBSD.
+  /// - Note: Only available on Darwin, Linux, Android, FreeBSD, OpenBSD,
+  ///   and WASI.
   @_alwaysEmitIntoClient
   public static var dataSync: Self { Self(rawValue: _O_DSYNC) }
 
@@ -124,17 +133,18 @@ extension FileDescriptor.StatusFlags {
   @available(*, unavailable, renamed: "dataSync")
   public static var O_DSYNC: Self { dataSync }
 
-  #if os(Linux) || os(Android) || os(OpenBSD)
+  #if os(Linux) || os(Android) || os(OpenBSD) || os(WASI)
   /// Each read waits, with ``sync`` or ``dataSync``,
   /// until writes still pending for the data it reads
   /// are written to the storage device.
   ///
   /// On Linux, Android and OpenBSD it's the same flag as ``sync``;
   /// on Linux, ``FileDescriptor/setStatusFlags(_:)`` can't change it.
+  /// On WASI it's a flag of its own.
   ///
   /// The corresponding C constant is `O_RSYNC`.
   ///
-  /// - Note: Only available on Linux, Android, and OpenBSD.
+  /// - Note: Only available on Linux, Android, OpenBSD, and WASI.
   @_alwaysEmitIntoClient
   public static var readSync: Self { Self(rawValue: _O_RSYNC) }
 
@@ -145,6 +155,16 @@ extension FileDescriptor.StatusFlags {
 }
 
 // Constants.swift has O_SYNC only for FreeBSD.
+#if os(WASI)
+@_alwaysEmitIntoClient
+internal var _O_SYNC: CInt { _getConst_O_SYNC() }
+
+@_alwaysEmitIntoClient
+internal var _O_DSYNC: CInt { _getConst_O_DSYNC() }
+
+@_alwaysEmitIntoClient
+internal var _O_RSYNC: CInt { _getConst_O_RSYNC() }
+#else
 #if !os(FreeBSD)
 @_alwaysEmitIntoClient
 internal var _O_SYNC: CInt { O_SYNC }
@@ -157,5 +177,6 @@ internal var _O_DSYNC: CInt { O_DSYNC }
 @_alwaysEmitIntoClient
 internal var _O_RSYNC: CInt { O_RSYNC }
 #endif
+#endif
 
-#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD)
+#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD) || os(WASI)

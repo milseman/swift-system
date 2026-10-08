@@ -203,7 +203,8 @@ extension Win32.JobHandle {
   /// The job's options.
   ///
   /// The corresponding C function is `QueryInformationJobObject`, with
-  /// `JobObjectExtendedLimitInformation`.
+  /// `JobObjectExtendedLimitInformation` and a
+  /// `JOBOBJECT_EXTENDED_LIMIT_INFORMATION`.
   @_alwaysEmitIntoClient
   public func options() throws(Win32.Error) -> Win32.JobOptions {
     Win32.JobOptions(
@@ -215,7 +216,8 @@ extension Win32.JobHandle {
   /// other limits.
   ///
   /// The corresponding C functions are `QueryInformationJobObject` and
-  /// `SetInformationJobObject`, with `JobObjectExtendedLimitInformation`.
+  /// `SetInformationJobObject`, with `JobObjectExtendedLimitInformation` and
+  /// a `JOBOBJECT_EXTENDED_LIMIT_INFORMATION`.
   @_alwaysEmitIntoClient
   public func setOptions(_ options: Win32.JobOptions) throws(Win32.Error) {
     try Win32._setOptions(_handle, options.rawValue).get()

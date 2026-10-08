@@ -994,6 +994,10 @@ extern size_t csystem_malloc_usable_size(const void *pointer) {
   return malloc_usable_size((void *)pointer);
 }
 
+// MAXSYMLINKS, from <sys/param.h>, which WASILibc's module doesn't include.
+#include <sys/param.h>
+int _system_get_MAXSYMLINKS(void) { return MAXSYMLINKS; }
+
 // wasi-libc's <string.h> declares memmem only with _GNU_SOURCE, which would
 // change other declarations in this file, so this declares it alone, as
 // wasi-libc defines it.

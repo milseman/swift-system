@@ -7,7 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-#if !os(Windows) && !os(WASI)
+#if !os(Windows)
 
 import Testing
 
@@ -17,6 +17,8 @@ import Darwin
 import Glibc
 #elseif canImport(Musl)
 import Musl
+#elseif canImport(WASILibc)
+import WASILibc
 #elseif canImport(Android)
 import Android
 #endif
@@ -53,6 +55,8 @@ private struct ExitCodeTests {
     #expect(ProcessID.ExitCode(rawValue: 3).description == "3")
   }
 
+  // WASI has no processes to exit in.
+  #if !os(WASI)
   @available(System 199, *)
   @Test func exitWithACode() async {
     await #expect(processExitsWith: .exitCode(EX_USAGE)) {
@@ -66,6 +70,7 @@ private struct ExitCodeTests {
       ProcessID.exitImmediately(.temporaryFailure)
     }
   }
+  #endif
 }
 
-#endif // !os(Windows) && !os(WASI)
+#endif // !os(Windows)

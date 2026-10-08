@@ -7,12 +7,12 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-// The calls behind unique files with permissions on Linux and Android,
-// where System makes the name itself rather than calling mktemp, so a mock
+// The calls behind unique files with permissions on Linux, Android,
+// FreeBSD and OpenBSD, where System makes the name itself rather than calling mktemp, so a mock
 // trace has only the opens. UniqueFilesWithPermissionsTest has the real
 // calls, on every platform, and Darwin's mock tests.
 
-#if (os(Linux) || os(Android)) && ENABLE_MOCKING
+#if (os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD)) && ENABLE_MOCKING
 
 import XCTest
 
@@ -109,4 +109,4 @@ final class UniqueFilesWithPermissionsLinuxTest: XCTestCase {
   }
 }
 
-#endif // (os(Linux) || os(Android)) && ENABLE_MOCKING
+#endif // (os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD)) && ENABLE_MOCKING

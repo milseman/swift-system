@@ -7,7 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-#if !os(Windows) && !os(WASI)
+#if !os(Windows)
 
 // The limits the C library's headers define, for sizing a buffer before
 // there's a file to ask. A file system can have lower limits of its own,
@@ -80,7 +80,7 @@ extension SystemConfig {
   public static var maxExtendedAttributeNameBytes: Int { Int(_XATTR_MAXNAMELEN) }
   #endif
 
-  #if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD)
+  #if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD) || os(WASI)
   /// The maximum number of symbolic links that resolving one path follows,
   /// as the C library's headers define it.
   ///
@@ -89,14 +89,15 @@ extension SystemConfig {
   /// fails with ``Errno/tooManySymbolicLinkLevels``.
   /// On Linux the headers' limit, 20 in glibc and Musl,
   /// is lower than the kernel's: the kernel follows up to 40 links.
-  /// FreeBSD's and OpenBSD's is 32.
+  /// FreeBSD's and OpenBSD's is 32, and WASI's, Musl's, 20.
   ///
   /// The corresponding C constant is `MAXSYMLINKS`.
   ///
-  /// - Note: Only available on Darwin, Linux, Android, FreeBSD, and OpenBSD.
+  /// - Note: Only available on Darwin, Linux, Android, FreeBSD, OpenBSD,
+  ///   and WASI.
   @_alwaysEmitIntoClient
   public static var maxSymbolicLinks: Int { Int(_MAXSYMLINKS) }
   #endif
 }
 
-#endif // !os(Windows) && !os(WASI)
+#endif // !os(Windows)

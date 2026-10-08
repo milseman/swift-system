@@ -261,7 +261,7 @@ extension Win32.TokenHandle {
   /// Needs ``Win32/TokenAccess/query``.
   ///
   /// The corresponding C function is `GetTokenInformation`, with
-  /// `TokenElevation`.
+  /// `TokenElevation` and a `TOKEN_ELEVATION`.
   @_alwaysEmitIntoClient
   public func isElevated() throws(Win32.Error) -> Bool {
     try Win32.TokenHandle._isElevated(_handle).get()

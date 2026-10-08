@@ -27,7 +27,7 @@ extension Win32 {
   /// ``withUnsafeBytes(_:)`` lends them to a Windows function that takes a
   /// `PSID`.
   ///
-  /// The corresponding C type is `SID`.
+  /// The corresponding C type is `SID`, and `PSID` a pointer to one.
   @frozen
   public struct SecurityIdentifier: Hashable, Sendable {
     // The SID's bytes: its revision, 1; its count of subauthorities; its
@@ -158,6 +158,9 @@ extension Win32.SecurityIdentifier: CustomStringConvertible, CustomDebugStringCo
   /// The identifier's string form, such as `S-1-5-32-544`, as
   /// `ConvertSidToStringSidW` writes it: an authority that doesn't fit in
   /// 32 bits is written as 12 hexadecimal digits after `0x`.
+  ///
+  /// The corresponding C function is `ConvertSidToStringSidW`, whose form
+  /// this writes without allocating it in the local heap.
   @inline(never)
   public var description: String {
     let authority = _authority
