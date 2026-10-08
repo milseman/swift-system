@@ -68,6 +68,33 @@ final class Win32ErrorTests: XCTestCase {
       (.cannotResolveFileName, DWORD(WinSDK.ERROR_CANT_RESOLVE_FILENAME)),
       (.notAReparsePoint, DWORD(WinSDK.ERROR_NOT_A_REPARSE_POINT)),
       (.invalidReparseData, DWORD(WinSDK.ERROR_INVALID_REPARSE_DATA)),
+      (.invalidBlock, DWORD(WinSDK.ERROR_INVALID_BLOCK)),
+      (.invalidAccess, DWORD(WinSDK.ERROR_INVALID_ACCESS)),
+      (.invalidData, DWORD(WinSDK.ERROR_INVALID_DATA)),
+      (.invalidDrive, DWORD(WinSDK.ERROR_INVALID_DRIVE)),
+      (.currentDirectory, DWORD(WinSDK.ERROR_CURRENT_DIRECTORY)),
+      (.noMoreFiles, DWORD(WinSDK.ERROR_NO_MORE_FILES)),
+      (.writeProtected, DWORD(WinSDK.ERROR_WRITE_PROTECT)),
+      (.badNetworkPath, DWORD(WinSDK.ERROR_BAD_NETPATH)),
+      (.networkAccessDenied, DWORD(WinSDK.ERROR_NETWORK_ACCESS_DENIED)),
+      (.badNetworkName, DWORD(WinSDK.ERROR_BAD_NET_NAME)),
+      (.cannotCreate, DWORD(WinSDK.ERROR_CANNOT_MAKE)),
+      (.failOnInterrupt24, DWORD(WinSDK.ERROR_FAIL_I24)),
+      (.bufferOverflow, DWORD(WinSDK.ERROR_BUFFER_OVERFLOW)),
+      (.invalidTargetHandle, DWORD(WinSDK.ERROR_INVALID_TARGET_HANDLE)),
+      (.seekOnDevice, DWORD(WinSDK.ERROR_SEEK_ON_DEVICE)),
+      (.labelTooLong, DWORD(WinSDK.ERROR_LABEL_TOO_LONG)),
+      (.badArguments, DWORD(WinSDK.ERROR_BAD_ARGUMENTS)),
+      (.maxThreadsReached, DWORD(WinSDK.ERROR_MAX_THRDS_REACHED)),
+      (.lockFailed, DWORD(WinSDK.ERROR_LOCK_FAILED)),
+      (.invalidStartingCodeSegment, DWORD(WinSDK.ERROR_INVALID_STARTING_CODESEG)),
+      (.fileNameOrExtensionTooLong, DWORD(WinSDK.ERROR_FILENAME_EXCED_RANGE)),
+      (.diskResourcesExhausted, DWORD(WinSDK.ERROR_DISK_RESOURCES_EXHAUSTED)),
+      (.fileSystemLimitation, DWORD(WinSDK.ERROR_FILE_SYSTEM_LIMITATION)),
+      (.ioIncomplete, DWORD(WinSDK.ERROR_IO_INCOMPLETE)),
+      (.notFound, DWORD(WinSDK.ERROR_NOT_FOUND)),
+      (.canceledByUser, DWORD(WinSDK.ERROR_CANCELLED)),
+      (.timeoutExpired, DWORD(WinSDK.ERROR_TIMEOUT)),
     ]
     for (error, code) in codes {
       XCTAssertEqual(error.rawValue, code, error.debugDescription)
@@ -75,7 +102,49 @@ final class Win32ErrorTests: XCTestCase {
     }
   }
 
+  func testSuccessIsNoError() {
+    XCTAssertEqual(Win32.Error.success.rawValue, DWORD(WinSDK.NO_ERROR))
+  }
+
+  func testEveryNamedCodeHasItsSymbolicName() {
+    // Each name is the one the SDK spells the code with, checked above.
+    XCTAssertEqual(Win32.Error.noMoreFiles.debugDescription, "ERROR_NO_MORE_FILES (18, 0x12)")
+    XCTAssertEqual(Win32.Error.timeoutExpired.debugDescription, "ERROR_TIMEOUT (1460, 0x5B4)")
+    XCTAssertEqual(
+      Win32.Error.fileNameOrExtensionTooLong.debugDescription,
+      "ERROR_FILENAME_EXCED_RANGE (206, 0xCE)")
+    XCTAssertEqual(
+      Win32.Error.invalidReparseData.debugDescription, "ERROR_INVALID_REPARSE_DATA (4392, 0x1128)")
+  }
+
+  func testTheCurrentLastError() {
+    // Each thread has its own last error, so this test's settings are its
+    // own; it restores what it found.
+    let saved = GetLastError()
+    defer { SetLastError(saved) }
+
+    SetLastError(DWORD(WinSDK.ERROR_NOT_FOUND))
+    XCTAssertEqual(Win32.Error.current, .notFound)
+
+    Win32.Error.current = .timeoutExpired
+    let code = GetLastError()
+    XCTAssertEqual(code, DWORD(WinSDK.ERROR_TIMEOUT))
+
+    Win32.Error.current = .success
+    XCTAssertEqual(Win32.Error.current, .success)
+  }
+
+  func testTheCurrentLastErrorAfterAFailure() {
+    // A null handle is never valid, and asking about one changes nothing.
+    var flags: DWORD = 0
+    let succeeded = GetHandleInformation(nil, &flags)
+    let error = Win32.Error.current
+    XCTAssertFalse(succeeded)
+    XCTAssertEqual(error, .invalidHandle)
+  }
+
   func testInternalConstantsMatchTheSDK() {
+    XCTAssertEqual(_FORMAT_MESSAGE_FROM_HMODULE, DWORD(WinSDK.FORMAT_MESSAGE_FROM_HMODULE))
     XCTAssertEqual(_FORMAT_MESSAGE_ALLOCATE_BUFFER, DWORD(WinSDK.FORMAT_MESSAGE_ALLOCATE_BUFFER))
     XCTAssertEqual(_FORMAT_MESSAGE_FROM_SYSTEM, DWORD(WinSDK.FORMAT_MESSAGE_FROM_SYSTEM))
     XCTAssertEqual(_FORMAT_MESSAGE_IGNORE_INSERTS, DWORD(WinSDK.FORMAT_MESSAGE_IGNORE_INSERTS))

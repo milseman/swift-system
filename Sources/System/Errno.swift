@@ -9,6 +9,9 @@
 
 /// An error number used by system calls to communicate what kind of error
 /// occurred.
+///
+/// The corresponding C type is `errno_t`, the type that Windows and C11's
+/// bounds-checking interfaces give an error number.
 @frozen
 @available(System 0.0.1, *)
 public struct Errno: RawRepresentable, Error, Hashable, Codable {
@@ -1565,6 +1568,8 @@ extension Errno {
   /// Each thread has its own `errno`.
   ///
   /// The corresponding C global variable is `errno`.
+  /// On Windows, the corresponding C functions are `_get_errno` and
+  /// `_set_errno`, which the C runtime reads and sets it with.
   @_alwaysEmitIntoClient
   public static var current: Errno {
     get { _current }

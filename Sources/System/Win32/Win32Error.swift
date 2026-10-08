@@ -50,7 +50,8 @@ extension Win32.Error {
   /// A failing Win32 function can leave this code in place, so a
   /// `throws(Win32.Error)` function can throw it.
   ///
-  /// The corresponding C constant is `ERROR_SUCCESS`.
+  /// The corresponding C constant is `ERROR_SUCCESS`, also known as
+  /// `NO_ERROR`.
   @_alwaysEmitIntoClient
   public static var success: Win32.Error { Win32.Error(rawValue: 0) }
 
@@ -364,6 +365,227 @@ extension Win32.Error {
   public var isSynthesized: Bool { rawValue & 0xFFFF_FF00 == 0xA053_5900 }
 }
 
+// More codes that Windows' file, network, thread and wait functions report,
+// in their numeric order, which adopters test for or map onto errno values.
+@available(System 199, *)
+extension Win32.Error {
+  /// The storage control block address isn't valid.
+  ///
+  /// The corresponding C constant is `ERROR_INVALID_BLOCK`.
+  @_alwaysEmitIntoClient
+  public static var invalidBlock: Win32.Error { Win32.Error(rawValue: 9) }
+
+  /// The access code isn't valid.
+  ///
+  /// The corresponding C constant is `ERROR_INVALID_ACCESS`.
+  @_alwaysEmitIntoClient
+  public static var invalidAccess: Win32.Error { Win32.Error(rawValue: 12) }
+
+  /// The data isn't valid.
+  ///
+  /// The corresponding C constant is `ERROR_INVALID_DATA`.
+  @_alwaysEmitIntoClient
+  public static var invalidData: Win32.Error { Win32.Error(rawValue: 13) }
+
+  /// The system can't find the drive specified.
+  ///
+  /// The corresponding C constant is `ERROR_INVALID_DRIVE`.
+  @_alwaysEmitIntoClient
+  public static var invalidDrive: Win32.Error { Win32.Error(rawValue: 15) }
+
+  /// The directory can't be removed, as when it's the current directory.
+  ///
+  /// The corresponding C constant is `ERROR_CURRENT_DIRECTORY`.
+  @_alwaysEmitIntoClient
+  public static var currentDirectory: Win32.Error { Win32.Error(rawValue: 16) }
+
+  /// There are no more files: a directory enumeration has reached its end.
+  ///
+  /// `FindNextFileW` reports the end of a directory this way.
+  ///
+  /// The corresponding C constant is `ERROR_NO_MORE_FILES`.
+  @_alwaysEmitIntoClient
+  public static var noMoreFiles: Win32.Error { Win32.Error(rawValue: 18) }
+
+  /// The media is write protected.
+  ///
+  /// The corresponding C constant is `ERROR_WRITE_PROTECT`.
+  @_alwaysEmitIntoClient
+  public static var writeProtected: Win32.Error { Win32.Error(rawValue: 19) }
+
+  /// The network path wasn't found.
+  ///
+  /// The corresponding C constant is `ERROR_BAD_NETPATH`.
+  @_alwaysEmitIntoClient
+  public static var badNetworkPath: Win32.Error { Win32.Error(rawValue: 53) }
+
+  /// Network access is denied.
+  ///
+  /// The corresponding C constant is `ERROR_NETWORK_ACCESS_DENIED`.
+  @_alwaysEmitIntoClient
+  public static var networkAccessDenied: Win32.Error { Win32.Error(rawValue: 65) }
+
+  /// The network name can't be found.
+  ///
+  /// The corresponding C constant is `ERROR_BAD_NET_NAME`.
+  @_alwaysEmitIntoClient
+  public static var badNetworkName: Win32.Error { Win32.Error(rawValue: 67) }
+
+  /// The directory or file can't be created.
+  ///
+  /// The corresponding C constant is `ERROR_CANNOT_MAKE`.
+  @_alwaysEmitIntoClient
+  public static var cannotCreate: Win32.Error { Win32.Error(rawValue: 82) }
+
+  /// The operation failed in the critical-error handler, interrupt 24h,
+  /// as for a device that's not ready.
+  ///
+  /// The corresponding C constant is `ERROR_FAIL_I24`.
+  @_alwaysEmitIntoClient
+  public static var failOnInterrupt24: Win32.Error { Win32.Error(rawValue: 83) }
+
+  /// A buffer is too small for the data.
+  ///
+  /// `GetAdaptersAddresses` reports a buffer too small for the adapters this
+  /// way. The system's message for it says that a file name is too long.
+  ///
+  /// The corresponding C constant is `ERROR_BUFFER_OVERFLOW`.
+  @_alwaysEmitIntoClient
+  public static var bufferOverflow: Win32.Error { Win32.Error(rawValue: 111) }
+
+  /// The target internal file identifier isn't valid.
+  ///
+  /// The corresponding C constant is `ERROR_INVALID_TARGET_HANDLE`.
+  @_alwaysEmitIntoClient
+  public static var invalidTargetHandle: Win32.Error { Win32.Error(rawValue: 114) }
+
+  /// The file pointer can't be set on the specified device or file.
+  ///
+  /// The corresponding C constant is `ERROR_SEEK_ON_DEVICE`.
+  @_alwaysEmitIntoClient
+  public static var seekOnDevice: Win32.Error { Win32.Error(rawValue: 132) }
+
+  /// The volume label is longer than the file system allows.
+  ///
+  /// The corresponding C constant is `ERROR_LABEL_TOO_LONG`.
+  @_alwaysEmitIntoClient
+  public static var labelTooLong: Win32.Error { Win32.Error(rawValue: 154) }
+
+  /// One or more arguments aren't correct.
+  ///
+  /// The corresponding C constant is `ERROR_BAD_ARGUMENTS`.
+  @_alwaysEmitIntoClient
+  public static var badArguments: Win32.Error { Win32.Error(rawValue: 160) }
+
+  /// The system can't create another thread.
+  ///
+  /// The corresponding C constant is `ERROR_MAX_THRDS_REACHED`.
+  @_alwaysEmitIntoClient
+  public static var maxThreadsReached: Win32.Error { Win32.Error(rawValue: 164) }
+
+  /// A region of a file can't be locked.
+  ///
+  /// The corresponding C constant is `ERROR_LOCK_FAILED`.
+  @_alwaysEmitIntoClient
+  public static var lockFailed: Win32.Error { Win32.Error(rawValue: 167) }
+
+  /// An executable's starting code segment isn't valid: the file isn't a
+  /// program Windows can run.
+  ///
+  /// The corresponding C constant is `ERROR_INVALID_STARTING_CODESEG`.
+  @_alwaysEmitIntoClient
+  public static var invalidStartingCodeSegment: Win32.Error { Win32.Error(rawValue: 188) }
+
+  /// The file name or extension is too long.
+  ///
+  /// The corresponding C constant is `ERROR_FILENAME_EXCED_RANGE`.
+  @_alwaysEmitIntoClient
+  public static var fileNameOrExtensionTooLong: Win32.Error { Win32.Error(rawValue: 206) }
+
+  /// The disk's physical resources are exhausted.
+  ///
+  /// The corresponding C constant is `ERROR_DISK_RESOURCES_EXHAUSTED`.
+  @_alwaysEmitIntoClient
+  public static var diskResourcesExhausted: Win32.Error { Win32.Error(rawValue: 314) }
+
+  /// A file system limitation keeps the operation from completing, as when
+  /// a file has too many fragments to grow.
+  ///
+  /// The corresponding C constant is `ERROR_FILE_SYSTEM_LIMITATION`.
+  @_alwaysEmitIntoClient
+  public static var fileSystemLimitation: Win32.Error { Win32.Error(rawValue: 665) }
+
+  /// An overlapped operation hasn't completed.
+  ///
+  /// `GetOverlappedResult` reports an operation still in progress this way
+  /// when it isn't asked to wait.
+  ///
+  /// The corresponding C constant is `ERROR_IO_INCOMPLETE`.
+  @_alwaysEmitIntoClient
+  public static var ioIncomplete: Win32.Error { Win32.Error(rawValue: 996) }
+
+  /// The element wasn't found.
+  ///
+  /// `CancelIoEx` reports that it found no operation to cancel this way.
+  ///
+  /// The corresponding C constant is `ERROR_NOT_FOUND`.
+  @_alwaysEmitIntoClient
+  public static var notFound: Win32.Error { Win32.Error(rawValue: 1168) }
+
+  /// The user canceled the operation, as by closing a dialog.
+  ///
+  /// The corresponding C constant is `ERROR_CANCELLED`.
+  @_alwaysEmitIntoClient
+  public static var canceledByUser: Win32.Error { Win32.Error(rawValue: 1223) }
+
+  /// The timeout expired before the operation completed.
+  ///
+  /// `SleepConditionVariableSRW` reports a wait that timed out this way.
+  ///
+  /// The corresponding C constant is `ERROR_TIMEOUT`.
+  @_alwaysEmitIntoClient
+  public static var timeoutExpired: Win32.Error { Win32.Error(rawValue: 1460) }
+}
+
+@available(System 199, *)
+extension Win32.Error {
+  // PROTOTYPE: public access to the last error, which needs the same care
+  // as Errno.current's access to errno. Whether to offer either is still
+  // open; see Prototype/PosixMore.
+
+  /// The calling thread's last error, which Win32 functions set when they
+  /// fail.
+  ///
+  /// - Important: The value is reliable only when it's read immediately
+  ///   after the Win32 call that set it, because Swift can run other code
+  ///   between the call and the read: releasing a value can run
+  ///   a deinitializer that calls `CloseHandle` or frees memory,
+  ///   which can change the last error.
+  ///   Read it in the statement after the call,
+  ///   before using any other value.
+  ///
+  /// Most Win32 functions set the last error only when they fail, so its
+  /// value means something only after a call that reported a failure. A
+  /// function whose failure value is also a result, such as `GetFileType`,
+  /// whose `FILE_TYPE_UNKNOWN` can mean either, needs the last error
+  /// cleared first, which setting this property does:
+  ///
+  ///     Win32.Error.current = .success
+  ///     let type = GetFileType(handle)
+  ///     if type == FILE_TYPE_UNKNOWN && Win32.Error.current != .success {
+  ///       throw Win32.Error.current
+  ///     }
+  ///
+  /// Each thread has its own last error.
+  ///
+  /// The corresponding C functions are `GetLastError` and `SetLastError`.
+  @_alwaysEmitIntoClient
+  public static var current: Win32.Error {
+    get { Win32.Error(rawValue: GetLastError()) }
+    set { SetLastError(newValue.rawValue) }
+  }
+}
+
 @available(System 199, *)
 extension Win32.Error: CustomStringConvertible, CustomDebugStringConvertible {
   /// The system's message for this code.
@@ -373,7 +595,9 @@ extension Win32.Error: CustomStringConvertible, CustomDebugStringConvertible {
   /// frees a buffer, so avoid it in hot paths. A code with no system message
   /// is rendered as a number.
   ///
-  /// The corresponding C function is `FormatMessageW`.
+  /// The corresponding C function is `FormatMessageW`, with
+  /// `FORMAT_MESSAGE_FROM_SYSTEM`, `FORMAT_MESSAGE_ALLOCATE_BUFFER` and
+  /// `FORMAT_MESSAGE_IGNORE_INSERTS`.
   @inline(never)
   public var description: String {
     if let message = _synthesizedMessage { return message }
@@ -404,27 +628,7 @@ extension Win32.Error {
   }
 
   internal var _systemMessage: String? {
-    // FORMAT_MESSAGE_ALLOCATE_BUFFER makes the buffer parameter a pointer to
-    // the pointer that receives the allocation.
-    var buffer: UnsafeMutablePointer<WCHAR>? = nil
-    let length = withUnsafeMutablePointer(to: &buffer) { pointer in
-      pointer.withMemoryRebound(
-        to: WCHAR.self,
-        capacity: MemoryLayout<UnsafeMutablePointer<WCHAR>?>.size / MemoryLayout<WCHAR>.size
-      ) { buffer in
-        system_FormatMessageW(
-          _FORMAT_MESSAGE_ALLOCATE_BUFFER | _FORMAT_MESSAGE_FROM_SYSTEM
-            | _FORMAT_MESSAGE_IGNORE_INSERTS,
-          nil, rawValue, 0, buffer, 0)
-      }
-    }
-    guard length > 0, let buffer else { return nil }
-    defer { _ = system_LocalFree(buffer) }
-    var message = String(
-      decoding: UnsafeBufferPointer(start: buffer, count: Int(length)), as: UTF16.self)
-    // System messages end with "\r\n".
-    while let last = message.last, last.isWhitespace { message.removeLast() }
-    return message
+    _win32Message(rawValue, flags: _FORMAT_MESSAGE_FROM_SYSTEM, source: nil)
   }
 
   // Codes System synthesizes have no system message.
@@ -446,7 +650,14 @@ extension Win32.Error {
     case 5: return "ERROR_ACCESS_DENIED"
     case 6: return "ERROR_INVALID_HANDLE"
     case 8: return "ERROR_NOT_ENOUGH_MEMORY"
+    case 9: return "ERROR_INVALID_BLOCK"
+    case 12: return "ERROR_INVALID_ACCESS"
+    case 13: return "ERROR_INVALID_DATA"
+    case 15: return "ERROR_INVALID_DRIVE"
+    case 16: return "ERROR_CURRENT_DIRECTORY"
     case 17: return "ERROR_NOT_SAME_DEVICE"
+    case 18: return "ERROR_NO_MORE_FILES"
+    case 19: return "ERROR_WRITE_PROTECT"
     case 21: return "ERROR_NOT_READY"
     case 23: return "ERROR_CRC"
     case 29: return "ERROR_WRITE_FAULT"
@@ -454,35 +665,85 @@ extension Win32.Error {
     case 33: return "ERROR_LOCK_VIOLATION"
     case 38: return "ERROR_HANDLE_EOF"
     case 50: return "ERROR_NOT_SUPPORTED"
+    case 53: return "ERROR_BAD_NETPATH"
+    case 65: return "ERROR_NETWORK_ACCESS_DENIED"
+    case 67: return "ERROR_BAD_NET_NAME"
     case 80: return "ERROR_FILE_EXISTS"
+    case 82: return "ERROR_CANNOT_MAKE"
+    case 83: return "ERROR_FAIL_I24"
     case 87: return "ERROR_INVALID_PARAMETER"
     case 109: return "ERROR_BROKEN_PIPE"
+    case 111: return "ERROR_BUFFER_OVERFLOW"
     case 112: return "ERROR_DISK_FULL"
+    case 114: return "ERROR_INVALID_TARGET_HANDLE"
     case 122: return "ERROR_INSUFFICIENT_BUFFER"
     case 123: return "ERROR_INVALID_NAME"
     case 126: return "ERROR_MOD_NOT_FOUND"
     case 127: return "ERROR_PROC_NOT_FOUND"
     case 131: return "ERROR_NEGATIVE_SEEK"
+    case 132: return "ERROR_SEEK_ON_DEVICE"
     case 145: return "ERROR_DIR_NOT_EMPTY"
+    case 154: return "ERROR_LABEL_TOO_LONG"
     case 158: return "ERROR_NOT_LOCKED"
+    case 160: return "ERROR_BAD_ARGUMENTS"
     case 161: return "ERROR_BAD_PATHNAME"
+    case 164: return "ERROR_MAX_THRDS_REACHED"
+    case 167: return "ERROR_LOCK_FAILED"
     case 183: return "ERROR_ALREADY_EXISTS"
+    case 188: return "ERROR_INVALID_STARTING_CODESEG"
+    case 206: return "ERROR_FILENAME_EXCED_RANGE"
     case 223: return "ERROR_FILE_TOO_LARGE"
     case 231: return "ERROR_PIPE_BUSY"
     case 232: return "ERROR_NO_DATA"
     case 233: return "ERROR_PIPE_NOT_CONNECTED"
     case 234: return "ERROR_MORE_DATA"
     case 267: return "ERROR_DIRECTORY"
+    case 314: return "ERROR_DISK_RESOURCES_EXHAUSTED"
+    case 665: return "ERROR_FILE_SYSTEM_LIMITATION"
     case 995: return "ERROR_OPERATION_ABORTED"
+    case 996: return "ERROR_IO_INCOMPLETE"
     case 997: return "ERROR_IO_PENDING"
+    case 1168: return "ERROR_NOT_FOUND"
+    case 1223: return "ERROR_CANCELLED"
     case 1224: return "ERROR_USER_MAPPED_FILE"
     case 1314: return "ERROR_PRIVILEGE_NOT_HELD"
+    case 1332: return "ERROR_NONE_MAPPED"
+    case 1337: return "ERROR_INVALID_SID"
+    case 1355: return "ERROR_NO_SUCH_DOMAIN"
+    case 1460: return "ERROR_TIMEOUT"
     case 1921: return "ERROR_CANT_RESOLVE_FILENAME"
+    case 4390: return "ERROR_NOT_A_REPARSE_POINT"
+    case 4392: return "ERROR_INVALID_REPARSE_DATA"
     // System's own code has no C name.
     case Win32.Error.incompleteTransfer.rawValue: return "incompleteTransfer"
     default: return nil
     }
   }
+}
+
+/// The message that `FormatMessageW` finds for a code, from the system's
+/// message tables or a module's, or `nil` if it finds none.
+internal func _win32Message(_ code: DWORD, flags: DWORD, source: HMODULE?) -> String? {
+  // FORMAT_MESSAGE_ALLOCATE_BUFFER makes the buffer parameter a pointer to
+  // the pointer that receives the allocation.
+  var buffer: UnsafeMutablePointer<WCHAR>? = nil
+  let length = withUnsafeMutablePointer(to: &buffer) { pointer in
+    pointer.withMemoryRebound(
+      to: WCHAR.self,
+      capacity: MemoryLayout<UnsafeMutablePointer<WCHAR>?>.size / MemoryLayout<WCHAR>.size
+    ) { buffer in
+      system_FormatMessageW(
+        _FORMAT_MESSAGE_ALLOCATE_BUFFER | _FORMAT_MESSAGE_IGNORE_INSERTS | flags,
+        source.map { UnsafeRawPointer($0) }, code, 0, buffer, 0)
+    }
+  }
+  guard length > 0, let buffer else { return nil }
+  defer { _ = system_LocalFree(buffer) }
+  var message = String(
+    decoding: UnsafeBufferPointer(start: buffer, count: Int(length)), as: UTF16.self)
+  // System messages end with "\r\n".
+  while let last = message.last, last.isWhitespace { message.removeLast() }
+  return message
 }
 
 @available(System 199, *)

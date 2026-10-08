@@ -115,6 +115,20 @@ final class Win32HResultTests: XCTestCase {
     }
   }
 
+  func testTheWin32ErrorAResultCarries() {
+    XCTAssertEqual(Win32.Error(hResult: .accessDenied), .accessDenied)
+    XCTAssertEqual(Win32.Error(hResult: Win32.HResult(win32Error: .fileNotFound)), .fileNotFound)
+    // Both successes are success.
+    XCTAssertEqual(Win32.Error(hResult: .ok), .success)
+    XCTAssertEqual(Win32.Error(hResult: .false), .success)
+    // A failure in another facility keeps its bit pattern.
+    XCTAssertEqual(Win32.Error(hResult: .unspecifiedFailure).rawValue, 0x8000_4005)
+    XCTAssertEqual(Win32.Error(hResult: .unexpectedFailure).rawValue, 0x8000_FFFF)
+    // System's own codes survive the trip.
+    XCTAssertEqual(
+      Win32.Error(hResult: Win32.HResult(win32Error: .incompleteTransfer)), .incompleteTransfer)
+  }
+
   func testWin32ErrorsFromHRESULTs() {
     // The conversion System's Win32 API applies to a failed HRESULT.
     XCTAssertEqual(_win32Error(fromHRESULT: Win32.HResult.accessDenied.rawValue), 5)

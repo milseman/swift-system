@@ -23,6 +23,9 @@ import WinSDK
 internal var _FORMAT_MESSAGE_ALLOCATE_BUFFER: DWORD { 0x0000_0100 }
 
 @_alwaysEmitIntoClient
+internal var _FORMAT_MESSAGE_FROM_HMODULE: DWORD { 0x0000_0800 }
+
+@_alwaysEmitIntoClient
 internal var _FORMAT_MESSAGE_FROM_SYSTEM: DWORD { 0x0000_1000 }
 
 @_alwaysEmitIntoClient

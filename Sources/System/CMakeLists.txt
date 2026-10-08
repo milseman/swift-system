@@ -392,6 +392,7 @@ target_sources(SystemPackage PRIVATE
   Win32/Win32Jobs.swift
   Win32/Win32Locking.swift
   Win32/Win32LongPaths.swift
+  Win32/Win32NTStatus.swift
   Win32/Win32NetworkAdapters.swift
   Win32/Win32Open.swift
   Win32/Win32OverlappedIO.swift
