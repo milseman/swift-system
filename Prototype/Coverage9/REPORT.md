@@ -34,6 +34,7 @@ unblocked") but the socket ones, which wait on Michael's decision about the Wind
 | 11 | `Win32.PriorityClass`; `Win32.readPassphrase(prompt:maxCount:)`; `fseek` | 80, 89, 155, 167, 168 | `5305bb0`, `c112feb` | 11 |
 | 12 | The ledger's readings: Swift words, `.member` in markers | 46 (its reading), 87, 91, 92 | `e668021`, `42f214a` | 12 |
 | 13 | Design questions, needs, and what can't be filled | the rest | none | 13 |
+| 14 | Bookkeeping: mapping.ini, and the Windows current directory | 140, 141 | each item's, and the report's | 14 |
 
 Names: no new public top-level name. `Memory`, `CString` and `Signal` are names System has elsewhere, now on Windows;
 the other new types (`Win32.NTStatus`, `Win32.KnownFolder`, `Win32.KnownFolderOptions`, `Win32.PriorityClass`) are
@@ -334,7 +335,11 @@ attributes]` (new, covered), `[Win32 scalar types]` (`UINT`, `ULONGLONG`, `ULONG
 `[Windows DLLs]` (`LoadLibraryW`), `[Windows local memory]`, `[Windows handles]`, `[Windows paths]`, `[Windows known
 folders]`, `[Windows named pipes]`, `[PATH_MAX]`, `[stdio]`, `[getenv]`, `[isatty]` (new), `[timespec_get]` (new),
 `[Windows wall clock]` (new), `[Windows threads]`, `[Windows I/O completion ports]`, `[executable path]`, `[Windows
-file information]`, `[Windows file times]` (new), `[Windows consoles]`. Six notes said System lacked API it has (F5).
+file information]`, `[Windows file times]` (new), `[Windows consoles]`, and `[Windows current directory]` (new, with the
+report: `GetCurrentDirectoryW` and `SetCurrentDirectoryW`, rows 140 and 141, covered by
+`FilePath.currentWorkingDirectory()` and `setCurrentWorkingDirectory(_:)` over `_wgetcwd` and `_wchdir`, which also
+set the drive's `=C:` variable; Foundation's `FileManager+Directories.swift:560-586`). Six notes said System lacked
+API it has (F5).
 
 ## Per-gap adopter changes
 
