@@ -446,7 +446,8 @@ extension FileStream {
   /// In a stream that translates newlines,
   /// positions count the file's bytes, so `\r\n` counts as two.
   ///
-  /// The corresponding C function is `_fseeki64`.
+  /// The corresponding C function is `_fseeki64`, or `fseek`, whose offset
+  /// is a 32-bit `long` on Windows.
   @_alwaysEmitIntoClient
   public func seek(offset: Int64, from origin: FileDescriptor.SeekOrigin) throws(Errno) {
     try _seek(offset: offset, from: origin).get()

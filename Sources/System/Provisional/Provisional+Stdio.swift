@@ -552,7 +552,8 @@ extension FileStream {
   /// A stream over a pipe, a socket or a terminal can't move,
   /// and throws ``Errno/illegalSeek``.
   ///
-  /// The corresponding C function is `fseeko`.
+  /// The corresponding C function is `fseeko`, or `fseek`, whose offset is
+  /// a `long`.
   @_alwaysEmitIntoClient
   public func seek(offset: Int64, from origin: FileDescriptor.SeekOrigin) throws(Errno) {
     try _seek(offset: offset, from: origin).get()

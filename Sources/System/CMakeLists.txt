@@ -402,6 +402,7 @@ target_sources(SystemPackage PRIVATE
   Win32/Win32NetworkAdapters.swift
   Win32/Win32Open.swift
   Win32/Win32OverlappedIO.swift
+  Win32/Win32Passphrase.swift
   Win32/Win32PathOperations.swift
   Win32/Win32Pipes.swift
   Win32/Win32Process.swift

@@ -828,6 +828,22 @@ internal func system_CoTaskMemFree(_ pv: UnsafeMutableRawPointer?) {
   CoTaskMemFree(pv)
 }
 
+// MARK: - Console I/O
+
+internal func system_ReadConsoleW(
+  _ hConsoleInput: HANDLE, _ lpBuffer: UnsafeMutableRawPointer, _ nNumberOfCharsToRead: DWORD,
+  _ lpNumberOfCharsRead: UnsafeMutablePointer<DWORD>
+) -> Bool {
+  ReadConsoleW(hConsoleInput, lpBuffer, nNumberOfCharsToRead, lpNumberOfCharsRead, nil)
+}
+
+internal func system_WriteConsoleW(
+  _ hConsoleOutput: HANDLE, _ lpBuffer: UnsafeRawPointer, _ nNumberOfCharsToWrite: DWORD,
+  _ lpNumberOfCharsWritten: UnsafeMutablePointer<DWORD>
+) -> Bool {
+  WriteConsoleW(hConsoleOutput, lpBuffer, nNumberOfCharsToWrite, lpNumberOfCharsWritten, nil)
+}
+
 // MARK: - Signals
 
 // The C runtime reports a number that names no signal to its invalid

@@ -607,6 +607,13 @@ HLOCAL LocalAlloc(UINT uFlags, SIZE_T uBytes);
 // handleapi.h, from Windows 10, version 1607.
 BOOL CompareObjectHandles(HANDLE hFirstObjectHandle, HANDLE hSecondObjectHandle);
 
+// consoleapi.h: console I/O. The input control is a
+// PCONSOLE_READCONSOLE_CONTROL, which System passes as NULL.
+BOOL ReadConsoleW(HANDLE hConsoleInput, LPVOID lpBuffer, DWORD nNumberOfCharsToRead,
+                  LPDWORD lpNumberOfCharsRead, PVOID pInputControl);
+BOOL WriteConsoleW(HANDLE hConsoleOutput, const void *lpBuffer, DWORD nNumberOfCharsToWrite,
+                   LPDWORD lpNumberOfCharsWritten, LPVOID lpReserved);
+
 // processthreadsapi.h: priority classes.
 #define IDLE_PRIORITY_CLASS 0x00000040
 #define BELOW_NORMAL_PRIORITY_CLASS 0x00004000
