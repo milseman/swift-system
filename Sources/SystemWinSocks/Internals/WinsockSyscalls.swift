@@ -159,6 +159,16 @@ internal func system_setsockopt(
   setsockopt(s, level, option, value?.assumingMemoryBound(to: CChar.self), length)
 }
 
+// MARK: - Polling
+
+internal func system_WSAPoll(
+  _ entries: UnsafeMutablePointer<WSAPOLLFD>?,
+  _ count: ULONG,
+  _ timeout: CInt
+) -> CInt {
+  WSAPoll(entries, count, timeout)
+}
+
 // MARK: - Handles
 
 internal func system_SetHandleInformation(_ handle: HANDLE, _ mask: DWORD, _ flags: DWORD) -> Bool {

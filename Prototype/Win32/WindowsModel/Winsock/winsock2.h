@@ -270,6 +270,25 @@ typedef struct _winsock_model_ipv6_mreq { // mirrors: ws2ipdef.h
   ULONG ipv6mr_interface;
 } IPV6_MREQ, *PIPV6_MREQ;
 
+// MARK: - Polling
+
+typedef struct _winsock_model_pollfd { // mirrors: winsock2.h
+  SOCKET fd;
+  SHORT events;
+  SHORT revents;
+} WSAPOLLFD, *PWSAPOLLFD, *LPWSAPOLLFD;
+
+#define POLLRDNORM 0x0100 // mirrors: winsock2.h
+#define POLLRDBAND 0x0200 // mirrors: winsock2.h
+#define POLLIN (POLLRDNORM | POLLRDBAND) // mirrors: winsock2.h
+#define POLLPRI 0x0400 // mirrors: winsock2.h
+#define POLLWRNORM 0x0010 // mirrors: winsock2.h
+#define POLLOUT (POLLWRNORM) // mirrors: winsock2.h
+#define POLLWRBAND 0x0020 // mirrors: winsock2.h
+#define POLLERR 0x0001 // mirrors: winsock2.h
+#define POLLHUP 0x0002 // mirrors: winsock2.h
+#define POLLNVAL 0x0004 // mirrors: winsock2.h
+
 // MARK: - Functions
 
 // The SDK's WSAPROTOCOL_INFOW is a complete structure, which this model
@@ -294,3 +313,5 @@ int getsockname(SOCKET s, SOCKADDR *name, int *namelen); // mirrors: winsock2.h
 int getpeername(SOCKET s, SOCKADDR *name, int *namelen); // mirrors: winsock2.h
 // cmd is a long, 32 bits on Windows.
 int ioctlsocket(SOCKET s, int cmd, u_long *argp); // mirrors: winsock2.h
+// Windows Vista and later.
+int WSAPoll(LPWSAPOLLFD fdArray, ULONG fds, INT timeout); // mirrors: winsock2.h

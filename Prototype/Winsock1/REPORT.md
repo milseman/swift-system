@@ -11,8 +11,9 @@ by `Prototype/Win32/check-winsock.sh`, and kept inside `#if os(Windows)`; its te
 its model, Winsock's error codes as `Win32.Error`, the socket types, `open` (`WSASocketW`, starting Winsock lazily),
 `close` and `shutdown` (`e7c4d48`); addresses, with `inet_pton` and `inet_ntop` (`5f3381d`); binding, listening,
 accepting, connecting, sending and receiving, and the socket names (`1dea80c`); options (`13c9a37`); and nonblocking
-mode with open options (this commit). Section 5 has what each adopter would change, row by row.
-- **Next**, P2 in order: `WSAPoll`; the extension functions, cached once per process, with `WSASendMsg` and
+mode with open options (`a4f6883`). P2's first part is done: polling, with `WSAPoll` (this commit). Section 5 has
+what each adopter would change, row by row.
+- **Next**, the rest of P2 in order: the extension functions, cached once per process, with `WSASendMsg` and
   `WSARecvMsg` (and SystemSockets' message API: `CInterop.MsgHdr` as `WSAMSG`, ancillary messages); completion
   ports (associating a socket, overlapped `WSASend`/`WSARecv`); Unix domain sockets as Windows has them.
 - **Open questions for Michael** (section 2): the manifest's form (host-conditional, or declared everywhere and empty
@@ -44,10 +45,11 @@ os(Windows)`. Its files mirror SystemSockets' layout:
 | `Sockets/SocketOptions+IP.swift` | `IPOption`, `IPv6Option`, their typed options, multicast membership |
 | `Sockets/SocketOptions+Timeouts.swift` | send and receive time-outs, linger |
 | `Sockets/SocketOpenOptions.swift` | `OpenOptions.nonBlocking`, `open(options:)`, `accept(options:)`, and `setNonBlocking(_:)` (`ioctlsocket(FIONBIO)`) |
+| `Sockets/SocketPoll.swift` | `CInterop.PollFD` (`WSAPOLLFD`), `SocketDescriptor.PollEvents` and `PollEntry`, the static `poll(_:timeout:retryOnInterrupt:)` over a `MutableSpan`, and `poll(for:timeout:retryOnInterrupt:)` (`WSAPoll`) |
 
 The parts, in order: the module, the socket types, `open`, `close` and `shutdown` (`e7c4d48`); addresses
 (`5f3381d`); connections, transfers and names (`1dea80c`); options (`13c9a37`); nonblocking mode and open options
-(this commit).
+(`a4f6883`). P2: polling (this commit).
 
 ## 2. Design calls, with the alternatives rejected
 
@@ -141,6 +143,14 @@ The parts, in order: the module, the socket types, `open`, `close` and `shutdown
   what POSIX does with `FileDescriptor.setStatusFlags`. There's no `OpenOptions.closeOnExec`: Windows has no `exec`, and
   System's sockets are never inherited. *Rejected*: a `closeOnExec` that does nothing, which would compile shared code
   that means something Windows can't; and a getter, which Winsock can't implement.
+- **Polling is `SocketDescriptor`'s** (section 29's proposal 7): SystemPackage's POSIX `poll` is `FileDescriptor`'s, with
+  `FileDescriptor.PollEvents`, `PollEntry`, a static `poll` over a `MutableSpan` and a `poll(for:timeout:)`; `WSAPoll`
+  polls sockets alone, so the same names and signatures are on `SocketDescriptor`, with the entry's `socket` where
+  POSIX's has `fileDescriptor`. There's no `priority` event: Winsock's provider rejects `POLLPRI`. `readable` is
+  `POLLIN`, which Winsock defines as `POLLRDNORM | POLLRDBAND`, and NIO polls `POLLRDNORM`, `readableNormalData`.
+  The documentation notes `WSAPoll`'s missed failed connects before Windows 10 version 2004. *Rejected*: putting
+  Windows' poll on `FileDescriptor`, which a socket isn't. SystemSockets could add the same `SocketDescriptor` names
+  on POSIX, over `poll`, so that code polling sockets spells it once (section 7).
 - **The address conversions don't start Winsock**: their documentation lists no `WSANOTINITIALISED`, and
   swift-certificates already calls `inet_pton` without starting it. An exit test checks it in a fresh process.
   *Rejected*: starting Winsock for them, which would load Winsock's providers into a process that only parses
@@ -206,6 +216,9 @@ What each file checks, and what it can reach:
   throwing `wouldBlock`, and blocking again after `setNonBlocking(false)`; `accept(options:)` setting the new socket's
   mode whatever the listener's (told apart by what an empty receive throws: `wouldBlock` at once, or `timedOut` after a
   50 ms time-out); and a nonblocking connect, which throws `wouldBlock` or finishes, then has no error once accepted.
+- `SocketPollTests`: the events against the SDK and their descriptions; the time-out's rounding; a connection's
+  readiness (writable, not readable, readable once a byte arrives, hung up or readable once the peer closes); a
+  listening socket readable with a connection pending; two entries polled at once. Every wait has a time-out.
 
 None deletes, moves or changes the permissions of anything, signals anything, or reaches the network.
 
@@ -243,7 +256,7 @@ module-qualified names (`SystemSockets.SocketAddress`) need the naming decision.
 | [linger] | `NIOCore/SocketOptionProvider.swift:37`, 182-219 | `CInterop.Linger` and its accessors; the `setSoLinger(_: CInterop.Linger)` overload, which NIO has for Darwin, widened | — |
 | [Winsock startup] | CNIOWindows' `WSAStartup.c`, a C runtime initializer | none needed: `open` starts Winsock | — |
 | [Winsock messages] | `BSDSocketAPIWindows.swift:110-113`, 146-166, 302-399, 414-426, 467-524, 703-855 | — | P2: `WSASendMsg`, `WSARecvMsg`, `WSABUF`, the `WSA_CMSG_*` walk |
-| [poll] | `NIOPosix/SelectorWSAPoll.swift`, `NIOPosix/SelectorGeneric.swift:24` | — | P2: `WSAPoll` |
+| [poll] | `NIOPosix/SelectorWSAPoll.swift` (the events at 33-75, `WSAPoll` at 305 and its error at 376), `NIOPosix/SelectorGeneric.swift:24` (`pollfd`) | `SocketDescriptor.PollEntry` over its `pollfd` array and `SocketDescriptor.poll(_:timeout:)` over a `MutableSpan` of them, or `CInterop.PollFD` where NIO keeps raw entries; its event mapping uses `readableNormalData` and `writableNormalData`, as it uses `POLLRDNORM` and `POLLWRNORM` | — |
 | [Windows name resolution] | `GetaddrinfoResolver.swift:44-55`, 145; `SocketAddresses.swift:24-29` | — | `GetAddrInfoW`, `FreeAddrInfoW`, `ADDRINFOW`: SystemSockets' `SocketAddress.resolve` over them, not started |
 | [sendfile] | `BSDSocketAPIWindows.swift:76`, 90, 578-608 | — | `TransmitFile`, an extension function: P2 |
 
@@ -263,6 +276,10 @@ test. Sharing would have saved writing them twice and keeping the doc comments i
   `swift build --target SystemWinSocks`, which can't run the tests.
 - **`Win32.Error`'s `debugDescription`** names only the codes SystemPackage's `_symbolicName` lists, so Winsock's
   codes print as numbers (`10035 (0x2733)`); its table needs the `WSAE` names.
+- **SystemSockets**: `SocketDescriptor.PollEntry` and `poll` over POSIX `poll` would let code that polls sockets spell
+  it as on Windows. And its `_value` and `_setValue` (`Sources/SystemSockets/Sockets/SocketOptions+IP.swift:280`, 289)
+  warn "forming 'UnsafeMutableRawPointer' to a variable of type 'T'"; SystemWinSocks passes the value through
+  `withUnsafeMutableBytes(of:)` and `withUnsafeBytes(of:)`, which don't.
 - **The tools** know two modules: `Utilities/api-delta/scripts/scan_sources.py` (`MODULE_DIRS`), the adopter-coverage
   scripts (`status.py`'s `SYSTEM_SOURCES`, `extract.py`'s `SYSTEM_MODULES`), and lint's cmake check (`MODULES`) read
   only `Sources/System` and `Sources/SystemSockets`, so neither lint's api rules, the coverage figures, nor the
