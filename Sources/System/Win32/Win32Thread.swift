@@ -436,7 +436,8 @@ extension Win32.ThreadHandle {
   ///
   /// - Returns: A new owned handle. The caller must close it.
   ///
-  /// The corresponding C function is `DuplicateHandle`.
+  /// The corresponding C function is `DuplicateHandle`, with
+  /// `DUPLICATE_SAME_ACCESS` for the same rights.
   @_alwaysEmitIntoClient
   public borrowing func duplicate(
     access: Win32.ThreadAccess? = nil,

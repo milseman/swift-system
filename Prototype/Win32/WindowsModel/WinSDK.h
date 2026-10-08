@@ -606,6 +606,16 @@ HLOCAL LocalAlloc(UINT uFlags, SIZE_T uBytes);
 // handleapi.h, from Windows 10, version 1607.
 BOOL CompareObjectHandles(HANDLE hFirstObjectHandle, HANDLE hSecondObjectHandle);
 
+// processthreadsapi.h: priority classes.
+#define IDLE_PRIORITY_CLASS 0x00000040
+#define BELOW_NORMAL_PRIORITY_CLASS 0x00004000
+#define NORMAL_PRIORITY_CLASS 0x00000020
+#define ABOVE_NORMAL_PRIORITY_CLASS 0x00008000
+#define HIGH_PRIORITY_CLASS 0x00000080
+#define REALTIME_PRIORITY_CLASS 0x00000100
+DWORD GetPriorityClass(HANDLE hProcess);
+BOOL SetPriorityClass(HANDLE hProcess, DWORD dwPriorityClass);
+
 // guiddef.h, knownfolders.h, shlobj_core.h and combaseapi.h: known folders.
 // Data1 is an unsigned long, 32 bits on Windows.
 typedef struct _GUID {

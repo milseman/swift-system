@@ -46,6 +46,14 @@ internal func system_CompareObjectHandles(_ first: HANDLE, _ second: HANDLE) -> 
   CompareObjectHandles(first, second)
 }
 
+internal func system_GetPriorityClass(_ hProcess: HANDLE) -> DWORD {
+  GetPriorityClass(hProcess)
+}
+
+internal func system_SetPriorityClass(_ hProcess: HANDLE, _ dwPriorityClass: DWORD) -> Bool {
+  SetPriorityClass(hProcess, dwPriorityClass)
+}
+
 internal func system_CreateFileW(
   _ lpFileName: UnsafePointer<WCHAR>,
   _ dwDesiredAccess: DWORD,

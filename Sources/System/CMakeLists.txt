@@ -406,6 +406,7 @@ target_sources(SystemPackage PRIVATE
   Win32/Win32Pipes.swift
   Win32/Win32Process.swift
   Win32/Win32ProcessCreation.swift
+  Win32/Win32ProcessPriority.swift
   Win32/Win32ReparsePoints.swift
   Win32/Win32SecurityDescriptor.swift
   Win32/Win32SecurityIdentifier.swift
