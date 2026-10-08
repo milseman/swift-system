@@ -24,8 +24,9 @@ PLATFORMS = ("Darwin", "Linux", "Musl", "Android", "FreeBSD", "OpenBSD", "WASI",
 FLAG_BITS = ("outside", "stub", "deprecated", "underscored", "spi", "overload", "upstream", "pitches",
              "unexplained", "nograph", "hidden")
 CLUSTERS = ("update-checkout", "swiftlang and apple", "ecosystem", "Unix tools")
-KINDS = ("migrated", "scanned", "not-scanned", "no-swift")
+KINDS = ("migrated", "on-system", "scanned", "not-scanned", "no-swift")
 CATEGORIES = ("unexplained", "System gap", "queued", "exception", "undecided", "not System's", "standard library")
+SPLIT = ("covers", "lacks", "other")
 HOW = {"p": 0, "l": 1, "q": 2}
 
 
@@ -85,6 +86,10 @@ def encode(master):
     for p in master["packages"]:
         rec = {"n": p["name"], "c": CLUSTERS.index(p["cluster"]), "k": KINDS.index(p["kind"]), "s": p["source"],
                "r": p.get("remote") or "", "cl": p.get("clone"), "sw": p.get("swift"), "no": p.get("note") or ""}
+        if p.get("aside"):
+            rec["a"] = {"by": p["aside"].get("by"), "why": p["aside"].get("why")}
+        if p.get("subdir"):
+            rec["sd"] = p["subdir"]
         mig = p.get("migration")
         if mig:
             nw, rd = mig["newest"], mig.get("readAt")
@@ -110,7 +115,8 @@ def encode(master):
                              "sites": [[S(s["file"]), s["line"], S(s.get("module")), CATEGORIES.index(s["category"]),
                                         plat_mask(s["platforms"]), [S(n) for n in s["names"]],
                                         [S(n) for n in s["lacks"]], S(s["reason"]), S(s.get("text")),
-                                        S(s.get("type")), S(s.get("importKind"))] for s in c["sites"]]}
+                                        S(s.get("type")), S(s.get("importKind")), SPLIT.index(s["bucket"]),
+                                        S(s["part"])] for s in c["sites"]]}
             elif src == "scan":
                 run = c.get("run")
                 rec["cu"] = {"src": "scan", "files": c.get("files"), "fileList": [S(f) for f in c.get("fileList") or []],
@@ -118,15 +124,17 @@ def encode(master):
                              "scan": c.get("scan"),
                              "run": [run["id"], run["date"], run["systemCommit"], run.get("extraction")] if run else None,
                              "names": [[S(x["name"]), S(x["kind"]), x["sites"], [S(f) for f in x["files"]]]
-                                       for x in c.get("names") or []]}
+                                       for x in c.get("names") or []],
+                             "fb": [[S(f), SPLIT.index(b[0]), S(b[1])]
+                                    for f, b in sorted((c.get("fileBuckets") or {}).items())]}
             elif src == "GAPS.md":
                 rec["cu"] = {"src": "GAPS.md", "commit": c.get("commit"),
                              "gaps": [[S(g.get("what") or ", ".join(g["names"])), S(g["where"]), S(g["platforms"]),
                                        S(g["note"])] for g in c.get("gaps") or []]}
         P.append(rec)
     meta = dict(master["meta"])
-    return {"v": 1, "digest": master.get("digest"), "meta": meta, "S": S.table, "A": areas, "D": D, "U": U,
-            "P": P, "charts": master["charts"], "notes": master["notes"]}
+    return {"v": 2, "digest": master.get("digest"), "meta": meta, "H": master.get("headline"), "S": S.table,
+            "A": areas, "D": D, "U": U, "P": P, "charts": master["charts"], "notes": master["notes"]}
 
 
 def script_json(obj):

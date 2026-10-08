@@ -59,6 +59,58 @@ REPORT = """# Lane A report
 ## 1. What
 """
 
+# A trivial merge's output (`git merge-tree BASE OURS THEIRS`, as git 2.50
+# prints it): f.txt and n.txt conflict in their text, h.txt was removed on
+# our side and changed on theirs, and k.txt was removed on theirs, unchanged
+# on ours. m.txt's added line only looks like a marker.
+TRIVIAL = """changed in both
+  base   100644 de980441c3ab03a8c07dda1ad27b8a11f39deb1e f.txt
+  our    100644 85cb8e339c490a5a91accdd9f5040d3198e0424c f.txt
+  their  100644 8948000eed9762246d3afb8bdcbdb95984fe3f46 f.txt
+@@ -1,3 +1,7 @@
+ a
++<<<<<<< .our
+ OURS
++=======
++THEIRS
++>>>>>>> .their
+ c
+removed in local
+  base   100644 2fa992c0b8b5c6acd2bdd4fa31de29d29799bdd5 h.txt
+  their  100644 5ea2ed416fbd4a4cbe227b75fe255dd7fa6bd4d6 h.txt
+removed in remote
+  base   100644 2fa992c0b8b5c6acd2bdd4fa31de29d29799bdd5 k.txt
+  our    100644 2fa992c0b8b5c6acd2bdd4fa31de29d29799bdd5 k.txt
+added in both
+  our    100644 acc4f05ada5d98d04c62e2ee8c292018c412b2c6 n.txt
+  their  100644 279ab66405d14412e54abe49d0f57e37c64ffa26 n.txt
+@@ -1 +1,5 @@
++<<<<<<< .our
+ new-ours
++=======
++new-theirs
++>>>>>>> .their
+changed in both
+  base   100644 587be6b4c3f93f93c489c0111bba5596147a26cb m.txt
+  our    100644 58357507d7751fd0614e6eca8e58703100d65c6a m.txt
+  their  100644 58357507d7751fd0614e6eca8e58703100d65c6a m.txt
+@@ -1 +1,2 @@
+ x
++<<<<<<< a fixture's own marker
+"""
+
+# A git without `merge-tree --write-tree` (before 2.38): its usage, for that
+# option, and the real git for everything else.
+OLD_GIT = """#!/bin/sh
+for a in "$@"; do
+  if [ "$a" = "--write-tree" ]; then
+    echo "usage: git merge-tree <base-tree> <branch1> <branch2>" >&2
+    exit 129
+  fi
+done
+exec "{git}" "$@"
+"""
+
 
 class TextTests(unittest.TestCase):
     def test_claude_dir_name(self):
@@ -90,6 +142,12 @@ class TextTests(unittest.TestCase):
         self.assertEqual(lanes.suffix_candidates("/mnt/sn", "/Users/m/sn/adopters-unix/swift-nio"),
                          ["/mnt/sn/Users/m/sn/adopters-unix/swift-nio", "/mnt/sn/m/sn/adopters-unix/swift-nio",
                           "/mnt/sn/sn/adopters-unix/swift-nio", "/mnt/sn/adopters-unix/swift-nio", "/mnt/sn/swift-nio"])
+
+    def test_trivial_conflicts(self):
+        self.assertEqual(lanes.trivial_conflicts(TRIVIAL), 3)        # f.txt, h.txt, n.txt
+        self.assertEqual(lanes.trivial_conflicts(""), 0)
+        self.assertTrue(lanes.NO_WRITE_TREE.search("usage: git merge-tree <base-tree> <branch1> <branch2>\n"))
+        self.assertFalse(lanes.NO_WRITE_TREE.search("fatal: Not a valid object name lane-x\n"))
 
     def test_linux_log(self):
         tmp = tempfile.mkdtemp(prefix="lanes-test-")
@@ -214,6 +272,34 @@ class CollectionTests(unittest.TestCase):
         before = git(main, "count-objects", "-v")
         lanes.collect(self.args(self.base))
         self.assertEqual(git(main, "count-objects", "-v"), before)
+
+    def test_git_without_write_tree(self):
+        # A git before 2.38 rejects `merge-tree --write-tree`: the trial
+        # merges fall back to the trivial merge, and still write nothing.
+        bin_dir = os.path.join(self.tmp, "old-git")
+        write(os.path.join(bin_dir, "git"), OLD_GIT.format(git=shutil.which("git")))
+        os.chmod(os.path.join(bin_dir, "git"), 0o755)
+        main = os.path.join(self.base, "swift-system")
+        before = git(main, "count-objects", "-v")
+        saved = lanes.ENV
+        lanes.ENV = dict(saved, PATH=bin_dir + os.pathsep + saved.get("PATH", ""))
+        try:
+            doc = lanes.collect(self.args(self.base))
+        finally:
+            lanes.ENV = saved
+        L = self.by_name(doc)
+        self.assertEqual((L["lane-b"]["conflicts"], L["lane-b"]["conflictsBy"]), (1, "trivial"))
+        self.assertEqual((L["lane-a"]["conflicts"], L["lane-a"]["conflictsBy"]), (0, "trivial"))
+        self.assertNotIn("problem", L["lane-b"])
+        md = lanes.markdown(doc)
+        self.assertIn("| 1* |", md)
+        self.assertIn("this git has no `merge-tree --write-tree`", md)
+        self.assertEqual(git(main, "count-objects", "-v"), before)
+        # With git's own --write-tree, the same counts.
+        doc = lanes.collect(self.args(self.base))
+        L = self.by_name(doc)
+        self.assertEqual((L["lane-b"]["conflicts"], L["lane-b"]["conflictsBy"]), (1, "write-tree"))
+        self.assertNotIn("this git has no", lanes.markdown(doc))
 
     def test_mounted_elsewhere(self):
         moved = os.path.join(self.tmp, "mnt", "folder")

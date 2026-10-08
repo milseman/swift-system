@@ -1,13 +1,18 @@
 // The master view's data model: the page's data (the JSON in #data) turned
-// into declarations and packages that refer to each other, and the filters
-// both views share. No DOM here: `regenerate.sh --check` runs this file in
-// node on the page's own data and checks its counts against the inputs.
+// into declarations and packages that refer to each other, the filters both
+// views share, and the headline's figures, recounted from the page's own
+// data. No DOM here: `regenerate.sh --check` runs this file in node on the
+// page's own data and checks its counts against the inputs.
 "use strict";
 var Model = (function () {
   var PLATFORMS = ["Darwin", "Linux", "Musl", "Android", "FreeBSD", "OpenBSD", "WASI", "Windows"];
   var FLAGS = ["outside", "stub", "deprecated", "underscored", "spi", "overload", "upstream", "pitches",
                "unexplained", "nograph", "hidden"];
   var HOW = ["precise", "lexical", "qualifier"];
+  var CLUSTERS = ["update-checkout", "swiftlang and apple", "ecosystem", "Unix tools"];
+  var EXAMPLES = 3;   // the cluster index of the examples' rows; 0-2 are the adopters'
+  var SPLIT = ["covers", "lacks", "other"];
+  var USES = ["all", "used", "adopters", "examples", "none"];
 
   function flag(d, name) { return (d.flags & (1 << FLAGS.indexOf(name))) !== 0; }
 
@@ -65,7 +70,9 @@ var Model = (function () {
 
   // The filters: package scope (cluster, kind of data, one package), and
   // declaration scope (pitch state, use, one declaration), and the search,
-  // which each view applies to its own rows.
+  // which each view applies to its own rows. Use is who uses a declaration,
+  // among the packages in scope: anyone, the adopters (the three library
+  // clusters), the examples, or no one.
   function defaults() {
     return {q: "", cluster: "all", kind: "all", state: "all", use: "all", onlyPkg: null, onlyDecl: null};
   }
@@ -82,12 +89,19 @@ var Model = (function () {
     return out;
   }
 
+  function usedBy(M, uses, examples) {
+    for (var k = 0; k < uses.length; k++) if ((M.pkgs[uses[k].p].c === EXAMPLES) === examples) return true;
+    return false;
+  }
+
   function declInScope(M, f, d, uses) {
     if (f.state !== "all" && d.state !== +f.state) return false;
     if (f.onlyDecl !== null && d.i !== f.onlyDecl) return false;
     if (f.onlyPkg !== null && uses.length === 0) return false;   // "used by" one package
     if (f.use === "used" && uses.length === 0) return false;
-    if (f.use === "unused" && uses.length !== 0) return false;
+    if (f.use === "adopters" && !usedBy(M, uses, false)) return false;
+    if (f.use === "examples" && !usedBy(M, uses, true)) return false;
+    if (f.use === "none" && uses.length !== 0) return false;
     return true;
   }
 
@@ -108,13 +122,13 @@ var Model = (function () {
     var decls = [], pkgs = [];
     M.decls.forEach(function (d) { if (dOk[d.i] && (!q || d.key.indexOf(q) >= 0)) decls.push(d.i); });
     var pkgUses = new Array(M.pkgs.length);
+    var someUse = f.use === "used" || f.use === "adopters" || f.use === "examples";
     M.pkgs.forEach(function (p) {
       var u = [];
       for (var k = 0; k < p.uses.length; k++) if (dOk[p.uses[k].d]) u.push(p.uses[k]);
       pkgUses[p.i] = u;
       if (!pkOk[p.i]) return;
-      if (f.use === "used" && u.length === 0) return;
-      if (f.use === "unused" && u.length !== 0) return;
+      if (someUse && u.length === 0) return;
       if (f.onlyDecl !== null && u.length === 0) return;
       if (q && p.key.indexOf(q) < 0) return;
       pkgs.push(p.i);
@@ -178,7 +192,91 @@ var Model = (function () {
     });
   }
 
-  // The headline figures (no filters).
+  // The intersection, as the page's top shows it, from the page's own data:
+  // what real users (the adopters by cluster, and the examples) use of the
+  // new API, how much of that is in no pitch, and what the adopters still
+  // use from C, by cluster, split into what System covers, what it lacks
+  // and the rest. Set-aside packages count in none of it.
+  function intersection(M) {
+    var S = M.S;
+    var users = CLUSTERS.map(function () { return {}; });
+    var using = CLUSTERS.map(function () { return 0; });
+    var sites = CLUSTERS.map(function () { return 0; });
+    var read = CLUSTERS.map(function () { return 0; });
+    var migrated = CLUSTERS.map(function () { return 0; });
+    var inCluster = CLUSTERS.map(function () { return 0; });
+    M.pkgs.forEach(function (p) {
+      if (p.a) return;
+      inCluster[p.c]++;
+      if (p.use) read[p.c]++;
+      if (p.k === 0) migrated[p.c]++;
+      if (p.uses.length) using[p.c]++;
+      p.uses.forEach(function (u) { users[p.c][u.d] = 1; sites[p.c] += u.sites.length; });
+    });
+    function union(gs) {
+      var o = {};
+      gs.forEach(function (g) { for (var k in users[g]) o[k] = 1; });
+      return o;
+    }
+    var adopters = union([0, 1, 2]), examples = users[EXAMPLES], anyone = union([0, 1, 2, EXAMPLES]);
+    function n(set) { return Object.keys(set).length; }
+    function unpitched(set) {
+      var c = 0;
+      for (var k in set) { var d = M.decls[+k]; if (d.state === 1 && !flag(d, "outside")) c++; }
+      return c;
+    }
+    var byState = {"1": 0, "2": 0, "3": 0, "4": 0, "5": 0}, outside = 0, both = 0;
+    for (var k in anyone) {
+      var d = M.decls[+k];
+      if (flag(d, "outside")) outside++; else byState[String(d.state)]++;
+      if (adopters[k] && examples[k]) both++;
+    }
+    var groups = {};
+    CLUSTERS.forEach(function (g, i) {
+      groups[g] = {declarations: n(users[i]), packages: using[i], read: read[i], migrated: migrated[i],
+                   sites: sites[i], unpitched: unpitched(users[i]), inCluster: inCluster[i]};
+    });
+    var use = {groups: groups, adopters: n(adopters), examples: n(examples), any: n(anyone), both: both,
+               adoptersOnly: n(adopters) - both, examplesOnly: n(examples) - both, byState: byState,
+               unpitched: unpitched(anyone), unpitchedAdopters: unpitched(adopters),
+               unpitchedExamples: unpitched(examples), outside: outside,
+               aside: M.pkgs.filter(function (p) { return p.a; }).map(function (p) { return p.n; })};
+    // C uses: the ledger's sites (update-checkout), the scanned files (the
+    // other two clusters), GAPS.md's gaps (the examples, each counted once).
+    var cuses = {};
+    CLUSTERS.forEach(function (g, ci) {
+      var row = {covers: 0, lacks: 0, other: 0, parts: {}, packages: 0, withData: 0, aside: 0,
+                 unit: ci === 0 ? "sites" : ci === EXAMPLES ? "gaps" : "files"};
+      var gapKeys = {};
+      M.pkgs.forEach(function (p) {
+        if (p.c !== ci) return;
+        var c = p.cu, items = [];
+        if (c && c.src === "ledger" && c.sites) items = c.sites.map(function (s) { return [s[11], S[s[12]]]; });
+        else if (c && c.src === "scan") items = (c.fb || []).map(function (x) { return [x[1], S[x[2]]]; });
+        else if (c && c.src === "GAPS.md") items = c.gaps.map(function (x) {
+          if (!p.a) gapKeys[x.join(",")] = 1;   // a gap several tools list is one gap
+          return [1, "a gap in GAPS.md"];
+        });
+        var counted = c && (c.src === "ledger" ? !!c.sites : c.src === "scan" || c.src === "GAPS.md");
+        if (p.a) { row.aside += items.length; return; }
+        row.packages++;
+        if (!counted) return;
+        row.withData++;
+        items.forEach(function (it) { row[SPLIT[it[0]]]++; row.parts[it[1]] = (row.parts[it[1]] || 0) + 1; });
+      });
+      if (ci === EXAMPLES) {
+        var distinct = Object.keys(gapKeys).length;
+        row.lacks = distinct;
+        row.parts = distinct ? {"a gap in GAPS.md": distinct} : {};
+      }
+      cuses[g] = row;
+    });
+    return {use: use, cuses: cuses};
+  }
+
+  // The headline figures (no filters), the explorer's context and the
+  // check's: every declaration, the main count by state, the declarations
+  // anyone uses, the ledger's sites; and the intersection.
   function headline(M) {
     var byState = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}, main = 0, used = 0;
     M.decls.forEach(function (d) {
@@ -195,10 +293,11 @@ var Model = (function () {
       if (p.c === 0) uc++;
     });
     return {declarations: M.decls.length, mainCount: main, byState: byState, used: used, packages: M.pkgs.length,
-            kinds: kinds, users: users, cuses: cuses, updateCheckout: uc};
+            kinds: kinds, users: users, cuses: cuses, updateCheckout: uc, intersection: intersection(M)};
   }
 
   return {build: build, defaults: defaults, view: view, sums: sums, tree: tree, headline: headline,
-          flag: flag, platforms: platforms, PLATFORMS: PLATFORMS, FLAGS: FLAGS, HOW: HOW};
+          intersection: intersection, flag: flag, platforms: platforms, PLATFORMS: PLATFORMS, FLAGS: FLAGS,
+          HOW: HOW, CLUSTERS: CLUSTERS, EXAMPLES: EXAMPLES, SPLIT: SPLIT, USES: USES};
 })();
 if (typeof module !== "undefined") module.exports = Model;

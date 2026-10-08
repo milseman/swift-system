@@ -13,10 +13,12 @@ each other. Exits 1 on any mismatch, after listing every one.
      uses are the API graph's usedBy sites, each once.
   5. The page's own counts: its model (model.js, run in node on the page's
      data) gives By API and By package the same sums, with and without each
-     cluster's filter; its headline figures and the charts' last points are
-     the totals above.
+     cluster's, kind's, pitch state's and use's filter; its headline (the
+     intersection) is master.json's; master.json's headline is recounted
+     from the By API side and from ledger.json; the history's last points
+     are the headline's.
   6. The packages are universe.tsv's, and the history file has today's
-     points as the charts end.
+     points as the figures end.
 
 Usage: check.py --master M --page P --delta API_DELTA_JSON [--ledger-json J]
                 [--status-md S] [--universe U] [--history H] [--graph G]
@@ -55,9 +57,11 @@ const M = Model.build(JSON.parse(input.data));
 const out = {headline: Model.headline(M), sums: {}};
 const filters = [['all', Model.defaults()]];
 for (let c = 0; c < 4; c++) filters.push(['cluster ' + c, Object.assign(Model.defaults(), {cluster: String(c)})]);
-for (let k = 0; k < 4; k++) filters.push(['kind ' + k, Object.assign(Model.defaults(), {kind: String(k)})]);
+for (let k = 0; k < 5; k++) filters.push(['kind ' + k, Object.assign(Model.defaults(), {kind: String(k)})]);
 for (let s = 1; s <= 5; s++) filters.push(['state ' + s, Object.assign(Model.defaults(), {state: String(s)})]);
-filters.push(['used', Object.assign(Model.defaults(), {use: 'used'})]);
+for (const u of ['used', 'adopters', 'examples', 'none'])
+  filters.push(['use ' + u, Object.assign(Model.defaults(), {use: u})]);
+filters.push(['use adopters, cluster 0', Object.assign(Model.defaults(), {use: 'adopters', cluster: '0'})]);
 // One package's declarations, and one declaration's packages, as the
 // detail panels' buttons set them: each migrated package, and the
 // declaration with the most users.
@@ -219,18 +223,30 @@ def check_views(c, master, pd, graph_path, delta):
         # already on main: the page counts them there.
         changed = {e["usr"] for e in delta["entries"] if e["status"] == "changed" and e.get("usr")}
         g = load(graph_path)
-        remotes = {(p.get("remote") or "").lower() for p in pkgs if p["cluster"] != "Unix tools"}
+        remotes = {(p.get("remote") or "").lower() for p in pkgs}
+        # A clone whose rows each cover a directory (the examples' tools)
+        # has the sites in those directories only.
+        dirs = collections.defaultdict(list)
+        for p in pkgs:
+            if p.get("subdir"):
+                dirs[(p.get("remote") or "").lower()].append(p["subdir"].rstrip("/") + "/")
         pk = {nid: n for nid, n in g["nodes"].items() if n["kind"] == "package"}
-        total = on_changed = 0
+        total = on_changed = by_dir = 0
         for ln in g["links"]:
-            if ln["kind"] != "usedBy" or (pk.get(ln["to"], {}).get("remote") or "").lower() not in remotes:
+            remote = (pk.get(ln["to"], {}).get("remote") or "").lower()
+            if ln["kind"] != "usedBy" or remote not in remotes:
                 continue
+            ss = ln.get("sites") or []
+            if remote in dirs:
+                ss = [x for x in ss if any((x.get("file") or "").startswith(d) for d in dirs[remote])]
+                by_dir += len(ss)
             if ln["from"] in changed:
-                on_changed += len(ln.get("sites") or [])
+                on_changed += len(ss)
             else:
-                total += len(ln.get("sites") or [])
+                total += len(ss)
         c.eq("the two ways in: master.json's sites = the API graph's usedBy sites, each once, but those of changed "
-             f"declarations ({on_changed}, counted as already on main)", sum(fwd.values()), total)
+             f"declarations ({on_changed}, counted as already on main); {by_dir} of them the examples', in their "
+             "rows' directories", sum(fwd.values()), total)
 
 
 def run_model(c, page_text, node):
@@ -290,11 +306,77 @@ def check_model(c, master, out):
                        f"{sorted(s['api']['byPkg'])}; {pkg} uses {n}")
     all_sites = sum(len(s) for d in decls for _, s in d["usedBy"])
     c.eq("page model: sites with no filter = master.json's", out["sums"]["all"]["api"]["sites"], all_sites)
+    # The use filters: by anyone is by adopters or by the examples, and the
+    # rest is by no one.
+    sm = out["sums"]
+    if all(k in sm for k in ("use used", "use none", "all")):
+        c.eq("page model: declarations used by anyone + by no one = all", sm["use used"]["api"]["declarations"] +
+             sm["use none"]["api"]["declarations"], sm["all"]["api"]["declarations"])
+    # The headline: the page's model recounts it from the page's own data.
+    mh = h.get("intersection")
+    if mh is None:
+        c.fail("page model: no headline (intersection) in the model's output")
+    else:
+        hl = master.get("headline") or {}
+        for part in ("use", "cuses"):
+            got, want = mh.get(part), hl.get(part)
+            if got != want:
+                keys = sorted(k for k in set(got or {}) | set(want or {}) if (got or {}).get(k) != (want or {}).get(k))
+                c.fail(f"page model: the headline's {part} isn't master.json's: they differ in {', '.join(keys[:6])}")
+            else:
+                c.passes.append(f"page model: the headline's {part} is master.json's")
+
+
+def check_headline(c, master, ledger_json):
+    """master.json's headline, recounted another way: the declarations in use
+    from By API's side (each declaration's users), and update-checkout's C
+    uses from ledger.json, every site in one part of the split or in a
+    set-aside package; the history's last points are the headline's."""
+    hl = master.get("headline")
+    if not hl:
+        c.fail("master.json has no headline")
+        return
+    pkgs, decls = master["packages"], master["declarations"]
+    aside = {i for i, p in enumerate(pkgs) if p.get("aside")}
+    groups = collections.defaultdict(set)
+    for di, d in enumerate(decls):
+        for pi, _sites in d["usedBy"]:
+            if pi not in aside:
+                groups[pkgs[pi]["cluster"]].add(di)
+    adopters = set().union(*(groups[g] for g in asm.ADOPTER_CLUSTERS))
+    examples = groups[asm.EXAMPLES_CLUSTER]
+    u = hl["use"]
+    c.eq("headline: in use, from By API's side", u["any"], len(adopters | examples))
+    c.eq("headline: in use by the adopters and by the examples, from By API's side",
+         (u["adopters"], u["examples"], u["both"]), (len(adopters), len(examples), len(adopters & examples)))
+    c.eq("headline: in use by each cluster, from By API's side",
+         {g: u["groups"][g]["declarations"] for g in asm.CLUSTERS}, {g: len(groups[g]) for g in asm.CLUSTERS})
+    unp = sum(1 for di in adopters | examples if decls[di]["state"] == 1 and not decls[di]["excluded"])
+    c.eq("headline: in use and in no pitch, from By API's side", u["unpitched"], unp)
+    for g, row in hl["cuses"].items():
+        if sum(row["parts"].values()) != row["covers"] + row["lacks"] + row["other"]:
+            c.fail(f"headline: {g}'s parts add up to {sum(row['parts'].values())}, its split to "
+                   f"{row['covers'] + row['lacks'] + row['other']}")
+    if ledger_json:
+        led = asm.ledger_from_json(load(ledger_json))
+        uc = hl["cuses"]["update-checkout"]
+        c.eq("headline: update-checkout's C uses, split, and set aside = ledger.json's total",
+             uc["covers"] + uc["lacks"] + uc["other"] + uc["aside"], led["total"])
+        names = {p["name"] for p in pkgs if p.get("aside")}
+        want = collections.Counter()
+        for repo, ss in led["sites"].items():
+            if repo in names:
+                continue
+            for x in ss:
+                want[asm.ledger_bucket(x, led["work"])[0]] += 1
+        c.eq("headline: update-checkout's split, recounted from ledger.json",
+             {b: uc[b] for b in asm.SPLIT}, {b: want.get(b, 0) for b in asm.SPLIT})
     ch = master["charts"]
     last = lambda k: (ch.get(k) or [{}])[-1].get("count")  # noqa: E731
-    c.eq("charts: new API not yet in a pitch, today", last("unpitched"), want_state.get(1, 0))
-    c.eq("charts: pitched, not yet merged, today", last("pitched"), want_state.get(3, 0) + want_state.get(4, 0))
-    c.eq("charts: C uses left, today", last("cuses"), led.get("total"))
+    c.eq("history: in use, today", last("used"), u["any"])
+    c.eq("history: in use, not in a pitch, today", last("unpitched-used"), u["unpitched"])
+    led_total = (master["meta"].get("ledger") or {}).get("total")
+    c.eq("history: C uses left in update-checkout (set-aside ones too), today", last("cuses"), led_total)
 
 
 def check_recount(c, master, pd):
@@ -347,6 +429,7 @@ def run(a):
     delta = load(a.delta)
     check_views(c, master, pd, a.graph or (master["meta"].get("graph") or {}).get("path"), delta)
     check_recount(c, master, pd)
+    check_headline(c, master, a.ledger_json)
     if text is not None:
         node = a.node if a.node != "auto" else shutil.which("node")
         check_model(c, master, run_model(c, text, node))

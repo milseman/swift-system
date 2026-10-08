@@ -8,13 +8,16 @@
                         (unless update-checkout has the fork) and anything
                         update-checkout has
   ecosystem             the clones in ../ecosystem in neither list: provisional
-  Unix tools            the tools of ../swift-system-examples, on its main
+  Unix tools            the tools of ../swift-system-examples, on its main, and
+                        the library targets they share (ExamplesSupport)
 
 Writes a TSV with one row per package: name, cluster, source (where the row
 comes from), clone (a path relative to the repository, or none), remote
 (owner/repository on GitHub), swift (yes, no, or ? when there's no clone to
-look in and non-swift.tsv doesn't list it), and a note. What it left out is
-listed after them, with cluster `excluded` and the reason as the note.
+look in and non-swift.tsv doesn't list it), a note, and subdir: the
+directory of the clone a row covers when it's one target of a package (a
+tool's Sources/Ls), else empty. What it left out is listed after them, with
+cluster `excluded` and the reason as the note.
 
 Nothing is fetched: clones are read with git, with lazy fetching off.
 
@@ -35,9 +38,10 @@ import subprocess  # noqa: E402
 
 CLUSTERS = ("update-checkout", "swiftlang and apple", "ecosystem", "Unix tools")
 SYSTEM_REMOTE = "apple/swift-system"
-COLUMNS = ("name", "cluster", "source", "clone", "remote", "swift", "note")
+COLUMNS = ("name", "cluster", "source", "clone", "remote", "swift", "note", "subdir")
 MANIFEST_RE = re.compile(r"(^|/)Package(@swift-[0-9.]+)?\.swift$")
 TOOL_RE = re.compile(r'\(\s*"([^"]+)"\s*,\s*"([^"]+)"\s*\)')
+LIBRARY_TARGET_RE = re.compile(r'\.target\(\s*name:\s*"([^"]+)"')
 ORGS = (("org-swiftlang.json", "swiftlang"), ("org-apple.json", "apple"))
 # Each migrated package's branches, newest first (status.py's PLATFORM_BRANCHES).
 MIGRATION_BRANCHES = ("migrate-all", "migrate-unix", "migrate-darwin", "no-darwin")
@@ -121,6 +125,12 @@ def tools_of(examples):
     if not m:
         raise SystemExit(f"universe: no `let tools` table in {examples}'s Package.swift on main")
     return TOOL_RE.findall(m.group(1))
+
+
+def library_targets_of(examples):
+    """The examples' library targets (`.target(name: "ExamplesSupport", ...)`),
+    the code the tools share, from Package.swift on main."""
+    return LIBRARY_TARGET_RE.findall(git(examples, "show", "main:Package.swift"))
 
 
 def build(a):
@@ -234,7 +244,12 @@ def build(a):
         for command, target in tools_of(a.examples):
             rows.append({"name": command, "cluster": CLUSTERS[3], "source": "swift-system-examples main",
                          "clone": rel(a.examples), "remote": ex_remote or "", "swift": "yes",
-                         "note": f"target {target}, Sources/{target}"})
+                         "note": f"target {target}, Sources/{target}", "subdir": f"Sources/{target}"})
+        for target in library_targets_of(a.examples):
+            rows.append({"name": target, "cluster": CLUSTERS[3], "source": "swift-system-examples main",
+                         "clone": rel(a.examples), "remote": ex_remote or "", "swift": "yes",
+                         "note": f"the tools' shared code: target {target}, Sources/{target}",
+                         "subdir": f"Sources/{target}"})
     # A name two rows share (each organization's `.github`) becomes the
     # repository's owner/name, so that every package has a name of its own.
     names = collections.Counter(r["name"] for r in rows)

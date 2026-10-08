@@ -24,7 +24,14 @@
 #                        set both empty to skip the adopters step
 #   API_GRAPH_COVERAGE_RESULTS  the coverage tools' results store, for the
 #                        packages' C interfaces (default ../coverage-results)
-#   API_GRAPH_ADOPTER_BRANCH    the migration branch (default migrate-darwin)
+#   API_GRAPH_ADOPTER_BRANCHES  the migration branches, newest first, comma-separated
+#                        (default migrate-all,migrate-unix,migrate-darwin): each
+#                        clone is read at the first of them it has
+#   API_GRAPH_ADOPTER_BRANCH    one migration branch, instead of that list
+#   API_GRAPH_EXAMPLES   the examples' repository, read at API_GRAPH_EXAMPLES_REF
+#                        (default main) as a package written on System (default
+#                        ../swift-system-examples beside the repository); set it
+#                        empty to skip
 #   API_GRAPH_ADOPTER_BUILDS    build (default): build a migration whose index
 #                        isn't cached; reuse: any cached index of the commit,
 #                        no builds; none: lexical only
@@ -192,9 +199,11 @@ if [ -z "${API_GRAPH_PREVIOUS:-}" ] && [ ! -f "$PREVIOUS" ]; then PREVIOUS="$OUT
 ADOPTERS="${API_GRAPH_ADOPTERS-$(dirname "$REPO")/adopters}"
 ECOSYSTEM="${API_GRAPH_ECOSYSTEM-$(dirname "$REPO")/ecosystem}"
 COVERAGE_RESULTS="${API_GRAPH_COVERAGE_RESULTS-$(dirname "$REPO")/coverage-results}"
+EXAMPLES="${API_GRAPH_EXAMPLES-$(dirname "$REPO")/swift-system-examples}"
 if [ -n "$ADOPTERS" ] && [ ! -d "$ADOPTERS" ]; then ADOPTERS=""; fi
 if [ -n "$ECOSYSTEM" ] && [ ! -d "$ECOSYSTEM" ]; then ECOSYSTEM=""; fi
 if [ -n "$COVERAGE_RESULTS" ] && [ ! -d "$COVERAGE_RESULTS" ]; then COVERAGE_RESULTS=""; fi
+if [ -n "$EXAMPLES" ] && [ ! -d "$EXAMPLES" ]; then EXAMPLES=""; fi
 CACHE="$(abspath "${API_GRAPH_CACHE:-$REPO/.build/api-graph-cache}")"
 BUILDS="${API_GRAPH_BUILDS-$REPO/.build/api-graph-builds}"
 if [ -n "$BUILDS" ]; then BUILDS="$(abspath "$BUILDS")"; fi
@@ -317,13 +326,15 @@ if [ -n "$ADOPTERS$ECOSYSTEM" ]; then
     --head-src "$WORK/head/src" --base-src "$WORK/base/src" --head-scan "$WORK/head/scan.json"
     --base-scan "$WORK/base/scan.json" --cnames "$WORK/cnames.json" --work "$WORK" --cache "$CACHE"
     --out "$WORK/adopters.json" --symbolgraphs "$DELTA/symbolgraphs/head"
-    --branch "${API_GRAPH_ADOPTER_BRANCH:-migrate-darwin}" --builds "${API_GRAPH_ADOPTER_BUILDS:-build}"
+    --branches "${API_GRAPH_ADOPTER_BRANCH:-${API_GRAPH_ADOPTER_BRANCHES:-migrate-all,migrate-unix,migrate-darwin}}"
+    --builds "${API_GRAPH_ADOPTER_BUILDS:-build}"
     --validate "${API_GRAPH_ADOPTER_VALIDATE:-declarations}" --jobs "${API_GRAPH_ADOPTER_JOBS:-4}"
     --min-free-gb "${API_GRAPH_MIN_FREE_GB:-15}")
   if [ -n "$BUILDS" ]; then adopters+=(--builds-dir "$BUILDS"); fi
   if [ -n "$ADOPTERS" ]; then adopters+=(--adopters "$ADOPTERS"); fi
   if [ -n "$ECOSYSTEM" ]; then adopters+=(--ecosystem "$ECOSYSTEM"); fi
   if [ -n "$COVERAGE_RESULTS" ]; then adopters+=(--coverage-results "$COVERAGE_RESULTS"); fi
+  if [ -n "$EXAMPLES" ]; then adopters+=(--examples "$EXAMPLES" --examples-ref "${API_GRAPH_EXAMPLES_REF:-main}"); fi
   python3 "$S/adopters.py" "${adopters[@]}" 2>&1 | tee "$WORK/logs/adopters.log"
 fi
 log "graph snapshot"

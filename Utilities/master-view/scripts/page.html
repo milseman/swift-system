@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:">
 <meta name="color-scheme" content="light dark">
-<title>Swift System: what system-next adds, and who needs it</title>
+<title>Swift System: what real users need of system-next</title>
 <style>
 /*CSS*/
 </style>
@@ -14,13 +14,13 @@
 <div class="page">
 <header class="top">
   <div class="top-row">
-    <h1>Swift System: what <code>system-next</code> adds, and who needs it</h1>
+    <h1>Swift System: what real users need of <code>system-next</code></h1>
     <button type="button" id="theme" class="theme" title="Light, dark, or as the system is">Theme: auto</button>
   </div>
   <p class="lede" id="lede">Loading…</p>
 </header>
 
-<section class="charts" id="charts" aria-label="Burn-down charts"></section>
+<section class="headline" id="headline" aria-label="What real users need"></section>
 
 <section class="controls" aria-label="Search and filters">
   <label class="search"><span class="vh">Search</span>
@@ -34,7 +34,7 @@
   <button type="button" id="reset" class="link">Clear filters</button>
 </section>
 
-<nav class="tabs" role="tablist" aria-label="Views">
+<nav class="tabs" id="tabs" role="tablist" aria-label="Views">
   <button type="button" role="tab" id="tab-api" aria-selected="true">By API</button>
   <button type="button" role="tab" id="tab-pkg" aria-selected="false">By package</button>
   <span class="tab-note" id="tab-note"></span>

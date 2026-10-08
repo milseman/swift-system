@@ -30,6 +30,15 @@ def load(path):
     return json.load(open(path, encoding="utf-8")) if path and os.path.exists(path) else None
 
 
+def branch_words(meta):
+    """The branches adopters.json's packages were read at, in words: one
+    branch (`migrate-darwin`), or each clone's newest of a list."""
+    bs = meta.get("branches") or ([meta["branch"]] if meta.get("branch") else [])
+    if len(bs) == 1:
+        return f"`{bs[0]}` branch"
+    return "newest migration branch (" + ", else ".join(f"`{b}`" for b in bs) + ")"
+
+
 def aggregate(adopters, node_ids):
     """Per package, the unit's adopted and would-benefit sites.
 
