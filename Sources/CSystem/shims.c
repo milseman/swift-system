@@ -993,6 +993,16 @@ extern char *csystem_nl_langinfo_l(int item, void *locale) {
 extern size_t csystem_malloc_usable_size(const void *pointer) {
   return malloc_usable_size((void *)pointer);
 }
+
+// wasi-libc's <string.h> declares memmem only with _GNU_SOURCE, which would
+// change other declarations in this file, so this declares it alone, as
+// wasi-libc defines it.
+void *memmem(const void *haystack, size_t haystackCount, const void *needle, size_t needleCount);
+
+extern void *csystem_memmem(const void *haystack, size_t haystackCount,
+                            const void *needle, size_t needleCount) {
+  return memmem(haystack, haystackCount, needle, needleCount);
+}
 #endif // defined(__wasi__)
 
 #ifdef __ANDROID__

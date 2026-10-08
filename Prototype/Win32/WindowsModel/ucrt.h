@@ -55,6 +55,21 @@ int _wrmdir(const unsigned short *_Path);
 // stdio.h, with wchar_t spelled as WinSDK.h's WCHAR.
 int _wremove(const unsigned short *_FileName);
 
+// stdlib.h and string.h: the allocator, and the memory and string
+// functions, with wchar_t spelled as WinSDK.h's WCHAR.
+void *malloc(size_t _Size);
+void *calloc(size_t _Count, size_t _Size);
+void *realloc(void *_Block, size_t _Size);
+void free(void *_Block);
+int memcmp(const void *_Buf1, const void *_Buf2, size_t _Size);
+void *memchr(const void *_Buf, int _Val, size_t _MaxCount);
+size_t strlen(const char *_Str);
+size_t strnlen(const char *_String, size_t _MaxCount);
+size_t wcslen(const unsigned short *_String);
+char *_strdup(const char *_Source);
+int strcmp(const char *_Str1, const char *_Str2);
+int strncmp(const char *_Str1, const char *_Str2, size_t _MaxCount);
+
 // stdlib.h, with wchar_t spelled as WinSDK.h's WCHAR.
 typedef int errno_t;
 errno_t _wputenv_s(const unsigned short *_Name, const unsigned short *_Value);

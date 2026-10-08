@@ -259,6 +259,12 @@ internal func _mapWindowsErrorToErrno(_ errorCode: DWORD) -> CInt { 22 } // mirr
 
 internal func system_close(_ fd: Int32) -> Int32 { 0 } // mirrors: Sources/System/Internals/Syscalls.swift
 
+internal func system_strlen(_ s: UnsafePointer<CChar>) -> Int { 0 } // mirrors: Sources/System/Internals/Exports.swift
+
+internal func system_platform_strlen(_ s: UnsafePointer<CInterop.PlatformChar>) -> Int { 0 } // mirrors: Sources/System/Internals/Exports.swift
+
+internal func system_free(_ pointer: UnsafeMutableRawPointer?) {} // mirrors: Sources/System/Internals/Exports.swift
+
 internal func valueOrErrno<I: FixedWidthInteger>( // mirrors: Sources/System/Util.swift
   retryOnInterrupt: Bool, _ f: () -> I
 ) -> Result<I, Errno> {

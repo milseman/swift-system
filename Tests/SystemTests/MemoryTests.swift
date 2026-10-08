@@ -244,7 +244,6 @@ private struct MemoryFunctionTests {
     #expect(Memory.firstIndex(of: 0, in: UnsafeRawBufferPointer(start: nil, count: 0)) == nil)
   }
 
-  #if !os(WASI)
   @available(System 199, *)
   @Test func firstRangeFindsTheFirstMatch() {
     func find(_ needle: String, in haystack: String) -> Range<Int>? {
@@ -269,7 +268,6 @@ private struct MemoryFunctionTests {
     let empty = UnsafeRawBufferPointer(start: nil, count: 0)
     #expect(Memory.firstRange(of: empty, in: empty) == 0..<0)
   }
-  #endif
 
   @available(System 199, *)
   @Test func secureZeroClearsTheBuffer() {
@@ -291,11 +289,9 @@ private struct MemoryFunctionTests {
     #expect(Memory.compare(RawSpan(_elements: abc.span), RawSpan(_elements: ab.span)) == 1)
     #expect(Memory.firstIndex(of: UInt8(ascii: "c"), in: RawSpan(_elements: abc.span)) == 2)
     #expect(Memory.firstIndex(of: UInt8(ascii: "z"), in: RawSpan(_elements: abc.span)) == nil)
-    #if !os(WASI)
     #expect(Memory.firstRange(of: RawSpan(_elements: ContiguousArray("bc".utf8).span),
                               in: RawSpan(_elements: abc.span)) == 1..<3)
     #expect(Memory.firstRange(of: RawSpan(_elements: abd.span), in: RawSpan(_elements: abc.span)) == nil)
-    #endif
 
     var key = ContiguousArray<UInt8>(repeating: 0x5A, count: 32)
     do {

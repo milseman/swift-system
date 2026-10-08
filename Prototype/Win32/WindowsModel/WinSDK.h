@@ -596,6 +596,10 @@ DWORD WaitForSingleObject(HANDLE hHandle, DWORD dwMilliseconds);
 typedef ULONG_PTR SIZE_T, *PSIZE_T;
 typedef const WCHAR *LPCWCH;
 
+// winnt.h defines RtlSecureZeroMemory inline, with volatile stores, and
+// SecureZeroMemory as a macro for it.
+PVOID RtlSecureZeroMemory(PVOID ptr, SIZE_T cnt);
+
 struct _PROC_THREAD_ATTRIBUTE_LIST;
 typedef struct _PROC_THREAD_ATTRIBUTE_LIST *PPROC_THREAD_ATTRIBUTE_LIST,
     *LPPROC_THREAD_ATTRIBUTE_LIST;

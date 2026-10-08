@@ -366,9 +366,11 @@ target_sources(SystemPackage PRIVATE
   VectoredIO/VectoredIO.swift)
 target_sources(SystemPackage PRIVATE
   Win32/BrokenDownTimeWindows.swift
+  Win32/CStringWindows.swift
   Win32/DynamicLibraryWindows.swift
   Win32/FilePathResolutionWindows.swift
   Win32/FileStreamWindows.swift
+  Win32/MemoryWindows.swift
   Win32/PathsWindows.swift
   Win32/ProcessEnvironmentWindows.swift
   Win32/ProcessExitWindows.swift

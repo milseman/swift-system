@@ -70,6 +70,11 @@ struct _system_dirent {
 // Swift module doesn't include; see shims.c.
 extern size_t csystem_malloc_usable_size(const void *pointer);
 
+// memmem, which wasi-libc defines, and whose <string.h> declares only with
+// _GNU_SOURCE, which Swift's import of WASILibc doesn't define; see shims.c.
+extern void *csystem_memmem(const void *haystack, size_t haystackCount,
+                            const void *needle, size_t needleCount);
+
 // Convert WASI dirent with d_name[] to _system_dirent
 static inline
 struct _system_dirent *

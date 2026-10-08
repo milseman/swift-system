@@ -298,15 +298,17 @@ internal func system_memchr(
   memchr(start, byte, count)
 }
 
-// WASI's libc declares memmem only with _GNU_SOURCE or _BSD_SOURCE, which
-// Swift's import of it doesn't define.
-#if !os(WASI)
+// WASI's libc declares memmem only with _GNU_SOURCE, which Swift's import
+// of it doesn't define, so on WASI this is a CSystem shim.
 internal func system_memmem(
   _ start: UnsafeRawPointer, _ count: Int, _ bytes: UnsafeRawPointer, _ byteCount: Int
 ) -> UnsafeMutableRawPointer? {
+#if os(WASI)
+  csystem_memmem(start, count, bytes, byteCount)
+#else
   memmem(start, count, bytes, byteCount)
-}
 #endif
+}
 
 // Stores that the compiler can't remove, as it can a memset of memory that
 // isn't read again.

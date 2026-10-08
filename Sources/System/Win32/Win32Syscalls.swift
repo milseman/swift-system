@@ -752,6 +752,57 @@ internal func system__wchdir(_ path: UnsafePointer<WCHAR>) -> CInt {
   return _wchdir(path)
 }
 
+// MARK: - The C runtime's allocator and string functions
+
+// A mocked allocation records its arguments and fails if an error is
+// forced; otherwise it allocates for real, as Syscalls+Memory.swift's do.
+// free is system_free, in Exports.swift.
+internal func system_malloc(_ size: Int) -> UnsafeMutableRawPointer? {
+#if ENABLE_MOCKING
+  if mockingEnabled, _mock(size) != 0 { return nil }
+#endif
+  return malloc(size)
+}
+
+internal func system_calloc(_ count: Int, _ size: Int) -> UnsafeMutableRawPointer? {
+#if ENABLE_MOCKING
+  if mockingEnabled, _mock(count, size) != 0 { return nil }
+#endif
+  return calloc(count, size)
+}
+
+internal func system_realloc(
+  _ pointer: UnsafeMutableRawPointer?, _ size: Int
+) -> UnsafeMutableRawPointer? {
+#if ENABLE_MOCKING
+  if mockingEnabled, _mock(pointer, size) != 0 { return nil }
+#endif
+  return realloc(pointer, size)
+}
+
+internal func system_memchr(
+  _ start: UnsafeRawPointer, _ byte: CInt, _ count: Int
+) -> UnsafeMutableRawPointer? {
+  memchr(start, byte, count)
+}
+
+// Stores that the compiler can't remove: winnt.h defines it inline, with
+// volatile stores, and SecureZeroMemory as its name.
+internal func system_RtlSecureZeroMemory(_ start: UnsafeMutableRawPointer, _ count: Int) {
+  _ = RtlSecureZeroMemory(start, SIZE_T(count))
+}
+
+internal func system_strnlen(_ string: UnsafePointer<CChar>, _ maxLength: Int) -> Int {
+  strnlen(string, maxLength)
+}
+
+internal func system__strdup(_ string: UnsafePointer<CChar>) -> UnsafeMutablePointer<CChar>? {
+#if ENABLE_MOCKING
+  if mockingEnabled, _mock(path: nil, String(cString: string)) != 0 { return nil }
+#endif
+  return _strdup(string)
+}
+
 internal func system__wremove(_ path: UnsafePointer<WCHAR>) -> CInt {
 #if ENABLE_MOCKING
   if mockingEnabled { return _mock(path: path) }
