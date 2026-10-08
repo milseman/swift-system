@@ -58,6 +58,30 @@ internal var _WSAID_WSASENDMSG: GUID {
        Data4: (0x84, 0xA7, 0x0D, 0xEE, 0x44, 0xCF, 0x60, 0x6D))
 }
 
+@_alwaysEmitIntoClient
+internal var _WSAID_ACCEPTEX: GUID {
+  GUID(Data1: 0xB536_7DF1, Data2: 0xCBAC, Data3: 0x11CF,
+       Data4: (0x95, 0xCA, 0x00, 0x80, 0x5F, 0x48, 0xA1, 0x92))
+}
+
+@_alwaysEmitIntoClient
+internal var _WSAID_CONNECTEX: GUID {
+  GUID(Data1: 0x25A2_07B9, Data2: 0xDDF3, Data3: 0x4660,
+       Data4: (0x8E, 0xE9, 0x76, 0xE5, 0x8C, 0x74, 0x06, 0x3E))
+}
+
+@_alwaysEmitIntoClient
+internal var _WSAID_TRANSMITFILE: GUID {
+  GUID(Data1: 0xB536_7DF0, Data2: 0xCBAC, Data3: 0x11CF,
+       Data4: (0x95, 0xCA, 0x00, 0x80, 0x5F, 0x48, 0xA1, 0x92))
+}
+
+@_alwaysEmitIntoClient
+internal var _SO_UPDATE_ACCEPT_CONTEXT: CInt { 0x700B }
+
+@_alwaysEmitIntoClient
+internal var _SO_UPDATE_CONNECT_CONTEXT: CInt { 0x7010 }
+
 // MARK: - Overlapped I/O
 
 // The Win32 codes that Winsock's WSA_IO_INCOMPLETE and CancelIoEx report,

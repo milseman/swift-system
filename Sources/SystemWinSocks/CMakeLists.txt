@@ -34,6 +34,7 @@ add_library(SystemWinSocks
   Sockets/SocketOptions.swift
   Sockets/SocketOverlappedIO.swift
   Sockets/SocketPoll.swift
+  Sockets/SocketStreamExtensions.swift
   Util.swift
   Win32Error+Winsock.swift)
 set_target_properties(SystemWinSocks PROPERTIES

@@ -11,13 +11,14 @@ by `Prototype/Win32/check-winsock.sh`, and kept inside `#if os(Windows)`; its te
 its model, Winsock's error codes as `Win32.Error`, the socket types, `open` (`WSASocketW`, starting Winsock lazily),
 `close` and `shutdown` (`e7c4d48`); addresses, with `inet_pton` and `inet_ntop` (`5f3381d`); binding, listening,
 accepting, connecting, sending and receiving, and the socket names (`1dea80c`); options (`13c9a37`); and nonblocking
-mode with open options (`a4f6883`). P2's first three parts are done: polling, with `WSAPoll` (`56851b2`); messages,
+mode with open options (`a4f6883`). P2's first four parts are done: polling, with `WSAPoll` (`56851b2`); messages,
 with `WSASendMsg` and `WSARecvMsg` looked up once per process, SystemSockets' ancillary messages, and the IP control
-messages (`f26f4c6`); and completion ports, with overlapped `WSASend` and `WSARecv` (this commit). Section 5 has
-what each adopter would change, row by row.
-- **Next**, the rest of P2 in order: the stream extension functions, `AcceptEx`, `ConnectEx` and `TransmitFile`
-  (overlapped, under Windows names, looked up once through a TCP socket), which the [sendfile] row needs; then Unix
-  domain sockets as Windows has them (`SOCKADDR_UN`, `UnixAddress`, stream only).
+messages (`f26f4c6`); completion ports, with overlapped `WSASend` and `WSARecv` (`9d94aa0`); and the stream extension
+functions, `AcceptEx`, `ConnectEx` and `TransmitFile` (this commit). Section 5 has what each adopter would change,
+row by row.
+- **Next**, the last of P2: Unix domain sockets as Windows has them (`SOCKADDR_UN`, `UnixAddress`, stream only, and
+  their files, which are reparse points); then, beyond P2, Windows name resolution (`GetAddrInfoW`), which the
+  [Windows name resolution] row needs.
 - **Open questions for Michael** (section 2): the manifest's form (host-conditional, or declared everywhere and empty
   elsewhere), and the module's name, which adopters that qualify names (`SystemSockets.SocketAddress`) spell per
   platform.
@@ -53,6 +54,7 @@ os(Windows)`. Its files mirror SystemSockets' layout:
 | `Sockets/SocketMessages+IP.swift` | `IPv4PacketInfo` (`IN_PKTINFO`), `IPv6PacketInfo`, `ExplicitCongestionNotification`, the messages' `typeOfService`, `trafficClass` and packet info, and `appendTypeOfService`/`appendTrafficClass` |
 | `Sockets/SocketOperations+Messages.swift` | `sendMessage` and `receiveMessage` (`WSASendMsg`, `WSARecvMsg`), in the span forms and the header forms |
 | `Internals/RawBuffer.swift` | SystemSockets' copy-on-write buffer, copied |
+| `Sockets/SocketStreamExtensions.swift` | `accept(into:addresses:overlapped:)` (`AcceptEx`) and `updateAcceptContext(listener:)`, `connect(to:overlapped:)` (`ConnectEx`) and `updateConnectContext()`, `transmitFile(_:byteCount:fromAbsoluteOffset:options:overlapped:)` (`TransmitFile`) with `TransmitFileOptions` |
 | `Sockets/SocketOverlappedIO.swift` | `Win32.CompletionPort.associate(_:key:)` for a socket; overlapped `send(_:flags:overlapped:)` (`WSASend`) and `receive(into:flags:overlapped:)` (`WSARecv`), `result(of:wait:)` (`WSAGetOverlappedResult`), `cancel(_:)` and `cancelAll()` (`CancelIoEx`) |
 
 `CInterop` also gains `IOVec` (`WSABUF`), `MsgHdr` (`WSAMSG`) and `CMsgHdr` (`WSACMSGHDR`), with SystemSockets' accessors
@@ -60,7 +62,8 @@ for them, and SystemPackage's for `iovec`.
 
 The parts, in order: the module, the socket types, `open`, `close` and `shutdown` (`e7c4d48`); addresses
 (`5f3381d`); connections, transfers and names (`1dea80c`); options (`13c9a37`); nonblocking mode and open options
-(`a4f6883`). P2: polling (`56851b2`); messages (`f26f4c6`); completion ports (this commit).
+(`a4f6883`). P2: polling (`56851b2`); messages (`f26f4c6`); completion ports (`9d94aa0`); the stream extension
+functions (this commit).
 
 ## 2. Design calls, with the alternatives rejected
 
@@ -200,6 +203,18 @@ The parts, in order: the module, the socket types, `open`, `close` and `shutdown
   which the documentation says. *Rejected*: an owner for overlapped sockets, as `Win32.OverlappedFileHandle` is for
   files: every socket System opens is overlapped already, and its blocking calls are safe, unlike `ReadFile` on an
   overlapped file; and returning `WSAGetOverlappedResult`'s flags, which matter only to message-oriented protocols.
+- **`AcceptEx`, `ConnectEx` and `TransmitFile` are Windows API under Swift names** (section 29's proposal 2: "Windows'
+  own, under Windows names"): `accept(into:addresses:overlapped:)`, `connect(to:overlapped:)` and
+  `transmitFile(_:byteCount:fromAbsoluteOffset:options:overlapped:)`, overlapped by the rules above, returning whether
+  the operation finished in the call; and the two options they need afterward, as methods: `updateAcceptContext
+  (listener:)` (`SO_UPDATE_ACCEPT_CONTEXT`) and `updateConnectContext()` (`SO_UPDATE_CONNECT_CONTEXT`). They're looked
+  up once per process through a TCP socket, as the message functions are through a UDP one; `mswsock.dll` exports
+  them too, but linking it isn't needed then, and the lookup is Microsoft's advice. Their `BOOL` is an `int`, which
+  their Swift types spell as `CInt`, rather than taking the SDK's `LPFN_` typedefs, since Swift imports `BOOL` as
+  `WindowsBool` or `Bool` depending on the context (the model as `ObjCBool`). Neither takes initial data, which
+  `AcceptEx` and `ConnectEx` can carry; `transmitFile` takes a borrowed raw `HANDLE`, which a C runtime descriptor's
+  `withWin32HandleIfAvailable` gives, and no head or tail buffers. *Rejected*: taking a `Win32.FileHandle`, which a
+  caller with a descriptor, as NIO is, can't make without taking ownership.
 - **The address conversions don't start Winsock**: their documentation lists no `WSANOTINITIALISED`, and
   swift-certificates already calls `inet_pton` without starting it. An exit test checks it in a fresh process.
   *Rejected*: starting Winsock for them, which would load Winsock's providers into a process that only parses
@@ -278,6 +293,12 @@ What each file checks, and what it can reach:
   packet, whether it finished at once or not; a canceled receive's packet and result, `operationAborted`, and
   nothing left to cancel; a second association failing with `invalidParameter`. Each `OVERLAPPED` and buffer is freed
   only after its packet is dequeued, and every dequeue has a five-second time-out.
+- `SocketStreamExtensionsTests`: the options and context codes against the SDK, the functions found, and the address
+  capacity; an overlapped accept and an overlapped connect on loopback, both reported through a completion port, then
+  the context updates and both sockets' names; and `transmitFile` sending 900 bytes of a temporary file from an offset
+  of 100, reported through a port and received whole. The file is the test's own: a random name in
+  `FilePath.temporaryDirectory()`, created with `createNew` (so it can't open another file), shared with no one, and
+  opened with `deleteOnClose`, so the system deletes it when its handle closes, even if the test crashes.
 
 None deletes, moves or changes the permissions of anything, signals anything, or reaches the network.
 
@@ -317,7 +338,7 @@ module-qualified names (`SystemSockets.SocketAddress`) need the naming decision.
 | [Winsock messages] | `BSDSocketAPIWindows.swift:110-113` (the `WSAMSG`, `WSACMSGHDR` and `LPFN_WSARECVMSG` imports), 146-166 (the GUIDs and the ioctl code), `recvmsg` and `sendmsg` at 302-399, `writev` at 414-426, `sendmmsg` at 467-524, the `CMSG` shims at 703-751, and the `WSABUF` and `WSAMSG` accessors at 771-855 | `receiveMessage(_:flags:)` and `sendMessage(_:flags:)` with a `CInterop.MsgHdr`, which look the functions up once; `UnsafeAncillaryMessages(header)` for the shims; the accessors (`vectors`, `control`, `controlLength`, `flags`), but for `name`, the C field's own name; `CInterop.IOVec`'s `base` and `length` for NIO's `iov_base` and `iov_len` | `writev` (`WSASend` with several buffers) and `sendmmsg`, which Winsock lacks and NIO's loop of `WSASendMsg` stands in for |
 | [poll] | `NIOPosix/SelectorWSAPoll.swift` (the events at 33-75, `WSAPoll` at 305 and its error at 376), `NIOPosix/SelectorGeneric.swift:24` (`pollfd`) | `SocketDescriptor.PollEntry` over its `pollfd` array and `SocketDescriptor.poll(_:timeout:)` over a `MutableSpan` of them, or `CInterop.PollFD` where NIO keeps raw entries; its event mapping uses `readableNormalData` and `writableNormalData`, as it uses `POLLRDNORM` and `POLLWRNORM` | — |
 | [Windows name resolution] | `GetaddrinfoResolver.swift:44-55`, 145; `SocketAddresses.swift:24-29` | — | `GetAddrInfoW`, `FreeAddrInfoW`, `ADDRINFOW`: SystemSockets' `SocketAddress.resolve` over them, not started |
-| [sendfile] | `BSDSocketAPIWindows.swift:76`, 90, 578-608 | — | `TransmitFile`, an extension function: P2 |
+| [sendfile] | `BSDSocketAPIWindows.swift:76`, 90, 578-608 | `transmitFile(_:byteCount:fromAbsoluteOffset:options:overlapped:)` with `.useKernelAPC`, the descriptor's handle from `withWin32HandleIfAvailable`, and an `OVERLAPPED` that outlives the transmission, which NIO's code doesn't (section 7) | a synchronous form, which `TransmitFile` has only without an offset |
 
 ## 6. Where sharing SystemSockets' code would have saved work
 
@@ -346,6 +367,12 @@ removed, and `RawBuffer.swift` is copied whole; about 900 lines that sharing wou
 - **swift-nio**: `NIOPosix/ControlMessage.swift:34` takes the IPv4 control messages' level on Windows to be
   `IPPROTO_IPV4` (4), where Winsock's is `IPPROTO_IP` (0), so NIO's Windows branch never decodes a received type of
   service or IPv4 packet information. Adopting SystemWinSocks fixes it; until then, it's NIO's to fix.
+- **swift-nio**: `NIOPosix/BSDSocketAPIWindows.swift`'s `sendfile` (578-608) passes `TransmitFile` an `OVERLAPPED` on the
+  stack, on a socket that `socket` made overlapped, and throws when the call returns `FALSE`, which an overlapped
+  transmission does with `WSA_IO_PENDING` while still going; Windows then writes the result into a stack frame that's
+  gone, and the bytes NIO reported as an error are sent anyway. On success it reports the whole length as sent, which
+  a transmission that's pending hasn't. Its `pread` and `pwrite` (530-576) pass `ReadFile` and `WriteFile` stack
+  `OVERLAPPED`s the same way. These look like NIO's to fix; with System, the `OVERLAPPED` is the caller's to keep.
 - **The tools** know two modules: `Utilities/api-delta/scripts/scan_sources.py` (`MODULE_DIRS`), the adopter-coverage
   scripts (`status.py`'s `SYSTEM_SOURCES`, `extract.py`'s `SYSTEM_MODULES`), and lint's cmake check (`MODULES`) read
   only `Sources/System` and `Sources/SystemSockets`, so neither lint's api rules, the coverage figures, nor the

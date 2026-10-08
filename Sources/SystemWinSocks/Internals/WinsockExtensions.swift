@@ -42,6 +42,48 @@ internal let _winsockMessageFunctions: Result<_WinsockMessageFunctions, Win32.Er
   }
 }()
 
+// The stream functions return BOOL, an int on Windows, which Swift imports
+// as WindowsBool or Bool depending on the context (and the model as
+// ObjCBool), so their types here spell it as CInt, its exact ABI, rather
+// than taking the SDK's LPFN_ACCEPTEX, LPFN_CONNECTEX and LPFN_TRANSMITFILE,
+// whose parameters they have.
+internal typealias _AcceptExFunction = @convention(c) (
+  SOCKET, SOCKET, UnsafeMutableRawPointer?, DWORD, DWORD, DWORD,
+  UnsafeMutablePointer<DWORD>?, UnsafeMutablePointer<OVERLAPPED>?
+) -> CInt
+
+internal typealias _ConnectExFunction = @convention(c) (
+  SOCKET, UnsafePointer<SOCKADDR>?, CInt, UnsafeMutableRawPointer?, DWORD,
+  UnsafeMutablePointer<DWORD>?, UnsafeMutablePointer<OVERLAPPED>?
+) -> CInt
+
+internal typealias _TransmitFileFunction = @convention(c) (
+  SOCKET, HANDLE?, DWORD, DWORD, UnsafeMutablePointer<OVERLAPPED>?,
+  UnsafeMutableRawPointer?, DWORD
+) -> CInt
+
+/// The stream functions, looked up through a TCP socket.
+internal struct _WinsockStreamFunctions {
+  internal var acceptEx: _AcceptExFunction
+  internal var connectEx: _ConnectExFunction
+  internal var transmitFile: _TransmitFileFunction
+}
+
+internal let _winsockStreamFunctions: Result<_WinsockStreamFunctions, Win32.Error> = {
+  _withProbeSocket(af: 2, type: 1, protocol: 6) { probe in
+    _extensionFunctionAddress(probe, _WSAID_ACCEPTEX).flatMap { accept in
+      _extensionFunctionAddress(probe, _WSAID_CONNECTEX).flatMap { connect in
+        _extensionFunctionAddress(probe, _WSAID_TRANSMITFILE).map { transmit in
+          _WinsockStreamFunctions(
+            acceptEx: unsafeBitCast(accept, to: _AcceptExFunction.self),
+            connectEx: unsafeBitCast(connect, to: _ConnectExFunction.self),
+            transmitFile: unsafeBitCast(transmit, to: _TransmitFileFunction.self))
+        }
+      }
+    }
+  }
+}()
+
 /// Calls `body` with a socket of the given kind, opened for looking up
 /// extension functions and closed afterward, after starting Winsock.
 internal func _withProbeSocket<R>(

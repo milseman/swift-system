@@ -20,3 +20,15 @@ typedef INT (*LPFN_WSARECVMSG)(SOCKET s, LPWSAMSG lpMsg, LPDWORD lpdwNumberOfByt
 typedef INT (*LPFN_WSASENDMSG)(SOCKET s, LPWSAMSG lpMsg, DWORD dwFlags, // mirrors: mswsock.h
                                LPDWORD lpNumberOfBytesSent, LPWSAOVERLAPPED lpOverlapped,
                                LPWSAOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine);
+
+// The stream extension functions' options. Their LPFN_ typedefs, which
+// return BOOL, the code spells itself (WinsockExtensions.swift).
+#define TF_DISCONNECT 0x01 // mirrors: mswsock.h
+#define TF_REUSE_SOCKET 0x02 // mirrors: mswsock.h
+#define TF_WRITE_BEHIND 0x04 // mirrors: mswsock.h
+#define TF_USE_DEFAULT_WORKER 0x00 // mirrors: mswsock.h
+#define TF_USE_SYSTEM_THREAD 0x10 // mirrors: mswsock.h
+#define TF_USE_KERNEL_APC 0x20 // mirrors: mswsock.h
+
+#define SO_UPDATE_ACCEPT_CONTEXT 0x700B // mirrors: mswsock.h
+#define SO_UPDATE_CONNECT_CONTEXT 0x7010 // mirrors: mswsock.h
