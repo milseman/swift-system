@@ -65,6 +65,23 @@ extension CInterop {
   ///
   /// The corresponding C type is `LINGER`.
   public typealias Linger = LINGER
+
+  /// I/O vector structure for scatter/gather I/O: Winsock's, whose length
+  /// comes first and is a `ULONG`.
+  ///
+  /// The corresponding C type is `WSABUF`.
+  public typealias IOVec = WSABUF
+
+  /// Message header structure for `WSASendMsg` and `WSARecvMsg`, Winsock's
+  /// `sendmsg` and `recvmsg`.
+  ///
+  /// The corresponding C type is `WSAMSG`.
+  public typealias MsgHdr = WSAMSG
+
+  /// Control message header structure, whose length is a `SIZE_T`.
+  ///
+  /// The corresponding C type is `WSACMSGHDR`.
+  public typealias CMsgHdr = WSACMSGHDR
 }
 
 #endif // os(Windows)

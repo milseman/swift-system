@@ -12,7 +12,9 @@ See https://swift.org/LICENSE.txt for license information
 add_library(SystemWinSocks
   Internals/CInterop+WinSockAccessors.swift
   Internals/CInterop+WinSocks.swift
+  Internals/RawBuffer.swift
   Internals/WinsockConstants.swift
+  Internals/WinsockExtensions.swift
   Internals/WinsockStartup.swift
   Internals/WinsockSyscalls.swift
   Sockets/SocketAddress+Family.swift
@@ -22,7 +24,10 @@ add_library(SystemWinSocks
   Sockets/SocketAddress+IPv6.swift
   Sockets/SocketAddress.swift
   Sockets/SocketDescriptor.swift
+  Sockets/SocketMessages+IP.swift
+  Sockets/SocketMessages.swift
   Sockets/SocketOpenOptions.swift
+  Sockets/SocketOperations+Messages.swift
   Sockets/SocketOperations.swift
   Sockets/SocketOptions+IP.swift
   Sockets/SocketOptions+Timeouts.swift

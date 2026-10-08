@@ -11,11 +11,12 @@ by `Prototype/Win32/check-winsock.sh`, and kept inside `#if os(Windows)`; its te
 its model, Winsock's error codes as `Win32.Error`, the socket types, `open` (`WSASocketW`, starting Winsock lazily),
 `close` and `shutdown` (`e7c4d48`); addresses, with `inet_pton` and `inet_ntop` (`5f3381d`); binding, listening,
 accepting, connecting, sending and receiving, and the socket names (`1dea80c`); options (`13c9a37`); and nonblocking
-mode with open options (`a4f6883`). P2's first part is done: polling, with `WSAPoll` (this commit). Section 5 has
-what each adopter would change, row by row.
-- **Next**, the rest of P2 in order: the extension functions, cached once per process, with `WSASendMsg` and
-  `WSARecvMsg` (and SystemSockets' message API: `CInterop.MsgHdr` as `WSAMSG`, ancillary messages); completion
-  ports (associating a socket, overlapped `WSASend`/`WSARecv`); Unix domain sockets as Windows has them.
+mode with open options (`a4f6883`). P2's first two parts are done: polling, with `WSAPoll` (`56851b2`), and messages,
+with `WSASendMsg` and `WSARecvMsg` looked up once per process, SystemSockets' ancillary messages, and the IP control
+messages (this commit). Section 5 has what each adopter would change, row by row.
+- **Next**, the rest of P2 in order: completion ports (associating a socket with `Win32.CompletionPort`, overlapped
+  `WSASend`/`WSARecv`, and the stream extension functions `AcceptEx`, `ConnectEx`, `TransmitFile`); then Unix domain
+  sockets as Windows has them (`SOCKADDR_UN`, `UnixAddress`, stream only).
 - **Open questions for Michael** (section 2): the manifest's form (host-conditional, or declared everywhere and empty
   elsewhere), and the module's name, which adopters that qualify names (`SystemSockets.SocketAddress`) spell per
   platform.
@@ -46,10 +47,18 @@ os(Windows)`. Its files mirror SystemSockets' layout:
 | `Sockets/SocketOptions+Timeouts.swift` | send and receive time-outs, linger |
 | `Sockets/SocketOpenOptions.swift` | `OpenOptions.nonBlocking`, `open(options:)`, `accept(options:)`, and `setNonBlocking(_:)` (`ioctlsocket(FIONBIO)`) |
 | `Sockets/SocketPoll.swift` | `CInterop.PollFD` (`WSAPOLLFD`), `SocketDescriptor.PollEvents` and `PollEntry`, the static `poll(_:timeout:retryOnInterrupt:)` over a `MutableSpan`, and `poll(for:timeout:retryOnInterrupt:)` (`WSAPoll`) |
+| `Internals/WinsockExtensions.swift` | the extension functions, looked up once per process through a probe socket (`WSAIoctl(SIO_GET_EXTENSION_FUNCTION_POINTER)`) |
+| `Sockets/SocketMessages.swift` | `SocketDescriptor.Option`, `AncillaryMessageBuffer` and `UnsafeAncillaryMessages` over `WSACMSGHDR`, laid out as `WSA_CMSG_*` lays them out |
+| `Sockets/SocketMessages+IP.swift` | `IPv4PacketInfo` (`IN_PKTINFO`), `IPv6PacketInfo`, `ExplicitCongestionNotification`, the messages' `typeOfService`, `trafficClass` and packet info, and `appendTypeOfService`/`appendTrafficClass` |
+| `Sockets/SocketOperations+Messages.swift` | `sendMessage` and `receiveMessage` (`WSASendMsg`, `WSARecvMsg`), in the span forms and the header forms |
+| `Internals/RawBuffer.swift` | SystemSockets' copy-on-write buffer, copied |
+
+`CInterop` also gains `IOVec` (`WSABUF`), `MsgHdr` (`WSAMSG`) and `CMsgHdr` (`WSACMSGHDR`), with SystemSockets' accessors
+for them, and SystemPackage's for `iovec`.
 
 The parts, in order: the module, the socket types, `open`, `close` and `shutdown` (`e7c4d48`); addresses
 (`5f3381d`); connections, transfers and names (`1dea80c`); options (`13c9a37`); nonblocking mode and open options
-(`a4f6883`). P2: polling (this commit).
+(`a4f6883`). P2: polling (`56851b2`); messages (this commit).
 
 ## 2. Design calls, with the alternatives rejected
 
@@ -151,6 +160,33 @@ The parts, in order: the module, the socket types, `open`, `close` and `shutdown
   The documentation notes `WSAPoll`'s missed failed connects before Windows 10 version 2004. *Rejected*: putting
   Windows' poll on `FileDescriptor`, which a socket isn't. SystemSockets could add the same `SocketDescriptor` names
   on POSIX, over `poll`, so that code polling sockets spells it once (section 7).
+- **Extension functions are looked up once per process** (section 29's proposal 7), each family through a socket
+  System opens for the purpose and closes, as Go's `golang.org/x/sys/windows` does (a UDP socket for `WSARecvMsg`
+  and `WSASendMsg`), from a global whose initializer runs once, so the first lookup's result is every call's. Windows'
+  own providers give every socket the same functions. *Rejected*: NIO's lookup on every call, which costs a
+  `WSAIoctl` per message; libuv's per handle, and .NET's per family, type and protocol, which serve layered
+  providers, at the cost of a cache to keep. `WSASendMsg` is also an export of `ws2_32` since Vista; it's looked up
+  with `WSARecvMsg`, as NIO does, so that both come from the socket's provider.
+- **Messages keep SystemSockets' API over Winsock's structures**: `CInterop.MsgHdr` is `WSAMSG`, `CMsgHdr` is
+  `WSACMSGHDR` (16 bytes, aligned to 8, so `space(forPayloadSize:)` and `length(forPayloadSize:)` are Linux's 64-bit
+  values), and `IOVec` is `WSABUF`, with SystemSockets' accessors and SystemPackage's `iovec` ones. What shows:
+  - `WSAMSG`'s own address field is called `name`, a `SOCKADDR` pointer, so SystemSockets' accessor of that name,
+    a raw pointer, can't be declared beside it: the initializer takes a raw pointer, and code that sets the field
+    spells its type.
+  - `WSARecvMsg` reads its flags from the header's `dwFlags`, which `receiveMessage(_:flags:)` sets from `flags`
+    before each call.
+  - A datagram that doesn't fit throws `messageTooLong`, as `receive` does, where POSIX returns it with
+    `dataTruncated`. *Rejected*: turning `WSAEMSGSIZE` into a count and `dataTruncated`, which would need the count
+    Winsock doesn't report for a failed call.
+  - Windows' own providers support `WSARecvMsg` and `WSASendMsg` on datagram and raw sockets, which the
+    documentation says.
+  - No `SCM_RIGHTS`: `appendFileDescriptors`, `fileDescriptors` and `Option.rights` are left out.
+- **IP control messages read Winsock's layouts**: its `IN_PKTINFO` is the address then the index, 8 bytes, where
+  Linux's `in_pktinfo` is 12 and has a local address, so `IPv4PacketInfo` has no `localAddress`, and its initializer
+  takes two fields. A received type of service is read whether Winsock sends it as `IP_RECVTOS` or `IP_TOS`, and a
+  traffic class as `IPV6_TCLASS` or `IPV6_RECVTCLASS`, since the documentation doesn't say; a Windows run tells
+  which. `appendTypeOfService` and `appendTrafficClass` build the messages POSIX takes, which `WSASendMsg` may not
+  honor; Windows' own are `IP_ECN` and `IPV6_ECN`, not wrapped. No `timestamp`: Winsock has no `SO_TIMESTAMP`.
 - **The address conversions don't start Winsock**: their documentation lists no `WSANOTINITIALISED`, and
   swift-certificates already calls `inet_pton` without starting it. An exit test checks it in a fresh process.
   *Rejected*: starting Winsock for them, which would load Winsock's providers into a process that only parses
@@ -219,6 +255,11 @@ What each file checks, and what it can reach:
 - `SocketPollTests`: the events against the SDK and their descriptions; the time-out's rounding; a connection's
   readiness (writable, not readable, readable once a byte arrives, hung up or readable once the peer closes); a
   listening socket readable with a connection pending; two entries polled at once. Every wait has a time-out.
+- `SocketMessagesTests`: the message functions found, and `SIO_GET_EXTENSION_FUNCTION_POINTER` against the SDK's
+  `IOC_` macros; the layout's sizes, and messages appended, iterated and read back; a UDP message with its sender's
+  address; a header of the test's own, gathering from two buffers and scattering into two; IPv4 and IPv6 packet
+  information on loopback; a received type of service; and a datagram too long for the buffer. UDP over 127.0.0.1
+  and `::1` only, each receive with a five-second time-out.
 
 None deletes, moves or changes the permissions of anything, signals anything, or reaches the network.
 
@@ -244,7 +285,7 @@ module-qualified names (`SystemSockets.SocketAddress`) need the naming decision.
 | [multicast] | `BSDSocketAPI.swift:23-33`, 425-543; `NIOPosix/SocketChannel.swift:46-49` (`INADDR_ANY`, `ip_mreq`, `ipv6_mreq`) and the joins at 1285-1420; `BSDSocketAPIWindows.swift:38-48` | the option names, and `changeMembership` (`SocketChannel.swift` near 1391), the Darwin branch, which `joinMulticastGroup`/`leaveMulticastGroup` serve | — |
 | [IPV6_V6ONLY and IP_HDRINCL] | `BSDSocketAPI.swift:25`, 34, 481-486, 545-550; `BSDSocketAPIWindows.swift:49` | `IPv6Option.v6Only`, `IPOption.headerIncluded` | — |
 | [TCP_NODELAY] | `BSDSocketAPI.swift:55`, 558-563; `BSDSocketAPIWindows.swift:55` | `TCPOption.noDelay` | — |
-| [ECN, TOS and packet info] | `NIOPosix/BSDSocketAPICommon.swift:29-30`; `NIOPosix/System.swift:116` | the option names (`receiveTypeOfService`, `receiveTrafficClass`, `packetInfo`) | the values, which arrive as control messages: P2 |
+| [ECN, TOS and packet info] | `NIOPosix/BSDSocketAPICommon.swift:29-30`; `NIOPosix/System.swift:116`; the decoding in `NIOPosix/ControlMessage.swift:225-330` and the encoding at 460-480 | the option names (`receiveTypeOfService`, `receiveTrafficClass`, `packetInfo`); the messages' `typeOfService`, `trafficClass`, `ipv4PacketInfo` and `ipv6PacketInfo`, as NIO's Darwin branch reads them, which also fixes NIO's Windows level: `ControlMessage.swift:34` takes the IPv4 messages' level to be `IPPROTO_IPV4` (4), where Winsock's is `IPPROTO_IP` (0) | `IP_ECN`, Windows' own ECN message |
 | [socket types] | `BSDSocketAPICommon.swift:32-34` | `SocketDescriptor.ConnectionType` | — |
 | [shutdown] | `BSDSocketAPIWindows.swift:57-59`, 177-188, 448-452 | `shutdown(_:)` with `ShutdownKind`, which takes Winsock's `SD_*` values | — |
 | [Winsock sockets] | `BSDSocketAPIWindows.swift:26`, 32, 74, 80, 84, the close at 220-225 and `setNonBlocking` at 618-629; `BSDSocketAPICommon.swift:27`; `NIOPosix/Windows.swift:19` | `close()`, and `setNonBlocking()`, whose `invalidArgument` NIO turns into `NIOFcntlFailedError` | `INVALID_SOCKET`: System names no invalid socket on any platform, and NIO keeps its own sentinel |
@@ -255,7 +296,7 @@ module-qualified names (`SystemSockets.SocketAddress`) need the naming decision.
 | [Winsock errors] | every `IOError(winsock: WSAGetLastError(), ...)` in `BSDSocketAPIWindows.swift`; `SelectorWSAPoll.swift:376` | errors arrive as `Win32.Error`; `IOError(winsock: CInt(bitPattern: error.rawValue), reason:)` keeps NIO's error type | — |
 | [linger] | `NIOCore/SocketOptionProvider.swift:37`, 182-219 | `CInterop.Linger` and its accessors; the `setSoLinger(_: CInterop.Linger)` overload, which NIO has for Darwin, widened | — |
 | [Winsock startup] | CNIOWindows' `WSAStartup.c`, a C runtime initializer | none needed: `open` starts Winsock | — |
-| [Winsock messages] | `BSDSocketAPIWindows.swift:110-113`, 146-166, 302-399, 414-426, 467-524, 703-855 | — | P2: `WSASendMsg`, `WSARecvMsg`, `WSABUF`, the `WSA_CMSG_*` walk |
+| [Winsock messages] | `BSDSocketAPIWindows.swift:110-113` (the `WSAMSG`, `WSACMSGHDR` and `LPFN_WSARECVMSG` imports), 146-166 (the GUIDs and the ioctl code), `recvmsg` and `sendmsg` at 302-399, `writev` at 414-426, `sendmmsg` at 467-524, the `CMSG` shims at 703-751, and the `WSABUF` and `WSAMSG` accessors at 771-855 | `receiveMessage(_:flags:)` and `sendMessage(_:flags:)` with a `CInterop.MsgHdr`, which look the functions up once; `UnsafeAncillaryMessages(header)` for the shims; the accessors (`vectors`, `control`, `controlLength`, `flags`), but for `name`, the C field's own name; `CInterop.IOVec`'s `base` and `length` for NIO's `iov_base` and `iov_len` | `writev` (`WSASend` with several buffers) and `sendmmsg`, which Winsock lacks and NIO's loop of `WSASendMsg` stands in for |
 | [poll] | `NIOPosix/SelectorWSAPoll.swift` (the events at 33-75, `WSAPoll` at 305 and its error at 376), `NIOPosix/SelectorGeneric.swift:24` (`pollfd`) | `SocketDescriptor.PollEntry` over its `pollfd` array and `SocketDescriptor.poll(_:timeout:)` over a `MutableSpan` of them, or `CInterop.PollFD` where NIO keeps raw entries; its event mapping uses `readableNormalData` and `writableNormalData`, as it uses `POLLRDNORM` and `POLLWRNORM` | — |
 | [Windows name resolution] | `GetaddrinfoResolver.swift:44-55`, 145; `SocketAddresses.swift:24-29` | — | `GetAddrInfoW`, `FreeAddrInfoW`, `ADDRINFOW`: SystemSockets' `SocketAddress.resolve` over them, not started |
 | [sendfile] | `BSDSocketAPIWindows.swift:76`, 90, 578-608 | — | `TransmitFile`, an extension function: P2 |
@@ -266,6 +307,10 @@ So far: the five nested types of `SocketDescriptor.swift` and the operations' bo
 constants and error types changed, and `Util.swift`'s helpers are its `valueOrErrno` family over another failure
 test. Sharing would have saved writing them twice and keeping the doc comments in step; it would have cost the
 `#if os(Windows)` in each body that the raw value's type, the error type, and the omissions need.
+
+Messages: `SocketMessages.swift` and its IP part are SystemSockets' with Winsock's layout and the descriptor messages
+removed, and `RawBuffer.swift` is copied whole; about 900 lines that sharing would have written once, with a
+`#if` for the layout's alignment, the packet-info structure, and the `SCM_RIGHTS` parts.
 
 ## 7. Needs outside the lane's files
 
@@ -280,6 +325,9 @@ test. Sharing would have saved writing them twice and keeping the doc comments i
   it as on Windows. And its `_value` and `_setValue` (`Sources/SystemSockets/Sockets/SocketOptions+IP.swift:280`, 289)
   warn "forming 'UnsafeMutableRawPointer' to a variable of type 'T'"; SystemWinSocks passes the value through
   `withUnsafeMutableBytes(of:)` and `withUnsafeBytes(of:)`, which don't.
+- **swift-nio**: `NIOPosix/ControlMessage.swift:34` takes the IPv4 control messages' level on Windows to be
+  `IPPROTO_IPV4` (4), where Winsock's is `IPPROTO_IP` (0), so NIO's Windows branch never decodes a received type of
+  service or IPv4 packet information. Adopting SystemWinSocks fixes it; until then, it's NIO's to fix.
 - **The tools** know two modules: `Utilities/api-delta/scripts/scan_sources.py` (`MODULE_DIRS`), the adopter-coverage
   scripts (`status.py`'s `SYSTEM_SOURCES`, `extract.py`'s `SYSTEM_MODULES`), and lint's cmake check (`MODULES`) read
   only `Sources/System` and `Sources/SystemSockets`, so neither lint's api rules, the coverage figures, nor the

@@ -169,6 +169,20 @@ internal func system_WSAPoll(
   WSAPoll(entries, count, timeout)
 }
 
+// MARK: - Extension functions
+
+internal func system_WSAIoctl(
+  _ s: SOCKET,
+  _ code: DWORD,
+  _ input: UnsafeMutableRawPointer?,
+  _ inputLength: DWORD,
+  _ output: UnsafeMutableRawPointer?,
+  _ outputLength: DWORD,
+  _ bytesReturned: UnsafeMutablePointer<DWORD>
+) -> CInt {
+  WSAIoctl(s, code, input, inputLength, output, outputLength, bytesReturned, nil, nil)
+}
+
 // MARK: - Handles
 
 internal func system_SetHandleInformation(_ handle: HANDLE, _ mask: DWORD, _ flags: DWORD) -> Bool {

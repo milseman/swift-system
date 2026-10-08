@@ -289,6 +289,44 @@ typedef struct _winsock_model_pollfd { // mirrors: winsock2.h
 #define POLLHUP 0x0002 // mirrors: winsock2.h
 #define POLLNVAL 0x0004 // mirrors: winsock2.h
 
+// MARK: - Messages and overlapped I/O
+
+typedef struct _WSABUF { // mirrors: ws2def.h
+  ULONG len;
+  CHAR *buf;
+} WSABUF, *LPWSABUF;
+
+typedef struct _WSAMSG { // mirrors: ws2def.h
+  LPSOCKADDR name;
+  INT namelen;
+  LPWSABUF lpBuffers;
+  ULONG dwBufferCount;
+  WSABUF Control;
+  ULONG dwFlags;
+} WSAMSG, *PWSAMSG, *LPWSAMSG;
+
+typedef struct _WSACMSGHDR { // mirrors: ws2def.h
+  SIZE_T cmsg_len;
+  INT cmsg_level;
+  INT cmsg_type;
+} WSACMSGHDR, *PWSACMSGHDR, *LPWSACMSGHDR;
+
+// WSAOVERLAPPED is a macro for OVERLAPPED, which WinSDK.h declares.
+typedef struct _OVERLAPPED *LPWSAOVERLAPPED; // mirrors: winsock2.h
+typedef void (*LPWSAOVERLAPPED_COMPLETION_ROUTINE)(DWORD dwError, DWORD cbTransferred, // mirrors: winsock2.h
+                                                   LPWSAOVERLAPPED lpOverlapped, DWORD dwFlags);
+
+// The IOC_ macros; _WSAIORW and the SIO_ codes built from it are
+// function-like, so they don't import.
+#define IOC_OUT 0x40000000 // mirrors: winsock2.h
+#define IOC_IN 0x80000000 // mirrors: winsock2.h
+#define IOC_INOUT (IOC_IN | IOC_OUT) // mirrors: winsock2.h
+#define IOC_WS2 0x08000000 // mirrors: winsock2.h
+
+int WSAIoctl(SOCKET s, DWORD dwIoControlCode, LPVOID lpvInBuffer, DWORD cbInBuffer, // mirrors: winsock2.h
+             LPVOID lpvOutBuffer, DWORD cbOutBuffer, LPDWORD lpcbBytesReturned,
+             LPWSAOVERLAPPED lpOverlapped, LPWSAOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine);
+
 // MARK: - Functions
 
 // The SDK's WSAPROTOCOL_INFOW is a complete structure, which this model

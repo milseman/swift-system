@@ -28,6 +28,185 @@
 import SystemPackage
 import WinSDK
 
+// MARK: - WSABUF
+
+@available(System 199, *)
+extension CInterop.IOVec {
+  /// Creates a vector for a buffer, from its start and its length in bytes,
+  /// by default an empty one.
+  ///
+  /// The corresponding C fields are `buf` and `len`.
+  @_alwaysEmitIntoClient
+  public init(base: UnsafeMutableRawPointer? = nil, length: Int = 0) {
+    self = CInterop.IOVec()
+    self.base = base
+    self.length = length
+  }
+
+  /// Creates a vector for a buffer.
+  @_alwaysEmitIntoClient
+  public init(_ buffer: UnsafeMutableRawBufferPointer) {
+    self.init(base: buffer.baseAddress, length: buffer.count)
+  }
+
+  /// The buffer's start.
+  ///
+  /// The corresponding C field is `buf`.
+  @_alwaysEmitIntoClient
+  public var base: UnsafeMutableRawPointer? {
+    get { UnsafeMutableRawPointer(buf) }
+    set { buf = newValue?.assumingMemoryBound(to: CHAR.self) }
+  }
+
+  /// The buffer's length in bytes, which Winsock's `ULONG` limits to
+  /// `UInt32.max`.
+  ///
+  /// The corresponding C field is `len`.
+  @_alwaysEmitIntoClient
+  public var length: Int {
+    get { Int(len) }
+    set { len = ULONG(newValue) }
+  }
+}
+
+// MARK: - WSAMSG
+
+// WSAMSG's own fields are name, namelen, lpBuffers, dwBufferCount, Control
+// and dwFlags. SystemSockets' accessor for the address is also called name,
+// a raw pointer, which can't be declared beside the C field, a SOCKADDR
+// pointer: the initializer takes a raw pointer, and code that reads or sets
+// the field itself spells its type.
+@available(System 199, *)
+extension CInterop.MsgHdr {
+  /// Creates a message header from its fields, by default all zero.
+  ///
+  /// The corresponding C fields are `name`, `namelen`, `lpBuffers`,
+  /// `dwBufferCount`, `Control`, and `dwFlags`.
+  @_alwaysEmitIntoClient
+  public init(
+    name: UnsafeMutableRawPointer? = nil,
+    nameLength: Int = 0,
+    vectors: UnsafeMutablePointer<CInterop.IOVec>? = nil,
+    vectorCount: Int = 0,
+    control: UnsafeMutableRawPointer? = nil,
+    controlLength: Int = 0,
+    flags: SocketDescriptor.MessageFlags = []
+  ) {
+    self = CInterop.MsgHdr()
+    self.name = name?.assumingMemoryBound(to: CInterop.SockAddr.self)
+    self.nameLength = nameLength
+    self.vectors = vectors
+    self.vectorCount = vectorCount
+    self.control = control
+    self.controlLength = controlLength
+    self.flags = flags
+  }
+
+  /// The address's length in bytes.
+  ///
+  /// The corresponding C field is `namelen`.
+  @_alwaysEmitIntoClient
+  public var nameLength: Int {
+    get { Int(namelen) }
+    set { namelen = .init(newValue) }
+  }
+
+  /// The I/O vectors that describe the message's data.
+  ///
+  /// The corresponding C field is `lpBuffers`.
+  @_alwaysEmitIntoClient
+  public var vectors: UnsafeMutablePointer<CInterop.IOVec>? {
+    get { lpBuffers }
+    set { lpBuffers = newValue }
+  }
+
+  /// The number of I/O vectors.
+  ///
+  /// The corresponding C field is `dwBufferCount`.
+  @_alwaysEmitIntoClient
+  public var vectorCount: Int {
+    get { Int(dwBufferCount) }
+    set { dwBufferCount = .init(newValue) }
+  }
+
+  /// The ancillary messages to send, or the buffer to receive them into.
+  ///
+  /// The corresponding C field is `Control.buf`.
+  @_alwaysEmitIntoClient
+  public var control: UnsafeMutableRawPointer? {
+    get { UnsafeMutableRawPointer(Control.buf) }
+    set { Control.buf = newValue?.assumingMemoryBound(to: CHAR.self) }
+  }
+
+  /// The ancillary messages' length in bytes.
+  ///
+  /// The corresponding C field is `Control.len`.
+  @_alwaysEmitIntoClient
+  public var controlLength: Int {
+    get { Int(Control.len) }
+    set { Control.len = .init(newValue) }
+  }
+
+  /// Flags that describe a received message. Winsock's `WSARecvMsg` also
+  /// reads them, as its receive flags.
+  ///
+  /// The corresponding C field is `dwFlags`.
+  @_alwaysEmitIntoClient
+  public var flags: SocketDescriptor.MessageFlags {
+    get { SocketDescriptor.MessageFlags(rawValue: CInt(bitPattern: dwFlags)) }
+    set { dwFlags = ULONG(bitPattern: newValue.rawValue) }
+  }
+}
+
+// MARK: - WSACMSGHDR
+
+@available(System 199, *)
+extension CInterop.CMsgHdr {
+  /// Creates an ancillary message header from its fields,
+  /// by default all zero.
+  ///
+  /// The corresponding C fields are `cmsg_len`, `cmsg_level`,
+  /// and `cmsg_type`.
+  @_alwaysEmitIntoClient
+  public init(
+    length: Int = 0,
+    level: SocketDescriptor.OptionLevel = SocketDescriptor.OptionLevel(rawValue: 0),
+    type: SocketDescriptor.Option = SocketDescriptor.Option(rawValue: 0)
+  ) {
+    self = CInterop.CMsgHdr()
+    self.length = length
+    self.level = level
+    self.type = type
+  }
+
+  /// The message's length in bytes, its header included.
+  ///
+  /// The corresponding C field is `cmsg_len`, a `SIZE_T`.
+  @_alwaysEmitIntoClient
+  public var length: Int {
+    get { Int(cmsg_len) }
+    set { cmsg_len = .init(newValue) }
+  }
+
+  /// The message's protocol level.
+  ///
+  /// The corresponding C field is `cmsg_level`.
+  @_alwaysEmitIntoClient
+  public var level: SocketDescriptor.OptionLevel {
+    get { SocketDescriptor.OptionLevel(rawValue: cmsg_level) }
+    set { cmsg_level = newValue.rawValue }
+  }
+
+  /// The message's protocol-specific type.
+  ///
+  /// The corresponding C field is `cmsg_type`.
+  @_alwaysEmitIntoClient
+  public var type: SocketDescriptor.Option {
+    get { SocketDescriptor.Option(rawValue: cmsg_type) }
+    set { cmsg_type = newValue.rawValue }
+  }
+}
+
 // MARK: - sockaddr
 
 @available(System 199, *)
