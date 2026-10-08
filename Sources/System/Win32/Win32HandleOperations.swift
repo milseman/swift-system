@@ -159,6 +159,32 @@ extension Win32.DirectoryHandle {
 
 @available(System 199, *)
 extension Win32 {
+  /// Returns whether two handles refer to the same kernel object.
+  ///
+  /// Two handles of one object compare equal however they were made:
+  /// duplicated, inherited, or opened separately, as two opens of one
+  /// file make two objects, which don't. The pseudo-handles of
+  /// `GetCurrentProcess` and `GetCurrentThread` refer to the calling
+  /// process and thread, so a thread's handle compares equal to the
+  /// calling thread's pseudo-handle only on that thread.
+  ///
+  /// The handles are borrowed: pass an owner's ``Win32/FileHandle/unsafeRawHandle``,
+  /// which stays valid while the owner lives.
+  ///
+  /// The corresponding C function is `CompareObjectHandles`.
+  @_alwaysEmitIntoClient
+  public static func handlesReferToSameObject(_ first: HANDLE, _ second: HANDLE) -> Bool {
+    _handlesReferToSameObject(first, second)
+  }
+
+  @usableFromInline
+  internal static func _handlesReferToSameObject(_ first: HANDLE, _ second: HANDLE) -> Bool {
+    system_CompareObjectHandles(first, second)
+  }
+}
+
+@available(System 199, *)
+extension Win32 {
   @usableFromInline
   internal static func _duplicateHandle(
     _ handle: HANDLE, access: DWORD?, inheritable: Bool

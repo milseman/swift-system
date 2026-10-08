@@ -42,6 +42,10 @@ internal func system_CloseHandle(_ hObject: HANDLE) -> Bool {
   CloseHandle(hObject)
 }
 
+internal func system_CompareObjectHandles(_ first: HANDLE, _ second: HANDLE) -> Bool {
+  CompareObjectHandles(first, second)
+}
+
 internal func system_CreateFileW(
   _ lpFileName: UnsafePointer<WCHAR>,
   _ dwDesiredAccess: DWORD,

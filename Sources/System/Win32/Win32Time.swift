@@ -175,7 +175,8 @@ extension Win32 {
   /// an unspecified start, so only differences between its values are
   /// meaningful.
   ///
-  /// The corresponding C function is `QueryPerformanceCounter`.
+  /// The corresponding C function is `QueryPerformanceCounter`, with a
+  /// `LARGE_INTEGER`.
   @_alwaysEmitIntoClient
   public static func performanceCounter() -> Int64 {
     _performanceCounter(frequency: false)
@@ -185,7 +186,8 @@ extension Win32 {
   ///
   /// The frequency is fixed when the system starts, so it can be read once.
   ///
-  /// The corresponding C function is `QueryPerformanceFrequency`.
+  /// The corresponding C function is `QueryPerformanceFrequency`, with a
+  /// `LARGE_INTEGER`.
   @_alwaysEmitIntoClient
   public static func performanceFrequency() -> Int64 {
     _performanceCounter(frequency: true)

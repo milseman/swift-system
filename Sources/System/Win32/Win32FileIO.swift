@@ -471,7 +471,8 @@ extension Win32.FileHandle {
   ///   unspecified value. To ask how many bytes a pipe has available to read,
   ///   use `PeekNamedPipe`.
   ///
-  /// The corresponding C function is `GetFileSizeEx`.
+  /// The corresponding C function is `GetFileSizeEx`, with a
+  /// `LARGE_INTEGER`.
   @_alwaysEmitIntoClient
   public func size() throws(Win32.Error) -> Int64 {
     try Win32._fileSize(_handle).get()

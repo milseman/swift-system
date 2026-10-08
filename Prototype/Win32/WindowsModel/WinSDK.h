@@ -603,6 +603,9 @@ PVOID RtlSecureZeroMemory(PVOID ptr, SIZE_T cnt);
 // winbase.h: the local heap's allocation, which LocalFree frees.
 HLOCAL LocalAlloc(UINT uFlags, SIZE_T uBytes);
 
+// handleapi.h, from Windows 10, version 1607.
+BOOL CompareObjectHandles(HANDLE hFirstObjectHandle, HANDLE hSecondObjectHandle);
+
 // guiddef.h, knownfolders.h, shlobj_core.h and combaseapi.h: known folders.
 // Data1 is an unsigned long, 32 bits on Windows.
 typedef struct _GUID {

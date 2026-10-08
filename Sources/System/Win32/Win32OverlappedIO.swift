@@ -461,7 +461,8 @@ extension Win32.CompletionPort {
   /// Throws if the wait itself fails, as it does when the port closes
   /// while a thread waits.
   ///
-  /// The corresponding C function is `GetQueuedCompletionStatus`.
+  /// The corresponding C function is `GetQueuedCompletionStatus`, with
+  /// the `LPOVERLAPPED` that the completion's overlapped holds.
   @_alwaysEmitIntoClient
   @available(*, noasync, message: "Waiting blocks the calling thread")
   public func dequeue(timeout: Duration? = nil) throws(Win32.Error) -> Win32.Completion? {
