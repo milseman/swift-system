@@ -99,12 +99,28 @@ internal enum _ControlMessageLayout {
     at offset: Int, in bytes: UnsafeRawBufferPointer
   ) -> Int? {
     guard offset >= 0, bytes.count - offset >= headerSize else { return nil }
-    let header = bytes.loadUnaligned(fromByteOffset: offset, as: CInterop.CMsgHdr.self)
-    // cmsg_len is a SIZE_T.
-    guard let length = Int(exactly: header.cmsg_len),
+    guard let length = Int(exactly: header(at: offset, in: bytes).length),
           length >= payloadOffset, length <= bytes.count - offset
     else { return nil }
     return length
+  }
+
+  /// The fields of the header at `offset` in `bytes`, which must hold one.
+  ///
+  /// WSACMSGHDR is a SIZE_T cmsg_len, then the INTs cmsg_level and
+  /// cmsg_type. They're read one by one, rather than as the structure: in
+  /// Swift 6.2, a client of inlinable code that loads a C structure from
+  /// raw bytes can fail to compile.
+  @inlinable
+  internal static func header(
+    at offset: Int, in bytes: UnsafeRawBufferPointer
+  ) -> (length: UInt, level: CInt, type: CInt) {
+    let level = offset + MemoryLayout<UInt>.size
+    return (
+      bytes.loadUnaligned(fromByteOffset: offset, as: UInt.self),
+      bytes.loadUnaligned(fromByteOffset: level, as: CInt.self),
+      bytes.loadUnaligned(fromByteOffset: level + MemoryLayout<CInt>.size, as: CInt.self)
+    )
   }
 
   /// The offset of the first message in `bytes`, or `nil` if there's none.
@@ -662,11 +678,11 @@ extension SocketDescriptor {
       guard let length = _ControlMessageLayout.messageLength(at: position.offset, in: bytes) else {
         preconditionFailure("Invalid index")
       }
-      let header = bytes.loadUnaligned(fromByteOffset: position.offset, as: CInterop.CMsgHdr.self)
+      let header = _ControlMessageLayout.header(at: position.offset, in: bytes)
       let payloadStart = position.offset + _ControlMessageLayout.payloadOffset
       return Message(
-        level: OptionLevel(rawValue: header.cmsg_level),
-        type: Option(rawValue: header.cmsg_type),
+        level: OptionLevel(rawValue: header.level),
+        type: Option(rawValue: header.type),
         payload: UnsafeRawBufferPointer(rebasing: bytes[payloadStart ..< position.offset + length]))
     }
   }

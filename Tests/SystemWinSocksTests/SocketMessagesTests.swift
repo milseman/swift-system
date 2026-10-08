@@ -32,6 +32,9 @@ private struct SocketMessagesTests {
   @available(System 199, *)
   @Test func layout() {
     #expect(MemoryLayout<CInterop.CMsgHdr>.size == 16)
+    // The inlinable readers take these offsets.
+    #expect(MemoryLayout<CInterop.CMsgHdr>.offset(of: \.cmsg_level) == 8)
+    #expect(MemoryLayout<CInterop.CMsgHdr>.offset(of: \.cmsg_type) == 12)
     #expect(AncillaryMessageBuffer.length(forPayloadSize: 4) == 20)
     #expect(AncillaryMessageBuffer.space(forPayloadSize: 4) == 24)
     #expect(AncillaryMessageBuffer.space(forPayloadSize: 8) == 24)
