@@ -183,6 +183,50 @@ internal func system_WSAIoctl(
   WSAIoctl(s, code, input, inputLength, output, outputLength, bytesReturned, nil, nil)
 }
 
+// MARK: - Overlapped I/O
+
+internal func system_WSASend(
+  _ s: SOCKET,
+  _ buffers: UnsafeMutablePointer<WSABUF>,
+  _ count: DWORD,
+  _ sent: UnsafeMutablePointer<DWORD>,
+  _ flags: DWORD,
+  _ overlapped: UnsafeMutablePointer<OVERLAPPED>
+) -> CInt {
+  WSASend(s, buffers, count, sent, flags, overlapped, nil)
+}
+
+internal func system_WSARecv(
+  _ s: SOCKET,
+  _ buffers: UnsafeMutablePointer<WSABUF>,
+  _ count: DWORD,
+  _ received: UnsafeMutablePointer<DWORD>,
+  _ flags: UnsafeMutablePointer<DWORD>,
+  _ overlapped: UnsafeMutablePointer<OVERLAPPED>
+) -> CInt {
+  WSARecv(s, buffers, count, received, flags, overlapped, nil)
+}
+
+internal func system_WSAGetOverlappedResult(
+  _ s: SOCKET,
+  _ overlapped: UnsafeMutablePointer<OVERLAPPED>,
+  _ transferred: UnsafeMutablePointer<DWORD>,
+  _ wait: Bool,
+  _ flags: UnsafeMutablePointer<DWORD>
+) -> Bool {
+  WSAGetOverlappedResult(s, overlapped, transferred, wait, flags)
+}
+
+internal func system_CancelIoEx(_ handle: HANDLE, _ overlapped: UnsafeMutablePointer<OVERLAPPED>?) -> Bool {
+  CancelIoEx(handle, overlapped)
+}
+
+internal func system_CreateIoCompletionPort(
+  _ handle: HANDLE, _ port: HANDLE, _ key: ULONG_PTR, _ threads: DWORD
+) -> HANDLE? {
+  CreateIoCompletionPort(handle, port, key, threads)
+}
+
 // MARK: - Handles
 
 internal func system_SetHandleInformation(_ handle: HANDLE, _ mask: DWORD, _ flags: DWORD) -> Bool {

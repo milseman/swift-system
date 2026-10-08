@@ -58,6 +58,16 @@ internal var _WSAID_WSASENDMSG: GUID {
        Data4: (0x84, 0xA7, 0x0D, 0xEE, 0x44, 0xCF, 0x60, 0x6D))
 }
 
+// MARK: - Overlapped I/O
+
+// The Win32 codes that Winsock's WSA_IO_INCOMPLETE and CancelIoEx report,
+// which SystemPackage doesn't name.
+@_alwaysEmitIntoClient
+internal var _WSA_IO_INCOMPLETE: DWORD { 996 }
+
+@_alwaysEmitIntoClient
+internal var _ERROR_NOT_FOUND: DWORD { 1168 }
+
 // MARK: - Handles
 
 @_alwaysEmitIntoClient

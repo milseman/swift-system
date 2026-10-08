@@ -11,12 +11,13 @@ by `Prototype/Win32/check-winsock.sh`, and kept inside `#if os(Windows)`; its te
 its model, Winsock's error codes as `Win32.Error`, the socket types, `open` (`WSASocketW`, starting Winsock lazily),
 `close` and `shutdown` (`e7c4d48`); addresses, with `inet_pton` and `inet_ntop` (`5f3381d`); binding, listening,
 accepting, connecting, sending and receiving, and the socket names (`1dea80c`); options (`13c9a37`); and nonblocking
-mode with open options (`a4f6883`). P2's first two parts are done: polling, with `WSAPoll` (`56851b2`), and messages,
+mode with open options (`a4f6883`). P2's first three parts are done: polling, with `WSAPoll` (`56851b2`); messages,
 with `WSASendMsg` and `WSARecvMsg` looked up once per process, SystemSockets' ancillary messages, and the IP control
-messages (this commit). Section 5 has what each adopter would change, row by row.
-- **Next**, the rest of P2 in order: completion ports (associating a socket with `Win32.CompletionPort`, overlapped
-  `WSASend`/`WSARecv`, and the stream extension functions `AcceptEx`, `ConnectEx`, `TransmitFile`); then Unix domain
-  sockets as Windows has them (`SOCKADDR_UN`, `UnixAddress`, stream only).
+messages (`f26f4c6`); and completion ports, with overlapped `WSASend` and `WSARecv` (this commit). Section 5 has
+what each adopter would change, row by row.
+- **Next**, the rest of P2 in order: the stream extension functions, `AcceptEx`, `ConnectEx` and `TransmitFile`
+  (overlapped, under Windows names, looked up once through a TCP socket), which the [sendfile] row needs; then Unix
+  domain sockets as Windows has them (`SOCKADDR_UN`, `UnixAddress`, stream only).
 - **Open questions for Michael** (section 2): the manifest's form (host-conditional, or declared everywhere and empty
   elsewhere), and the module's name, which adopters that qualify names (`SystemSockets.SocketAddress`) spell per
   platform.
@@ -52,13 +53,14 @@ os(Windows)`. Its files mirror SystemSockets' layout:
 | `Sockets/SocketMessages+IP.swift` | `IPv4PacketInfo` (`IN_PKTINFO`), `IPv6PacketInfo`, `ExplicitCongestionNotification`, the messages' `typeOfService`, `trafficClass` and packet info, and `appendTypeOfService`/`appendTrafficClass` |
 | `Sockets/SocketOperations+Messages.swift` | `sendMessage` and `receiveMessage` (`WSASendMsg`, `WSARecvMsg`), in the span forms and the header forms |
 | `Internals/RawBuffer.swift` | SystemSockets' copy-on-write buffer, copied |
+| `Sockets/SocketOverlappedIO.swift` | `Win32.CompletionPort.associate(_:key:)` for a socket; overlapped `send(_:flags:overlapped:)` (`WSASend`) and `receive(into:flags:overlapped:)` (`WSARecv`), `result(of:wait:)` (`WSAGetOverlappedResult`), `cancel(_:)` and `cancelAll()` (`CancelIoEx`) |
 
 `CInterop` also gains `IOVec` (`WSABUF`), `MsgHdr` (`WSAMSG`) and `CMsgHdr` (`WSACMSGHDR`), with SystemSockets' accessors
 for them, and SystemPackage's for `iovec`.
 
 The parts, in order: the module, the socket types, `open`, `close` and `shutdown` (`e7c4d48`); addresses
 (`5f3381d`); connections, transfers and names (`1dea80c`); options (`13c9a37`); nonblocking mode and open options
-(`a4f6883`). P2: polling (`56851b2`); messages (this commit).
+(`a4f6883`). P2: polling (`56851b2`); messages (`f26f4c6`); completion ports (this commit).
 
 ## 2. Design calls, with the alternatives rejected
 
@@ -187,6 +189,17 @@ The parts, in order: the module, the socket types, `open`, `close` and `shutdown
   traffic class as `IPV6_TCLASS` or `IPV6_RECVTCLASS`, since the documentation doesn't say; a Windows run tells
   which. `appendTypeOfService` and `appendTrafficClass` build the messages POSIX takes, which `WSASendMsg` may not
   honor; Windows' own are `IP_ECN` and `IPV6_ECN`, not wrapped. No `timestamp`: Winsock has no `SO_TIMESTAMP`.
+- **Overlapped socket I/O follows section 27's overlapped files**: `@unsafe` operations with raw pointers for the
+  `OVERLAPPED` and the buffer, which Windows uses until the operation finishes; `nil` for a pending one; the
+  `OVERLAPPED` not read after the call starts it, since a completion port's waiter can take the packet first; and
+  `cancel` returning `false` when nothing was pending. `Win32.CompletionPort` gains `associate(_:key:)` for a socket,
+  in an extension in this module, through the port's `unsafeRawHandle`, which section 27 left for Winsock to add.
+  What differs from files: `result(of:wait:)` can wait only for an operation whose `OVERLAPPED` has an event, as
+  `WSAGetOverlappedResult` requires, and it throws Winsock's code, where a completion port's packet carries the
+  Win32 code the kernel's status maps to (`ERROR_NETNAME_DELETED` for a reset connection, not `WSAECONNRESET`),
+  which the documentation says. *Rejected*: an owner for overlapped sockets, as `Win32.OverlappedFileHandle` is for
+  files: every socket System opens is overlapped already, and its blocking calls are safe, unlike `ReadFile` on an
+  overlapped file; and returning `WSAGetOverlappedResult`'s flags, which matter only to message-oriented protocols.
 - **The address conversions don't start Winsock**: their documentation lists no `WSANOTINITIALISED`, and
   swift-certificates already calls `inet_pton` without starting it. An exit test checks it in a fresh process.
   *Rejected*: starting Winsock for them, which would load Winsock's providers into a process that only parses
@@ -260,6 +273,11 @@ What each file checks, and what it can reach:
   address; a header of the test's own, gathering from two buffers and scattering into two; IPv4 and IPv6 packet
   information on loopback; a received type of service; and a datagram too long for the buffer. UDP over 127.0.0.1
   and `::1` only, each receive with a five-second time-out.
+- `SocketOverlappedIOTests`: the codes against the SDK; an overlapped receive, pending until the peer sends, reported
+  through a completion port with its key, `OVERLAPPED` and count, and by `result(of:wait:)`; an overlapped send's
+  packet, whether it finished at once or not; a canceled receive's packet and result, `operationAborted`, and
+  nothing left to cancel; a second association failing with `invalidParameter`. Each `OVERLAPPED` and buffer is freed
+  only after its packet is dequeued, and every dequeue has a five-second time-out.
 
 None deletes, moves or changes the permissions of anything, signals anything, or reaches the network.
 

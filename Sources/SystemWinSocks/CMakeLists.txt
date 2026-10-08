@@ -32,6 +32,7 @@ add_library(SystemWinSocks
   Sockets/SocketOptions+IP.swift
   Sockets/SocketOptions+Timeouts.swift
   Sockets/SocketOptions.swift
+  Sockets/SocketOverlappedIO.swift
   Sockets/SocketPoll.swift
   Util.swift
   Win32Error+Winsock.swift)

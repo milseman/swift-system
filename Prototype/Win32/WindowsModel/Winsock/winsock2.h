@@ -316,6 +316,19 @@ typedef struct _OVERLAPPED *LPWSAOVERLAPPED; // mirrors: winsock2.h
 typedef void (*LPWSAOVERLAPPED_COMPLETION_ROUTINE)(DWORD dwError, DWORD cbTransferred, // mirrors: winsock2.h
                                                    LPWSAOVERLAPPED lpOverlapped, DWORD dwFlags);
 
+// Overlapped operations' codes, which are the Win32 codes WinSDK.h has.
+#define WSA_IO_PENDING (ERROR_IO_PENDING) // mirrors: winsock2.h
+#define WSA_IO_INCOMPLETE (ERROR_IO_INCOMPLETE) // mirrors: winsock2.h
+
+int WSASend(SOCKET s, LPWSABUF lpBuffers, DWORD dwBufferCount, LPDWORD lpNumberOfBytesSent, // mirrors: winsock2.h
+            DWORD dwFlags, LPWSAOVERLAPPED lpOverlapped,
+            LPWSAOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine);
+int WSARecv(SOCKET s, LPWSABUF lpBuffers, DWORD dwBufferCount, LPDWORD lpNumberOfBytesRecvd, // mirrors: winsock2.h
+            LPDWORD lpFlags, LPWSAOVERLAPPED lpOverlapped,
+            LPWSAOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine);
+BOOL WSAGetOverlappedResult(SOCKET s, LPWSAOVERLAPPED lpOverlapped, LPDWORD lpcbTransfer, // mirrors: winsock2.h
+                            BOOL fWait, LPDWORD lpdwFlags);
+
 // The IOC_ macros; _WSAIORW and the SIO_ codes built from it are
 // function-like, so they don't import.
 #define IOC_OUT 0x40000000 // mirrors: winsock2.h
