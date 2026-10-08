@@ -7,12 +7,12 @@ signatures over Winsock (section 29's P0, its second form). Base: system-next at
 runs real Windows: the code is written from the Winsock documentation, compiled on macOS against a model of the SDK
 by `Prototype/Win32/check-winsock.sh`, and kept inside `#if os(Windows)`; its tests are Windows-only and haven't run.
 
-**Resume here:** P1's first two parts are done (section 1): the module, its manifest and CMake hooks, the harness
+**Resume here:** P1's first three parts are done (section 1): the module, its manifest and CMake hooks, the harness
 and its model, Winsock's error codes as `Win32.Error`, the socket types, `open` (`WSASocketW`, starting Winsock
-lazily), `close` and `shutdown` (`e7c4d48`); then addresses: `SocketAddress`, `IPv4Address`, `IPv6Address`, their
-`Host`s and text forms (`inet_pton`, `inet_ntop`), and the `CInterop` aliases with their accessors (this commit).
-- **Next**, in order: binding, listening, accepting, connecting, sending and receiving, and the local and peer names;
-  then options; then nonblocking (`ioctlsocket(FIONBIO)`) and open options; then P2.
+lazily), `close` and `shutdown` (`e7c4d48`); addresses, with `inet_pton` and `inet_ntop` (`5f3381d`); and binding,
+listening, accepting, connecting, sending and receiving, and the socket names (this commit).
+- **Next**, in order: options (levels, socket, TCP, IPv4, IPv6 and multicast options, timeouts, linger); then
+  nonblocking (`ioctlsocket(FIONBIO)`) and open options; then P2.
 - **Check** with `Prototype/Win32/check-winsock.sh` after each change; `swift build` and `swift test` on macOS, which
   compile none of it; `Utilities/lint/lint.sh cmake api`.
 
@@ -26,7 +26,7 @@ os(Windows)`. Its files mirror SystemSockets' layout:
 | File | What |
 |---|---|
 | `Sockets/SocketDescriptor.swift` | `SocketDescriptor` (`rawValue: SOCKET`), `Domain`, `ConnectionType`, `ProtocolID`, `MessageFlags`, `ShutdownKind` |
-| `Sockets/SocketOperations.swift` | `open` (`WSASocketW`), `close` (`closesocket`), `shutdown` |
+| `Sockets/SocketOperations.swift` | `open` (`WSASocketW`), `close` (`closesocket`), `shutdown`, `bind`, `listen`, `accept`, `connect`, `send` and `receive` (with and without an address: `send`, `recv`, `sendto`, `recvfrom`), `getLocalAddress` and `getPeerAddress` |
 | `Win32Error+Winsock.swift` | Winsock's codes as `Win32.Error`, with `Errno`'s names |
 | `Internals/WinsockStartup.swift` | `WSAStartup`, once per process, before the first socket |
 | `Internals/WinsockSyscalls.swift` | the `system_` layer, the only callers of Winsock's functions |
@@ -36,8 +36,8 @@ os(Windows)`. Its files mirror SystemSockets' layout:
 | `Internals/CInterop+WinSocks.swift` | `CInterop.SockAddr` (`SOCKADDR`), `SockLen`, `SAFamily`, `SockAddrIn`, `InAddr`, `In6Addr`, `SockAddrIn6`, `SockAddrStorage`, `Linger` |
 | `Internals/CInterop+WinSockAccessors.swift` | SystemSockets' Swift-named accessors for those structures |
 
-The parts, in order: the module, the socket types, `open`, `close` and `shutdown` (`e7c4d48`); addresses (this
-commit).
+The parts, in order: the module, the socket types, `open`, `close` and `shutdown` (`e7c4d48`); addresses
+(`5f3381d`); connections, transfers and names (this commit).
 
 ## 2. Design calls, with the alternatives rejected
 
@@ -90,6 +90,21 @@ commit).
   where POSIX's are 16 and 46; `description(into:)` throws `invalidParameter` for a buffer too small, which is what
   Windows' `inet_ntop` reports, where POSIX's reports `ENOSPC`; and `SocketAddress(address:length:)` treats a
   negative length as 0, since Winsock's `socklen_t` is a signed `int`.
+- **Accepted sockets are made non-inheritable** with `SetHandleInformation` just after `accept` returns, as Python
+  does: `WSA_FLAG_NO_HANDLE_INHERIT` is a creation flag, which the listening socket's doesn't pass on, so a child that
+  another thread creates in between, inheriting handles, can inherit the socket, as on Darwin with `closeOnExec`. If
+  that fails, the socket is closed and the error thrown. *Rejected*: leaving accepted sockets inheritable, unlike
+  `open`'s; `AcceptEx` with a socket created non-inheritable, which has no window but is the overlapped API (P2).
+- **Winsock's behaviors that differ from POSIX are documented where they show, not hidden**: a datagram that doesn't
+  fit fills the buffer and throws `messageTooLong`, where POSIX returns the truncated count; a nonblocking connect
+  throws `wouldBlock`, where POSIX throws `EINPROGRESS`; `getLocalAddress` of an unbound socket throws
+  `invalidArgument`, where POSIX reports the unspecified address; closing a nonblocking socket with a linger time
+  can throw `wouldBlock` and leave it open; a refused connection takes a second or more, since Windows' TCP retries
+  it. One is hidden: Winsock leaves `recvfrom`'s address untouched on a connected stream socket, where POSIX reports
+  none, so `receive(into:sender:)` empties the address first and leaves it empty if nothing filled it, as
+  SystemSockets' callers expect.
+- **Lengths are clamped to `Int32.max`**, since Winsock's `send` and `recv` take an `int`: a stream sends or receives
+  less, as it may anyway, and no datagram is that long.
 - **The address conversions don't start Winsock**: their documentation lists no `WSANOTINITIALISED`, and
   swift-certificates already calls `inet_pton` without starting it. An exit test checks it in a fresh process.
   *Rejected*: starting Winsock for them, which would load Winsock's providers into a process that only parses
@@ -139,6 +154,13 @@ What each file checks, and what it can reach:
   conversions and lengths; `description(into:)` and its `invalidParameter`; parsing C strings; the accessors against
   the C fields; and, in an exit test (a child process of swift-testing's own, which runs only the closure), that
   the conversions work before Winsock starts. No sockets.
+- `SocketOperationsTests`: TCP over IPv4 and IPv6 loopback (bind to port 0, listen, connect, accept with the client's
+  address, the peer's address, a `waitForAll` receive, a shutdown seen as the end of the stream); that accepted
+  sockets aren't inherited; that a stream receive leaves the sender empty; a UDP round trip with the sender's
+  address; a datagram larger than the buffer throwing `messageTooLong` after filling it; a refused connection to a
+  port a socket holds without listening; the names of an unbound and unconnected socket; a second bind of an address
+  in use. Every address is 127.0.0.1 or `::1`, with a port the system picks, so nothing reaches beyond the host or
+  listens where the firewall would ask; every socket is the test's own and closed by a `defer`.
 
 None deletes, moves or changes the permissions of anything, signals anything, or reaches the network.
 

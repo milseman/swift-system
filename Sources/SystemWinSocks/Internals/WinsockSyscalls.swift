@@ -43,6 +43,98 @@ internal func system_shutdown(_ s: SOCKET, _ how: CInt) -> CInt {
   shutdown(s, how)
 }
 
+// MARK: - Connection operations
+
+internal func system_bind(
+  _ s: SOCKET,
+  _ addr: UnsafePointer<SOCKADDR>?,
+  _ len: CInt
+) -> CInt {
+  bind(s, addr, len)
+}
+
+internal func system_listen(_ s: SOCKET, _ backlog: CInt) -> CInt {
+  listen(s, backlog)
+}
+
+internal func system_accept(
+  _ s: SOCKET,
+  _ addr: UnsafeMutablePointer<SOCKADDR>?,
+  _ len: UnsafeMutablePointer<CInt>?
+) -> SOCKET {
+  accept(s, addr, len)
+}
+
+internal func system_connect(
+  _ s: SOCKET,
+  _ addr: UnsafePointer<SOCKADDR>?,
+  _ len: CInt
+) -> CInt {
+  connect(s, addr, len)
+}
+
+// MARK: - Data transfer
+
+internal func system_send(
+  _ s: SOCKET,
+  _ buffer: UnsafeRawPointer?,
+  _ len: CInt,
+  _ flags: CInt
+) -> CInt {
+  send(s, buffer?.assumingMemoryBound(to: CChar.self), len, flags)
+}
+
+internal func system_recv(
+  _ s: SOCKET,
+  _ buffer: UnsafeMutableRawPointer?,
+  _ len: CInt,
+  _ flags: CInt
+) -> CInt {
+  recv(s, buffer?.assumingMemoryBound(to: CChar.self), len, flags)
+}
+
+internal func system_sendto(
+  _ s: SOCKET,
+  _ buffer: UnsafeRawPointer?,
+  _ len: CInt,
+  _ flags: CInt,
+  _ to: UnsafePointer<SOCKADDR>?,
+  _ tolen: CInt
+) -> CInt {
+  sendto(s, buffer?.assumingMemoryBound(to: CChar.self), len, flags, to, tolen)
+}
+
+internal func system_recvfrom(
+  _ s: SOCKET,
+  _ buffer: UnsafeMutableRawPointer?,
+  _ len: CInt,
+  _ flags: CInt,
+  _ from: UnsafeMutablePointer<SOCKADDR>?,
+  _ fromlen: UnsafeMutablePointer<CInt>?
+) -> CInt {
+  recvfrom(s, buffer?.assumingMemoryBound(to: CChar.self), len, flags, from, fromlen)
+}
+
+// MARK: - Socket names
+
+internal func system_getsockname(
+  _ s: SOCKET,
+  _ addr: UnsafeMutablePointer<SOCKADDR>?,
+  _ len: UnsafeMutablePointer<CInt>?
+) -> CInt {
+  getsockname(s, addr, len)
+}
+
+internal func system_getpeername(
+  _ s: SOCKET,
+  _ addr: UnsafeMutablePointer<SOCKADDR>?,
+  _ len: UnsafeMutablePointer<CInt>?
+) -> CInt {
+  getpeername(s, addr, len)
+}
+
+// MARK: - Handles
+
 internal func system_SetHandleInformation(_ handle: HANDLE, _ mask: DWORD, _ flags: DWORD) -> Bool {
   SetHandleInformation(handle, mask, flags)
 }
