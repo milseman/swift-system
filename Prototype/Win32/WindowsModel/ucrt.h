@@ -50,6 +50,10 @@ int _isatty(int _FileHandle);
 // spells it as WinSDK.h's WCHAR.
 unsigned short *_wgetcwd(unsigned short *_DstBuf, int _SizeInWords);
 int _wchdir(const unsigned short *_Path);
+int _wrmdir(const unsigned short *_Path);
+
+// stdio.h, with wchar_t spelled as WinSDK.h's WCHAR.
+int _wremove(const unsigned short *_FileName);
 
 // stdlib.h, with wchar_t spelled as WinSDK.h's WCHAR.
 typedef int errno_t;
@@ -92,6 +96,7 @@ errno_t _get_tzname(size_t *_ReturnValue, char *_Buffer, size_t _SizeInBytes, in
 size_t strftime(char *_Buffer, size_t _SizeInBytes, const char *_Format, const tm *_Tm);
 
 // errno.h
+#define EACCES 13
 #define EINVAL 22
 #define ERANGE 34
 #define EOVERFLOW 132

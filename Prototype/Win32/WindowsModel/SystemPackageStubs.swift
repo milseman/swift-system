@@ -132,6 +132,8 @@ public struct Errno: RawRepresentable, Error, Hashable, Codable { // mirrors: So
   @_alwaysEmitIntoClient
   public static var outOfRange: Errno { .init(rawValue: 34) }
   @_alwaysEmitIntoClient
+  public static var directoryNotEmpty: Errno { .init(rawValue: 41) }
+  @_alwaysEmitIntoClient
   public static var noData: Errno { .init(rawValue: 120) }
   @_alwaysEmitIntoClient
   public static var notSupported: Errno { .init(rawValue: 129) }

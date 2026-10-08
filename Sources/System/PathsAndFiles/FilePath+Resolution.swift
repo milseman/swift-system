@@ -7,7 +7,9 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-#if !os(Windows) && !os(WASI)
+#if !os(Windows)
+
+// FilePathResolutionWindows.swift has these for Windows.
 
 // MARK: - realpath
 
@@ -118,4 +120,4 @@ extension FilePath {
   }
 }
 
-#endif // !os(Windows) && !os(WASI)
+#endif // !os(Windows)

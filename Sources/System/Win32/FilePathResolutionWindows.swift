@@ -11,8 +11,8 @@
 
 import WinSDK
 
-// FilePath.canonicalized() on Windows. FilePath+Resolution.swift declares it
-// for the other platforms but WASI, over realpath.
+// FilePath.canonicalized() and remove() on Windows. FilePath+Resolution.swift
+// declares them for the other platforms, over realpath and remove.
 
 @available(System 199, *)
 extension FilePath {
@@ -95,6 +95,79 @@ extension FilePath {
       return .success(Win32._removingUnneededExtendedLengthPrefix(resolved))
     case .failure(let error):
       return .failure(Errno(approximating: error))
+    }
+  }
+}
+
+// MARK: - remove
+
+@available(System 199, *)
+extension FilePath {
+  /// Removes the file or empty directory at this path.
+  ///
+  /// - Parameters:
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// This method removes a directory, which must be empty,
+  /// and anything else, including a symbolic link.
+  ///
+  /// On Windows, the C runtime's `_wremove` removes only files,
+  /// so a directory, which it can't remove, is removed with `_wrmdir`,
+  /// which removes a directory symbolic link or a junction itself,
+  /// not its target.
+  /// A read-only file, and a file that's open without sharing deletion,
+  /// can't be removed: this method throws ``Errno/permissionDenied``.
+  ///
+  /// The corresponding C function is `remove`, or on Windows `_wremove`,
+  /// with `_wrmdir` for a directory.
+  @_alwaysEmitIntoClient
+  public func remove(retryOnInterrupt: Bool = true) throws(Errno) {
+    try withPlatformString {
+      FilePath._remove($0, retryOnInterrupt: retryOnInterrupt)
+    }.get()
+  }
+
+  /// Removes the file or empty directory at the given path.
+  ///
+  /// - Parameters:
+  ///   - path: The location of the file or directory to remove.
+  ///   - retryOnInterrupt: Whether to retry the operation
+  ///     if it throws ``Errno/interrupted``.
+  ///     The default is `true`.
+  ///     Pass `false` to try only once and throw an error upon interruption.
+  ///
+  /// See ``remove(retryOnInterrupt:)`` for what Windows removes.
+  ///
+  /// The corresponding C function is `remove`, or on Windows `_wremove`,
+  /// with `_wrmdir` for a directory.
+  @_alwaysEmitIntoClient
+  public static func remove(
+    _ path: UnsafePointer<CInterop.PlatformChar>,
+    retryOnInterrupt: Bool = true
+  ) throws(Errno) {
+    try _remove(path, retryOnInterrupt: retryOnInterrupt).get()
+  }
+
+  @usableFromInline
+  internal static func _remove(
+    _ path: UnsafePointer<CInterop.PlatformChar>,
+    retryOnInterrupt: Bool
+  ) -> Result<(), Errno> {
+    let removed = nothingOrErrno(retryOnInterrupt: retryOnInterrupt) {
+      system__wremove(path)
+    }
+    // _wremove is DeleteFileW, which a directory fails with EACCES. glibc's
+    // remove tries unlink first in the same way.
+    guard case .failure(let error) = removed, error == .permissionDenied else { return removed }
+    let attributes = system_GetFileAttributesW(path)
+    guard attributes != INVALID_FILE_ATTRIBUTES, attributes & Win32.FileAttributes.directory.rawValue != 0 else {
+      return removed
+    }
+    return nothingOrErrno(retryOnInterrupt: retryOnInterrupt) {
+      system__wrmdir(path)
     }
   }
 }

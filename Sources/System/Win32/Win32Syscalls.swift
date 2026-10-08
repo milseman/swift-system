@@ -752,6 +752,20 @@ internal func system__wchdir(_ path: UnsafePointer<WCHAR>) -> CInt {
   return _wchdir(path)
 }
 
+internal func system__wremove(_ path: UnsafePointer<WCHAR>) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(path: path) }
+#endif
+  return _wremove(path)
+}
+
+internal func system__wrmdir(_ path: UnsafePointer<WCHAR>) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(path: path) }
+#endif
+  return _wrmdir(path)
+}
+
 internal func system_GetModuleFileNameW(
   _ hModule: HMODULE?, _ lpFilename: UnsafeMutablePointer<WCHAR>, _ nSize: DWORD
 ) -> DWORD {
