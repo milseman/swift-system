@@ -9,3 +9,6 @@ See https://swift.org/LICENSE.txt for license information
 
 add_subdirectory(CSystem)
 add_subdirectory(System)
+if(CMAKE_SYSTEM_NAME STREQUAL Windows)
+  add_subdirectory(SystemWinSocks)
+endif()

@@ -1,0 +1,147 @@
+# The winsock-1 lane: Windows sockets for System
+
+System's sockets on Windows, so that swift-nio and swift-certificates can leave WinSDK's Winsock for System. The
+design is `Prototype/Win32/REPORT.md` section 29 ("windows-3: Winsock, a design"), with the module structure Michael
+chose on 2026-09-25: a separate, Windows-only module, `SystemWinSocks`, which declares SystemSockets' names and
+signatures over Winsock (section 29's P0, its second form). Base: system-next at `3f3aed7`. Nothing here builds or
+runs real Windows: the code is written from the Winsock documentation, compiled on macOS against a model of the SDK
+by `Prototype/Win32/check-winsock.sh`, and kept inside `#if os(Windows)`; its tests are Windows-only and haven't run.
+
+**Resume here:** P1's first part is done (section 1): the module, its manifest and CMake hooks, the harness and its
+model, Winsock's error codes as `Win32.Error`, the socket types (`Domain`, `ConnectionType`, `ProtocolID`,
+`MessageFlags`, `ShutdownKind`), and `open` (`WSASocketW`, starting Winsock lazily), `close` and `shutdown`.
+- **Next**, in order: addresses (`SocketAddress`, `IPv4Address`, `IPv6Address`, their `Host`s, `inet_pton` and
+  `inet_ntop`, the `CInterop` aliases and their accessors); then binding, listening, accepting, connecting, sending
+  and receiving, and the local and peer names; then options; then nonblocking (`ioctlsocket(FIONBIO)`); then P2.
+- **Check** with `Prototype/Win32/check-winsock.sh` after each change; `swift build` and `swift test` on macOS, which
+  compile none of it; `Utilities/lint/lint.sh cmake api`.
+
+## 1. What
+
+`Sources/SystemWinSocks`, a module that only a Windows host's manifest declares, with a target that links `ws2_32`
+(the WinSDK module map's WinSock2 submodule links it too), its test target `Tests/SystemWinSocksTests`, and a CMake
+list that `Sources/CMakeLists.txt` adds only when `CMAKE_SYSTEM_NAME` is Windows. Every file is inside `#if
+os(Windows)`. Its files mirror SystemSockets' layout:
+
+| File | What |
+|---|---|
+| `Sockets/SocketDescriptor.swift` | `SocketDescriptor` (`rawValue: SOCKET`), `Domain`, `ConnectionType`, `ProtocolID`, `MessageFlags`, `ShutdownKind` |
+| `Sockets/SocketOperations.swift` | `open` (`WSASocketW`), `close` (`closesocket`), `shutdown` |
+| `Win32Error+Winsock.swift` | Winsock's codes as `Win32.Error`, with `Errno`'s names |
+| `Internals/WinsockStartup.swift` | `WSAStartup`, once per process, before the first socket |
+| `Internals/WinsockSyscalls.swift` | the `system_` layer, the only callers of Winsock's functions |
+| `Internals/WinsockConstants.swift` | internal constants, as values |
+| `Util.swift` | `valueOrWinsockError` and its kin, `_buildDescription` |
+
+## 2. Design calls, with the alternatives rejected
+
+- **The module declares SystemSockets' names** (section 29's proposal 1, in P0's second form, as Michael decided):
+  `SocketDescriptor`, its nested types, and their members have SystemSockets' spellings and parameter lists, so code
+  written against them compiles on both where the concept holds. The differences are the ones section 29 predicts:
+  the raw value's type (`SOCKET`, a `UINT_PTR`), the error type (`Win32.Error`), and what Winsock lacks. *Rejected*:
+  section 29's default, SystemSockets' own sources compiled for Windows over a Winsock `system_` layer; Michael chose
+  the separate module for its different handle type, errors, startup, linkage and message API. Section 6 says where
+  sharing the code would have saved work.
+- **Only a Windows host declares the target and product**, as only a host other than Windows declares the plugin
+  targets, and as the request says ("built only on Windows"). Nothing changes on macOS or Linux. *Rejected for now*:
+  declaring them everywhere, with every file inside `#if os(Windows)` so that they're empty elsewhere. That would let
+  an adopter's manifest say `.product(name: "SystemWinSocks", package: "swift-system", condition: .when(platforms:
+  [.windows]))`, as NIO's says of SystemSockets: SwiftPM looks a product dependency up whatever its condition, and a
+  product the host's manifest doesn't declare is an error (`productDependencyNotFound`, in
+  `../swift-package-manager/Sources/PackageGraph/ModulesGraph+Loading.swift`, the loop at "Establish product
+  dependencies"). With the default, an adopter wraps its dependency in `#if os(Windows)`, which a cross-compiling
+  build (manifest on one host, Windows the target) gets wrong. **Open question for Michael**; switching is a few
+  lines of `Package.swift`.
+- **Errors are `Win32.Error`** (section 29's proposal 4). Winsock's codes are system error codes, which `FormatMessageW`
+  describes. Each code is named as `Errno` names the POSIX code it stands for (`wouldBlock`, `connectionReset`,
+  `socketNotConnected`, `nowInProgress`, `notSupportedOnSocket`), so that a typed `catch .wouldBlock` reads the same
+  on both platforms; the three Winsock-only codes have names of their own (`networkSubsystemNotReady`,
+  `winsockVersionNotSupported`, `winsockNotStarted`). In an untyped catch, `.wouldBlock` is ambiguous between `Errno`
+  and `Win32.Error`, both of whose `~=` are disfavored, so spell the type there. *Rejected*: section 29's shorter
+  names (`inProgress`, `notConnected`), which would make a shared call site spell the code two ways; and `Errno`,
+  which section 29 rejects. The names are in an extension in this module, not in `Sources/System/Win32/`.
+- **Winsock starts lazily** (proposal 5): `open` calls `WSAStartup(2.2)` through a global whose initializer runs
+  once per process, so the first call's result is every call's, failure included; System never calls `WSACleanup`.
+  *Rejected*: retrying a failed start on the next `open`, which a modern Windows never needs; starting from a C
+  runtime initializer, as NIO's `CNIOWindows` does, which needs a C target; and asking callers to start it.
+- **Sockets are created with `WSASocketW`, `WSA_FLAG_OVERLAPPED` and `WSA_FLAG_NO_HANDLE_INHERIT`** (proposal 6):
+  `socket`'s sockets are overlapped already, and blocking `send` and `recv` still block on them; the second flag is
+  `SOCK_CLOEXEC`'s counterpart, and a test checks it with `GetHandleInformation`.
+- **`retryOnInterrupt` stays**, with SystemSockets' defaults, and retries `WSAEINTR`, which Winsock 2 reports only for
+  a call that Winsock 1.1's `WSACancelBlockingCall` canceled. *Rejected*: dropping the parameter, which would break the
+  shared signatures for nothing.
+- **Constants are values** (`Domain(rawValue: 23)`), as the Win32 namespace's are, with the doc sentence naming the C
+  constant, and `@_alwaysEmitIntoClient`. The tests hold each to the SDK's macro on Windows; on macOS the harness
+  holds them to the model's values, and the model's to Rust's bindings where those have them (section 3).
+- **What Winsock lacks is left out** (proposal 2), not faked: `fileDescriptor` and the initializers from a
+  `FileDescriptor` (a Winsock socket isn't a C runtime descriptor), `MessageFlags.endOfRecord` and `.noSignal`, and
+  `Domain.routing` and `.keyManagement`.
+
+## 3. The model, and what it can't catch
+
+`Prototype/Win32/check-winsock.sh` compiles `Sources/SystemWinSocks` and `Tests/SystemWinSocksTests` on macOS to object
+code, with their `os(Windows)` conditions turned on, against `Prototype/Win32/WindowsModel` and its new
+`Winsock/` part: `winsock2.h`, `ws2tcpip.h` and `mswsock.h` (each declaration marked with the SDK header it mirrors),
+their module map, and `WinSDK+Winsock.swift`, the overlay's Winsock declarations (`INVALID_SOCKET`, `FIONBIO`). It
+builds SystemPackage from `SystemPackageStubs.swift` and the real `Sources/System/Win32`, as `check-windows.sh` does,
+so `Win32.Error` is the real one. It takes about ten seconds.
+
+- **The module map.** On Windows, Winsock is the WinSock2 submodule of the WinSDK Clang module. Clang won't add a
+  submodule to WindowsModel's WinSDK from a second module map (`module WinSDK.WinSock2` parses, but Clang's build of
+  WinSDK reads only the map that defines it), so the Winsock model is a Clang module of its own, `WinSock2Model`,
+  which the harness's WinSDK overlay re-exports: `import WinSDK` and `WinSDK.socket` then work as on Windows. The
+  harness fails if a source or test file names `WinSock2Model`.
+- **Private tags.** The structures that macOS's C library also defines (`sockaddr_in`, `in_addr`, `linger` and the
+  rest) have private tags, as WinSDK.h's `sockaddr` does, since Clang rejects two definitions of a tag when a file sees
+  both modules; the code spells them by their SDK typedefs (`SOCKADDR_IN`), which Windows has too.
+- **Checks before compiling**: every top-level declaration in the headers names its SDK header; every numeric
+  constant matches Rust's standard library bindings (Homebrew's Rust source, or `WINDOWS_SYS_RS`), which Microsoft's
+  metadata generates, where they have it, which is about two thirds; the overlay stand-ins match the real overlay,
+  read from `../ecosystem/swift` (`SWIFT_SOURCE`); and every SystemWinSocks constant whose doc names its C constant has
+  the model's value. A wrong value in either place fails the run (tried).
+- **It can't catch** where the model differs from the SDK in a way Swift sees: a macro that doesn't import on
+  Windows, a type the importer gives differently, a structure's layout (the model's `SCOPE_ID` has no bit-fields, and
+  `WSAPROTOCOL_INFOW` is incomplete); runtime behavior; or the constants Rust's bindings lack (the IP and IPv6
+  options other than multicast's, the TCP keepalive options, `INET_ADDRSTRLEN`), which only the Windows tests check.
+
+## 4. Tests
+
+`Tests/SystemWinSocksTests`, swift-testing as SystemSocketsTests is, each test opening and closing its own sockets.
+What each file checks, and what it can reach:
+
+- `WinsockConstantsTests`: every constant, public and internal, against the SDK's macro; the descriptions. No sockets.
+- `WinsockErrorTests`: every Winsock code against the SDK; `FormatMessageW` describes one; Winsock starts. No sockets.
+- `SocketDescriptorTests`: opening and closing TCP, UDP and IPv6 sockets; that they aren't inherited; that an unknown
+  family, closing `INVALID_SOCKET`, and shutting down an unconnected socket throw the codes the documentation gives.
+  Nothing binds or connects.
+
+None deletes, moves or changes the permissions of anything, signals anything, or reaches the network.
+
+## 5. For the adopters
+
+Filled in as the API lands; see section 8.
+
+## 6. Where sharing SystemSockets' code would have saved work
+
+So far: the five nested types of `SocketDescriptor.swift` and the operations' bodies are SystemSockets' with
+constants and error types changed, and `Util.swift`'s helpers are its `valueOrErrno` family over another failure
+test. Sharing would have saved writing them twice and keeping the doc comments in step; it would have cost the
+`#if os(Windows)` in each body that the raw value's type, the error type, and the omissions need.
+
+## 7. Needs outside the lane's files
+
+- **Building on Windows**: SystemSockets' files `#error` outside Darwin, Linux, Musl, Android and WASI, and
+  `Package.swift` doesn't exclude it on Windows, so `swift build` and `swift test` there stop at those errors before
+  reaching SystemWinSocks. The Windows box needs SystemSockets, SystemSocketsTests and Samples' dependency on
+  SystemSockets left out of a Windows host's manifest (Samples' other sources may not build there either), or
+  `swift build --target SystemWinSocks`, which can't run the tests.
+- **`Win32.Error`'s `debugDescription`** names only the codes SystemPackage's `_symbolicName` lists, so Winsock's
+  codes print as numbers (`10035 (0x2733)`); its table needs the `WSAE` names.
+- **The tools** know two modules: `Utilities/api-delta/scripts/scan_sources.py` (`MODULE_DIRS`), the adopter-coverage
+  scripts (`status.py`'s `SYSTEM_SOURCES`, `extract.py`'s `SYSTEM_MODULES`), and lint's cmake check (`MODULES`) read
+  only `Sources/System` and `Sources/SystemSockets`, so neither lint's api rules, the coverage figures, nor the
+  status page see SystemWinSocks yet.
+
+## 8. Next
+
+See *Resume here*.

@@ -138,6 +138,33 @@ let pluginTargets: [Target] = [
 ]
 #endif
 
+// SystemWinSocks: Winsock, Windows' sockets, with SystemSockets' names, in a
+// module of its own (Prototype/Winsock1/REPORT.md). Only a Windows host
+// declares it, as only a host other than Windows declares the plugin
+// targets, so other platforms build nothing of it.
+#if os(Windows)
+let winsockProducts: [Product] = [
+  .library(name: "SystemWinSocks", targets: ["SystemWinSocks"]),
+]
+let winsockTargets: [Target] = [
+  .target(
+    name: "SystemWinSocks",
+    dependencies: ["SystemPackage"],
+    path: "Sources/SystemWinSocks",
+    exclude: ["CMakeLists.txt"],
+    cSettings: cSettings,
+    swiftSettings: swiftSettings,
+    linkerSettings: [.linkedLibrary("ws2_32")]),
+  .testTarget(
+    name: "SystemWinSocksTests",
+    dependencies: ["SystemPackage", "SystemWinSocks"],
+    swiftSettings: swiftSettings),
+]
+#else
+let winsockProducts: [Product] = []
+let winsockTargets: [Target] = []
+#endif
+
 let package = Package(
   name: "swift-system",
   platforms: platforms,
@@ -145,7 +172,7 @@ let package = Package(
     .library(name: "SystemPackage", targets: ["SystemPackage"]),
     .library(name: "SystemSockets", targets: ["SystemSockets"]),
     .executable(name: "system-samples", targets: ["Samples"]),
-  ] + pluginProducts,
+  ] + pluginProducts + winsockProducts,
   dependencies: [
     .package(url: "https://github.com/apple/swift-argument-parser", from: "1.3.0"),
   ],
@@ -203,6 +230,6 @@ let package = Package(
       ],
       path: "Sources/Samples",
       swiftSettings: swiftSettings),
-  ] + pluginTargets,
+  ] + pluginTargets + winsockTargets,
   swiftLanguageModes: [.v6]
 )
