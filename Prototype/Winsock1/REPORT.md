@@ -7,19 +7,26 @@ signatures over Winsock (section 29's P0, its second form). Base: system-next at
 runs real Windows: the code is written from the Winsock documentation, compiled on macOS against a model of the SDK
 by `Prototype/Win32/check-winsock.sh`, and kept inside `#if os(Windows)`; its tests are Windows-only and haven't run.
 
-**Resume here:** P1 and P2 are done (section 1), and name resolution after them. P1, in five parts: the module, its
-manifest and CMake hooks, the harness and its model, Winsock's error codes as `Win32.Error`, the socket types, `open`
-(`WSASocketW`, starting Winsock lazily), `close` and `shutdown` (`e7c4d48`); addresses, with `inet_pton` and
-`inet_ntop` (`5f3381d`); binding, listening, accepting, connecting, sending and receiving, and the socket names
-(`1dea80c`); options (`13c9a37`); and nonblocking mode with open options (`a4f6883`). P2, in five: polling, with
-`WSAPoll` (`56851b2`); messages, with `WSASendMsg` and `WSARecvMsg` looked up once per process, SystemSockets'
-ancillary messages, and the IP control messages (`f26f4c6`); completion ports, with overlapped `WSASend` and
-`WSARecv` (`9d94aa0`); the stream extension functions, `AcceptEx`, `ConnectEx` and `TransmitFile` (`54ca343`); and
-Unix domain sockets (`c151d0e`). Then name resolution, over `GetAddrInfoW` and `GetNameInfoW` (`495e1f2`), and
-SystemSockets' `writeAll` and `closeAfter` (this commit).
-Section 5 has what each adopter would change, row by row; every socket row has System API now.
+Darwin, before any change (`3f3aed7`): `swift build` succeeds; XCTest 582 tests (5 skipped), swift-testing 536 tests
+in 89 suites, all passing. After the lane (`a8777cc`): the same, as after its first commit, since nothing here is
+built on macOS. `Utilities/lint/lint.sh cmake api`: 0 errors, 0 warnings, before and after (it reads neither
+SystemWinSocks' sources nor its CMake list; section 7). `check-windows.sh` passes, and `check-winsock.sh` at each
+commit.
+
+**Resume here:** the lane's work is done; the next step is the Windows box (section 8). P1 and P2 are done
+(section 1), and name resolution after them. P1, in five parts: the module, its manifest and CMake hooks, the harness
+and its model, Winsock's error codes as `Win32.Error`, the socket types, `open` (`WSASocketW`, starting Winsock
+lazily), `close` and `shutdown` (`e7c4d48`); addresses, with `inet_pton` and `inet_ntop` (`5f3381d`); binding,
+listening, accepting, connecting, sending and receiving, and the socket names (`1dea80c`); options (`13c9a37`); and
+nonblocking mode with open options (`a4f6883`). P2, in five: polling, with `WSAPoll` (`56851b2`); messages, with
+`WSASendMsg` and `WSARecvMsg` looked up once per process, SystemSockets' ancillary messages, and the IP control
+messages (`f26f4c6`); completion ports, with overlapped `WSASend` and `WSARecv` (`9d94aa0`); the stream extension
+functions, `AcceptEx`, `ConnectEx` and `TransmitFile` (`54ca343`); and Unix domain sockets (`c151d0e`). Then name
+resolution, over `GetAddrInfoW` and `GetNameInfoW` (`495e1f2`); SystemSockets' `writeAll` and `closeAfter`
+(`1fd4ee3`); control-message headers read field by field (`67f02f6`); and `mapping.ini`'s notes (`a8777cc`). Section
+5 has what each adopter would change, row by row; every socket row has System API now.
 - **Next** (section 8): the Windows box's first run, which needs `Package.swift` to leave SystemSockets out on
-  Windows (section 7), and then the fixes it calls for; the tools' module lists (section 7).
+  Windows (section 7), and the checks of section 4's list; then the tools' module lists (section 7).
 - **Open questions for Michael** (section 2): the manifest's form (host-conditional, or declared everywhere and empty
   elsewhere), and the module's name, which adopters that qualify names (`SystemSockets.SocketAddress`) spell per
   platform.
@@ -67,8 +74,8 @@ for them, and SystemPackage's for `iovec`.
 The parts, in order: the module, the socket types, `open`, `close` and `shutdown` (`e7c4d48`); addresses
 (`5f3381d`); connections, transfers and names (`1dea80c`); options (`13c9a37`); nonblocking mode and open options
 (`a4f6883`). P2: polling (`56851b2`); messages (`f26f4c6`); completion ports (`9d94aa0`); the stream extension
-functions (`54ca343`); Unix domain sockets (`c151d0e`). Then name resolution (`495e1f2`) and the helpers (this
-commit).
+functions (`54ca343`); Unix domain sockets (`c151d0e`). Then name resolution (`495e1f2`), the helpers (`1fd4ee3`),
+and control-message headers read field by field (`67f02f6`).
 
 ## 2. Design calls, with the alternatives rejected
 
@@ -247,8 +254,9 @@ commit).
 
 `Prototype/Win32/check-winsock.sh` compiles `Sources/SystemWinSocks` and `Tests/SystemWinSocksTests` on macOS to object
 code, with their `os(Windows)` conditions turned on, against `Prototype/Win32/WindowsModel` and its new
-`Winsock/` part: `winsock2.h`, `ws2tcpip.h` and `mswsock.h` (each declaration marked with the SDK header it mirrors),
-their module map, and `WinSDK+Winsock.swift`, the overlay's Winsock declarations (`INVALID_SOCKET`, `FIONBIO`). It
+`Winsock/` part: `winsock2.h`, `ws2tcpip.h`, `mswsock.h` and `afunix.h` (each declaration marked with the SDK header
+it mirrors), their module map, and `WinSDK+Winsock.swift`, the overlay's Winsock declarations (`INVALID_SOCKET`,
+`FIONBIO`). It
 builds SystemPackage from `SystemPackageStubs.swift` and the real `Sources/System/Win32`, as `check-windows.sh` does,
 so `Win32.Error` is the real one. It takes about ten seconds.
 
@@ -268,7 +276,13 @@ so `Win32.Error` is the real one. It takes about ten seconds.
 - **What the model makes the code avoid**: inlinable `loadUnaligned(as:)` of one of the model's structs can stop a
   client's compile (Swift 6.2: "Conformance of '_tag' to 'BitwiseCopyable' not found in referenced module", reproduced
   with a plain Clang module of two structs, and not with Darwin's), so the address conversions rebind memory instead,
-  as SystemSockets' do. Whether Windows' WinSDK module has the problem is unknown.
+  as SystemSockets' do, and the inlinable control-message readers read `WSACMSGHDR`'s fields as integers, at offsets
+  a test holds to `MemoryLayout`'s. Whether Windows' WinSDK module has the problem is unknown. The model also keeps
+  the code from taking the SDK's `LPFN_` typedefs for functions that return `BOOL`, which import as `ObjCBool` here
+  and, on Windows, as `WindowsBool` or `Bool` depending on the context (section 2).
+- **Shared with coverage-9's work**: the Winsock model leans on WinSDK.h for its base types and for `SOCKADDR` and
+  `AF_INET`, and declares `GUID` itself, which WinSDK.h lacks. If WinSDK.h changes those, or gains a `GUID` of its own,
+  the harness fails until the two agree.
 - **It can't catch** where the model differs from the SDK in a way Swift sees: a macro that doesn't import on
   Windows, a type the importer gives differently, a structure's layout (the model's `SCOPE_ID` has no bit-fields, and
   `WSAPROTOCOL_INFOW` is incomplete); runtime behavior; or the constants Rust's bindings lack (the IP and IPv6
@@ -336,7 +350,31 @@ What each file checks, and what it can reach:
   message; and a numeric reverse lookup. Only numeric names and the passive lookup, so no resolver or DNS server is
   asked anything.
 
-None deletes, moves or changes the permissions of anything, signals anything, or reaches the network.
+What they can touch, checked before writing each: two tests create a file, each removing only its own (the
+`TransmitFile` test's temporary file, with `deleteOnClose`, and the Unix socket test's socket file, after its bind
+created it); none deletes, moves or changes the permissions of anything else, or signals anything; every socket is
+on loopback (127.0.0.1, `::1`, or a Unix path in the temporary directory), and the one multicast group is joined on
+the loopback interface, so nothing reaches the network; the resolution tests are numeric, so no resolver or DNS
+server is asked. None has run.
+
+**A Windows run must check** what the code takes from the documentation, or from other projects, rather than from a
+run:
+- That `inet_pton` and `inet_ntop` work before `WSAStartup` (the exit test), as swift-certificates relies on.
+- That `accept`'s socket is inheritable until `SetHandleInformation` (the test checks only the result).
+- The codes the failure tests expect: `WSAEAFNOSUPPORT` for an unknown family, `WSAENOTCONN` for shutting down an
+  unconnected socket, `WSAEINVAL` for an unbound socket's name, `WSAECONNREFUSED`, `WSAEADDRINUSE`, `WSAEMSGSIZE` for
+  `recv` and `WSARecvMsg`, `WSAETIMEDOUT` for a receive time-out, and `ERROR_INVALID_PARAMETER` from `inet_ntop`.
+- Winsock's option types: `DWORD` milliseconds for the time-outs, `DWORD`s for `IP_MULTICAST_TTL` and
+  `IP_MULTICAST_LOOP`, `u_short` linger fields, `TCP_KEEPIDLE` and its kin settable before connecting, and
+  `IPV6_V6ONLY`'s `true` default.
+- The message types Winsock sends a received type of service and traffic class as (`typeOfService` reads two), and
+  `IN_PKTINFO`'s 8-byte layout.
+- Multicast on the loopback interface, which the test needs Windows to support.
+- That the message, stream and probe lookups find their extension functions through a UDP and a TCP socket, and that
+  the GUIDs are right (only NIO's code vouches for the message functions' GUIDs, and none for the stream ones').
+- A completion port's packet for a canceled socket operation carrying `ERROR_OPERATION_ABORTED`.
+- Unix domain sockets: a stream round trip, no datagrams, and a path's UTF-8.
+- Every constant against the SDK, especially those Rust's bindings lack (section 3).
 
 ## 5. For the adopters
 
@@ -378,14 +416,26 @@ module-qualified names (`SystemSockets.SocketAddress`) need the naming decision.
 
 ## 6. Where sharing SystemSockets' code would have saved work
 
-So far: the five nested types of `SocketDescriptor.swift` and the operations' bodies are SystemSockets' with
-constants and error types changed, and `Util.swift`'s helpers are its `valueOrErrno` family over another failure
-test. Sharing would have saved writing them twice and keeping the doc comments in step; it would have cost the
-`#if os(Windows)` in each body that the raw value's type, the error type, and the omissions need.
+About 5,300 of the module's 7,800 lines are SystemSockets' files with Winsock's changes, file for file, and about
+600 more are its C-structure accessors: the socket types, operations, options, open options, addresses, Unix
+addresses, resolution, messages and helpers. Sharing SystemSockets' sources, section 29's default form of P0, would
+have written those once and kept their documentation in step, which two copies won't do by themselves. What each copy
+changes, and what a shared source would have needed `#if os(Windows)` for:
+- the raw value's type (`SOCKET`) and the error type (`Win32.Error`) in every signature, which a typealias for each
+  could have carried;
+- constants spelled as Winsock's values, where SystemSockets imports the C library's macros;
+- the omissions (no `fileDescriptor`, `pair`, `closeOnExec`, `SCM_RIGHTS`, `reusePort`, low-water marks,
+  `timestamp`, `localAddress` of packet information);
+- Winsock's value types inside the options (milliseconds, `u_short`, `DWORD`), its structures' union fields
+  (`S_un.S_addr`, `u.Byte`) and missing length fields, its control-message alignment and `IN_PKTINFO`, the
+  wide-character resolver, and the extension-function calls for messages;
+- the documentation of each difference, which is most of the changed lines.
 
-Messages: `SocketMessages.swift` and its IP part are SystemSockets' with Winsock's layout and the descriptor messages
-removed, and `RawBuffer.swift` is copied whole; about 900 lines that sharing would have written once, with a
-`#if` for the layout's alignment, the packet-info structure, and the `SCM_RIGHTS` parts.
+`RawBuffer.swift` is copied whole, as SystemSockets copies it from SystemPackage, and `Util.swift`'s helpers are its
+`valueOrErrno` family over another failure test. What sharing wouldn't have saved: the Windows-only parts, about 1,700
+lines (startup, the Winsock codes, the `system_` layer and internal constants, the extension-function lookups,
+polling on `SocketDescriptor`, overlapped I/O, the stream extension functions), which are new on any plan, and the
+harness and its model.
 
 ## 7. Needs outside the lane's files
 
@@ -412,8 +462,30 @@ removed, and `RawBuffer.swift` is copied whole; about 900 lines that sharing wou
 - **The tools** know two modules: `Utilities/api-delta/scripts/scan_sources.py` (`MODULE_DIRS`), the adopter-coverage
   scripts (`status.py`'s `SYSTEM_SOURCES`, `extract.py`'s `SYSTEM_MODULES`), and lint's cmake check (`MODULES`) read
   only `Sources/System` and `Sources/SystemSockets`, so neither lint's api rules, the coverage figures, nor the
-  status page see SystemWinSocks yet.
+  status page see SystemWinSocks yet; `mapping.ini`'s notes (`a8777cc`) say what it covers meanwhile. This lane
+  checked its CMake list with lint's own `check_cmake.check` on `Sources/SystemWinSocks`.
+- **CI** builds CMake on Linux only, so SystemWinSocks' CMake list is never configured there; a Windows CMake job, or
+  the list check run on its directory, would cover it.
+- **Names in `Win32.Error`**: SystemWinSocks' extension adds Winsock's codes, with `Errno`'s names (`interrupted`,
+  `wouldBlock`, `timedOut`, `connectionReset` and the rest). SystemPackage must not add those names for other codes;
+  coverage-9's pending names (`notFound`, `timeoutExpired`, `ioIncomplete`, `current` and others) don't collide.
 
 ## 8. Next
 
-See *Resume here*.
+1. **The Windows box**: apply the `Package.swift` change of section 7 (leave SystemSockets, SystemSocketsTests and
+   Samples' use of it out of a Windows host's manifest), then `swift build` and `swift test --filter
+   SystemWinSocksTests`, and go through section 4's list; fix what the model let through, and record each fix with the
+   Windows behavior it found.
+2. **The two open questions** (section 2), the manifest's form and the module's name, before any adopter takes the
+   module, since both change what an adopter's manifest and code say.
+3. **The tools' module lists** (section 7), so that lint's api rules, the coverage figures and the status page see
+   SystemWinSocks.
+4. **The adopters**, in their own lanes, from section 5: NIO's Windows branches widened to SystemWinSocks, which also
+   fixes its control-message level; its `TransmitFile`, `ReadFile` and `WriteFile` `OVERLAPPED`s (section 7), its own;
+   swift-certificates' `canImport(SystemWinSocks)`.
+5. **More of Windows' own**, none started, each a gap only where an adopter needs it: Hyper-V sockets (`AF_HYPERV`),
+   VM sockets' counterpart; `IP_ECN` and `IPV6_ECN`; UDP segmentation and receive coalescing (`UDP_SEND_MSG_SIZE`,
+   `UDP_RECV_MAX_COALESCED_SIZE`), where NIO's `setUDPSegmentSize` and `setUDPReceiveOffload` throw unsupported on
+   Windows; `SIO_TCP_INFO`, for NIO's TCP connection information; `WSADuplicateSocketW`, Windows' way to give a socket
+   to another process, where POSIX passes descriptors; `GetAcceptExSockaddrs`, `DisconnectEx` and `TransmitPackets`;
+   `SIO_AF_UNIX_GETPEERPID`.
