@@ -6,10 +6,12 @@ builds or runs real Windows: the Windows-only code is compiled on macOS against 
 (`Prototype/Win32/check-windows.sh`, `check-winsock.sh`), and the Windows host's manifest was checked by loading and
 building a copy of the package whose manifest has `os(Windows)` replaced by `true`.
 
-**Resume here:** items 1 to 5 are committed: the manifest (`dda94d2`), the tools (`5bbb2ea`), `mapping.ini`'s
-coverage (`300a8da`), `Win32.Error`'s Winsock names (`2239b61`), the first-run script (`6b5f5b2`), and SystemSockets'
-poll and warnings (the commit after it). Next: lint and the harnesses on the last code commit, the Linux, Musl and
-WASI checks, the last `swift build` and `swift test`, and STATUS.md, regenerated once.
+**Resume here:** the lane is done; every item is committed, the last code commit is `7a59159`, and STATUS.md is
+regenerated there and committed with this report. Next is the Windows box: `Utilities/windows/first-run.ps1`, then
+section 4's checks (section 6). Commits: the manifest (`dda94d2`); the tools (`5bbb2ea`); `mapping.ini`'s coverage
+(`300a8da`); `Win32.Error`'s Winsock names (`2239b61`); the first-run script (`6b5f5b2`); SystemSockets' polling and
+its warnings (`3c1343a`); SystemWinSocks' comments without its module's name (`f03620b`) and SocketDescriptor's
+`SOCKET` sentence (`7a59159`).
 
 ## 1. What
 
@@ -58,6 +60,13 @@ WASI checks, the last `swift build` and `swift test`, and STATUS.md, regenerated
   forward to `FileDescriptor`'s, over POSIX `poll`; code that polls sockets now spells it once. And SystemSockets'
   `_value` and `_setValue` pass the option through `withUnsafeMutableBytes(of:)` and `withUnsafeBytes(of:)`, as
   SystemWinSocks does, which ends their two "forming 'UnsafeMutableRawPointer' to a variable of type 'T'" warnings.
+- **SystemWinSocks stays movable** (Michael, 10-09: the socket API may land in the System module): nothing in it
+  depends on its module's name; it has no qualified names, strings or conditions with it, and the six comments that
+  named it now say "System" or "this module" (`f03620b`). A move would fold its copies of SystemPackage's internals (`_RawBuffer`,
+  `valueOrWinsockError` beside `valueOrErrno`, `_buildDescription`) into SystemPackage's, and put its `Win32.Error`
+  names (`wouldBlock` and the rest) beside SystemPackage's, which don't collide (winsock-1's section 7).
+- **SocketDescriptor's doc names `SOCKET`** (`7a59159`), so the coverage tools read it as that C type's Swift type;
+  the ledger had ranked [Winsock sockets] first among the System gaps, with `SOCKET` "named nowhere".
 
 ## 2. Design calls, with the alternatives rejected
 
@@ -157,7 +166,8 @@ WASI checks, the last `swift build` and `swift test`, and STATUS.md, regenerated
   `throws:AddressResolutionError` entries, and `closeAfter(_:)` by its path. So there was nothing to fix.
 - lint's unit tests (17, two new: helpers per module, a module's platforms where it declares API) and
   adopter-coverage's (32) pass.
-- Tests added or changed, each Windows only, and what each can touch (checked before compiling them; none has run):
+- Tests added or changed, and what each can touch (checked before compiling or running them; the three Windows
+  ones compile against the model and have never run):
   - `WinsockErrorTests.codesHaveTheirSymbolicNames` (new): reads `debugDescription` for 62 codes; touches nothing.
   - `WinsockErrorTests.winsockErrorIsTheThreadsLastError` (new): starts Winsock, calls `closesocket(INVALID_SOCKET)`,
     which names no socket, and reads `WSAGetLastError` and `GetLastError`; it sets its own thread's last error and
@@ -171,6 +181,21 @@ WASI checks, the last `swift build` and `swift test`, and STATUS.md, regenerated
 - `Prototype/Win32/check-winsock.sh` failed at the base (5d0b151: "redefinition of '_GUID'", the two models' `GUID`s);
   after the fix it passes: 108 of the model's 185 constants checked against Rust's bindings, 135 SystemWinSocks
   constants against the model, SystemWinSocks (30 files) and its tests (13 files) compile. `check-windows.sh` passes.
+- After, at the last code commit (`7a59159`), on macOS: `swift build` succeeds, with no warning from this lane's files;
+  `swift test`: XCTest 582 tests (5 skipped), swift-testing 542 tests in 91 suites (the 4 new), all passing.
+  `Utilities/lint/lint.sh cmake api`: 0 errors, 0 warnings. `check-windows.sh` and `check-winsock.sh` pass.
+- Linux (`Utilities/linux/build.sh test`, swift:6.2-noble, arm64): XCTest 496 tests (6 skipped), swift-testing 506
+  tests in 88 suites, all passing, with no warning from this lane's files; the empty SystemWinSocks and its tests
+  build, and "Socket polling" passes. Logs: `../linux-logs/winsock-2-f03620b-test.log` and
+  `../linux-logs/winsock-2-7a59159-test.log`.
+- Musl (`cross.sh musl`, at `f03620b`): SystemSockets and SystemWinSocks build (`build -- --target X`, exit 0);
+  the whole package doesn't, only because of the samples (`Platforms/Enums/PlatformProcess.swift` and
+  `Platforms/Samples/Processes.swift` can't find `kill`, `waitpid`, `errno` and the rest), which are unchanged since
+  the base. WASI (`cross.sh wasi build-tests`, the package without sockets, at `f03620b`): builds, with the empty
+  SystemWinSocks and its tests. Nothing later than `f03620b` but a doc comment inside `#if os(Windows)`.
+- `Prototype/Status/STATUS.md`, regenerated once at the end (`STATUS_SYSTEM_NEXT=winsock-2`, at `7a59159`, after a
+  first run at `f03620b` that led to `7a59159`): its API section shows SystemWinSocks' declarations, and its ledger
+  reads the Winsock coverage; the figures are in the file.
 - `Utilities/adopter-coverage/check.sh nio` (NIO at `9cb66c6d`, System at `5bbb2ea`), in a results store of the lane's
   own under `.build` seeded with a copy of the shared store's NIO index, so the shared store is untouched: NIO's
   Windows functions go from 53 covered, 17 partial and 58 missing with SystemWinSocks unread (the tools with
@@ -191,15 +216,38 @@ winsock-1's section 4, coverage-9's sections 1, 3, 4, 5 and 7, and this lane's:
 
 ## 5. Needs outside the lane's files
 
-- **CLAUDE.md** says SystemSockets' `#error`s stop a Windows build and that only a Windows host declares SystemWinSocks;
-  both changed here.
+- **CLAUDE.md** says SystemSockets' `#error`s stop SwiftPM builds for Windows and that only a Windows host declares
+  SystemWinSocks; both changed here (a Windows host builds SystemSockets from `WindowsHost/` and declares
+  SystemWinSocks, as every host does), and its Commands section could name `Utilities/windows/first-run.ps1`.
+- **`Utilities/README.md`**, the tools' index, has no row for `Utilities/windows/first-run.ps1`.
 - **The demos lane**: the socket samples import SystemSockets without a condition, so the samples are left out of a
   Windows host's manifest; conditioning those imports would let them come back.
+- **The platform-enum lane**: on Musl, `Sources/Samples/Platforms/Enums/PlatformProcess.swift` and
+  `Platforms/Samples/Processes.swift` can't find `kill`, `waitpid`, `errno`, `sleep`, `posix_spawn` and the rest
+  (no Musl import), so `cross.sh musl build` fails in the samples.
 - **api-graph, api-burndown and master-view** list two modules (`cluster.py`'s `place`, `build_graph.py`,
   `index_refs.py`'s `KEEP_SWIFT`, `adopters.py`'s `SYSTEM_MODULES`, `source_index.py`'s `MODULES`, `verify.py`'s
   directories); they get SystemWinSocks' declarations from api-delta's output, but their own source and index reads
   don't see the module.
+- **CI's Windows job** (`.github/workflows/pull_request.yml`, `enable_windows_checks`) stopped at SystemSockets'
+  `#error`s; with this manifest it builds SystemWinSocks and runs the Windows tests, none of which has run before, so
+  it fails where the first run does until that run's fixes land.
+- **SystemSockets' `init(cString:)` warnings** (`SocketAddress+IPv4.swift:117`, `+IPv6.swift:130`,
+  `+Resolution.swift:358-359`, deprecated in favor of `String(decoding:as:)`) remain; item 5 named only `_value` and
+  `_setValue`.
 
 ## 6. Next
 
-(Filled in at the end.)
+1. **The Windows box**: run `Utilities/windows/first-run.ps1` from a clone of `system-next` with this branch merged,
+   send back the log, and go through section 4 (and the README's list). Fix what the model let through, recording the
+   Windows behavior each fix found, and teach the model (`Prototype/Win32/WindowsModel`) what it missed.
+2. **From the run's answers**: `[Winsock errors]` in `mapping.ini` (covered by `Win32.Error.current` if Winsock's last
+   error is the thread's); the type-of-service message type in `SocketMessages+IP.swift`'s readers; and the build's
+   warnings.
+3. **Open for Michael**: SystemSockets declared on a Windows host from an empty file, against the request's leaving
+   it out (section 2), and the samples left out there; the module's name, with the re-exporting `WindowsHost` file as
+   a further alternative; and whether System names an invalid socket (`INVALID_SOCKET`, NIO's sentinel), which is now
+   the first of the ledger's Windows socket gaps.
+4. **The adopters**, in their own lanes, from winsock-1's section 5: NIO's Windows branches widened to SystemWinSocks,
+   with `.product(name: "SystemWinSocks", package: "swift-system", condition: .when(platforms: [.windows]))`; its
+   POSIX selectors could poll through `SocketDescriptor.poll` now, as its Windows one would.

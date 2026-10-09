@@ -1,9 +1,9 @@
 # Status: System's API and its adopters
 
-Generated 2026-10-08 by `Utilities/adopter-coverage/status.sh`, from commits only; rerun it rather than editing this file. How each figure is made, and what it can't see, is in [How this is computed](#how-this-is-computed).
+Generated 2026-10-09 by `Utilities/adopter-coverage/status.sh`, from commits only; rerun it rather than editing this file. How each figure is made, and what it can't see, is in [How this is computed](#how-this-is-computed).
 
-- **System**: `coverage-9` @ `1f788961` (mapping.ini: [Windows current directory], covered by FilePath's current working directory API on Windows), which contains `coverage-9` @ `1f788961` (mapping.ini: [Windows current directory], covered by FilePath's current working directory API on Windows); 0 commit(s) of `coverage-9` aren't in `coverage-9`.
-- **API delta**: `main` @ `1b452c29` → `HEAD` @ `4cb30026` (api-delta's last run; nothing it reads has changed since).
+- **System**: `winsock-2` @ `7a591590` (SystemWinSocks: SocketDescriptor's doc names SOCKET, the C type it wraps), which contains `winsock-2` @ `7a591590` (SystemWinSocks: SocketDescriptor's doc names SOCKET, the C type it wraps); 0 commit(s) of `winsock-2` aren't in `winsock-2`.
+- **API delta**: `main` @ `1b452c29` → `HEAD` @ `7a591590`.
 - **Adopters** (`../adopters`, branch `migrate-darwin`, against its merge base with `main`):
   - WasmKit @ `4917e060`, base `1e9c513d`
   - indexstore-db @ `53bf43b6`, base `441ead77`
@@ -32,24 +32,25 @@ Copied verbatim from `Utilities/api-delta/regenerate.sh` (`BASE_REF=main`, `HEAD
 
 ## Summary
 
-- **3427 added, 0 removed, 1 changed** declarations in the macOS symbol graphs.
+- **3433 added, 0 removed, 1 changed** declarations in the macOS symbol graphs.
   - SystemPackage: +2843, 1 changed (448 → 3291 public symbols).
-  - SystemSockets: +584 (0 → 584 public symbols). SystemSockets is a new module; it doesn't exist on `main`.
+  - SystemSockets: +590 (0 → 590 public symbols). SystemSockets is a new module; it doesn't exist on `main`.
+  - SystemWinSocks: none; its declarations compile only on Windows, so the source scan's count below has them. SystemWinSocks is a new module; it doesn't exist on `main`.
 - Availability of the additions:
-  - System 199: 3393
+  - System 199: 3399
   - System 199 + explicit OS floor: 26
   - System 0.0.1 + explicit OS floor: 8
 - The source scan finds these new public declarations, which the macOS graphs can't show:
-  - 1670 compiled only on other platforms;
-  - 254 new `@available(*, unavailable, renamed:)` stubs;
-  - 1 new underscored public declaration(s).
+  - 2213 compiled only on other platforms (SystemPackage: 1593, SystemSockets: 77, SystemWinSocks: 543);
+  - 256 new `@available(*, unavailable, renamed:)` stubs;
+  - 2 new underscored public declaration(s).
   - 5 declarations the scan couldn't classify; see the list below.
   - 29 added, removed or changed graph symbols the scan didn't find (enum case: 28, no source location: 1). Enum cases have no `public` keyword, and synthesized members have no location; any others are scanner misses. Their platforms show as `?`.
 - 0 public declarations hidden from the graphs were removed.
 - No public declaration is conditional on `ENABLE_MOCKING` or `DEBUG`, so a release build has the same public API as the debug graphs.
 - Cross-check with `swift-api-digester`, which dumps every declaration, implicit ones included:
   - SystemPackage: +3170 / -1 declarations, which is the graphs' +2843 plus 321 implicit ones; explicit declarations it has that the graphs don't: `FileDescriptor.close()`, `_opaque_pthread_cond_t.initializer`, `_opaque_pthread_mutex_t.errorCheckingInitializer`, `_opaque_pthread_mutex_t.initializer`, `_opaque_pthread_mutex_t.recursiveInitializer`, `_opaque_pthread_rwlock_t.initializer`; it has every graph addition; `-diagnose-sdk` reports no breaking changes.
-  - SystemSockets: +657 / -0 declarations, which is the graphs' +584 plus 72 implicit ones; explicit declarations it has that the graphs don't: `SocketAddress._withUnsafeMutablePointer(_:)`; it has every graph addition.
+  - SystemSockets: +663 / -0 declarations, which is the graphs' +590 plus 72 implicit ones; explicit declarations it has that the graphs don't: `SocketAddress._withUnsafeMutablePointer(_:)`; it has every graph addition.
 - 0 removed and 1 changed in the graphs, and 0 removed among the declarations the graphs can't see. The full list below gives the first kind, and section 5 the second. The *changed* check compares declaration text (including default arguments), availability, conformances, generic and extension constraints, and access level, and pairs symbols by path when a signature change alters the USR.
 
 ### By area
@@ -158,10 +159,11 @@ Each row is a top-level type, and nested types count toward it: `FilePath.Resolu
 | SystemSockets | [`AddressResolutionError`](#systemsockets-addressresolutionerror) | 5 | 0 | 0 | S199 ×5 |
 | SystemSockets | [`CInterop`](#systemsockets-cinterop) | 3 | 0 | 0 | S199 ×3 |
 | SystemSockets | [`CInterop (extends SystemPackage)`](#systemsockets-cinterop-extends-systempackage) | 19 | 0 | 0 | S199 ×19 |
+| SystemSockets | [`FileDescriptor (extends SystemPackage)`](#systemsockets-filedescriptor-extends-systempackage) | 2 | 0 | 0 | S199 ×2 |
 | SystemSockets | [`IPv4Address`](#systemsockets-ipv4address) | 32 | 0 | 0 | S199 ×32 |
 | SystemSockets | [`IPv6Address`](#systemsockets-ipv6address) | 30 | 0 | 0 | S199 ×30 |
 | SystemSockets | [`SocketAddress`](#systemsockets-socketaddress) | 67 | 0 | 0 | S199 ×67 |
-| SystemSockets | [`SocketDescriptor`](#systemsockets-socketdescriptor) | 353 | 0 | 0 | S199 ×347, S199+OS ×6 |
+| SystemSockets | [`SocketDescriptor`](#systemsockets-socketdescriptor) | 357 | 0 | 0 | S199 ×351, S199+OS ×6 |
 | SystemSockets | [`UnixAddress`](#systemsockets-unixaddress) | 8 | 0 | 0 | S199 ×8 |
 | SystemSockets | [`VMSocketAddress`](#systemsockets-vmsocketaddress) | 20 | 0 | 0 | S199 ×20 |
 | SystemSockets | [`cmsghdr (extends Darwin)`](#systemsockets-cmsghdr-extends-darwin) | 4 | 0 | 0 | S199 ×4 |
@@ -175,16 +177,16 @@ Each row is a top-level type, and nested types count toward it: `FilePath.Resolu
 | SystemSockets | [`sockaddr_storage (extends Darwin)`](#systemsockets-sockaddr-storage-extends-darwin) | 3 | 0 | 0 | S199 ×3 |
 | SystemSockets | [`sockaddr_un (extends Darwin)`](#systemsockets-sockaddr-un-extends-darwin) | 5 | 0 | 0 | S199 ×5 |
 | SystemSockets | [`sockaddr_vm (extends Darwin)`](#systemsockets-sockaddr-vm-extends-darwin) | 5 | 0 | 0 | S199 ×5 |
-| **Total** | | **3427** | **0** | **1** | |
+| **Total** | | **3433** | **0** | **1** | |
 
 ## ABI: exported symbols
 
-What each module's release build exports, at `main` (`1b452c29`) → HEAD (`1f788961`), beside the API points above: `nm`'s external symbols in the objects of `swift build -c release`, built from an export of the commit. Every public property exports a property descriptor, `@_alwaysEmitIntoClient` or not (the SDK's System does too), so the descriptors grow with the API. *Code* is functions and accessors, what `@_alwaysEmitIntoClient` leaves to the client: of *public* declarations, in the symbol graphs, and *other*, which the graphs don't show (`@usableFromInline` internals, synthesized Equatable and Hashable members, deinitializers, stored properties' initial values).
+What each module's release build exports, at `main` (`1b452c29`) → HEAD (`7a591590`), beside the API points above: `nm`'s external symbols in the objects of `swift build -c release`, built from an export of the commit. Every public property exports a property descriptor, `@_alwaysEmitIntoClient` or not (the SDK's System does too), so the descriptors grow with the API. *Code* is functions and accessors, what `@_alwaysEmitIntoClient` leaves to the client: of *public* declarations, in the symbol graphs, and *other*, which the graphs don't show (`@usableFromInline` internals, synthesized Equatable and Hashable members, deinitializers, stored properties' initial values).
 
 | Module | Exported | Property descriptors | Conformances | Types | Code, public | Code, other |
 |---|---:|---:|---:|---:|---:|---:|
 | SystemPackage | 830 → 5108 | 406 → 2307 | 167 → 817 | 90 → 670 | 118 → 518 | 49 → 796 |
-| SystemSockets | — → 881 | — → 336 | — → 139 | — → 132 | — → 168 | — → 106 |
+| SystemSockets | — → 882 | — → 337 | — → 139 | — → 132 | — → 168 | — → 106 |
 
 ### Candidates for `@_alwaysEmitIntoClient`
 
@@ -493,7 +495,7 @@ Verbatim, not rerun: each package's own test totals (at the start, and the lates
 
 # 3. Gaps
 
-Every `SYSTEM-GAP:` marker in the packages' sources at each adopter's newest migration branch, the commit section 4 reads (WasmKit `migrate-unix` @ `d0f9f8de`, indexstore-db `migrate-all` @ `96d2a952`, sourcekit-lsp `migrate-all` @ `79583cc1`, swift-argument-parser `migrate-all` @ `22831ad7`, swift-async-algorithms `migrate-all` @ `0178ed40`, swift-build `migrate-all` @ `4f55b04e`, swift-certificates `migrate-all` @ `c310582c`, swift-corelibs-xctest `migrate-darwin` @ `80a3f954`, swift-crypto `migrate-all` @ `ef1e59aa`, swift-docc `migrate-all` @ `4e6a5cea`, swift-driver `migrate-unix` @ `e7850bd0`, swift-experimental-string-processing `migrate-all` @ `f0d0fc7f`, swift-format `migrate-all` @ `af182284`, swift-foundation `migrate-unix` @ `a9c8edea`, swift-foundation-icu `migrate-all` @ `2eb5e8e9`, swift-llbuild `migrate-unix` @ `314f1127`, swift-log `migrate-all` @ `a7d69695`, swift-nio `migrate-unix` @ `b2f3c6c9`, swift-package-manager `migrate-unix` @ `efff7333`, swift-sdk-generator `migrate-unix` @ `bc251e13`, swift-stress-tester `migrate-all` @ `e1702563`, swift-subprocess `migrate-unix` @ `a58cc217`, swift-syntax `migrate-all` @ `e6918103`, swift-testing `migrate-all` @ `7669b72e`, swift-tools-protocols `migrate-unix` @ `2b2c75dc`, swift-tools-support-core `migrate-unix` @ `5f85e38e`): 343 markers in 104 files, of which 1 are outside the packages' targets. Each marker's text is read for the C interfaces it names (see [How this is computed](#how-this-is-computed)); a marker that names none is counted under its phrase, with the Darwin names imported under it deciding its status. Status is against System at `1f788961`:
+Every `SYSTEM-GAP:` marker in the packages' sources at each adopter's newest migration branch, the commit section 4 reads (WasmKit `migrate-unix` @ `d0f9f8de`, indexstore-db `migrate-all` @ `96d2a952`, sourcekit-lsp `migrate-all` @ `79583cc1`, swift-argument-parser `migrate-all` @ `22831ad7`, swift-async-algorithms `migrate-all` @ `0178ed40`, swift-build `migrate-all` @ `4f55b04e`, swift-certificates `migrate-all` @ `c310582c`, swift-corelibs-xctest `migrate-darwin` @ `80a3f954`, swift-crypto `migrate-all` @ `ef1e59aa`, swift-docc `migrate-all` @ `4e6a5cea`, swift-driver `migrate-unix` @ `e7850bd0`, swift-experimental-string-processing `migrate-all` @ `f0d0fc7f`, swift-format `migrate-all` @ `af182284`, swift-foundation `migrate-unix` @ `a9c8edea`, swift-foundation-icu `migrate-all` @ `2eb5e8e9`, swift-llbuild `migrate-unix` @ `314f1127`, swift-log `migrate-all` @ `a7d69695`, swift-nio `migrate-unix` @ `b2f3c6c9`, swift-nio-extras `migrate-all` @ `2877a3b9`, swift-nio-http2 `migrate-all` @ `9988a49f`, swift-nio-imap `migrate-all` @ `2c5a5948`, swift-nio-ssl `migrate-all` @ `d2683eb3`, swift-package-manager `migrate-unix` @ `efff7333`, swift-sdk-generator `migrate-unix` @ `bc251e13`, swift-stress-tester `migrate-all` @ `e1702563`, swift-subprocess `migrate-unix` @ `a58cc217`, swift-syntax `migrate-all` @ `e6918103`, swift-testing `migrate-all` @ `7669b72e`, swift-tools-protocols `migrate-unix` @ `2b2c75dc`, swift-tools-support-core `migrate-unix` @ `5f85e38e`): 345 markers in 105 files, of which 3 are outside the packages' targets. Each marker's text is read for the C interfaces it names (see [How this is computed](#how-this-is-computed)); a marker that names none is counted under its phrase, with the Darwin names imported under it deciding its status. Status is against System at `7a591590`:
 
 - **missing**: System documents none of it (or only some: *k of n*), and `mapping.ini` has no answer outside System for it.
 - **covered**: a System declaration's doc comment names it as the corresponding C interface, a CInterop alias names it, or, for `X members`, System gives `CInterop` alias of `X` Swift-named accessors. The marker is stale, or the package hasn't adopted the API yet.
@@ -505,7 +507,7 @@ The last two are answers outside System, read from `mapping.ini` at System's com
 
 A family marked *(provisional)* is a C-library layer above the OS (math, stdio, locales, string.h and ctype.h) that System wraps provisionally, in `Sources/System/Provisional/`, since it may move to the standard library; it counts like everything else.
 
-Interfaces: 34 missing, 56 covered, 30 unread, 1 standard library, 121 in all.
+Interfaces: 36 missing, 56 covered, 30 unread, 1 standard library, 123 in all.
 
 | # | Interface | Status | Files | Packages | Family |
 |---:|---|---|---:|---|---|
@@ -616,20 +618,22 @@ Interfaces: 34 missing, 56 covered, 30 unread, 1 standard library, 121 in all.
 | 105 | stdlib.h and sysexits.h exit codes' C names | unread | 1 | swift-testing | stdlib.h and sysexits.h exit codes' C names |
 | 106 | `strchr` | missing | 1 | swift-testing | string.h and ctype.h (provisional) |
 | 107 | `strerror_r` | missing | 1 | swift-testing | string.h and ctype.h (provisional) |
-| 108 | `strncmp` | covered (doc comment) | 1 | swift-testing | strncmp |
-| 109 | SystemConfig.maxIOVectors on FreeBSD and OpenBSD | unread | 1 | swift-nio | SystemConfig.maxIOVectors on FreeBSD and OpenBSD |
-| 110 | `SystemIdentity` | missing | 1 | swift-foundation | SystemIdentity |
-| 111 | SystemSockets on FreeBSD (PackageDescription can't name .freebsd) | unread | 1 | WasmKit | SystemSockets on FreeBSD (PackageDescription can't name .freebsd) |
-| 112 | SystemSockets on OpenBSD | unread | 1 | swift-nio | SystemSockets on OpenBSD |
-| 113 | `task_set_exception_ports` | missing | 1 | swift-testing | mach/task.h |
-| 114 | `TCP_INFO` | covered (doc comment) | 1 | swift-nio | socket options |
-| 115 | test's own C-shaped helpers on FreeBSD and OpenBSD (the Darwin round's design call 19) | unread | 1 | swift-nio | test's own C-shaped helpers on FreeBSD and OpenBSD (the Darwin round's design call 19) |
-| 116 | `timespec_get` | covered (doc comment) | 1 | swift-testing | time.h |
-| 117 | `unmap` | missing | 1 | swift-foundation | unmap |
-| 118 | `unsafeAddress` | missing | 1 | swift-async-algorithms | as UnfairLock is |
-| 119 | `usleep` | covered (as `nanosleep`) | 1 | swift-stress-tester | sleep |
-| 120 | `version` | covered (doc comment) | 1 | swift-foundation | version |
-| 121 | `wasip1` | missing | 1 | swift-async-algorithms | PThread on WASI without threads |
+| 108 | `strftime_l` | missing | 1 | swift-nio-imap | locale (provisional) |
+| 109 | `strncmp` | covered (doc comment) | 1 | swift-testing | strncmp |
+| 110 | `strptime_l` | missing | 1 | swift-nio-imap | locale (provisional) |
+| 111 | SystemConfig.maxIOVectors on FreeBSD and OpenBSD | unread | 1 | swift-nio | SystemConfig.maxIOVectors on FreeBSD and OpenBSD |
+| 112 | `SystemIdentity` | missing | 1 | swift-foundation | SystemIdentity |
+| 113 | SystemSockets on FreeBSD (PackageDescription can't name .freebsd) | unread | 1 | WasmKit | SystemSockets on FreeBSD (PackageDescription can't name .freebsd) |
+| 114 | SystemSockets on OpenBSD | unread | 1 | swift-nio | SystemSockets on OpenBSD |
+| 115 | `task_set_exception_ports` | missing | 1 | swift-testing | mach/task.h |
+| 116 | `TCP_INFO` | covered (doc comment) | 1 | swift-nio | socket options |
+| 117 | test's own C-shaped helpers on FreeBSD and OpenBSD (the Darwin round's design call 19) | unread | 1 | swift-nio | test's own C-shaped helpers on FreeBSD and OpenBSD (the Darwin round's design call 19) |
+| 118 | `timespec_get` | covered (doc comment) | 1 | swift-testing | time.h |
+| 119 | `unmap` | missing | 1 | swift-foundation | unmap |
+| 120 | `unsafeAddress` | missing | 1 | swift-async-algorithms | as UnfairLock is |
+| 121 | `usleep` | covered (as `nanosleep`) | 1 | swift-stress-tester | sleep |
+| 122 | `version` | covered (doc comment) | 1 | swift-foundation | version |
+| 123 | `wasip1` | missing | 1 | swift-async-algorithms | PThread on WASI without threads |
 
 ## Missing, by family
 
@@ -655,18 +659,19 @@ The missing interfaces above, grouped, largest first: the order to fill them in.
 | 16 | fileSize | 1 | swift-foundation | `fileSize` |
 | 17 | fopencookie | 1 | swift-testing | `fopencookie` |
 | 18 | fts off Darwin | 1 | swift-foundation | `FTS_*`, `kinds` |
-| 19 | Mach-O | 1 | swift-testing | `images` |
-| 20 | mach/task.h | 1 | swift-testing | `task_set_exception_ports` |
-| 21 | maxSymbolicLinks | 1 | swift-foundation | `maxSymbolicLinks` |
-| 22 | mptcp_info | 1 | swift-nio | `mptcp_info` |
-| 23 | MPTCP_INFO | 1 | swift-nio | `MPTCP_INFO` |
-| 24 | PathCchIsRoot | 1 | swift-format | `PathCchIsRoot` |
-| 25 | PThread on WASI without threads | 1 | swift-async-algorithms | `wasip1` |
-| 26 | real | 1 | swift-foundation | `real` |
-| 27 | secureValue | 1 | swift-foundation | `secureValue` |
-| 28 | SystemIdentity | 1 | swift-foundation | `SystemIdentity` |
-| 29 | unmap | 1 | swift-foundation | `unmap` |
-| 30 | WASI | 1 | swift-foundation | `none` |
+| 19 | locale (provisional) | 1 | swift-nio-imap | `strftime_l`, `strptime_l` |
+| 20 | Mach-O | 1 | swift-testing | `images` |
+| 21 | mach/task.h | 1 | swift-testing | `task_set_exception_ports` |
+| 22 | maxSymbolicLinks | 1 | swift-foundation | `maxSymbolicLinks` |
+| 23 | mptcp_info | 1 | swift-nio | `mptcp_info` |
+| 24 | MPTCP_INFO | 1 | swift-nio | `MPTCP_INFO` |
+| 25 | PathCchIsRoot | 1 | swift-format | `PathCchIsRoot` |
+| 26 | PThread on WASI without threads | 1 | swift-async-algorithms | `wasip1` |
+| 27 | real | 1 | swift-foundation | `real` |
+| 28 | secureValue | 1 | swift-foundation | `secureValue` |
+| 29 | SystemIdentity | 1 | swift-foundation | `SystemIdentity` |
+| 30 | unmap | 1 | swift-foundation | `unmap` |
+| 31 | WASI | 1 | swift-foundation | `none` |
 
 ## Markers that name no C interface
 
@@ -1030,7 +1035,9 @@ The missing interfaces above, grouped, largest first: the order to fill them in.
 - stdlib.h and sysexits.h exit codes' C names (unread): swift-testing: `Sources/Testing/ExitTests/ExitStatus.swift:113`
 - `strchr` (missing): swift-testing: `Sources/Testing/Support/Environment.swift:90`
 - `strerror_r` (missing): swift-testing: `Sources/Testing/Support/CError.swift:76`
+- `strftime_l` (missing): swift-nio-imap: `Examples/IMAPTool/Sources/IMAPToolLib/Message/InternetMessageDateParsing.swift:20` (outside the targets)
 - `strncmp` (covered): swift-testing: `Sources/Testing/Support/Environment.swift:90`
+- `strptime_l` (missing): swift-nio-imap: `Examples/IMAPTool/Sources/IMAPToolLib/Message/InternetMessageDateParsing.swift:18` (outside the targets)
 - SystemConfig.maxIOVectors on FreeBSD and OpenBSD (unread): swift-nio: `Sources/NIOPosix/System.swift:459`
 - `SystemIdentity` (missing): swift-foundation: `Sources/FoundationEssentials/ProcessInfo/ProcessInfo.swift:432`
 - SystemSockets on FreeBSD (PackageDescription can't name .freebsd) (unread): WasmKit: `Sources/CLICommands/TCPListener.swift:104`
@@ -1146,7 +1153,7 @@ All repositories, files by module and kind, lexically (the counted modules any f
 
 **The floor** (no site left on a platform but exceptions) holds on no platform: Darwin (70 sites left), Linux (89 sites left), Musl (85 sites left), Android (116 sites left), FreeBSD (316 sites left), OpenBSD (306 sites left), WASI (213 sites left), Windows (672 sites left).
 
-The ledger: every site in the update-checkout cluster that still uses a platform C module, each with one category and its reason, so that nothing left on C is lost; in full in `ledger.json` (status.sh's `STATUS_LEDGER_JSON`). A *site* is an import of a module that `Utilities/adopter-coverage/modules.ini` counts ([count]) or lists ([report]), at its file and line, with the platforms whose build compiles it (`?`: maybe) and the C names it serves there; or a `SYSTEM-GAP:` marker that sits over no such import (one that does is part of the imports' reason). Every library, test and other file is read, at the commits section 4 reads, and the swift repository too. Categories, by `Utilities/adopter-coverage/exceptions.ini`'s entries first, then by each C name against System at `coverage-9` @ `1f788961` and `Utilities/adopter-coverage/mapping.ini`: 569 unexplained, 217 System gap, 23 queued, 33 exception, 123 undecided, 62 standard library; 27 excluded. How each is decided is in [How this is computed](#how-this-is-computed).
+The ledger: every site in the update-checkout cluster that still uses a platform C module, each with one category and its reason, so that nothing left on C is lost; in full in `ledger.json` (status.sh's `STATUS_LEDGER_JSON`). A *site* is an import of a module that `Utilities/adopter-coverage/modules.ini` counts ([count]) or lists ([report]), at its file and line, with the platforms whose build compiles it (`?`: maybe) and the C names it serves there; or a `SYSTEM-GAP:` marker that sits over no such import (one that does is part of the imports' reason). Every library, test and other file is read, at the commits section 4 reads, and the swift repository too. Categories, by `Utilities/adopter-coverage/exceptions.ini`'s entries first, then by each C name against System at `winsock-2` @ `7a591590` and `Utilities/adopter-coverage/mapping.ini`: 723 unexplained, 61 System gap, 23 queued, 33 exception, 123 undecided, 64 standard library; 27 excluded. How each is decided is in [How this is computed](#how-this-is-computed).
 
 ## Unexplained
 
@@ -1192,6 +1199,7 @@ Sites that no entry and no System gap explains: the ones to look at. Either Syst
 | swift-build | `Sources/SWBUtil/FSProxy.swift` | 38 `WinSDK` (scoped) | Windows | System covers every C name it serves there: HANDLE |
 | swift-build | `Sources/SWBUtil/HashContext.swift` | 14 `WinSDK` | Windows | no C name it serves was found on its platforms |
 | swift-certificates | `Sources/X509/Lock.swift` | 16 `ucrt`, 17 `WinSDK` | Windows | System covers every C name it serves there: AcquireSRWLockExclusive, InitializeSRWLock, ReleaseSRWLockExclusive, SRWLOCK |
+| swift-certificates | `Sources/X509/Verifier/RFC5280/URIConstraints.swift` | 21 `WinSDK` | Windows | System covers every C name it serves there: AF_INET, AF_INET6, IN6_ADDR, IN_ADDR |
 | swift-crypto | `Sources/Crypto/Util/SecureBytes.swift` | 316 marker: string.h memset_s, on Windows: Memory.secureZero(_:). It's Darwin's on… | Darwin?, Linux?, Musl?, Android?, FreeBSD?, OpenBSD?, WASI?, Windows? | System covers every C name it serves there: memset_s |
 | swift-crypto | `Sources/Crypto/Util/Zeroization.swift` | 29 marker: string.h memset_s, on Windows: Memory.secureZero(_:). It's Darwin's on…, 38 marker: string.h memset_s, as above, 47 marker: string.h memset_s, as above, 56 marker: string.h memset_s, as above | Darwin?, Linux?, Musl?, Android?, FreeBSD?, OpenBSD?, WASI?, Windows? | System covers every C name it serves there: memset_s |
 | swift-crypto | `Sources/CryptoBoringWrapper/AEAD/BoringSSLAEAD.swift` | 161 marker: stdlib.h malloc and free, on Windows: Memory.allocate(byteCount:) and …, 276 marker: stdlib.h malloc and free, as above, 370 marker: stdlib.h malloc and free, as above | Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | System covers every C name it serves there: free, malloc |
@@ -1285,7 +1293,43 @@ Sites that no entry and no System gap explains: the ones to look at. Either Syst
 | swift-nio | `Sources/NIOConcurrencyHelpers/atomics.swift` | 23 `ucrt`, 24 `WinSDK` | Windows | System covers every C name it serves there: Sleep |
 | swift-nio | `Sources/NIOConcurrencyHelpers/atomics.swift` | 29 marker: PThread.yield on WASI without threads (coverage-5 N2) | FreeBSD, OpenBSD, WASI | the marker names no C interface (PThread.yield on WASI without threads (coverage-5 N2)) |
 | swift-nio | `Sources/NIOConcurrencyHelpers/atomics.swift` | 31 `Glibc` | FreeBSD, OpenBSD | System covers every C name it serves there: sched_yield |
+| swift-nio | `Sources/NIOCore/BSDSocketAPI.swift` | 18 `WinSDK` (scoped) | Windows | System covers every C name it serves there: IPPROTO_IP |
+| swift-nio | `Sources/NIOCore/BSDSocketAPI.swift` | 19 `WinSDK` (scoped) | Windows | System covers every C name it serves there: IPPROTO_IPV6 |
+| swift-nio | `Sources/NIOCore/BSDSocketAPI.swift` | 20 `WinSDK` (scoped) | Windows | System covers every C name it serves there: IPPROTO_TCP |
+| swift-nio | `Sources/NIOCore/BSDSocketAPI.swift` | 21 `WinSDK` (scoped) | Windows | System covers every C name it serves there: IPPROTO_UDP |
+| swift-nio | `Sources/NIOCore/BSDSocketAPI.swift` | 23 `WinSDK` (scoped) | Windows | System covers every C name it serves there: IP_ADD_MEMBERSHIP |
+| swift-nio | `Sources/NIOCore/BSDSocketAPI.swift` | 24 `WinSDK` (scoped) | Windows | System covers every C name it serves there: IP_DROP_MEMBERSHIP |
+| swift-nio | `Sources/NIOCore/BSDSocketAPI.swift` | 25 `WinSDK` (scoped) | Windows | System covers every C name it serves there: IP_HDRINCL |
+| swift-nio | `Sources/NIOCore/BSDSocketAPI.swift` | 26 `WinSDK` (scoped) | Windows | System covers every C name it serves there: IP_MULTICAST_IF |
+| swift-nio | `Sources/NIOCore/BSDSocketAPI.swift` | 27 `WinSDK` (scoped) | Windows | System covers every C name it serves there: IP_MULTICAST_LOOP |
+| swift-nio | `Sources/NIOCore/BSDSocketAPI.swift` | 28 `WinSDK` (scoped) | Windows | System covers every C name it serves there: IP_MULTICAST_TTL |
+| swift-nio | `Sources/NIOCore/BSDSocketAPI.swift` | 29 `WinSDK` (scoped) | Windows | System covers every C name it serves there: IPV6_JOIN_GROUP |
+| swift-nio | `Sources/NIOCore/BSDSocketAPI.swift` | 30 `WinSDK` (scoped) | Windows | System covers every C name it serves there: IPV6_LEAVE_GROUP |
+| swift-nio | `Sources/NIOCore/BSDSocketAPI.swift` | 31 `WinSDK` (scoped) | Windows | System covers every C name it serves there: IPV6_MULTICAST_HOPS |
+| swift-nio | `Sources/NIOCore/BSDSocketAPI.swift` | 32 `WinSDK` (scoped) | Windows | System covers every C name it serves there: IPV6_MULTICAST_IF |
+| swift-nio | `Sources/NIOCore/BSDSocketAPI.swift` | 33 `WinSDK` (scoped) | Windows | System covers every C name it serves there: IPV6_MULTICAST_LOOP |
+| swift-nio | `Sources/NIOCore/BSDSocketAPI.swift` | 34 `WinSDK` (scoped) | Windows | System covers every C name it serves there: IPV6_V6ONLY |
+| swift-nio | `Sources/NIOCore/BSDSocketAPI.swift` | 36 `WinSDK` (scoped) | Windows | System covers every C name it serves there: AF_INET |
+| swift-nio | `Sources/NIOCore/BSDSocketAPI.swift` | 37 `WinSDK` (scoped) | Windows | System covers every C name it serves there: AF_INET6 |
+| swift-nio | `Sources/NIOCore/BSDSocketAPI.swift` | 38 `WinSDK` (scoped) | Windows | System covers every C name it serves there: AF_UNIX |
+| swift-nio | `Sources/NIOCore/BSDSocketAPI.swift` | 40 `WinSDK` (scoped) | Windows | System covers every C name it serves there: PF_INET |
+| swift-nio | `Sources/NIOCore/BSDSocketAPI.swift` | 41 `WinSDK` (scoped) | Windows | System covers every C name it serves there: PF_INET6 |
+| swift-nio | `Sources/NIOCore/BSDSocketAPI.swift` | 42 `WinSDK` (scoped) | Windows | System covers every C name it serves there: PF_UNIX |
+| swift-nio | `Sources/NIOCore/BSDSocketAPI.swift` | 44 `WinSDK` (scoped) | Windows | System covers every C name it serves there: SO_BROADCAST |
+| swift-nio | `Sources/NIOCore/BSDSocketAPI.swift` | 45 `WinSDK` (scoped) | Windows | System covers every C name it serves there: SO_ERROR |
+| swift-nio | `Sources/NIOCore/BSDSocketAPI.swift` | 46 `WinSDK` (scoped) | Windows | System covers every C name it serves there: SO_KEEPALIVE |
+| swift-nio | `Sources/NIOCore/BSDSocketAPI.swift` | 47 `WinSDK` (scoped) | Windows | System covers every C name it serves there: SO_LINGER |
+| swift-nio | `Sources/NIOCore/BSDSocketAPI.swift` | 48 `WinSDK` (scoped) | Windows | System covers every C name it serves there: SO_RCVBUF |
+| swift-nio | `Sources/NIOCore/BSDSocketAPI.swift` | 49 `WinSDK` (scoped) | Windows | System covers every C name it serves there: SO_RCVTIMEO |
+| swift-nio | `Sources/NIOCore/BSDSocketAPI.swift` | 50 `WinSDK` (scoped) | Windows | System covers every C name it serves there: SO_REUSEADDR |
+| swift-nio | `Sources/NIOCore/BSDSocketAPI.swift` | 51 `WinSDK` (scoped) | Windows | System covers every C name it serves there: SO_SNDBUF |
+| swift-nio | `Sources/NIOCore/BSDSocketAPI.swift` | 53 `WinSDK` (scoped) | Windows | System covers every C name it serves there: SOL_SOCKET |
+| swift-nio | `Sources/NIOCore/BSDSocketAPI.swift` | 55 `WinSDK` (scoped) | Windows | System covers every C name it serves there: TCP_NODELAY |
+| swift-nio | `Sources/NIOCore/BSDSocketAPI.swift` | 57 `WinSDK` (scoped) | Windows | System covers every C name it serves there: SOCKET |
+| swift-nio | `Sources/NIOCore/BSDSocketAPI.swift` | 59 `WinSDK` (scoped) | Windows | System covers every C name it serves there: inet_ntop |
+| swift-nio | `Sources/NIOCore/BSDSocketAPI.swift` | 60 `WinSDK` (scoped) | Windows | System covers every C name it serves there: inet_pton |
 | swift-nio | `Sources/NIOCore/BSDSocketAPI.swift` | 62 `WinSDK` (scoped) | Windows | System covers every C name it serves there: GetLastError |
+| swift-nio | `Sources/NIOCore/BSDSocketAPI.swift` | 63 `WinSDK` (scoped) | Windows | System covers every C name it serves there: WSAGetLastError |
 | swift-nio | `Sources/NIOCore/BSDSocketAPI.swift` | 71 `Musl` | Musl | no C name it serves was found on its platforms |
 | swift-nio | `Sources/NIOCore/BSDSocketAPI.swift` | 79 `Glibc`, 1 marker | FreeBSD | System covers every C name it serves there: IPPROTO_IP, IPPROTO_IPV6, IPPROTO_TCP, IPPROTO_UDP, IPV6_JOIN_GROUP, IPV6_LEAVE_GROUP, IPV6_MULTICAST_HOPS, IPV6_MULTICAST_IF… |
 | swift-nio | `Sources/NIOCore/BSDSocketAPI.swift` | 226 marker: SystemSockets on FreeBSD and Windows, 256 marker: SystemSockets on FreeBSD and Windows, 267 marker: SystemSockets on FreeBSD and Windows, 279 marker: SystemSockets on FreeBSD and Windows, 315 marker: SystemSockets on FreeBSD and Windows, 381 marker: SystemSockets on FreeBSD and Windows, 418 marker: SystemSockets on FreeBSD and Windows, 429 marker: SystemSockets on FreeBSD and Windows, 440 marker: SystemSockets on FreeBSD and Windows, 451 marker: SystemSockets on FreeBSD and Windows, 462 marker: SystemSockets on FreeBSD and Windows, 476 marker: SystemSockets on FreeBSD and Windows, 490 marker: SystemSockets on FreeBSD and Windows, 501 marker: SystemSockets on FreeBSD and Windows, 512 marker: SystemSockets on FreeBSD and Windows, 523 marker: SystemSockets on FreeBSD and Windows, 534 marker: SystemSockets on FreeBSD and Windows, 546 marker: SystemSockets on FreeBSD and Windows, 560 marker: SystemSockets on FreeBSD and Windows, 630 marker: SystemSockets on FreeBSD and Windows, 641 marker: SystemSockets on FreeBSD and Windows, 652 marker: SystemSockets on FreeBSD and Windows, 663 marker: SystemSockets on FreeBSD and Windows, 674 marker: SystemSockets on FreeBSD and Windows, 685 marker: SystemSockets on FreeBSD and Windows, 696 marker: SystemSockets on FreeBSD and Windows, 707 marker: SystemSockets on FreeBSD and Windows | FreeBSD, OpenBSD, WASI, Windows | the marker names no C interface (SystemSockets on FreeBSD and Windows) |
@@ -1308,19 +1352,44 @@ Sites that no entry and no System gap explains: the ones to look at. Either Syst
 | swift-nio | `Sources/NIOCore/IO.swift` | 35 `Glibc`, 1 marker, 39 `WASILibc`, 1 marker | FreeBSD, OpenBSD, WASI | no C name it serves was found on its platforms |
 | swift-nio | `Sources/NIOCore/Interfaces.swift` | 23 `Glibc`, 1 marker, 32 `WASILibc`, 1 marker | FreeBSD, WASI | System covers every C name it serves there: sa_family |
 | swift-nio | `Sources/NIOCore/Interfaces.swift` | 28 marker: the C library, for this file's C arms | OpenBSD | the marker names no C interface (C library) |
+| swift-nio | `Sources/NIOCore/Interfaces.swift` | 34 `WinSDK` (scoped) | Windows | System covers every C name it serves there: AF_INET |
+| swift-nio | `Sources/NIOCore/Interfaces.swift` | 35 `WinSDK` (scoped) | Windows | System covers every C name it serves there: AF_INET6 |
+| swift-nio | `Sources/NIOCore/Interfaces.swift` | 37 `WinSDK` (scoped) | Windows | System covers every C name it serves there: INET_ADDRSTRLEN |
+| swift-nio | `Sources/NIOCore/Interfaces.swift` | 38 `WinSDK` (scoped) | Windows | System covers every C name it serves there: INET6_ADDRSTRLEN |
+| swift-nio | `Sources/NIOCore/Interfaces.swift` | 40 `WinSDK` (scoped) | Windows | System covers every C name it serves there: ADDRESS_FAMILY |
 | swift-nio | `Sources/NIOCore/Interfaces.swift` | 41 `WinSDK` (scoped) | Windows | System covers every C name it serves there: IP_ADAPTER_ADDRESSES |
 | swift-nio | `Sources/NIOCore/Interfaces.swift` | 42 `WinSDK` (scoped) | Windows | System covers every C name it serves there: IP_ADAPTER_UNICAST_ADDRESS |
+| swift-nio | `Sources/NIOCore/Interfaces.swift` | 44 `WinSDK` (scoped) | Windows | System covers every C name it serves there: sockaddr |
+| swift-nio | `Sources/NIOCore/Interfaces.swift` | 45 `WinSDK` (scoped) | Windows | System covers every C name it serves there: sockaddr_in |
+| swift-nio | `Sources/NIOCore/Interfaces.swift` | 46 `WinSDK` (scoped) | Windows | System covers every C name it serves there: sockaddr_in6 |
+| swift-nio | `Sources/NIOCore/Interfaces.swift` | 48 `WinSDK` (scoped) | Windows | System covers every C name it serves there: sockaddr_un |
 | swift-nio | `Sources/NIOCore/Interfaces.swift` | 211 marker: SystemSockets on FreeBSD, OpenBSD and Windows | FreeBSD, OpenBSD, WASI, Windows | the marker names no C interface (SystemSockets on FreeBSD) |
+| swift-nio | `Sources/NIOCore/SocketAddresses.swift` | 18 `WinSDK` (scoped) | Windows | System covers every C name it serves there: AF_INET |
+| swift-nio | `Sources/NIOCore/SocketAddresses.swift` | 19 `WinSDK` (scoped) | Windows | System covers every C name it serves there: AF_INET6 |
+| swift-nio | `Sources/NIOCore/SocketAddresses.swift` | 21 `WinSDK` (scoped) | Windows | System covers every C name it serves there: INET_ADDRSTRLEN |
+| swift-nio | `Sources/NIOCore/SocketAddresses.swift` | 22 `WinSDK` (scoped) | Windows | System covers every C name it serves there: INET6_ADDRSTRLEN |
+| swift-nio | `Sources/NIOCore/SocketAddresses.swift` | 24 `WinSDK` (scoped) | Windows | System covers every C name it serves there: FreeAddrInfoW |
+| swift-nio | `Sources/NIOCore/SocketAddresses.swift` | 25 `WinSDK` (scoped) | Windows | System covers every C name it serves there: GetAddrInfoW |
+| swift-nio | `Sources/NIOCore/SocketAddresses.swift` | 26 `WinSDK` (scoped) | Windows | System covers every C name it serves there: gai_strerrorA |
+| swift-nio | `Sources/NIOCore/SocketAddresses.swift` | 28 `WinSDK` (scoped) | Windows | System covers every C name it serves there: ADDRESS_FAMILY |
+| swift-nio | `Sources/NIOCore/SocketAddresses.swift` | 29 `WinSDK` (scoped) | Windows | System covers every C name it serves there: ADDRINFOW |
+| swift-nio | `Sources/NIOCore/SocketAddresses.swift` | 30 `WinSDK` (scoped) | Windows | System covers every C name it serves there: IN_ADDR |
+| swift-nio | `Sources/NIOCore/SocketAddresses.swift` | 31 `WinSDK` (scoped) | Windows | System covers every C name it serves there: IN6_ADDR |
+| swift-nio | `Sources/NIOCore/SocketAddresses.swift` | 33 `WinSDK` (scoped) | Windows | System covers every C name it serves there: sockaddr |
+| swift-nio | `Sources/NIOCore/SocketAddresses.swift` | 34 `WinSDK` (scoped) | Windows | System covers every C name it serves there: sockaddr_in |
+| swift-nio | `Sources/NIOCore/SocketAddresses.swift` | 35 `WinSDK` (scoped) | Windows | System covers every C name it serves there: sockaddr_in6 |
+| swift-nio | `Sources/NIOCore/SocketAddresses.swift` | 37 `WinSDK` (scoped) | Windows | System covers every C name it serves there: sockaddr_un |
 | swift-nio | `Sources/NIOCore/SocketAddresses.swift` | 78 `WASILibc`, 1 marker | WASI | System covers every C name it serves there: s_addr, sin6_addr, sin6_family, sin6_flowinfo, sin6_port, sin6_scope_id, sin_addr, sin_family… |
 | swift-nio | `Sources/NIOCore/SocketAddresses.swift` | 139 marker: SystemSockets on FreeBSD and Windows, 160 marker: SystemSockets on FreeBSD and Windows, 181 marker: SystemSockets on FreeBSD and Windows, 213 marker: SystemSockets on FreeBSD and Windows, 226 marker: SystemSockets on FreeBSD and Windows, 270 marker: SystemSockets on FreeBSD and Windows, 279 marker: SystemSockets on FreeBSD and Windows, 302 marker: SystemSockets on FreeBSD and Windows, 321 marker: SystemSockets on FreeBSD and Windows, 330 marker: SystemSockets on FreeBSD and Windows, 356 marker: SystemSockets on FreeBSD and Windows, 377 marker: SystemSockets on FreeBSD and Windows, 404 marker: SystemSockets on FreeBSD and Windows, 420 marker: SystemSockets on FreeBSD and Windows, 435 marker: SystemSockets on FreeBSD and Windows, 450 marker: SystemSockets on FreeBSD and Windows, 465 marker: SystemSockets on FreeBSD and Windows, 491 marker: SystemSockets on FreeBSD and Windows, 530 marker: SystemSockets on FreeBSD and Windows, 567 marker: SystemSockets on FreeBSD and Windows, 665 marker: SystemSockets on FreeBSD and Windows, 701 marker: SystemSockets on FreeBSD and Windows, 734 marker: SystemSockets on FreeBSD and Windows, 894 marker: SystemSockets on FreeBSD and Windows, 1012 marker: SystemSockets on FreeBSD and Windows, 1059 marker: SystemSockets on FreeBSD and Windows, 1104 marker: SystemSockets on FreeBSD and Windows, 1126 marker: SystemSockets on FreeBSD and Windows | FreeBSD, OpenBSD, WASI, Windows | the marker names no C interface (SystemSockets on FreeBSD and Windows) |
 | swift-nio | `Sources/NIOCore/SocketAddresses.swift` | 611 marker: SystemSockets on FreeBSD, 632 marker: SystemSockets on FreeBSD, 819 marker: SystemSockets on FreeBSD, 872 marker: SystemSockets on FreeBSD, 996 marker: SystemSockets on FreeBSD, 1046 marker: SystemSockets on FreeBSD | FreeBSD, OpenBSD, WASI | the marker names no C interface (SystemSockets on FreeBSD) |
 | swift-nio | `Sources/NIOCore/SocketAddresses.swift` | 923 marker: address, family on Windows (Windows later), 969 marker: address, bytes, family on Windows (Windows later) | FreeBSD, OpenBSD, WASI, Windows | the marker names no C interface |
 | swift-nio | `Sources/NIOCore/SocketOptionProvider.swift` | 19 `Musl`, 21 `Bionic` | Musl, Android | no C name it serves was found on its platforms |
-| swift-nio | `Sources/NIOCore/SocketOptionProvider.swift` | 30 `Glibc`, 1 marker, 34 `Glibc`, 1 marker, 40 `WASILibc`, 1 marker | FreeBSD, OpenBSD, WASI | System covers every C name it serves there: linger |
+| swift-nio | `Sources/NIOCore/SocketOptionProvider.swift` | 30 `Glibc`, 1 marker, 34 `Glibc`, 1 marker, 37 `WinSDK`, 40 `WASILibc`, 1 marker | FreeBSD, OpenBSD, WASI, Windows | System covers every C name it serves there: linger |
 | swift-nio | `Sources/NIOCore/SocketOptionProvider.swift` | 192 marker: SystemSockets on FreeBSD and Windows, 221 marker: SystemSockets on FreeBSD and Windows, 246 marker: SystemSockets on FreeBSD and Windows, 261 marker: SystemSockets on FreeBSD and Windows, 412 marker: SystemSockets on FreeBSD and Windows | FreeBSD, OpenBSD, WASI, Windows | the marker names no C interface (SystemSockets on FreeBSD and Windows) |
 | swift-nio | `Sources/NIOCore/SystemCallHelpers.swift` | 31 marker: NetworkInterface on Windows, 238 marker: NetworkInterface on Windows | Windows | the marker names no C interface |
 | swift-nio | `Sources/NIOCore/Utilities.swift` | 21 `Glibc`, 27 `Glibc`, 51 `WASILibc` | FreeBSD, OpenBSD, WASI | no C name it serves was found on its platforms |
 | swift-nio | `Sources/NIOCore/Utilities.swift` | 32 `WinSDK` (scoped) | Windows | System covers every C name it serves there: RelationProcessorCore |
+| swift-nio | `Sources/NIOCore/Utilities.swift` | 34 `WinSDK` (scoped) | Windows | System covers every C name it serves there: AF_UNSPEC |
 | swift-nio | `Sources/NIOCore/Utilities.swift` | 35 `WinSDK` (scoped) | Windows | System covers every C name it serves there: ERROR_BUFFER_OVERFLOW |
 | swift-nio | `Sources/NIOCore/Utilities.swift` | 36 `WinSDK` (scoped) | Windows | System covers every C name it serves there: ERROR_SUCCESS |
 | swift-nio | `Sources/NIOCore/Utilities.swift` | 38 `WinSDK` (scoped) | Windows | System covers every C name it serves there: GetAdaptersAddresses |
@@ -1337,17 +1406,86 @@ Sites that no entry and no System gap explains: the ones to look at. Either Syst
 | swift-nio | `Sources/NIOFS/Internal/System Calls/Syscall.swift` | 22 `Glibc` | FreeBSD, OpenBSD | no C name it serves was found on its platforms |
 | swift-nio | `Sources/NIOFS/Internal/SystemFileHandle.swift` | 26 `Glibc`, 1 marker | FreeBSD, OpenBSD | no C name it serves was found on its platforms |
 | swift-nio | `Sources/NIOHTTP1Server/main.swift` | 21 `WinSDK` | Windows | System covers every C name it serves there: STD_INPUT_HANDLE, STD_OUTPUT_HANDLE |
+| swift-nio | `Sources/NIOMulticastChat/main.swift` | 26 `WinSDK` | Windows | System covers every C name it serves there: sin_addr |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPICommon.swift` | 29 `WinSDK` (scoped) | Windows | System covers every C name it serves there: IP_RECVTOS |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPICommon.swift` | 30 `WinSDK` (scoped) | Windows | System covers every C name it serves there: IPV6_RECVTCLASS |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPICommon.swift` | 32 `WinSDK` (scoped) | Windows | System covers every C name it serves there: SOCK_DGRAM |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPICommon.swift` | 33 `WinSDK` (scoped) | Windows | System covers every C name it serves there: SOCK_STREAM |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPICommon.swift` | 34 `WinSDK` (scoped) | Windows | System covers every C name it serves there: SOCK_RAW |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPICommon.swift` | 36 `WinSDK` (scoped) | Windows | System covers every C name it serves there: socklen_t |
 | swift-nio | `Sources/NIOPosix/BSDSocketAPICommon.swift` | 84 marker: SystemSockets on FreeBSD and Windows, 95 marker: SystemSockets on FreeBSD and Windows, 104 marker: SystemSockets on FreeBSD and Windows, 123 marker: SystemSockets on FreeBSD and Windows, 151 marker: SystemSockets on FreeBSD and Windows, 263 marker: SystemSockets on FreeBSD and Windows, 315 marker: SystemSockets on FreeBSD and Windows | FreeBSD, OpenBSD, Windows | the marker names no C interface (SystemSockets on FreeBSD and Windows) |
 | swift-nio | `Sources/NIOPosix/BSDSocketAPIPosix.swift` | 96 marker: SystemSockets on FreeBSD, 171 marker: SystemSockets on FreeBSD, 360 marker: SystemSockets on FreeBSD, 376 marker: SystemSockets on FreeBSD, 441 marker: SystemSockets on FreeBSD | FreeBSD, OpenBSD | the marker names no C interface (SystemSockets on FreeBSD) |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 22 `WinSDK` (scoped) | Windows | System covers every C name it serves there: AF_INET |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 23 `WinSDK` (scoped) | Windows | System covers every C name it serves there: AF_INET6 |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 24 `WinSDK` (scoped) | Windows | System covers every C name it serves there: AF_UNIX |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 26 `WinSDK` (scoped) | Windows | System covers every C name it serves there: FIONBIO |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 28 `WinSDK` (scoped) | Windows | System covers every C name it serves there: INET_ADDRSTRLEN |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 29 `WinSDK` (scoped) | Windows | System covers every C name it serves there: INET6_ADDRSTRLEN |
 | swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 31 `WinSDK` (scoped) | Windows | System covers every C name it serves there: INVALID_HANDLE_VALUE |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 34 `WinSDK` (scoped) | Windows | System covers every C name it serves there: IPPROTO_IP |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 35 `WinSDK` (scoped) | Windows | System covers every C name it serves there: IPPROTO_IPV6 |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 36 `WinSDK` (scoped) | Windows | System covers every C name it serves there: IPPROTO_TCP |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 38 `WinSDK` (scoped) | Windows | System covers every C name it serves there: IP_ADD_MEMBERSHIP |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 39 `WinSDK` (scoped) | Windows | System covers every C name it serves there: IP_DROP_MEMBERSHIP |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 40 `WinSDK` (scoped) | Windows | System covers every C name it serves there: IP_MULTICAST_IF |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 41 `WinSDK` (scoped) | Windows | System covers every C name it serves there: IP_MULTICAST_LOOP |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 42 `WinSDK` (scoped) | Windows | System covers every C name it serves there: IP_MULTICAST_TTL |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 44 `WinSDK` (scoped) | Windows | System covers every C name it serves there: IPV6_JOIN_GROUP |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 45 `WinSDK` (scoped) | Windows | System covers every C name it serves there: IPV6_LEAVE_GROUP |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 46 `WinSDK` (scoped) | Windows | System covers every C name it serves there: IPV6_MULTICAST_HOPS |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 47 `WinSDK` (scoped) | Windows | System covers every C name it serves there: IPV6_MULTICAST_IF |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 48 `WinSDK` (scoped) | Windows | System covers every C name it serves there: IPV6_MULTICAST_LOOP |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 49 `WinSDK` (scoped) | Windows | System covers every C name it serves there: IPV6_V6ONLY |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 51 `WinSDK` (scoped) | Windows | System covers every C name it serves there: PF_INET |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 52 `WinSDK` (scoped) | Windows | System covers every C name it serves there: PF_INET6 |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 53 `WinSDK` (scoped) | Windows | System covers every C name it serves there: PF_UNIX |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 55 `WinSDK` (scoped) | Windows | System covers every C name it serves there: TCP_NODELAY |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 57 `WinSDK` (scoped) | Windows | System covers every C name it serves there: SD_BOTH |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 58 `WinSDK` (scoped) | Windows | System covers every C name it serves there: SD_RECEIVE |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 59 `WinSDK` (scoped) | Windows | System covers every C name it serves there: SD_SEND |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 61 `WinSDK` (scoped) | Windows | System covers every C name it serves there: SO_ERROR |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 62 `WinSDK` (scoped) | Windows | System covers every C name it serves there: SO_KEEPALIVE |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 63 `WinSDK` (scoped) | Windows | System covers every C name it serves there: SO_LINGER |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 64 `WinSDK` (scoped) | Windows | System covers every C name it serves there: SO_RCVBUF |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 65 `WinSDK` (scoped) | Windows | System covers every C name it serves there: SO_RCVTIMEO |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 66 `WinSDK` (scoped) | Windows | System covers every C name it serves there: SO_REUSEADDR |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 67 `WinSDK` (scoped) | Windows | System covers every C name it serves there: SO_REUSE_UNICASTPORT |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 69 `WinSDK` (scoped) | Windows | System covers every C name it serves there: SOL_SOCKET |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 71 `WinSDK` (scoped) | Windows | System covers every C name it serves there: SOCK_DGRAM |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 72 `WinSDK` (scoped) | Windows | System covers every C name it serves there: SOCK_STREAM |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 76 `WinSDK` (scoped) | Windows | System covers every C name it serves there: TF_USE_KERNEL_APC |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 78 `WinSDK` (scoped) | Windows | System covers every C name it serves there: accept |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 79 `WinSDK` (scoped) | Windows | System covers every C name it serves there: bind |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 80 `WinSDK` (scoped) | Windows | System covers every C name it serves there: closesocket |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 81 `WinSDK` (scoped) | Windows | System covers every C name it serves there: connect |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 82 `WinSDK` (scoped) | Windows | System covers every C name it serves there: getpeername |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 83 `WinSDK` (scoped) | Windows | System covers every C name it serves there: getsockname |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 84 `WinSDK` (scoped) | Windows | System covers every C name it serves there: ioctlsocket |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 85 `WinSDK` (scoped) | Windows | System covers every C name it serves there: listen |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 86 `WinSDK` (scoped) | Windows | System covers every C name it serves there: shutdown |
 | swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 88 `WinSDK` (scoped) | Windows | System covers every C name it serves there: GetLastError |
 | swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 89 `WinSDK` (scoped) | Windows | System covers every C name it serves there: ReadFile |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 90 `WinSDK` (scoped) | Windows | System covers every C name it serves there: TransmitFile |
 | swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 91 `WinSDK` (scoped) | Windows | System covers every C name it serves there: WriteFile |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 92 `WinSDK` (scoped) | Windows | System covers every C name it serves there: WSAGetLastError |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 94 `WinSDK` (scoped) | Windows | System covers every C name it serves there: WSASend |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 96 `WinSDK` (scoped) | Windows | System covers every C name it serves there: socklen_t |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 99 `WinSDK` (scoped) | Windows | System covers every C name it serves there: ADDRESS_FAMILY |
 | swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 100 `WinSDK` (scoped) | Windows | System covers every C name it serves there: DWORD |
 | swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 101 `WinSDK` (scoped) | Windows | System covers every C name it serves there: HANDLE |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 102 `WinSDK` (scoped) | Windows | System covers every C name it serves there: IN_ADDR |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 103 `WinSDK` (scoped) | Windows | System covers every C name it serves there: LINGER |
 | swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 104 `WinSDK` (scoped) | Windows | System covers every C name it serves there: OVERLAPPED |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 105 `WinSDK` (scoped) | Windows | System covers every C name it serves there: SOCKADDR |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 106 `WinSDK` (scoped) | Windows | System covers every C name it serves there: SOCKADDR_IN |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 107 `WinSDK` (scoped) | Windows | System covers every C name it serves there: SOCKADDR_IN6 |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 108 `WinSDK` (scoped) | Windows | System covers every C name it serves there: SOCKADDR_UN |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 109 `WinSDK` (scoped) | Windows | System covers every C name it serves there: SOCKADDR_STORAGE |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 110 `WinSDK` (scoped) | Windows | System covers every C name it serves there: WSACMSGHDR |
+| swift-nio | `Sources/NIOPosix/BSDSocketAPIWindows.swift` | 111 `WinSDK` (scoped) | Windows | System covers every C name it serves there: WSAMSG |
 | swift-nio | `Sources/NIOPosix/BaseSocket.swift` | 34 `WinSDK` (scoped) | Windows | System covers every C name it serves there: EAFNOSUPPORT |
 | swift-nio | `Sources/NIOPosix/BaseSocket.swift` | 35 `WinSDK` (scoped) | Windows | System covers every C name it serves there: EBADF |
+| swift-nio | `Sources/NIOPosix/BaseSocket.swift` | 37 `WinSDK` (scoped) | Windows | System covers every C name it serves there: socklen_t |
 | swift-nio | `Sources/NIOPosix/BaseSocket.swift` | 69 marker: family on Windows (Windows later), 84 marker: family on Windows (Windows later), 112 marker: family on Windows (Windows later), 138 marker: family on Windows (Windows later) | FreeBSD, OpenBSD, Windows | the marker names no C interface (family on Windows (Windows later)) |
 | swift-nio | `Sources/NIOPosix/BaseSocket.swift` | 99 marker: SystemSockets on FreeBSD and Windows, 247 marker: SystemSockets on FreeBSD and Windows, 349 marker: SystemSockets on FreeBSD and Windows, 379 marker: SystemSockets on FreeBSD and Windows | FreeBSD, OpenBSD, Windows | the marker names no C interface (SystemSockets on FreeBSD and Windows) |
 | swift-nio | `Sources/NIOPosix/Bootstrap.swift` | 26 `ucrt` | Windows | System covers every C name it serves there: FILE_TYPE_PIPE, GetFileType, HANDLE, INVALID_HANDLE_VALUE, _get_osfhandle |
@@ -1361,9 +1499,22 @@ Sites that no entry and no System gap explains: the ones to look at. Either Syst
 | swift-nio | `Sources/NIOPosix/ControlMessage.swift` | 203 marker: SystemSockets on FreeBSD and Windows, 242 marker: SystemSockets on FreeBSD and Windows, 290 marker: SystemSockets on FreeBSD and Windows, 310 marker: SystemSockets on FreeBSD and Windows, 335 marker: SystemSockets on FreeBSD and Windows, 437 marker: SystemSockets on FreeBSD and Windows, 478 marker: SystemSockets on FreeBSD and Windows, 490 marker: SystemSockets on FreeBSD and Windows | FreeBSD, OpenBSD, Windows | the marker names no C interface (SystemSockets on FreeBSD and Windows) |
 | swift-nio | `Sources/NIOPosix/DatagramVectorReadManager.swift` | 159 marker: SystemSockets on FreeBSD and Windows | FreeBSD, OpenBSD, Windows | the marker names no C interface (SystemSockets on FreeBSD and Windows) |
 | swift-nio | `Sources/NIOPosix/DatagramVectorReadManager.swift` | 230 marker: SystemSockets on FreeBSD | FreeBSD, OpenBSD | the marker names no C interface (SystemSockets on FreeBSD) |
+| swift-nio | `Sources/NIOPosix/GetaddrinfoResolver.swift` | 45 `WinSDK` (scoped) | Windows | System covers every C name it serves there: AF_INET |
+| swift-nio | `Sources/NIOPosix/GetaddrinfoResolver.swift` | 46 `WinSDK` (scoped) | Windows | System covers every C name it serves there: AF_INET6 |
+| swift-nio | `Sources/NIOPosix/GetaddrinfoResolver.swift` | 48 `WinSDK` (scoped) | Windows | System covers every C name it serves there: FreeAddrInfoW |
+| swift-nio | `Sources/NIOPosix/GetaddrinfoResolver.swift` | 49 `WinSDK` (scoped) | Windows | System covers every C name it serves there: GetAddrInfoW |
+| swift-nio | `Sources/NIOPosix/GetaddrinfoResolver.swift` | 50 `WinSDK` (scoped) | Windows | System covers every C name it serves there: gai_strerrorA |
+| swift-nio | `Sources/NIOPosix/GetaddrinfoResolver.swift` | 52 `WinSDK` (scoped) | Windows | System covers every C name it serves there: ADDRESS_FAMILY |
+| swift-nio | `Sources/NIOPosix/GetaddrinfoResolver.swift` | 53 `WinSDK` (scoped) | Windows | System covers every C name it serves there: ADDRINFOW |
+| swift-nio | `Sources/NIOPosix/GetaddrinfoResolver.swift` | 54 `WinSDK` (scoped) | Windows | System covers every C name it serves there: SOCKADDR_IN |
+| swift-nio | `Sources/NIOPosix/GetaddrinfoResolver.swift` | 55 `WinSDK` (scoped) | Windows | System covers every C name it serves there: SOCKADDR_IN6 |
 | swift-nio | `Sources/NIOPosix/GetaddrinfoResolver.swift` | 202 marker: SystemSockets on FreeBSD | FreeBSD, OpenBSD | the marker names no C interface (SystemSockets on FreeBSD) |
 | swift-nio | `Sources/NIOPosix/NonBlockingFileIO.swift` | 1358 marker: Stat on Windows (Windows later) | WASI, Windows | the marker names no C interface (Stat on Windows (Windows later)) |
+| swift-nio | `Sources/NIOPosix/PendingDatagramWritesManager.swift` | 40 `WinSDK` (scoped) | Windows | System covers every C name it serves there: socklen_t |
 | swift-nio | `Sources/NIOPosix/PendingDatagramWritesManager.swift` | 188 marker: SystemSockets on FreeBSD and Windows | FreeBSD, OpenBSD, Windows | the marker names no C interface (SystemSockets on FreeBSD and Windows) |
+| swift-nio | `Sources/NIOPosix/PipePair.swift` | 26 `WinSDK` (scoped) | Windows | System covers every C name it serves there: socklen_t |
+| swift-nio | `Sources/NIOPosix/SelectorGeneric.swift` | 24 `WinSDK` | Windows | System covers every C name it serves there: pollfd |
+| swift-nio | `Sources/NIOPosix/Socket.swift` | 29 `WinSDK` | Windows | System covers every C name it serves there: WSABUF |
 | swift-nio | `Sources/NIOPosix/Socket.swift` | 213 marker: SystemSockets on FreeBSD and Windows, 232 marker: SystemSockets on FreeBSD and Windows, 281 marker: SystemSockets on FreeBSD and Windows, 300 marker: SystemSockets on FreeBSD and Windows | FreeBSD, OpenBSD, Windows | the marker names no C interface (SystemSockets on FreeBSD and Windows) |
 | swift-nio | `Sources/NIOPosix/SocketChannel.swift` | 40 `WinSDK` (scoped) | Windows | System covers every C name it serves there: ECONNABORTED |
 | swift-nio | `Sources/NIOPosix/SocketChannel.swift` | 41 `WinSDK` (scoped) | Windows | System covers every C name it serves there: ECONNREFUSED |
@@ -1371,10 +1522,16 @@ Sites that no entry and no System gap explains: the ones to look at. Either Syst
 | swift-nio | `Sources/NIOPosix/SocketChannel.swift` | 43 `WinSDK` (scoped) | Windows | System covers every C name it serves there: ENFILE |
 | swift-nio | `Sources/NIOPosix/SocketChannel.swift` | 44 `WinSDK` (scoped) | Windows | System covers every C name it serves there: ENOBUFS |
 | swift-nio | `Sources/NIOPosix/SocketChannel.swift` | 45 `WinSDK` (scoped) | Windows | System covers every C name it serves there: ENOMEM |
+| swift-nio | `Sources/NIOPosix/SocketChannel.swift` | 46 `WinSDK` (scoped) | Windows | System covers every C name it serves there: INADDR_ANY |
+| swift-nio | `Sources/NIOPosix/SocketChannel.swift` | 48 `WinSDK` (scoped) | Windows | System covers every C name it serves there: ip_mreq |
+| swift-nio | `Sources/NIOPosix/SocketChannel.swift` | 49 `WinSDK` (scoped) | Windows | System covers every C name it serves there: ipv6_mreq |
+| swift-nio | `Sources/NIOPosix/SocketChannel.swift` | 50 `WinSDK` (scoped) | Windows | System covers every C name it serves there: socklen_t |
 | swift-nio | `Sources/NIOPosix/SocketChannel.swift` | 1294 marker: SystemSockets on FreeBSD and Windows, 1310 marker: SystemSockets on FreeBSD and Windows, 1333 marker: SystemSockets on FreeBSD and Windows, 1353 marker: SystemSockets on FreeBSD and Windows | FreeBSD, OpenBSD, Windows | the marker names no C interface (SystemSockets on FreeBSD and Windows) |
+| swift-nio | `Sources/NIOPosix/SocketProtocols.swift` | 22 `WinSDK` (scoped) | Windows | System covers every C name it serves there: socklen_t |
 | swift-nio | `Sources/NIOPosix/System.swift` | 70 marker: the C library's type and errno names that NIOPosix's clients reach thr… | Linux, Musl, Android, FreeBSD | the marker names no C interface (C library's type and errno names that NIOPosix's clients reach through this public) |
 | swift-nio | `Sources/NIOPosix/System.swift` | 77 `Musl`, re-exported, 79 `Android`, re-exported | Musl, Android | no C name it serves was found on its platforms |
 | swift-nio | `Sources/NIOPosix/System.swift` | 110 `Glibc`, re-exported | OpenBSD | System covers every C name it serves there: EAGAIN, EINPROGRESS, IPPROTO_UDP, SHUT_RD, SHUT_RDWR, SHUT_WR, UIO_MAXIOV, kevent |
+| swift-nio | `Sources/NIOPosix/System.swift` | 116 `ucrt`, re-exported | Windows | System covers every C name it serves there: IPPROTO_UDP, IPV6_PKTINFO, IP_PKTINFO, _get_errno, strerror_s |
 | swift-nio | `Sources/NIOPosix/System.swift` | 133 marker: SystemSockets on FreeBSD, 151 marker: SystemSockets on FreeBSD, 528 marker: SystemSockets on FreeBSD, 552 marker: SystemSockets on FreeBSD, 567 marker: SystemSockets on FreeBSD, 604 marker: SystemSockets on FreeBSD, 636 marker: SystemSockets on FreeBSD, 681 marker: SystemSockets on FreeBSD, 717 marker: SystemSockets on FreeBSD, 753 marker: SystemSockets on FreeBSD, 781 marker: SystemSockets on FreeBSD, 868 marker: SystemSockets on FreeBSD, 889 marker: SystemSockets on FreeBSD, 960 marker: SystemSockets on FreeBSD, 1037 marker: SystemSockets on FreeBSD, 1063 marker: SystemSockets on FreeBSD, 1218 marker: SystemSockets on FreeBSD | FreeBSD, OpenBSD | the marker names no C interface (SystemSockets on FreeBSD) |
 | swift-nio | `Sources/NIOPosix/System.swift` | 164 marker: NetworkInterface on Windows, 1080 marker: NetworkInterface on Windows | Windows | the marker names no C interface |
 | swift-nio | `Sources/NIOPosix/System.swift` | 459 marker: SystemConfig.maxIOVectors on FreeBSD and OpenBSD; SocketDescriptor.Shu… | FreeBSD, OpenBSD | the marker names no C interface (SystemConfig.maxIOVectors on FreeBSD and OpenBSD) |
@@ -1395,15 +1552,17 @@ Sites that no entry and no System gap explains: the ones to look at. Either Syst
 | swift-nio | `Tests/NIOFSTests/FileInfoTests.swift` | 30 `Android` | Android | System covers every C name it serves there: st_atim, st_blksize, st_blocks, st_ctim, st_dev, st_gid, st_ino, st_mode… |
 | swift-nio | `Tests/NIOHTTP1Tests/TestUtils.swift` | 59 `WinSDK`, 60 `ucrt` | Windows | System covers every C name it serves there: CreateDirectoryW, Sleep, _O_BINARY, _O_RDWR, _SH_DENYNO, _S_IREAD, _S_IWRITE, _sopen_s |
 | swift-nio | `Tests/NIOPosixTests/AsyncChannelBootstrapTests.swift` | 23 `ucrt` | Windows | System covers every C name it serves there: _O_BINARY |
+| swift-nio | `Tests/NIOPosixTests/ChannelPipelineTest.swift` | 31 `WinSDK` | Windows | System covers every C name it serves there: sin_port |
 | swift-nio | `Tests/NIOPosixTests/ChannelPipelineTest.swift` | 251 marker: SystemSockets on FreeBSD and Windows | FreeBSD, OpenBSD, WASI, Windows | the marker names no C interface (SystemSockets on FreeBSD and Windows) |
 | swift-nio | `Tests/NIOPosixTests/ControlMessageTests.swift` | 34 marker: SystemSockets on FreeBSD | FreeBSD, OpenBSD, WASI | the marker names no C interface (SystemSockets on FreeBSD) |
-| swift-nio | `Tests/NIOPosixTests/HappyEyeballsTest.swift` | 29 `Glibc`, 1 marker | FreeBSD, OpenBSD | System covers every C name it serves there: sin6_addr, sin6_family, sin6_flowinfo, sin6_port, sin6_scope_id, sin_addr, sin_family, sin_port |
+| swift-nio | `Tests/NIOPosixTests/HappyEyeballsTest.swift` | 29 `Glibc`, 1 marker, 31 `WinSDK` | FreeBSD, OpenBSD, Windows | System covers every C name it serves there: sin6_addr, sin6_family, sin6_flowinfo, sin6_port, sin6_scope_id, sin_addr, sin_family, sin_port |
 | swift-nio | `Tests/NIOPosixTests/HappyEyeballsTest.swift` | 154 marker: SystemSockets on FreeBSD and Windows, 175 marker: SystemSockets on FreeBSD and Windows, 200 marker: SystemSockets on FreeBSD and Windows, 213 marker: SystemSockets on FreeBSD and Windows | FreeBSD, OpenBSD, WASI, Windows | the marker names no C interface (SystemSockets on FreeBSD and Windows) |
 | swift-nio | `Tests/NIOPosixTests/MulticastTest.swift` | 160 marker: SystemSockets on FreeBSD, 182 marker: SystemSockets on FreeBSD | FreeBSD, OpenBSD, WASI | the marker names no C interface (SystemSockets on FreeBSD) |
 | swift-nio | `Tests/NIOPosixTests/NIOFileHandleTest.swift` | 22 `ucrt` | Windows | no C name it serves was found on its platforms |
 | swift-nio | `Tests/NIOPosixTests/NIOTransportAccessibleChannelCoreTests.swift` | 21 `WinSDK` | Windows | no C name it serves was found on its platforms |
 | swift-nio | `Tests/NIOPosixTests/PendingDatagramWritesManagerTests.swift` | 49 marker: family on Windows (Windows later) | FreeBSD, OpenBSD, WASI, Windows | the marker names no C interface (family on Windows (Windows later)) |
 | swift-nio | `Tests/NIOPosixTests/PendingDatagramWritesManagerTests.swift` | 191 marker: SystemSockets on FreeBSD and Windows | FreeBSD, OpenBSD, WASI, Windows | the marker names no C interface (SystemSockets on FreeBSD and Windows) |
+| swift-nio | `Tests/NIOPosixTests/SocketAddressTest.swift` | 22 `WinSDK` | Windows | System covers every C name it serves there: AF_UNSPEC, sa_family, sin6_addr, sin6_family, sin6_flowinfo, sin6_port, sin6_scope_id, sin_addr… |
 | swift-nio | `Tests/NIOPosixTests/SocketAddressTest.swift` | 73 marker: SystemSockets on FreeBSD and Windows, 89 marker: SystemSockets on FreeBSD and Windows, 149 marker: SystemSockets on FreeBSD and Windows, 194 marker: SystemSockets on FreeBSD and Windows, 205 marker: SystemSockets on FreeBSD and Windows, 239 marker: SystemSockets on FreeBSD and Windows, 378 marker: SystemSockets on FreeBSD and Windows, 603 marker: SystemSockets on FreeBSD and Windows, 643 marker: SystemSockets on FreeBSD and Windows | FreeBSD, OpenBSD, WASI, Windows | the marker names no C interface (SystemSockets on FreeBSD and Windows) |
 | swift-nio | `Tests/NIOPosixTests/SocketAddressTest.swift` | 281 marker: SystemSockets on FreeBSD, 317 marker: SystemSockets on FreeBSD | FreeBSD, OpenBSD | the marker names no C interface (SystemSockets on FreeBSD) |
 | swift-nio | `Tests/NIOPosixTests/SocketAddressTest.swift` | 449 marker: family, unspecified on Windows (Windows later) | FreeBSD, OpenBSD, WASI, Windows | the marker names no C interface |
@@ -1507,103 +1666,69 @@ Each row is a gap in System at `system-next`: a mapping.ini entry (or a C name i
 
 | # | Gap | Lacks | Unblocks | Holds | Repositories | C names | System |
 |---:|---|---|---:|---:|---|---|---|
-| 1 | [multicast] | WASI, Windows | 22 (3 files) | 24 | swift-nio | `IPV6_JOIN_GROUP`, `IPV6_LEAVE_GROUP`, `IPV6_MULTICAST_HOPS`, `IPV6_MULTICAST_IF`, `IPV6_MULTICAST_LOOP`, `IP_ADD_MEMBERSHIP`… | SocketDescriptor.IPv6Option.joinGroup isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, … |
-| 2 | [address families] | Windows | 20 (6 files) | 24 | swift-certificates, swift-nio | `AF_INET`, `AF_INET6`, `AF_UNIX`, `AF_UNSPEC`, `PF_INET`, `PF_INET6`… | SocketAddress.Family.ipv4 isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI) |
-| 3 | [socket options] | Android, OpenBSD, WASI, Windows | 16 (2 files) | 18 | swift-nio | `SOL_SOCKET`, `SO_BROADCAST`, `SO_ERROR`, `SO_KEEPALIVE`, `SO_LINGER`, `SO_RCVBUF`… | SocketDescriptor.AncillaryMessageBuffer.Message.timestamp isn't built on Windows (only Darwin, Linux, Musl, … |
-| 4 | [Winsock addresses] | Windows | 16 (5 files) | 18 | swift-certificates, swift-nio | `ADDRESS_FAMILY`, `IN6_ADDR`, `IN_ADDR`, `SOCKADDR`, `SOCKADDR_IN`, `SOCKADDR_IN6`… | System names it nowhere |
-| 5 | [sockaddr types] | Windows | 15 (9 files) | 17 | swift-certificates, swift-nio | `in6_addr`, `in_addr`, `sockaddr`, `sockaddr_in`, `sockaddr_in6`, `sockaddr_un`… | CInterop.SockLen isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI) |
-| 6 | [Windows name resolution] | Windows | 8 (2 files) | 9 | swift-nio | `ADDRINFOW`, `FreeAddrInfoW`, `GetAddrInfoW`, `gai_strerrorA` | System names it nowhere |
-| 7 | [Winsock sockets] | Windows | 7 (3 files) | 12 | swift-nio | `FIONBIO`, `INVALID_SOCKET`, `SOCKET`, `SOCKET_ERROR`, `closesocket`, `ioctlsocket` | System names it nowhere |
-| 8 | [protocol levels] | Windows | 7 (2 files) | 9 | swift-nio | `IPPROTO_IP`, `IPPROTO_IPV6`, `IPPROTO_TCP`, `IPPROTO_UDP` | SocketDescriptor.ProtocolID.ip isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, … |
-| 9 | [INADDR_ANY] | Windows | 7 (4 files) | 7 | swift-nio | `INADDR_ANY`, `INET6_ADDRSTRLEN`, `INET_ADDRSTRLEN` | IPv4Address.Host.descriptionCapacity isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, … |
-| 10 | [Winsock messages] | Windows | 6 (2 files) | 7 | swift-nio | `LPFN_WSARECVMSG`, `LPFN_WSASENDMSG`, `LPWSAMSG`, `WSABUF`, `WSACMSGHDR`, `WSAIoctl`… | System names it nowhere |
-| 11 | [socket types] | Windows | 5 (2 files) | 6 | swift-nio | `SOCK_DGRAM`, `SOCK_RAW`, `SOCK_STREAM` | SocketDescriptor.ConnectionType.datagram isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, … |
-| 12 | [shutdown] | Windows | 4 (1 file) | 5 | swift-nio | `SD_BOTH`, `SD_RECEIVE`, `SD_SEND`, `shutdown` | System names it nowhere |
-| 13 | [ECN, TOS and packet info] | Windows | 4 (2 files) | 4 | swift-nio | `IPV6_PKTINFO`, `IPV6_RECVTCLASS`, `IP_PKTINFO`, `IP_RECVTOS` | SocketDescriptor.IPv6Option.receiveTrafficClass isn't built on Windows (only Darwin, Linux, Musl, Android, … |
-| 14 | [signal numbers] | WASI | 4 (1 file) | 4 | swift-testing | `SIGABRT` | Signal.abort isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, Windows) |
-| 15 | [IPV6_V6ONLY and IP_HDRINCL] | WASI, Windows | 3 (2 files) | 5 | swift-nio | `IPV6_V6ONLY`, `IP_HDRINCL` | SocketDescriptor.IPv6Option.v6Only isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, … |
-| 16 | [TCP_NODELAY] | WASI, Windows | 3 (2 files) | 4 | swift-nio | `TCP_NODELAY` | SocketDescriptor.TCPOption.noDelay isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, … |
-| 17 | [sendfile] | FreeBSD, Windows | 3 (2 files) | 4 | swift-nio | `TF_USE_KERNEL_APC`, `TransmitFile`, `sendfile` | System names it nowhere |
-| 18 | [inet_ntop and inet_pton] | Windows | 3 (2 files) | 4 | swift-certificates, swift-nio | `inet_ntop`, `inet_pton` | IPv4Address.Host.init isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI) |
-| 19 | [Winsock errors] | Windows | 2 (2 files) | 6 | swift-nio | `WSAEINVAL`, `WSAEWOULDBLOCK`, `WSAGetLastError` | System names it nowhere |
-| 20 | [SO_RCVTIMEO and SO_TIMESTAMP] | Windows | 3 (2 files) | 3 | swift-nio | `SO_RCVTIMEO` | SocketDescriptor.SocketOption.receiveTimeout isn't built on Windows (only Darwin, Linux, Musl, Android, … |
-| 21 | [Windows process exit] | Windows | 2 (2 files) | 3 | swift-build, swift-subprocess | `RegisterWaitForSingleObject`, `UnregisterWait`, `WAITORTIMERCALLBACK`, `WT_EXECUTELONGFUNCTION`, `WT_EXECUTEONLYONCE` | System names it nowhere |
-| 22 | [getsockname and getpeername] | Windows | 2 (1 file) | 3 | swift-nio | `getpeername`, `getsockname` | SocketDescriptor.getPeerAddress isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
-| 23 | [linger] | Windows | 2 (2 files) | 3 | swift-nio | `LINGER`, `linger` | CInterop.Linger isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI) |
-| 24 | POSIXErrorCode | Windows | 2 (1 file) | 2 | swift-foundation | `POSIXErrorCode` | CInterop.POSIXErrorCode isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI) |
-| 25 | [sockaddr_storage] | Windows | 2 (2 files) | 2 | swift-nio | `sockaddr_storage` | CInterop.SockAddrStorage isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI) |
-| 26 | funopen | Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | 1 (1 file) | 1 | swift-testing | `funopen` | System names it nowhere |
-| 27 | getc_unlocked | Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | 1 (1 file) | 1 | swift-testing | `getc_unlocked` | System names it nowhere |
-| 28 | strchr | Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | 1 (1 file) | 1 | swift-testing | `strchr` | System names it nowhere |
-| 29 | task_set_exception_ports | Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | 1 (1 file) | 1 | swift-testing | `task_set_exception_ports` | System names it nowhere |
-| 30 | [FreeBSD extended attributes] | OpenBSD, WASI, Windows | 1 (1 file) | 1 | swift-foundation | `extattr_*` | System names it nowhere |
-| 31 | [call stack] | Musl, FreeBSD, OpenBSD | 1 (1 file) | 1 | swift-testing | `backtrace` | CallStack.returnAddresses isn't built on Musl (only Darwin, Linux) |
-| 32 | [usleep] | WASI, Windows | 1 (1 file) | 2 | swift-sdk-generator, swift-stress-tester | `usleep` | PThread.sleep(for:) isn't built on WASI |
-| 33 | useconds_t | Android, WASI | 2 (1 file) | 2 | swift-sdk-generator | `useconds_t` | System names it nowhere |
-| 34 | CLOCK_MONOTONIC_RAW | FreeBSD, OpenBSD | 1 (1 file) | 1 | wasmkit | `CLOCK_MONOTONIC_RAW` | ClockID.monotonicRaw isn't built on FreeBSD (only Darwin, Linux, Musl, Android) |
-| 35 | [dlopen] | WASI, Windows | 1 (1 file) | 1 | swift-testing | `dlsym` | DynamicLibrary.address isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
-| 36 | sin_addr | Windows | 1 (1 file) | 4 | swift-nio | `sin_addr` | System's accessor isn't built on Windows |
-| 37 | sin_port | Windows | 1 (1 file) | 4 | swift-nio | `sin_port` | System's accessor isn't built on Windows |
-| 38 | [accept] | Windows | 1 (1 file) | 3 | swift-nio | `accept` | SocketDescriptor.accept isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
-| 39 | [listen] | Windows | 1 (1 file) | 3 | swift-nio | `listen` | SocketDescriptor.listen isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
-| 40 | LC_ALL | Windows | 1 (1 file) | 2 | swift-foundation | `LC_ALL` | CLocale.Category.all isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI) |
-| 41 | [bind] | Windows | 1 (1 file) | 2 | swift-nio | `bind` | SocketDescriptor.bind isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
-| 42 | [connect] | Windows | 1 (1 file) | 2 | swift-nio | `connect` | SocketDescriptor.connect isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
-| 43 | [poll] | Windows | 1 (1 file) | 2 | swift-nio | `POLLERR`, `POLLHUP`, `POLLNVAL`, `POLLRDNORM`, `POLLWRNORM`, `WSAPoll`… | CInterop.PollFD isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI) |
-| 44 | [send and receive] | Windows | 1 (1 file) | 2 | swift-nio | `recv`, `send` | SocketDescriptor.receive isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
-| 45 | [socket] | Windows | 1 (1 file) | 2 | swift-nio | `socket` | SocketDescriptor.open isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
-| 46 | UnmapViewOfFile | Windows | 1 (1 file) | 1 | swift-foundation | `UnmapViewOfFile` | System names it nowhere |
-| 47 | [Windows process creation] | Windows | 1 (1 file) | 1 | swift-subprocess | `CreateProcessWithLogonW`, `LOGON_WITH_PROFILE`, `LPPROC_THREAD_ATTRIBUTE_LIST`, `STARTF_USESHOWWINDOW`, `SW_HIDE`, `SW_SHOWMAXIMIZED`… | System names it nowhere |
-| 48 | [file type bits] | OpenBSD | 1 (1 file) | 1 | swift-nio | `S_IFWHT` | FileType.whiteout isn't built on OpenBSD (only Darwin, FreeBSD) |
-| 49 | [getuid] | WASI | 1 (1 file) | 1 | swift-foundation | `getuid` | UserID.real isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
-| 50 | [pipe] | WASI | 1 (1 file) | 1 | swift-testing | `pipe2` | FileDescriptor.pipe isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, Windows) |
-| 51 | [stdio] | Android | 1 (1 file) | 1 | swift-testing | `fmemopen` | FileStream.open isn't built on Android (only Darwin, Linux, Musl, FreeBSD, OpenBSD, WASI) |
-| 52 | f_frsize | FreeBSD | 1 (1 file) | 1 | swift-foundation | `f_frsize` | System's accessor isn't built on FreeBSD |
-| 53 | munmap | WASI | 1 (1 file) | 1 | swift-foundation | `munmap` | MemoryMapping.unmap isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
-| 54 | raise | WASI | 1 (1 file) | 1 | swift-testing | `raise` | Signal.raise isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, Windows) |
-| 55 | setlocale | Windows | 1 (1 file) | 1 | swift-foundation | `setlocale` | CLocale.globalName isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI) |
-| 56 | copy_file_range | Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | 0 (0 files) | 1 | swift-testing | `copy_file_range` | System names it nowhere |
-| 57 | [Mach-O file format] | Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | 0 (0 files) | 2 | swift-syntax | `mach_header_64` | CInterop.MachHeader64 isn't built on Linux (only Darwin) |
-| 58 | [loaded images] | Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | 2 (1 file) | 2 | swift-syntax | `_dyld_get_image_header`, `getsectiondata` | DynamicLibrary.loadedImageHeader isn't built on Linux (only Darwin) |
-| 59 | fclonefileat | Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | 0 (0 files) | 1 | swift-testing | `fclonefileat` | FileDescriptor.clone isn't built on Linux (only Darwin) |
-| 60 | FICLONE | Darwin, FreeBSD, OpenBSD, WASI, Windows | 1 (1 file) | 1 | swift-testing | `FICLONE` | FileDescriptor.cloneContents isn't built on Darwin (only Linux, Musl, Android) |
-| 61 | IPTOS_ECN_* | Linux, Musl, Android, FreeBSD | 0 (0 files) | 1 | swift-nio | `IPTOS_ECN_*` | System names it nowhere |
-| 62 | [sendmmsg and recvmmsg] | FreeBSD | 1 (1 file) | 1 | swift-nio | `sendmmsg` | SocketDescriptor.sendMessages isn't built on FreeBSD (only Darwin, Linux, Musl, Android) |
-| 63 | ai_family | FreeBSD, OpenBSD, Windows | 0 (0 files) | 2 | swift-nio | `ai_family` | System names it nowhere |
-| 64 | ai_flags | FreeBSD, OpenBSD | 1 (1 file) | 1 | swift-nio | `ai_flags` | System names it nowhere |
-| 65 | msg_hdr | Windows | 0 (0 files) | 3 | swift-nio | `msg_hdr` | System's accessor isn't built on Windows |
-| 66 | msg_len | Windows | 2 (2 files) | 3 | swift-nio | `msg_len` | System's accessor isn't built on Windows |
-| 67 | cmsg_len | Windows | 1 (1 file) | 1 | swift-nio | `cmsg_len` | System's accessor isn't built on Windows |
-| 68 | sin6_addr | Windows | 0 (0 files) | 3 | swift-nio | `sin6_addr` | System's accessor isn't built on Windows |
-| 69 | sin6_family | Windows | 0 (0 files) | 3 | swift-nio | `sin6_family` | System's accessor isn't built on Windows |
-| 70 | sin6_flowinfo | Windows | 0 (0 files) | 3 | swift-nio | `sin6_flowinfo` | System's accessor isn't built on Windows |
-| 71 | sin6_port | Windows | 0 (0 files) | 3 | swift-nio | `sin6_port` | System's accessor isn't built on Windows |
-| 72 | sin6_scope_id | Windows | 0 (0 files) | 3 | swift-nio | `sin6_scope_id` | System's accessor isn't built on Windows |
-| 73 | sin_family | Windows | 1 (1 file) | 3 | swift-nio | `sin_family` | System's accessor isn't built on Windows |
-| 74 | sun_family | Windows | 0 (0 files) | 3 | swift-nio | `sun_family` | System's accessor isn't built on Windows |
-| 75 | sun_path | Windows | 2 (2 files) | 3 | swift-nio | `sun_path` | System's accessor isn't built on Windows |
-| 76 | ss_family | Windows | 1 (1 file) | 1 | swift-nio | `ss_family` | System's accessor isn't built on Windows |
-| 77 | st_dev | Windows | 0 (0 files) | 2 | llbuild | `st_dev` | System's accessor isn't built on Windows |
-| 78 | st_ino | Windows | 0 (0 files) | 2 | llbuild | `st_ino` | System's accessor isn't built on Windows |
-| 79 | st_mode | Windows | 0 (0 files) | 2 | llbuild | `st_mode` | System's accessor isn't built on Windows |
-| 80 | st_size | Windows | 2 (1 file) | 2 | llbuild | `st_size` | System's accessor isn't built on Windows |
-| 81 | FindClose | Windows | 0 (0 files) | 1 | swift-foundation | `FindClose` | System's implementation uses it; no public declaration names it |
-| 82 | FindExInfoBasic | Windows | 0 (0 files) | 1 | swift-foundation | `FindExInfoBasic` | System names it nowhere |
-| 83 | FindExSearchNameMatch | Windows | 0 (0 files) | 1 | swift-foundation | `FindExSearchNameMatch` | System names it nowhere |
-| 84 | FindFirstFileExW | Windows | 0 (0 files) | 1 | swift-foundation | `FindFirstFileExW` | System names it nowhere |
-| 85 | FindNextFileW | Windows | 0 (0 files) | 1 | swift-foundation | `FindNextFileW` | System's implementation uses it; no public declaration names it |
-| 86 | WIN32_FIND_DATAW | Windows | 1 (1 file) | 1 | swift-foundation | `WIN32_FIND_DATAW` | System's implementation uses it; no public declaration names it |
-| 87 | MAP_FAILED | WASI | 0 (0 files) | 1 | swift-foundation | `MAP_FAILED` | MemoryMapping.init isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
-| 88 | MAP_PRIVATE | WASI | 0 (0 files) | 1 | swift-foundation | `MAP_PRIVATE` | MemoryMapping.Options.private isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
-| 89 | MPTCP_INFO | Linux | 0 (0 files) | 1 | swift-nio | `MPTCP_INFO` | System names it nowhere |
-| 90 | [TCP connection info] | Linux | 1 (1 file) | 1 | swift-nio | `mptcp_info` | System names it nowhere |
-| 91 | PROT_READ | WASI | 0 (0 files) | 1 | swift-foundation | `PROT_READ` | MemoryMapping.Protection.read isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
-| 92 | mmap | WASI | 1 (1 file) | 1 | swift-foundation | `mmap` | MemoryMapping isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
-| 93 | WSAEFAULT | Windows | 0 (0 files) | 1 | swift-nio | `WSAEFAULT` | System names it nowhere |
-| 94 | [gettimeofday] | Windows | 0 (0 files) | 1 | swift-nio | `timeval` | CInterop.TimeVal isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI) |
-| 95 | l_linger | Windows | 0 (0 files) | 1 | swift-nio | `l_linger` | System's accessor isn't built on Windows |
-| 96 | l_onoff | Windows | 0 (0 files) | 1 | swift-nio | `l_onoff` | System's accessor isn't built on Windows |
-| 97 | tv_usec | Windows | 1 (1 file) | 1 | swift-nio | `tv_usec` | System's accessor isn't built on Windows |
+| 1 | [Winsock sockets] | Windows | 6 (4 files) | 7 | swift-nio | `INVALID_SOCKET`, `SOCKET_ERROR` | System names it nowhere |
+| 2 | [signal numbers] | WASI | 4 (1 file) | 4 | swift-testing | `SIGABRT` | Signal.abort isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, Windows) |
+| 3 | [socket options] | Android, OpenBSD, WASI | 2 (1 file) | 3 | swift-nio | `SOL_SOCKET`, `SO_REUSEPORT` | SocketDescriptor.SocketOption.reusePort isn't built on Android (only Darwin, Linux, Musl, FreeBSD) |
+| 4 | [Windows process exit] | Windows | 2 (2 files) | 3 | swift-build, swift-subprocess | `RegisterWaitForSingleObject`, `UnregisterWait`, `WAITORTIMERCALLBACK`, `WT_EXECUTELONGFUNCTION`, `WT_EXECUTEONLYONCE` | System names it nowhere |
+| 5 | [Winsock messages] | Windows | 2 (1 file) | 3 | swift-nio | `LPFN_WSARECVMSG`, `LPFN_WSASENDMSG`, `WSAIoctl`, `_GUID` | System's implementation uses it; no public declaration names it |
+| 6 | POSIXErrorCode | Windows | 2 (1 file) | 2 | swift-foundation | `POSIXErrorCode` | CInterop.POSIXErrorCode isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI) |
+| 7 | [sockaddr_storage] | Windows | 2 (2 files) | 2 | swift-nio | `sockaddr_storage` | CInterop.SockAddrStorage isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI) |
+| 8 | funopen | Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | 1 (1 file) | 1 | swift-testing | `funopen` | System names it nowhere |
+| 9 | getc_unlocked | Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | 1 (1 file) | 1 | swift-testing | `getc_unlocked` | System names it nowhere |
+| 10 | strchr | Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | 1 (1 file) | 1 | swift-testing | `strchr` | System names it nowhere |
+| 11 | task_set_exception_ports | Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | 1 (1 file) | 1 | swift-testing | `task_set_exception_ports` | System names it nowhere |
+| 12 | ai_family | FreeBSD, OpenBSD, Windows | 1 (1 file) | 2 | swift-nio | `ai_family` | System names it nowhere |
+| 13 | [FreeBSD extended attributes] | OpenBSD, WASI, Windows | 1 (1 file) | 1 | swift-foundation | `extattr_*` | System names it nowhere |
+| 14 | [call stack] | Musl, FreeBSD, OpenBSD | 1 (1 file) | 1 | swift-testing | `backtrace` | CallStack.returnAddresses isn't built on Musl (only Darwin, Linux) |
+| 15 | [usleep] | WASI, Windows | 1 (1 file) | 2 | swift-sdk-generator, swift-stress-tester | `usleep` | PThread.sleep(for:) isn't built on WASI |
+| 16 | useconds_t | Android, WASI | 2 (1 file) | 2 | swift-sdk-generator | `useconds_t` | System names it nowhere |
+| 17 | CLOCK_MONOTONIC_RAW | FreeBSD, OpenBSD | 1 (1 file) | 1 | wasmkit | `CLOCK_MONOTONIC_RAW` | ClockID.monotonicRaw isn't built on FreeBSD (only Darwin, Linux, Musl, Android) |
+| 18 | [dlopen] | WASI, Windows | 1 (1 file) | 1 | swift-testing | `dlsym` | DynamicLibrary.address isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
+| 19 | ai_flags | FreeBSD, OpenBSD | 1 (1 file) | 1 | swift-nio | `ai_flags` | System names it nowhere |
+| 20 | LC_ALL | Windows | 1 (1 file) | 2 | swift-foundation | `LC_ALL` | CLocale.Category.all isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI) |
+| 21 | [socket] | Windows | 1 (1 file) | 2 | swift-nio | `socket` | SocketDescriptor.open isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
+| 22 | UnmapViewOfFile | Windows | 1 (1 file) | 1 | swift-foundation | `UnmapViewOfFile` | System names it nowhere |
+| 23 | [Windows process creation] | Windows | 1 (1 file) | 1 | swift-subprocess | `CreateProcessWithLogonW`, `LOGON_WITH_PROFILE`, `LPPROC_THREAD_ATTRIBUTE_LIST`, `STARTF_USESHOWWINDOW`, `SW_HIDE`, `SW_SHOWMAXIMIZED`… | System names it nowhere |
+| 24 | [file type bits] | OpenBSD | 1 (1 file) | 1 | swift-nio | `S_IFWHT` | FileType.whiteout isn't built on OpenBSD (only Darwin, FreeBSD) |
+| 25 | [getuid] | WASI | 1 (1 file) | 1 | swift-foundation | `getuid` | UserID.real isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
+| 26 | [pipe] | WASI | 1 (1 file) | 1 | swift-testing | `pipe2` | FileDescriptor.pipe isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, Windows) |
+| 27 | [sendfile] | FreeBSD | 1 (1 file) | 1 | swift-nio | `sendfile` | FileDescriptor.sendFile isn't built on FreeBSD (only Darwin, Linux, Musl, Android, Windows) |
+| 28 | [sockaddr types] | Windows | 1 (1 file) | 1 | swift-certificates | `in6_addr`, `in_addr` | CInterop.In6Addr isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI) |
+| 29 | [stdio] | Android | 1 (1 file) | 1 | swift-testing | `fmemopen` | FileStream.open isn't built on Android (only Darwin, Linux, Musl, FreeBSD, OpenBSD, WASI) |
+| 30 | f_frsize | FreeBSD | 1 (1 file) | 1 | swift-foundation | `f_frsize` | System's accessor isn't built on FreeBSD |
+| 31 | munmap | WASI | 1 (1 file) | 1 | swift-foundation | `munmap` | MemoryMapping.unmap isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
+| 32 | raise | WASI | 1 (1 file) | 1 | swift-testing | `raise` | Signal.raise isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, Windows) |
+| 33 | setlocale | Windows | 1 (1 file) | 1 | swift-foundation | `setlocale` | CLocale.globalName isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI) |
+| 34 | copy_file_range | Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | 0 (0 files) | 1 | swift-testing | `copy_file_range` | System names it nowhere |
+| 35 | [Mach-O file format] | Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | 0 (0 files) | 2 | swift-syntax | `mach_header_64` | CInterop.MachHeader64 isn't built on Linux (only Darwin) |
+| 36 | [loaded images] | Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | 2 (1 file) | 2 | swift-syntax | `_dyld_get_image_header`, `getsectiondata` | DynamicLibrary.loadedImageHeader isn't built on Linux (only Darwin) |
+| 37 | fclonefileat | Linux, Musl, Android, FreeBSD, OpenBSD, WASI, Windows | 0 (0 files) | 1 | swift-testing | `fclonefileat` | FileDescriptor.clone isn't built on Linux (only Darwin) |
+| 38 | FICLONE | Darwin, FreeBSD, OpenBSD, WASI, Windows | 1 (1 file) | 1 | swift-testing | `FICLONE` | FileDescriptor.cloneContents isn't built on Darwin (only Linux, Musl, Android) |
+| 39 | IPTOS_ECN_* | Linux, Musl, Android, FreeBSD | 0 (0 files) | 1 | swift-nio | `IPTOS_ECN_*` | System names it nowhere |
+| 40 | [sendmmsg and recvmmsg] | FreeBSD | 1 (1 file) | 1 | swift-nio | `sendmmsg` | SocketDescriptor.sendMessages isn't built on FreeBSD (only Darwin, Linux, Musl, Android) |
+| 41 | msg_hdr | Windows | 0 (0 files) | 3 | swift-nio | `msg_hdr` | System's accessor isn't built on Windows |
+| 42 | msg_len | Windows | 3 (3 files) | 3 | swift-nio | `msg_len` | System's accessor isn't built on Windows |
+| 43 | st_dev | Windows | 0 (0 files) | 2 | llbuild | `st_dev` | System's accessor isn't built on Windows |
+| 44 | st_ino | Windows | 0 (0 files) | 2 | llbuild | `st_ino` | System's accessor isn't built on Windows |
+| 45 | st_mode | Windows | 0 (0 files) | 2 | llbuild | `st_mode` | System's accessor isn't built on Windows |
+| 46 | st_size | Windows | 2 (1 file) | 2 | llbuild | `st_size` | System's accessor isn't built on Windows |
+| 47 | FindClose | Windows | 0 (0 files) | 1 | swift-foundation | `FindClose` | System's implementation uses it; no public declaration names it |
+| 48 | FindExInfoBasic | Windows | 0 (0 files) | 1 | swift-foundation | `FindExInfoBasic` | System names it nowhere |
+| 49 | FindExSearchNameMatch | Windows | 0 (0 files) | 1 | swift-foundation | `FindExSearchNameMatch` | System names it nowhere |
+| 50 | FindFirstFileExW | Windows | 0 (0 files) | 1 | swift-foundation | `FindFirstFileExW` | System names it nowhere |
+| 51 | FindNextFileW | Windows | 0 (0 files) | 1 | swift-foundation | `FindNextFileW` | System's implementation uses it; no public declaration names it |
+| 52 | WIN32_FIND_DATAW | Windows | 1 (1 file) | 1 | swift-foundation | `WIN32_FIND_DATAW` | System's implementation uses it; no public declaration names it |
+| 53 | MAP_FAILED | WASI | 0 (0 files) | 1 | swift-foundation | `MAP_FAILED` | MemoryMapping.init isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
+| 54 | MAP_PRIVATE | WASI | 0 (0 files) | 1 | swift-foundation | `MAP_PRIVATE` | MemoryMapping.Options.private isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
+| 55 | MPTCP_INFO | Linux | 0 (0 files) | 1 | swift-nio | `MPTCP_INFO` | System names it nowhere |
+| 56 | [TCP connection info] | Linux | 1 (1 file) | 1 | swift-nio | `mptcp_info` | System names it nowhere |
+| 57 | PROT_READ | WASI | 0 (0 files) | 1 | swift-foundation | `PROT_READ` | MemoryMapping.Protection.read isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
+| 58 | mmap | WASI | 1 (1 file) | 1 | swift-foundation | `mmap` | MemoryMapping isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD) |
+| 59 | [IPV6_V6ONLY and IP_HDRINCL] | WASI | 0 (0 files) | 1 | swift-nio | `IPV6_V6ONLY`, `IP_HDRINCL` | SocketDescriptor.IPv6Option.v6Only isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, … |
+| 60 | [TCP_NODELAY] | WASI | 0 (0 files) | 1 | swift-nio | `TCP_NODELAY` | SocketDescriptor.TCPOption.noDelay isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, … |
+| 61 | [multicast] | WASI | 1 (1 file) | 1 | swift-nio | `IPV6_JOIN_GROUP`, `IPV6_LEAVE_GROUP`, `IPV6_MULTICAST_HOPS`, `IPV6_MULTICAST_IF`, `IPV6_MULTICAST_LOOP`, `IP_ADD_MEMBERSHIP`… | SocketDescriptor.IPv6Option.joinGroup isn't built on WASI (only Darwin, Linux, Musl, Android, FreeBSD, … |
+| 62 | [gettimeofday] | Windows | 0 (0 files) | 1 | swift-nio | `timeval` | CInterop.TimeVal isn't built on Windows (only Darwin, Linux, Musl, Android, FreeBSD, OpenBSD, WASI) |
+| 63 | tv_usec | Windows | 1 (1 file) | 1 | swift-nio | `tv_usec` | System's accessor isn't built on Windows |
 
 ## Queued work
 
@@ -1664,8 +1789,8 @@ Sites whose C names that System doesn't cover all have the standard library's an
 
 | Answer | Sites | Repositories |
 |---|---:|---|
-| [Win32 scalar types] | 45 | indexstore-db, sourcekit-lsp, swift-build, swift-docc, swift-driver, swift-foundation, swift-nio, swift-testing, swift-tools-support-core, swiftpm, wasmkit |
-| [C scalar types] | 7 | swift-foundation, swift-nio, swift-subprocess, swiftpm |
+| [Win32 scalar types] | 46 | indexstore-db, sourcekit-lsp, swift-build, swift-docc, swift-driver, swift-foundation, swift-nio, swift-testing, swift-tools-support-core, swiftpm, wasmkit |
+| [C scalar types] | 8 | swift-foundation, swift-nio, swift-subprocess, swiftpm |
 | [memory copies] | 7 | swift-foundation |
 | [monotonic clock] | 2 | swift-nio |
 | [mutexes] | 1 | swift-subprocess |
@@ -1742,11 +1867,10 @@ Not sites at all; they count nowhere.
 - `Tests/SwiftBuildTests/ConsoleCommands/CLIConnection.swift` 127 marker: TerminalDescriptor.openPseudoterminal() on OpenBSD (openpty, fcntl, F_… (OpenBSD): **queued** (N3): N3 (openpty: OpenBSD)
 - `Tests/SwiftBuildTests/ConsoleCommands/ServiceConsoleTests.swift` 19 `WinSDK` (Windows): **System gap**: [Windows process exit] (RegisterWaitForSingleObject, UnregisterWait, WT_EXECUTELONGFUNCTION…: Windows)
 
-**swift-certificates**, at `../adopters/swift-certificates` `migrate-all` @ `c310582c`: 5 sites, 2 of them unexplained (above).
+**swift-certificates**, at `../adopters/swift-certificates` `migrate-all` @ `c310582c`: 5 sites, 3 of them unexplained (above).
 
 - `Sources/X509/Lock.swift` 24 `WASILibc`, 1 marker (WASI): **queued** (N2): N2 (pthread_mutex_t: WASI)
-- `Sources/X509/Verifier/RFC5280/URIConstraints.swift` 21 `WinSDK` (Windows): **System gap**: [address families] (AF_INET, AF_INET6: Windows); [Winsock addresses] (IN6_ADDR, IN_ADDR: Windows)
-- `Sources/X509/Verifier/ServerIdentityPolicy.swift` 26 `WinSDK` (Windows): **System gap**: [address families] (AF_INET, AF_INET6: Windows); [sockaddr types] (in6_addr, in_addr: Windows); [inet_ntop and inet_pton] (inet_pton: Windows)
+- `Sources/X509/Verifier/ServerIdentityPolicy.swift` 26 `WinSDK` (Windows): **System gap**: [sockaddr types] (in6_addr, in_addr: Windows)
 
 **swift-collections**, at `../ecosystem/swift-collections` @ `c11818f3`: no sites.
 
@@ -1896,194 +2020,40 @@ Not sites at all; they count nowhere.
 
 **swift-markdown**, at `../ecosystem/swift-markdown` @ `392b73b8`: no sites.
 
-**swift-nio**, at `../adopters/swift-nio` `migrate-unix` @ `b2f3c6c9`: 483 sites, 294 of them unexplained (above).
+**swift-nio**, at `../adopters/swift-nio` `migrate-unix` @ `b2f3c6c9`: 483 sites, 447 of them unexplained (above).
 
 - `Sources/NIOConcurrencyHelpers/atomics.swift` 33 `WASILibc` (WASI): **queued** (N2): N2 (sched_yield: WASI)
 - `Sources/NIOConcurrencyHelpers/lock.swift` 16 `ucrt`, 17 `WinSDK` (Windows): **standard library**: [monotonic clock] (timeGetTime: Windows)
-- `Sources/NIOCore/BSDSocketAPI.swift` 16 `ucrt` (Windows): **System gap**: [protocol levels] (IPPROTO_IP, IPPROTO_IPV6, IPPROTO_TCP…: Windows); [multicast] (IPV6_JOIN_GROUP, IPV6_LEAVE_GROUP, IPV6_MULTICAST_HOPS…: Windows); [IPV6_V6ONLY and IP_HDRINCL] (IPV6_V6ONLY, IP_HDRINCL: Windows); [address families] (PF_INET, PF_INET6, PF_UNIX: Windows); [Winsock sockets] (SOCKET: Windows); [socket options] (SOL_SOCKET, SO_BROADCAST, SO_ERROR…: Windows); and 4 more
-- `Sources/NIOCore/BSDSocketAPI.swift` 18 `WinSDK` (scoped) (Windows): **System gap**: [protocol levels] (IPPROTO_IP: Windows)
-- `Sources/NIOCore/BSDSocketAPI.swift` 19 `WinSDK` (scoped) (Windows): **System gap**: [protocol levels] (IPPROTO_IPV6: Windows)
-- `Sources/NIOCore/BSDSocketAPI.swift` 20 `WinSDK` (scoped) (Windows): **System gap**: [protocol levels] (IPPROTO_TCP: Windows)
-- `Sources/NIOCore/BSDSocketAPI.swift` 21 `WinSDK` (scoped) (Windows): **System gap**: [protocol levels] (IPPROTO_UDP: Windows)
-- `Sources/NIOCore/BSDSocketAPI.swift` 23 `WinSDK` (scoped) (Windows): **System gap**: [multicast] (IP_ADD_MEMBERSHIP: Windows)
-- `Sources/NIOCore/BSDSocketAPI.swift` 24 `WinSDK` (scoped) (Windows): **System gap**: [multicast] (IP_DROP_MEMBERSHIP: Windows)
-- `Sources/NIOCore/BSDSocketAPI.swift` 25 `WinSDK` (scoped) (Windows): **System gap**: [IPV6_V6ONLY and IP_HDRINCL] (IP_HDRINCL: Windows)
-- `Sources/NIOCore/BSDSocketAPI.swift` 26 `WinSDK` (scoped) (Windows): **System gap**: [multicast] (IP_MULTICAST_IF: Windows)
-- `Sources/NIOCore/BSDSocketAPI.swift` 27 `WinSDK` (scoped) (Windows): **System gap**: [multicast] (IP_MULTICAST_LOOP: Windows)
-- `Sources/NIOCore/BSDSocketAPI.swift` 28 `WinSDK` (scoped) (Windows): **System gap**: [multicast] (IP_MULTICAST_TTL: Windows)
-- `Sources/NIOCore/BSDSocketAPI.swift` 29 `WinSDK` (scoped) (Windows): **System gap**: [multicast] (IPV6_JOIN_GROUP: Windows)
-- `Sources/NIOCore/BSDSocketAPI.swift` 30 `WinSDK` (scoped) (Windows): **System gap**: [multicast] (IPV6_LEAVE_GROUP: Windows)
-- `Sources/NIOCore/BSDSocketAPI.swift` 31 `WinSDK` (scoped) (Windows): **System gap**: [multicast] (IPV6_MULTICAST_HOPS: Windows)
-- `Sources/NIOCore/BSDSocketAPI.swift` 32 `WinSDK` (scoped) (Windows): **System gap**: [multicast] (IPV6_MULTICAST_IF: Windows)
-- `Sources/NIOCore/BSDSocketAPI.swift` 33 `WinSDK` (scoped) (Windows): **System gap**: [multicast] (IPV6_MULTICAST_LOOP: Windows)
-- `Sources/NIOCore/BSDSocketAPI.swift` 34 `WinSDK` (scoped) (Windows): **System gap**: [IPV6_V6ONLY and IP_HDRINCL] (IPV6_V6ONLY: Windows)
-- `Sources/NIOCore/BSDSocketAPI.swift` 36 `WinSDK` (scoped) (Windows): **System gap**: [address families] (AF_INET: Windows)
-- `Sources/NIOCore/BSDSocketAPI.swift` 37 `WinSDK` (scoped) (Windows): **System gap**: [address families] (AF_INET6: Windows)
-- `Sources/NIOCore/BSDSocketAPI.swift` 38 `WinSDK` (scoped) (Windows): **System gap**: [address families] (AF_UNIX: Windows)
-- `Sources/NIOCore/BSDSocketAPI.swift` 40 `WinSDK` (scoped) (Windows): **System gap**: [address families] (PF_INET: Windows)
-- `Sources/NIOCore/BSDSocketAPI.swift` 41 `WinSDK` (scoped) (Windows): **System gap**: [address families] (PF_INET6: Windows)
-- `Sources/NIOCore/BSDSocketAPI.swift` 42 `WinSDK` (scoped) (Windows): **System gap**: [address families] (PF_UNIX: Windows)
-- `Sources/NIOCore/BSDSocketAPI.swift` 44 `WinSDK` (scoped) (Windows): **System gap**: [socket options] (SO_BROADCAST: Windows)
-- `Sources/NIOCore/BSDSocketAPI.swift` 45 `WinSDK` (scoped) (Windows): **System gap**: [socket options] (SO_ERROR: Windows)
-- `Sources/NIOCore/BSDSocketAPI.swift` 46 `WinSDK` (scoped) (Windows): **System gap**: [socket options] (SO_KEEPALIVE: Windows)
-- `Sources/NIOCore/BSDSocketAPI.swift` 47 `WinSDK` (scoped) (Windows): **System gap**: [socket options] (SO_LINGER: Windows)
-- `Sources/NIOCore/BSDSocketAPI.swift` 48 `WinSDK` (scoped) (Windows): **System gap**: [socket options] (SO_RCVBUF: Windows)
-- `Sources/NIOCore/BSDSocketAPI.swift` 49 `WinSDK` (scoped) (Windows): **System gap**: [SO_RCVTIMEO and SO_TIMESTAMP] (SO_RCVTIMEO: Windows)
-- `Sources/NIOCore/BSDSocketAPI.swift` 50 `WinSDK` (scoped) (Windows): **System gap**: [socket options] (SO_REUSEADDR: Windows)
-- `Sources/NIOCore/BSDSocketAPI.swift` 51 `WinSDK` (scoped) (Windows): **System gap**: [socket options] (SO_SNDBUF: Windows)
-- `Sources/NIOCore/BSDSocketAPI.swift` 53 `WinSDK` (scoped) (Windows): **System gap**: [socket options] (SOL_SOCKET: Windows)
-- `Sources/NIOCore/BSDSocketAPI.swift` 55 `WinSDK` (scoped) (Windows): **System gap**: [TCP_NODELAY] (TCP_NODELAY: Windows)
-- `Sources/NIOCore/BSDSocketAPI.swift` 57 `WinSDK` (scoped) (Windows): **System gap**: [Winsock sockets] (SOCKET: Windows)
-- `Sources/NIOCore/BSDSocketAPI.swift` 59 `WinSDK` (scoped) (Windows): **System gap**: [inet_ntop and inet_pton] (inet_ntop: Windows)
-- `Sources/NIOCore/BSDSocketAPI.swift` 60 `WinSDK` (scoped) (Windows): **System gap**: [inet_ntop and inet_pton] (inet_pton: Windows)
-- `Sources/NIOCore/BSDSocketAPI.swift` 63 `WinSDK` (scoped) (Windows): **System gap**: [Winsock errors] (WSAGetLastError: Windows)
+- `Sources/NIOCore/BSDSocketAPI.swift` 16 `ucrt` (Windows): **standard library**: [C scalar types] (size_t: Windows)
 - `Sources/NIOCore/BSDSocketAPI.swift` 75 `Android`, 1 marker (Android): **System gap**: [socket options] (SO_REUSEPORT: Android)
 - `Sources/NIOCore/BSDSocketAPI.swift` 90 `Glibc`, 1 marker (OpenBSD): **System gap**: [socket options] (SO_REUSEPORT: OpenBSD)
 - `Sources/NIOCore/BSDSocketAPI.swift` 99 `WASILibc`, 1 marker (WASI): **System gap**: [multicast] (IPV6_JOIN_GROUP, IPV6_LEAVE_GROUP, IPV6_MULTICAST_HOPS…: WASI); [IPV6_V6ONLY and IP_HDRINCL] (IPV6_V6ONLY, IP_HDRINCL: WASI); [socket options] (SOL_SOCKET: WASI); [TCP_NODELAY] (TCP_NODELAY: WASI)
 - `Sources/NIOCore/IO.swift` 16 `ucrt`, 25 `WinSDK` (scoped) (Windows): **standard library**: [Win32 scalar types] (WCHAR: Windows)
-- `Sources/NIOCore/Interfaces.swift` 34 `WinSDK` (scoped) (Windows): **System gap**: [address families] (AF_INET: Windows)
-- `Sources/NIOCore/Interfaces.swift` 35 `WinSDK` (scoped) (Windows): **System gap**: [address families] (AF_INET6: Windows)
-- `Sources/NIOCore/Interfaces.swift` 37 `WinSDK` (scoped) (Windows): **System gap**: [INADDR_ANY] (INET_ADDRSTRLEN: Windows)
-- `Sources/NIOCore/Interfaces.swift` 38 `WinSDK` (scoped) (Windows): **System gap**: [INADDR_ANY] (INET6_ADDRSTRLEN: Windows)
-- `Sources/NIOCore/Interfaces.swift` 40 `WinSDK` (scoped) (Windows): **System gap**: [Winsock addresses] (ADDRESS_FAMILY: Windows)
-- `Sources/NIOCore/Interfaces.swift` 44 `WinSDK` (scoped) (Windows): **System gap**: [sockaddr types] (sockaddr: Windows)
-- `Sources/NIOCore/Interfaces.swift` 45 `WinSDK` (scoped) (Windows): **System gap**: [sockaddr types] (sockaddr_in: Windows)
-- `Sources/NIOCore/Interfaces.swift` 46 `WinSDK` (scoped) (Windows): **System gap**: [sockaddr types] (sockaddr_in6: Windows)
 - `Sources/NIOCore/Interfaces.swift` 47 `WinSDK` (scoped) (Windows): **System gap**: [sockaddr_storage] (sockaddr_storage: Windows)
-- `Sources/NIOCore/Interfaces.swift` 48 `WinSDK` (scoped) (Windows): **System gap**: [sockaddr types] (sockaddr_un: Windows)
 - `Sources/NIOCore/Interfaces.swift` 50 `WinSDK` (scoped) (Windows): **standard library**: [Win32 scalar types] (UINT8: Windows)
-- `Sources/NIOCore/SocketAddresses.swift` 16 `ucrt` (Windows): **System gap**: [Winsock addresses] (ADDRESS_FAMILY, IN6_ADDR, IN_ADDR: Windows); [Windows name resolution] (ADDRINFOW, FreeAddrInfoW, GetAddrInfoW…: Windows); ai_family (ai_family: Windows); sin6_addr (sin6_addr: Windows); sin6_family (sin6_family: Windows); sin6_flowinfo (sin6_flowinfo: Windows); and 7 more
-- `Sources/NIOCore/SocketAddresses.swift` 18 `WinSDK` (scoped) (Windows): **System gap**: [address families] (AF_INET: Windows)
-- `Sources/NIOCore/SocketAddresses.swift` 19 `WinSDK` (scoped) (Windows): **System gap**: [address families] (AF_INET6: Windows)
-- `Sources/NIOCore/SocketAddresses.swift` 21 `WinSDK` (scoped) (Windows): **System gap**: [INADDR_ANY] (INET_ADDRSTRLEN: Windows)
-- `Sources/NIOCore/SocketAddresses.swift` 22 `WinSDK` (scoped) (Windows): **System gap**: [INADDR_ANY] (INET6_ADDRSTRLEN: Windows)
-- `Sources/NIOCore/SocketAddresses.swift` 24 `WinSDK` (scoped) (Windows): **System gap**: [Windows name resolution] (FreeAddrInfoW: Windows)
-- `Sources/NIOCore/SocketAddresses.swift` 25 `WinSDK` (scoped) (Windows): **System gap**: [Windows name resolution] (GetAddrInfoW: Windows)
-- `Sources/NIOCore/SocketAddresses.swift` 26 `WinSDK` (scoped) (Windows): **System gap**: [Windows name resolution] (gai_strerrorA: Windows)
-- `Sources/NIOCore/SocketAddresses.swift` 28 `WinSDK` (scoped) (Windows): **System gap**: [Winsock addresses] (ADDRESS_FAMILY: Windows)
-- `Sources/NIOCore/SocketAddresses.swift` 29 `WinSDK` (scoped) (Windows): **System gap**: [Windows name resolution] (ADDRINFOW: Windows)
-- `Sources/NIOCore/SocketAddresses.swift` 30 `WinSDK` (scoped) (Windows): **System gap**: [Winsock addresses] (IN_ADDR: Windows)
-- `Sources/NIOCore/SocketAddresses.swift` 31 `WinSDK` (scoped) (Windows): **System gap**: [Winsock addresses] (IN6_ADDR: Windows)
-- `Sources/NIOCore/SocketAddresses.swift` 33 `WinSDK` (scoped) (Windows): **System gap**: [sockaddr types] (sockaddr: Windows)
-- `Sources/NIOCore/SocketAddresses.swift` 34 `WinSDK` (scoped) (Windows): **System gap**: [sockaddr types] (sockaddr_in: Windows)
-- `Sources/NIOCore/SocketAddresses.swift` 35 `WinSDK` (scoped) (Windows): **System gap**: [sockaddr types] (sockaddr_in6: Windows)
+- `Sources/NIOCore/SocketAddresses.swift` 16 `ucrt` (Windows): **System gap**: ai_family (ai_family: Windows)
 - `Sources/NIOCore/SocketAddresses.swift` 36 `WinSDK` (scoped) (Windows): **System gap**: [sockaddr_storage] (sockaddr_storage: Windows)
-- `Sources/NIOCore/SocketAddresses.swift` 37 `WinSDK` (scoped) (Windows): **System gap**: [sockaddr types] (sockaddr_un: Windows)
 - `Sources/NIOCore/SocketAddresses.swift` 39 `WinSDK` (scoped) (Windows): **standard library**: [C scalar types] (u_short: Windows)
 - `Sources/NIOCore/SocketAddresses.swift` 75 `Glibc`, 1 marker (FreeBSD, OpenBSD): **System gap**: ai_family (ai_family: FreeBSD, OpenBSD); ai_flags (ai_flags: FreeBSD, OpenBSD)
 - `Sources/NIOCore/SocketOptionProvider.swift` 25 marker: mptcp_info (MPTCP_INFO), on Linux (Linux, Musl): **System gap**: MPTCP_INFO (MPTCP_INFO: Linux); [TCP connection info] (mptcp_info: Linux)
-- `Sources/NIOCore/SocketOptionProvider.swift` 37 `WinSDK` (Windows): **System gap**: [linger] (linger: Windows)
-- `Sources/NIOCore/Utilities.swift` 31 `ucrt`, 34 `WinSDK` (scoped) (Windows): **System gap**: [address families] (AF_UNSPEC: Windows)
-- `Sources/NIOCore/Utilities.swift` 45 `WinSDK` (scoped) (Windows): **standard library**: [Win32 scalar types] (ULONG: Windows)
-- `Sources/NIOMulticastChat/main.swift` 26 `WinSDK` (Windows): **System gap**: sin_addr (sin_addr: Windows)
-- `Sources/NIOPosix/BSDSocketAPICommon.swift` 25 `ucrt` (Windows): **System gap**: [Winsock sockets] (INVALID_SOCKET: Windows); [ECN, TOS and packet info] (IPV6_RECVTCLASS, IP_RECVTOS: Windows); [socket types] (SOCK_DGRAM, SOCK_RAW, SOCK_STREAM: Windows)
-- `Sources/NIOPosix/BSDSocketAPICommon.swift` 27 `WinSDK` (scoped) (Windows): **System gap**: [Winsock sockets] (INVALID_SOCKET: Windows)
-- `Sources/NIOPosix/BSDSocketAPICommon.swift` 29 `WinSDK` (scoped) (Windows): **System gap**: [ECN, TOS and packet info] (IP_RECVTOS: Windows)
-- `Sources/NIOPosix/BSDSocketAPICommon.swift` 30 `WinSDK` (scoped) (Windows): **System gap**: [ECN, TOS and packet info] (IPV6_RECVTCLASS: Windows)
-- `Sources/NIOPosix/BSDSocketAPICommon.swift` 32 `WinSDK` (scoped) (Windows): **System gap**: [socket types] (SOCK_DGRAM: Windows)
-- `Sources/NIOPosix/BSDSocketAPICommon.swift` 33 `WinSDK` (scoped) (Windows): **System gap**: [socket types] (SOCK_STREAM: Windows)
-- `Sources/NIOPosix/BSDSocketAPICommon.swift` 34 `WinSDK` (scoped) (Windows): **System gap**: [socket types] (SOCK_RAW: Windows)
-- `Sources/NIOPosix/BSDSocketAPICommon.swift` 36 `WinSDK` (scoped) (Windows): **System gap**: [sockaddr types] (socklen_t: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 20 `ucrt` (Windows): **System gap**: [Winsock sockets] (FIONBIO, INVALID_SOCKET, SOCKET_ERROR…: Windows); [Winsock addresses] (IN_ADDR, SOCKADDR, SOCKADDR_IN…: Windows); [Winsock messages] (LPFN_WSARECVMSG, LPFN_WSASENDMSG, LPWSAMSG…: Windows); [shutdown] (SD_BOTH, SD_RECEIVE, SD_SEND…: Windows); [sendfile] (TF_USE_KERNEL_APC, TransmitFile: Windows); [Winsock errors] (WSAEINVAL, WSAEWOULDBLOCK, WSAGetLastError: Windows); and 9 more
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 22 `WinSDK` (scoped) (Windows): **System gap**: [address families] (AF_INET: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 23 `WinSDK` (scoped) (Windows): **System gap**: [address families] (AF_INET6: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 24 `WinSDK` (scoped) (Windows): **System gap**: [address families] (AF_UNIX: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 26 `WinSDK` (scoped) (Windows): **System gap**: [Winsock sockets] (FIONBIO: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 28 `WinSDK` (scoped) (Windows): **System gap**: [INADDR_ANY] (INET_ADDRSTRLEN: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 29 `WinSDK` (scoped) (Windows): **System gap**: [INADDR_ANY] (INET6_ADDRSTRLEN: Windows)
+- `Sources/NIOCore/Utilities.swift` 31 `ucrt`, 45 `WinSDK` (scoped) (Windows): **standard library**: [Win32 scalar types] (ULONG: Windows)
+- `Sources/NIOPosix/BSDSocketAPICommon.swift` 25 `ucrt`, 27 `WinSDK` (scoped) (Windows): **System gap**: [Winsock sockets] (INVALID_SOCKET: Windows)
+- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 20 `ucrt` (Windows): **System gap**: [Winsock sockets] (INVALID_SOCKET, SOCKET_ERROR: Windows); [Winsock messages] (LPFN_WSARECVMSG, LPFN_WSASENDMSG, WSAIoctl…: Windows); msg_hdr (msg_hdr: Windows); msg_len (msg_len: Windows); [socket] (socket: Windows)
 - `Sources/NIOPosix/BSDSocketAPIWindows.swift` 32 `WinSDK` (scoped) (Windows): **System gap**: [Winsock sockets] (INVALID_SOCKET: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 34 `WinSDK` (scoped) (Windows): **System gap**: [protocol levels] (IPPROTO_IP: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 35 `WinSDK` (scoped) (Windows): **System gap**: [protocol levels] (IPPROTO_IPV6: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 36 `WinSDK` (scoped) (Windows): **System gap**: [protocol levels] (IPPROTO_TCP: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 38 `WinSDK` (scoped) (Windows): **System gap**: [multicast] (IP_ADD_MEMBERSHIP: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 39 `WinSDK` (scoped) (Windows): **System gap**: [multicast] (IP_DROP_MEMBERSHIP: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 40 `WinSDK` (scoped) (Windows): **System gap**: [multicast] (IP_MULTICAST_IF: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 41 `WinSDK` (scoped) (Windows): **System gap**: [multicast] (IP_MULTICAST_LOOP: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 42 `WinSDK` (scoped) (Windows): **System gap**: [multicast] (IP_MULTICAST_TTL: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 44 `WinSDK` (scoped) (Windows): **System gap**: [multicast] (IPV6_JOIN_GROUP: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 45 `WinSDK` (scoped) (Windows): **System gap**: [multicast] (IPV6_LEAVE_GROUP: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 46 `WinSDK` (scoped) (Windows): **System gap**: [multicast] (IPV6_MULTICAST_HOPS: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 47 `WinSDK` (scoped) (Windows): **System gap**: [multicast] (IPV6_MULTICAST_IF: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 48 `WinSDK` (scoped) (Windows): **System gap**: [multicast] (IPV6_MULTICAST_LOOP: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 49 `WinSDK` (scoped) (Windows): **System gap**: [IPV6_V6ONLY and IP_HDRINCL] (IPV6_V6ONLY: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 51 `WinSDK` (scoped) (Windows): **System gap**: [address families] (PF_INET: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 52 `WinSDK` (scoped) (Windows): **System gap**: [address families] (PF_INET6: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 53 `WinSDK` (scoped) (Windows): **System gap**: [address families] (PF_UNIX: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 55 `WinSDK` (scoped) (Windows): **System gap**: [TCP_NODELAY] (TCP_NODELAY: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 57 `WinSDK` (scoped) (Windows): **System gap**: [shutdown] (SD_BOTH: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 58 `WinSDK` (scoped) (Windows): **System gap**: [shutdown] (SD_RECEIVE: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 59 `WinSDK` (scoped) (Windows): **System gap**: [shutdown] (SD_SEND: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 61 `WinSDK` (scoped) (Windows): **System gap**: [socket options] (SO_ERROR: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 62 `WinSDK` (scoped) (Windows): **System gap**: [socket options] (SO_KEEPALIVE: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 63 `WinSDK` (scoped) (Windows): **System gap**: [socket options] (SO_LINGER: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 64 `WinSDK` (scoped) (Windows): **System gap**: [socket options] (SO_RCVBUF: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 65 `WinSDK` (scoped) (Windows): **System gap**: [SO_RCVTIMEO and SO_TIMESTAMP] (SO_RCVTIMEO: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 66 `WinSDK` (scoped) (Windows): **System gap**: [socket options] (SO_REUSEADDR: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 67 `WinSDK` (scoped) (Windows): **System gap**: [Winsock addresses] (SO_REUSE_UNICASTPORT: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 69 `WinSDK` (scoped) (Windows): **System gap**: [socket options] (SOL_SOCKET: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 71 `WinSDK` (scoped) (Windows): **System gap**: [socket types] (SOCK_DGRAM: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 72 `WinSDK` (scoped) (Windows): **System gap**: [socket types] (SOCK_STREAM: Windows)
 - `Sources/NIOPosix/BSDSocketAPIWindows.swift` 74 `WinSDK` (scoped) (Windows): **System gap**: [Winsock sockets] (SOCKET_ERROR: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 76 `WinSDK` (scoped) (Windows): **System gap**: [sendfile] (TF_USE_KERNEL_APC: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 78 `WinSDK` (scoped) (Windows): **System gap**: [accept] (accept: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 79 `WinSDK` (scoped) (Windows): **System gap**: [bind] (bind: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 80 `WinSDK` (scoped) (Windows): **System gap**: [Winsock sockets] (closesocket: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 81 `WinSDK` (scoped) (Windows): **System gap**: [connect] (connect: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 82 `WinSDK` (scoped) (Windows): **System gap**: [getsockname and getpeername] (getpeername: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 83 `WinSDK` (scoped) (Windows): **System gap**: [getsockname and getpeername] (getsockname: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 84 `WinSDK` (scoped) (Windows): **System gap**: [Winsock sockets] (ioctlsocket: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 85 `WinSDK` (scoped) (Windows): **System gap**: [listen] (listen: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 86 `WinSDK` (scoped) (Windows): **System gap**: [shutdown] (shutdown: Windows)
 - `Sources/NIOPosix/BSDSocketAPIWindows.swift` 87 `WinSDK` (scoped) (Windows): **System gap**: [socket] (socket: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 90 `WinSDK` (scoped) (Windows): **System gap**: [sendfile] (TransmitFile: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 92 `WinSDK` (scoped) (Windows): **System gap**: [Winsock errors] (WSAGetLastError: Windows)
 - `Sources/NIOPosix/BSDSocketAPIWindows.swift` 93 `WinSDK` (scoped) (Windows): **System gap**: [Winsock messages] (WSAIoctl: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 94 `WinSDK` (scoped) (Windows): **System gap**: [Winsock messages] (WSASend: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 96 `WinSDK` (scoped) (Windows): **System gap**: [sockaddr types] (socklen_t: Windows)
 - `Sources/NIOPosix/BSDSocketAPIWindows.swift` 97 `WinSDK` (scoped) (Windows): **standard library**: [C scalar types] (u_long: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 99 `WinSDK` (scoped) (Windows): **System gap**: [Winsock addresses] (ADDRESS_FAMILY: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 102 `WinSDK` (scoped) (Windows): **System gap**: [Winsock addresses] (IN_ADDR: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 103 `WinSDK` (scoped) (Windows): **System gap**: [linger] (LINGER: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 105 `WinSDK` (scoped) (Windows): **System gap**: [Winsock addresses] (SOCKADDR: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 106 `WinSDK` (scoped) (Windows): **System gap**: [Winsock addresses] (SOCKADDR_IN: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 107 `WinSDK` (scoped) (Windows): **System gap**: [Winsock addresses] (SOCKADDR_IN6: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 108 `WinSDK` (scoped) (Windows): **System gap**: [Winsock addresses] (SOCKADDR_UN: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 109 `WinSDK` (scoped) (Windows): **System gap**: [Winsock addresses] (SOCKADDR_STORAGE: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 110 `WinSDK` (scoped) (Windows): **System gap**: [Winsock messages] (WSACMSGHDR: Windows)
-- `Sources/NIOPosix/BSDSocketAPIWindows.swift` 111 `WinSDK` (scoped) (Windows): **System gap**: [Winsock messages] (WSAMSG: Windows)
 - `Sources/NIOPosix/BSDSocketAPIWindows.swift` 113 `WinSDK` (scoped) (Windows): **System gap**: [Winsock messages] (LPFN_WSARECVMSG: Windows)
-- `Sources/NIOPosix/BaseSocket.swift` 37 `WinSDK` (scoped) (Windows): **System gap**: [sockaddr types] (socklen_t: Windows)
 - `Sources/NIOPosix/DatagramVectorReadManager.swift` 33 `WinSDK` (Windows): **System gap**: msg_hdr (msg_hdr: Windows); msg_len (msg_len: Windows)
-- `Sources/NIOPosix/GetaddrinfoResolver.swift` 45 `WinSDK` (scoped) (Windows): **System gap**: [address families] (AF_INET: Windows)
-- `Sources/NIOPosix/GetaddrinfoResolver.swift` 46 `WinSDK` (scoped) (Windows): **System gap**: [address families] (AF_INET6: Windows)
-- `Sources/NIOPosix/GetaddrinfoResolver.swift` 48 `WinSDK` (scoped) (Windows): **System gap**: [Windows name resolution] (FreeAddrInfoW: Windows)
-- `Sources/NIOPosix/GetaddrinfoResolver.swift` 49 `WinSDK` (scoped) (Windows): **System gap**: [Windows name resolution] (GetAddrInfoW: Windows)
-- `Sources/NIOPosix/GetaddrinfoResolver.swift` 50 `WinSDK` (scoped) (Windows): **System gap**: [Windows name resolution] (gai_strerrorA: Windows)
-- `Sources/NIOPosix/GetaddrinfoResolver.swift` 52 `WinSDK` (scoped) (Windows): **System gap**: [Winsock addresses] (ADDRESS_FAMILY: Windows)
-- `Sources/NIOPosix/GetaddrinfoResolver.swift` 53 `WinSDK` (scoped) (Windows): **System gap**: [Windows name resolution] (ADDRINFOW: Windows)
-- `Sources/NIOPosix/GetaddrinfoResolver.swift` 54 `WinSDK` (scoped) (Windows): **System gap**: [Winsock addresses] (SOCKADDR_IN: Windows)
-- `Sources/NIOPosix/GetaddrinfoResolver.swift` 55 `WinSDK` (scoped) (Windows): **System gap**: [Winsock addresses] (SOCKADDR_IN6: Windows)
-- `Sources/NIOPosix/PendingDatagramWritesManager.swift` 40 `WinSDK` (scoped) (Windows): **System gap**: [sockaddr types] (socklen_t: Windows)
-- `Sources/NIOPosix/PipePair.swift` 26 `WinSDK` (scoped) (Windows): **System gap**: [sockaddr types] (socklen_t: Windows)
-- `Sources/NIOPosix/SelectorGeneric.swift` 24 `WinSDK` (Windows): **System gap**: [poll] (pollfd: Windows)
-- `Sources/NIOPosix/SelectorWSAPoll.swift` 21 `WinSDK` (Windows): **System gap**: [Winsock sockets] (INVALID_SOCKET, SOCKET_ERROR: Windows); [poll] (POLLERR, POLLHUP, POLLNVAL…: Windows); [Winsock errors] (WSAGetLastError: Windows); [accept] (accept: Windows); [listen] (listen: Windows); [send and receive] (recv, send: Windows); and 2 more
-- `Sources/NIOPosix/Socket.swift` 29 `WinSDK` (Windows): **System gap**: [Winsock messages] (WSABUF: Windows)
-- `Sources/NIOPosix/SocketChannel.swift` 46 `WinSDK` (scoped) (Windows): **System gap**: [INADDR_ANY] (INADDR_ANY: Windows)
-- `Sources/NIOPosix/SocketChannel.swift` 48 `WinSDK` (scoped) (Windows): **System gap**: [multicast] (ip_mreq: Windows)
-- `Sources/NIOPosix/SocketChannel.swift` 49 `WinSDK` (scoped) (Windows): **System gap**: [multicast] (ipv6_mreq: Windows)
-- `Sources/NIOPosix/SocketChannel.swift` 50 `WinSDK` (scoped) (Windows): **System gap**: [sockaddr types] (socklen_t: Windows)
-- `Sources/NIOPosix/SocketProtocols.swift` 22 `WinSDK` (scoped) (Windows): **System gap**: [sockaddr types] (socklen_t: Windows)
+- `Sources/NIOPosix/SelectorWSAPoll.swift` 21 `WinSDK` (Windows): **System gap**: [Winsock sockets] (INVALID_SOCKET, SOCKET_ERROR: Windows)
 - `Sources/NIOPosix/System.swift` 75 `Glibc`, re-exported (Linux, FreeBSD): **System gap**: [sendfile] (sendfile: FreeBSD)
 - `Sources/NIOPosix/System.swift` 105 marker: sendmmsg and recvmmsg's mmsghdr, in6_pktinfo and IPTOS_ECN_* (CNIOLinu… (Linux, Musl, Android, FreeBSD): **System gap**: IPTOS_ECN_* (IPTOS_ECN_*: Linux, Musl, Android, FreeBSD); [sendmmsg and recvmmsg] (sendmmsg: FreeBSD)
-- `Sources/NIOPosix/System.swift` 116 `ucrt`, re-exported (Windows): **System gap**: [protocol levels] (IPPROTO_UDP: Windows); [ECN, TOS and packet info] (IPV6_PKTINFO, IP_PKTINFO: Windows)
 - `Sources/NIOPosix/ThreadWindows.swift` 19 `WinSDK` (Windows): **standard library**: [Win32 scalar types] (PWSTR: Windows)
-- `Sources/NIOPosix/Windows.swift` 19 `WinSDK` (Windows): **System gap**: [Winsock sockets] (SOCKET, SOCKET_ERROR: Windows); [Winsock errors] (WSAGetLastError: Windows); [send and receive] (recv: Windows)
+- `Sources/NIOPosix/Windows.swift` 19 `WinSDK` (Windows): **System gap**: [Winsock sockets] (SOCKET_ERROR: Windows)
 - `Tests/NIOFSTests/FileTypeTests.swift` 49 `Glibc`, 1 marker (FreeBSD, OpenBSD): **System gap**: [file type bits] (S_IFWHT: OpenBSD)
-- `Tests/NIOPosixTests/ChannelPipelineTest.swift` 31 `WinSDK` (Windows): **System gap**: sin_port (sin_port: Windows)
-- `Tests/NIOPosixTests/HappyEyeballsTest.swift` 31 `WinSDK` (Windows): **System gap**: sin6_addr (sin6_addr: Windows); sin6_family (sin6_family: Windows); sin6_flowinfo (sin6_flowinfo: Windows); sin6_port (sin6_port: Windows); sin6_scope_id (sin6_scope_id: Windows); sin_addr (sin_addr: Windows); and 2 more
-- `Tests/NIOPosixTests/PendingDatagramWritesManagerTests.swift` 38 `WinSDK` (Windows): **System gap**: msg_hdr (msg_hdr: Windows); msg_len (msg_len: Windows); [sockaddr types] (socklen_t: Windows)
-- `Tests/NIOPosixTests/SocketAddressTest.swift` 22 `WinSDK` (Windows): **System gap**: [address families] (AF_UNSPEC: Windows); sin6_addr (sin6_addr: Windows); sin6_family (sin6_family: Windows); sin6_flowinfo (sin6_flowinfo: Windows); sin6_port (sin6_port: Windows); sin6_scope_id (sin6_scope_id: Windows); and 6 more
-- `Tests/NIOPosixTests/SocketOptionProviderTest.swift` 21 `WinSDK` (Windows): **System gap**: WSAEFAULT (WSAEFAULT: Windows); l_linger (l_linger: Windows); l_onoff (l_onoff: Windows); [linger] (linger: Windows); [gettimeofday] (timeval: Windows); tv_usec (tv_usec: Windows)
+- `Tests/NIOPosixTests/PendingDatagramWritesManagerTests.swift` 38 `WinSDK` (Windows): **System gap**: msg_hdr (msg_hdr: Windows); msg_len (msg_len: Windows)
+- `Tests/NIOPosixTests/SocketOptionProviderTest.swift` 21 `WinSDK` (Windows): **System gap**: [gettimeofday] (timeval: Windows); tv_usec (tv_usec: Windows)
 
 **swift-numerics**, at `../ecosystem/swift-numerics` @ `0a5bc040`: no sites.
 
@@ -2227,9 +2197,9 @@ have changed since their last runs, and a few seconds when they haven't.
   and `time`, `free`, `sleep` and `remove` are C functions; and taking the imports as the interfaces
   everywhere, since `import struct Darwin.msghdr` is there for msghdr's fields, not for the name CInterop
   already has.
-- **Covered** means System's library modules (`Sources/System`, `Sources/SystemSockets`, not the samples) name
-  the interface in a doc comment's *The corresponding C … is* sentence, or a public typealias targets it, or, for
-  `X members`, an `extension CInterop.<alias of X>` exists. A few interfaces count as covered by the replacement
+- **Covered** means System's library modules (`Sources/System`, `Sources/SystemSockets`, `Sources/SystemWinSocks`,
+  not the samples) name the interface in a doc comment's *The corresponding C … is* sentence, or a public
+  typealias targets it, or, for `X members`, an `extension CInterop.<alias of X>` exists. A few interfaces count as covered by the replacement
   System wraps instead (`EQUIVALENTS` in `scripts/status.py`: usleep and sleep by nanosleep, localtime and gmtime
   by their `_r` forms, mkstemp and mkstemps by mkostemp(s), time and gettimeofday by clock_gettime), and the table
   says so. A family that System answers with a design of its own, rather than a wrapper, counts as covered once a
