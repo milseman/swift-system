@@ -7,7 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-// Accessors for the Winsock structures that SystemWinSocks vends, with
+// Accessors for the Winsock structures that System vends on Windows, with
 // SystemSockets' names, so that code that reads and builds them compiles on
 // both, and so that a client that doesn't import WinSDK can use them under
 // MemberImportVisibility. They also hide what Winsock spells differently:
@@ -15,7 +15,7 @@
 // which Swift can't import.
 //
 // The names are Swift names, never the C fields', so that a file that
-// imports both SystemWinSocks and WinSDK sees no ambiguity. An initializer
+// imports both this module and WinSDK sees no ambiguity. An initializer
 // whose parameters all have defaults is also the zero value, as C's zero
 // initializer is, so its defaults are all zero: the family is
 // `.unspecified`. Winsock's structures have no length field.

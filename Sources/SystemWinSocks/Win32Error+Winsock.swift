@@ -12,7 +12,7 @@
 import SystemPackage
 
 // Winsock's codes are Windows system error codes (Winsock numbers its BSD
-// codes as Berkeley's errno plus 10000), so SystemWinSocks reports them as
+// codes as Berkeley's errno plus 10000), so System reports them as
 // Win32.Error. Each is named as Errno names the POSIX code it stands for, so
 // that a typed catch reads the same on both: `catch .wouldBlock`. In an
 // untyped catch, spell the type, `catch Win32.Error.wouldBlock`, since Errno

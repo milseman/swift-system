@@ -14,8 +14,8 @@ import WinSDK
 
 // Winsock's extension functions, such as WSARecvMsg, which ws2_32 doesn't
 // export: a socket's provider hands them out through
-// WSAIoctl(SIO_GET_EXTENSION_FUNCTION_POINTER), keyed by GUID. SystemWinSocks
-// looks each family of them up once per process, the first time one is
+// WSAIoctl(SIO_GET_EXTENSION_FUNCTION_POINTER), keyed by GUID. System looks
+// each family of them up once per process, the first time one is
 // needed, through a socket it opens for the purpose and closes, as Go's
 // golang.org/x/sys/windows does; NIO looks them up on every call. Windows'
 // own providers hand every socket the same functions. A socket of another

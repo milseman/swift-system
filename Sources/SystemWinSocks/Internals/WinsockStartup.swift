@@ -13,7 +13,7 @@ import SystemPackage
 import WinSDK
 
 // Winsock must be started, with WSAStartup, before a process's first socket.
-// SystemWinSocks starts it once, when it first creates a socket, as Rust's
+// System starts it once, when it first creates a socket, as Rust's
 // standard library does, and never calls WSACleanup: Winsock counts its
 // starts, so a process that started it elsewhere is unaffected, and cleanup
 // matters only to code that unloads Winsock. A global's initializer runs
