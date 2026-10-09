@@ -43,6 +43,16 @@ def write(path, text):
         f.write(text)
 
 
+def tree_times(root):
+    """{path: (size, modification time, mode)} for everything under root."""
+    out = {}
+    for d, dirs, files in os.walk(root):
+        for n in dirs + files:
+            st = os.lstat(os.path.join(d, n))
+            out[os.path.relpath(os.path.join(d, n), root)] = (st.st_size, st.st_mtime_ns, st.st_mode)
+    return out
+
+
 def commit(repo, files, message):
     for rel, text in files.items():
         write(os.path.join(repo, rel), text)
@@ -268,10 +278,15 @@ class CollectionTests(unittest.TestCase):
         self.assertIsNone(doc["hostRoot"])
 
     def test_nothing_is_written_to_the_repositories(self):
+        # Not even a file's time: git updates the time of an object it finds
+        # it already has ("freshening"), which a trial merge run with the
+        # repository's objects as an alternate would do to the repository.
         main = os.path.join(self.base, "swift-system")
         before = git(main, "count-objects", "-v")
+        times = tree_times(self.base)
         lanes.collect(self.args(self.base))
         self.assertEqual(git(main, "count-objects", "-v"), before)
+        self.assertEqual(tree_times(self.base), times)
 
     def test_git_without_write_tree(self):
         # A git before 2.38 rejects `merge-tree --write-tree`: the trial
