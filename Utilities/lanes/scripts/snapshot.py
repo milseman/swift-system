@@ -1368,7 +1368,7 @@ def lint_task(run, adopter_clones):
     conditionals for each adopter clone."""
     t0 = time.time()
     skips = []
-    out = {"system": None, "adopters": None}
+    out = {"system": None, "adopters": None, "xcrun": bool(shutil.which("xcrun"))}
     path = os.path.join(run.root, "swift-system")
     try:
         g = run.git(path)
@@ -2019,7 +2019,7 @@ def environment_task(run, discovery):
     t0 = time.time()
     out = {"root": run.root, "hostRoot": discovery["hostRoot"], "python": platform.python_version(),
            "platform": f"{platform.system()} {platform.release()} {platform.machine()}",
-           "git": git_version(), "trialMerges": merge_mode(run),
+           "git": git_version(), "trialMerges": merge_mode(run), "xcrun": shutil.which("xcrun"),
            "claude": "readable" if run.claude else "unknown (~/.claude can't be read here)"}
     try:
         code, df, err = sh(["df", "-h", run.root], run.call_timeout(20))
@@ -2357,6 +2357,7 @@ def r_environment(doc, zone):
     out.append(f"- Root: `{doc.get('root')}`" + (f", recorded as `{doc['hostRoot']}`" if doc.get("hostRoot") else
                                                   " (the lanes' recorded paths)"))
     out.append(f"- Git: {doc.get('git')}; trial merges: {doc.get('trialMerges')}")
+    out.append(f"- xcrun: {doc.get('xcrun') or 'none (lint conditionals runs without the SDK Swift names)'}")
     out.append(f"- Python {doc.get('python')}, {doc.get('platform')}")
     out.append(f"- Claude Code sessions: {doc.get('claude')}")
     out.append(f"- Free disk: {doc.get('freeGiB')} GiB")
@@ -2706,13 +2707,19 @@ def r_logs(doc, zone):
                    x.get("commit", ""), ", ".join(x.get("commitIn", [])), "; ".join(x.get("summary", [])),
                    f"{(x.get('errors') or {}).get('lines', '')} ({(x.get('errors') or {}).get('distinct', '')})"
                    if x.get("errors") else "",
-                   x.get("exit", ""), " ⏎ ".join((x.get("errors") or {}).get("first", [])))
-                  for x in doc["logs"]])
+                   x.get("exit", ""), first_errors(x)) for x in doc["logs"]])
     out.append("")
     out.append("First lines:")
     out.append("")
     out += table(["Log", "First line"], [(x["file"], x.get("header", "")) for x in doc["logs"]])
     return out
+
+
+def first_errors(x):
+    e = x.get("errors") or {}
+    first = e.get("first", [])
+    more = e.get("distinct", 0) - len(first)
+    return " ⏎ ".join(first) + (f" (and {more} more distinct: grep 'error:' on the log)" if more > 0 else "")
 
 
 def r_integration(doc, zone):
@@ -2816,6 +2823,10 @@ def r_lint(doc, zone):
         out.append("")
     out.append(f"At system-next's head {short(doc.get('head'))}, from a scratch checkout of it.")
     out.append("")
+    if doc.get("xcrun") is False:
+        out.append("No `xcrun` here: lint's conditionals check reads the macOS SDK's Swift interfaces through it "
+                   "(`ledger.swift_declared_names`), so here it runs without their names, and can find more.")
+        out.append("")
     s = doc.get("system")
     if s:
         out.append("## System: cmake, pitches, api")
@@ -2837,8 +2848,7 @@ def r_lint(doc, zone):
         out.append("## Adopters: markers and conditionals, each clone at its newest migration branch")
         out.append("")
         for k, r in (a.get("runs") or {}).items():
-            out.append(f"- `{r['command'][:200]}{'…' if len(r['command']) > 200 else ''}`: exit {r['exit']}; "
-                       + (r["stderr"][-1] if r["stderr"] else ""))
+            out.append(f"- `{r['command']}`: exit {r['exit']}; " + (r["stderr"][-1] if r["stderr"] else ""))
         out.append("")
         rows = []
         for c in a["clones"]:
