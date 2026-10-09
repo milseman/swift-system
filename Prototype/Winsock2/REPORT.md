@@ -6,9 +6,9 @@ builds or runs real Windows: the Windows-only code is compiled on macOS against 
 (`Prototype/Win32/check-windows.sh`, `check-winsock.sh`), and the Windows host's manifest was checked by loading and
 building a copy of the package whose manifest has `os(Windows)` replaced by `true`.
 
-**Resume here:** items 1 and 2 are committed: the manifest (`dda94d2`), the tools (`5bbb2ea`) and `mapping.ini`'s
-coverage (the commit after it). Next: `Win32.Error`'s Winsock names (item 3), the first-run script (item 4), and item 5
-if time remains; STATUS.md is regenerated once, at the end.
+**Resume here:** items 1 to 3 are committed: the manifest (`dda94d2`), the tools (`5bbb2ea`), `mapping.ini`'s
+coverage (`300a8da`) and `Win32.Error`'s Winsock names (the commit after it). Next: the first-run script (item 4), and
+item 5 if time remains; STATUS.md is regenerated once, at the end.
 
 ## 1. What
 
@@ -35,6 +35,11 @@ if time remains; STATUS.md is regenerated once, at the end.
   public reads `WSAGetLastError`); [inet_ntop and inet_pton] cites SystemWinSocks' `description(into:)` too. Also a
   stale citation in [UDP segmentation offload] (`throws`, where SystemSockets' `setOption` now throws `Errno`),
   which made every `check.sh` run report a problem.
+- **`Win32.Error`'s Winsock names**: `_symbolicName` names Winsock's 62 codes from `WSAEINTR` (10004) to `WSANO_DATA`
+  (11004), so `debugDescription` prints `WSAEWOULDBLOCK (10035, 0x2733)` where it printed `10035 (0x2733)`; the values
+  come from Rust's bindings. A test in `WinsockErrorTests` holds each name to the SDK's macro, and the model gains the
+  18 codes it lacked. The harness's model also had two `GUID`s since the merge of coverage-9 (known folders, in
+  WinSDK.h) and winsock-1 (mswsock.h), so `check-winsock.sh` failed at the base; mswsock.h's is gone.
 
 ## 2. Design calls, with the alternatives rejected
 
@@ -90,6 +95,11 @@ if time remains; STATUS.md is regenerated once, at the end.
   needs neither, since System starts Winsock and throws the codes. What [Winsock errors] lacks is a public reader of
   `WSAGetLastError` for a caller's own Winsock calls. *Rejected*: `wrap = no` for startup, which says System
   shouldn't have it, where System does it.
+- **Winsock's names are in SystemPackage's table**, beside the other winerror.h names, and cover every Winsock code,
+  not only the 39 SystemWinSocks names: a `Win32.Error` from any Winsock call then prints its name. Codes that share a
+  value with a Win32 code (`WSA_IO_PENDING` is `ERROR_IO_PENDING`) keep the Win32 name. *Rejected*: a table in
+  SystemWinSocks that SystemPackage's `debugDescription` would consult through a hook, which buys nothing if the
+  sockets move into System, as Michael's note of 10-09 allows.
 - **[getaddrinfo]'s Windows row stays missing**: its three Windows sites (`GetaddrinfoResolver.swift` 215, 216 and
   228) read members through NIO's `CAddrInfo`, which is `addrinfo` in the macOS index but `ADDRINFOW` on Windows,
   where [Windows name resolution] covers it. An artifact of extracting from a macOS index, left to the coverage
@@ -110,6 +120,9 @@ if time remains; STATUS.md is regenerated once, at the end.
   `throws:AddressResolutionError` entries, and `closeAfter(_:)` by its path. So there was nothing to fix.
 - lint's unit tests (17, two new: helpers per module, a module's platforms where it declares API) and
   adopter-coverage's (32) pass.
+- `Prototype/Win32/check-winsock.sh` failed at the base (5d0b151: "redefinition of '_GUID'", the two models' `GUID`s);
+  after the fix it passes: 108 of the model's 185 constants checked against Rust's bindings, 135 SystemWinSocks
+  constants against the model, SystemWinSocks (30 files) and its tests (13 files) compile. `check-windows.sh` passes.
 - `Utilities/adopter-coverage/check.sh nio` (NIO at `9cb66c6d`, System at `5bbb2ea`), in a results store of the lane's
   own under `.build` seeded with a copy of the shared store's NIO index, so the shared store is untouched: NIO's
   Windows functions go from 53 covered, 17 partial and 58 missing with SystemWinSocks unread (the tools with

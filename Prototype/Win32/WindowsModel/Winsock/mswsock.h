@@ -2,14 +2,8 @@
 
 #include "winsock2.h"
 
-// guiddef.h's GUID, whose Data1 is an unsigned long, 32 bits on Windows.
-// The model declares it here, since WinSDK.h doesn't.
-typedef struct _GUID { // mirrors: guiddef.h
-  unsigned int Data1;
-  unsigned short Data2;
-  unsigned short Data3;
-  unsigned char Data4[8];
-} GUID;
+// GUID is guiddef.h's, which WinSDK.h's model declares for the known
+// folders.
 
 // The extension functions for messages, which WSAIoctl hands out by GUID.
 // WSAID_WSARECVMSG and WSAID_WSASENDMSG are initializer lists, which
