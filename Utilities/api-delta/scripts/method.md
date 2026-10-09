@@ -53,6 +53,8 @@ Each decision is listed with the alternative it rejected.
 11. **Ship a single module's archive as is.** `main` has only SystemPackage, and in this toolchain `docc merge` of a single archive fails ("The file “tutorials” couldn't be opened").
 12. **Cross-check with `swift-api-digester`, not with a second symbol-graph run.** The digester is the compiler's own API-breakage tool and applies different inclusion rules: it keeps implicit and underscored declarations. Agreement between the two is therefore meaningful, and the report lists every declaration the digester has that the graphs don't.
     *Rejected:* diffing `.swiftinterface` files, which needs library evolution (see decision 7).
+13. **Read SystemWinSocks from the source scan alone.** Every host's manifest declares it, and all of its files are inside `#if os(Windows)`, so the macOS graphs, the digester and DocC have none of it: its public declarations are section 5's, compiled only on Windows, and the summary counts them by module. The source diff and the `@_spi` count cover `Sources/SystemWinSocks` too.
+    *Rejected:* graphs from `Prototype/Win32/check-winsock.sh`, which compiles the module on macOS against a model of the Windows SDK: the model isn't the SDK, and the report would mix a model's types into the API.
 
 ### Limitations
 

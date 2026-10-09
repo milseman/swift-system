@@ -24,7 +24,8 @@ import os
 import re
 import sys
 
-MODULE_DIRS = {"Sources/System": "SystemPackage", "Sources/SystemSockets": "SystemSockets"}
+MODULE_DIRS = {"Sources/System": "SystemPackage", "Sources/SystemSockets": "SystemSockets",
+               "Sources/SystemWinSocks": "SystemWinSocks"}
 # Excluded from the SwiftPM build on non-Linux hosts, and compiled only on Linux.
 LINUX_ONLY_DIRS = ["Sources/System/IORing"]
 

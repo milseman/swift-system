@@ -5,7 +5,8 @@ Inputs (all paths are arguments; see regenerate.sh):
   --delta         symbolgraph_delta.py output
   --base-scan     scan_sources.py output for the base commit
   --head-scan     scan_sources.py output for the head commit
-  --diff          `git diff -U0 BASE HEAD -- Sources/System Sources/SystemSockets`
+  --diff          `git diff -U0 BASE HEAD -- Sources/System Sources/SystemSockets
+                  Sources/SystemWinSocks`
   --base-reqavail / --head-reqavail
                   logs of builds with -require-explicit-availability=warn
   --docc          LABEL=PATH diagnostics files from `docc convert`, e.g.
@@ -22,6 +23,10 @@ import os
 import re
 
 OS_ORDER = ["macOS", "iOS", "watchOS", "tvOS", "visionOS"]
+# The modules the report covers. SystemWinSocks' files are all inside
+# `#if os(Windows)`, so the macOS graphs have none of it, and only the source
+# scan's declarations show it.
+MODULES = ("SystemPackage", "SystemSockets", "SystemWinSocks")
 ALL_PLATFORMS = ["Darwin", "Linux", "Musl", "Android", "FreeBSD", "OpenBSD", "WASI", "Windows"]
 # Conformances that are implied or inferred; hidden to keep type lines short.
 IMPLIED = {"BitwiseCopyable", "SendableMetatype", "Copyable", "Escapable"}
@@ -182,7 +187,14 @@ def main():
     bs_index = {(d["file"], d["line"]): d for d in bs_decls}
     unsupported = {m: set(v) for m, v in head_scan["moduleUnsupportedPlatforms"].items()}
     module_platforms = {m: [p for p in ALL_PLATFORMS if p not in unsupported.get(m, set())]
-                        for m in ("SystemPackage", "SystemSockets")}
+                        for m in MODULES}
+    # Where each module's declarations compile, which can be narrower than
+    # where the module builds: SystemWinSocks builds everywhere, empty but
+    # on Windows.
+    decl_platforms = collections.defaultdict(set)
+    for d in hs_decls:
+        decl_platforms[d["module"]].update(d["platforms"])
+    declared_on = {m: [p for p in module_platforms[m] if p in decl_platforms[m]] for m in MODULES}
     for e in entries:
         idx = bs_index if e["status"] == "removed" else hs_index
         d = idx.get((e["file"], e["line"]))
@@ -288,7 +300,8 @@ def main():
         subject = meta.get(side.lower() + "Subject")
         w(f"- {side}: `{ref}` @ `{meta[side.lower() + 'Commit']}`" + (f" — {md_text(subject)}" if subject else ""))
     w("")
-    w(f"This covers the **SystemPackage** and **SystemSockets** modules. It was generated {meta['date']} "
+    w(f"This covers the **SystemPackage** and **SystemSockets** modules, and **SystemWinSocks**, which only "
+      f"Windows compiles, so that the source scan alone sees it. It was generated {meta['date']} "
       f"on {meta['host']} with {meta['swift']}, macOS SDK {meta['sdk']}.")
     w("")
     w("The primary source is the public symbol graphs of a macOS debug build of each commit. Synthesized "
@@ -308,12 +321,17 @@ def main():
     w("")
     w(f"- **{len(added)} added, {len(removed)} removed, {len(changed)} changed** declarations in the macOS "
       f"symbol graphs.")
-    for m in ("SystemPackage", "SystemSockets"):
+    for m in MODULES:
         if m not in base_mods and m not in head_mods:
             continue
         b, h = cnt["base"].get(m, 0), cnt["head"].get(m, 0)
         note = (f" {m} is a new module; it doesn't exist on `{base_ref}`." if m not in base_mods else
                 f" {m} doesn't exist on `{head_ref}`." if m not in head_mods else "")
+        if not b and not h and not n_add[m] and not n_rem[m] and not n_chg[m]:
+            only = declared_on[m] if len(declared_on[m]) < len(module_platforms[m]) else []
+            w(f"  - {m}: none" + (f"; its declarations compile only on {', '.join(only)}, so the source scan's "
+                                  "count below has them" if only else "") + f".{note}")
+            continue
         tally = f"+{n_add.get(m, 0)}" + (f", −{n_rem[m]}" if n_rem[m] else "") + \
             (f", {n_chg[m]} changed" if n_chg[m] else "")
         w(f"  - {m}: {tally} ({b} → {h} public symbols).{note}")
@@ -324,7 +342,10 @@ def main():
         w(f"  - {k}: {ac[k]}")
     hn = collections.Counter(d["hiddenClass"] for d in hidden_new)
     w("- The source scan finds these new public declarations, which the macOS graphs can't show:")
-    w(f"  - {hn.get('platform', 0)} compiled only on other platforms;")
+    by_module = collections.Counter(d["module"] for d in hidden_new if d["hiddenClass"] == "platform")
+    w(f"  - {hn.get('platform', 0)} compiled only on other platforms"
+      + (" (" + ", ".join(f"{m}: {by_module[m]}" for m in MODULES if by_module[m]) + ")" if by_module else "")
+      + ";")
     w(f"  - {hn.get('unavailable', 0)} new `@available(*, unavailable, renamed:)` stubs;")
     w(f"  - {hn.get('underscored', 0)} new underscored public declaration(s).")
     if hn.get("unexplained") or hn.get("nonpublic-scope"):
@@ -604,10 +625,12 @@ def main():
       "the module builds on), a missing doc comment, and constraints, then gives the source location.")
     w("")
     builds = []
-    for m in ("SystemPackage", "SystemSockets"):
+    for m in MODULES:
         if m in head_mods:
+            only = declared_on[m] if len(declared_on[m]) < len(module_platforms[m]) else []
             builds.append(f"{m} builds on {', '.join(module_platforms[m])}"
-                          + (", because its files `#error` elsewhere." if unsupported.get(m) else "."))
+                          + (", because its files `#error` elsewhere" if unsupported.get(m) else "")
+                          + (f", and declares nothing but on {', '.join(only)}" if only else "") + ".")
     w(" ".join(builds))
     w("")
     for status, title in (("removed", "Removed"), ("changed", "Changed")):
@@ -624,7 +647,7 @@ def main():
             w("")
     w(f"### Added ({len(added)})")
     w("")
-    for m in ("SystemPackage", "SystemSockets"):
+    for m in MODULES:
         items = [e for e in added if e["module"] == m]
         if not items:
             continue

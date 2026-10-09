@@ -1,6 +1,7 @@
 #!/bin/bash
 # Generates a report of the public API delta between two commits for the
-# SystemPackage and SystemSockets modules, plus DocC archives for both. See
+# SystemPackage and SystemSockets modules, plus DocC archives for both, and
+# for SystemWinSocks, which only Windows compiles, from the source scan. See
 # README.md in this directory.
 #
 #   Utilities/api-delta/regenerate.sh                  # main vs system-next
@@ -209,10 +210,11 @@ done
 log "source diff"
 git -C "$REPO" -c core.quotePath=false diff --no-ext-diff --no-textconv --no-color \
   --src-prefix=a/ --dst-prefix=b/ --find-renames -U0 "$BASE_COMMIT" "$HEAD_COMMIT" \
-  -- Sources/System Sources/SystemSockets > "$WORK/src.diff"
+  -- Sources/System Sources/SystemSockets Sources/SystemWinSocks > "$WORK/src.diff"
 
 spi_count() {
-  { git -C "$REPO" grep --no-color -F -c '@_spi' "$1" -- Sources/System Sources/SystemSockets || true; } \
+  { git -C "$REPO" grep --no-color -F -c '@_spi' "$1" -- Sources/System Sources/SystemSockets \
+      Sources/SystemWinSocks || true; } \
     | awk -F: '{n += $NF} END {print n + 0}'
 }
 SPI_BASE="$(spi_count "$BASE_COMMIT")"

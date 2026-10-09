@@ -63,7 +63,7 @@ SWIFT_LIBS = {"Swift", "_Concurrency", "_StringProcessing", "Synchronization", "
               "_Differentiation", "SwiftShims", "Combine"}
 FOUNDATION = {"Foundation", "FoundationEssentials", "FoundationInternationalization", "_FoundationCShims",
               "FoundationNetworking", "FoundationXML"}
-SYSTEM_MODULES = {"SystemPackage", "System", "CSystem", "SystemSockets"}
+SYSTEM_MODULES = {"SystemPackage", "System", "CSystem", "SystemSockets", "SystemWinSocks"}
 
 KIND_NAMES = {4: "macro", 5: "type", 6: "type", 7: "type", 8: "type", 10: "type", 11: "type", 12: "function",
               13: "variable", 14: "field", 15: "constant", 16: "function", 17: "function", 18: "function",

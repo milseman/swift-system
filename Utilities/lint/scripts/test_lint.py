@@ -163,6 +163,17 @@ class MarkerTests(unittest.TestCase):
                          ["PThread.Key", "FileDescriptor"])
         self.assertNotIn("Windows", names.platforms("PThread.Key"))
 
+    def test_module_platforms_are_where_it_declares(self):
+        # SystemWinSocks builds everywhere, empty but on Windows.
+        scan = {"declarations": SCAN["declarations"] + [
+            {"access": "public", "scopes": [], "name": "SocketDescriptor", "kw": "struct",
+             "module": "SystemWinSocks", "platforms": ["Windows"]},
+        ], "moduleUnsupportedPlatforms": dict(SCAN["moduleUnsupportedPlatforms"], SystemWinSocks=[])}
+        names = check_markers.SystemNames(scan)
+        self.assertEqual(names.platforms("SystemWinSocks"), {"Windows"})
+        self.assertEqual(names.mentioned("SystemWinSocks for WSAPoll"), ["SystemWinSocks"])
+        self.assertEqual(len(names.platforms("SystemPackage")), 8)
+
 
 # ---------------------------------------------------------------- conditionals
 
@@ -430,6 +441,17 @@ class ApiTests(unittest.TestCase):
         ])
         missing = next(f for f in got if f.rule == "api/doc-sentence-missing" and "qux" in f.message)
         self.assertIn("C function `qux`", missing.message)
+
+    def test_helpers_are_per_module(self):
+        # Each module has its own `_qux`; neither name is shared with the
+        # other module's, so each is followed in its own module.
+        other = SYSCALLS.replace("system_qux", "system_quux").replace("qux(x)", "quux(x)")
+        source = check_api.Source(texts={"Sources/System/Internals/Syscalls.swift": SYSCALLS,
+                                         "Sources/SystemWinSocks/Internals/WinsockSyscalls.swift": other})
+        reach = check_api.Reach(source)
+        self.assertEqual(reach.reach("_qux(1)", "Sources/System/F.swift"), ({"qux"}, set()))
+        self.assertEqual(reach.reach("_qux(1)", "Sources/SystemWinSocks/Sockets/F.swift"), ({"quux"}, set()))
+        self.assertEqual(reach.reach("_qux(1)", "Sources/SystemSockets/F.swift"), (set(), set()))
 
     def test_allowlist(self):
         delta, scan, source, graphs = self.fixture()

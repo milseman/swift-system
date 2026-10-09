@@ -56,7 +56,7 @@ RULES = [
     ("api/c-struct-property", "error", "a public stored property of a C struct type a client must reach into"),
 ]
 ALLOWLIST = os.path.join(TOOL, "allowlist.ini")
-SYSTEM_DIRS = ("Sources/System", "Sources/SystemSockets")
+SYSTEM_DIRS = ("Sources/System", "Sources/SystemSockets", "Sources/SystemWinSocks")
 C_STRUCT_USR = re.compile(r"^c:@(?:S|SA|U|UA)@")
 CORRESPONDING = re.compile(r"\bcorresponding\s+C\b", re.I)
 IDENT = re.compile(r"(?<![\w$])([A-Za-z_]\w*)")
@@ -179,14 +179,21 @@ class Source:
         return "\n".join(out)
 
 
+def module_dir(f):
+    """The module directory of a source path: the SYSTEM_DIRS entry it's in."""
+    return next((d for d in SYSTEM_DIRS if f.startswith(d + "/")), "")
+
+
 class Reach:
     """What a declaration's code reaches by System's three-layer
     convention: `system_foo` calls the C function foo, `_FOO` in
     Constants*.swift forwards the C constant FOO, and a `_foo(...)` helper
-    (layer 2) is followed once, when System declares one function of that
-    name, to the `system_` calls and constants in its body. Helpers of
-    common or overloaded names aren't followed: by name alone they lead
-    anywhere."""
+    (layer 2) is followed once, when the declaration's module declares one
+    function of that name, to the `system_` calls and constants in its body.
+    Helpers of common or overloaded names aren't followed: by name alone
+    they lead anywhere. A helper is looked up in the declaration's own
+    module, since one module can't call another's internal helpers, and
+    SystemWinSocks repeats SystemSockets' (`_bind`, `_accept`)."""
 
     def __init__(self, source):
         self.constants = {}
@@ -198,8 +205,8 @@ class Reach:
                     self.constants[m.group(1)] = m.group(2)
             for i, line in enumerate(code, 1):
                 for m in re.finditer(r"\bfunc\s+`?(_[a-z]\w*)\s*[(<]", line):
-                    bodies[m.group(1)].append(source.body(f, i))
-        self.helpers = {n: b[0] for n, b in bodies.items() if len(b) == 1}
+                    bodies[(module_dir(f), m.group(1))].append(source.body(f, i))
+        self.helpers = {k: b[0] for k, b in bodies.items() if len(b) == 1}
 
     def direct(self, body):
         names = set(IDENT.findall(body))
@@ -207,12 +214,13 @@ class Reach:
         consts = {self.constants[n] for n in names if n in self.constants}
         return funcs, consts, names
 
-    def reach(self, body):
-        """(C functions, C constants) a body reaches."""
+    def reach(self, body, f=""):
+        """(C functions, C constants) a body in file f reaches."""
         funcs, consts, names = self.direct(body)
         for n in names:
-            if n in self.helpers and re.search(rf"\b{re.escape(n)}\s*\(", body):
-                f2, c2, _ = self.direct(self.helpers[n])
+            helper = self.helpers.get((module_dir(f), n))
+            if helper is not None and re.search(rf"\b{re.escape(n)}\s*\(", body):
+                f2, c2, _ = self.direct(helper)
                 funcs |= f2
                 consts |= c2
         return funcs, consts
@@ -428,7 +436,7 @@ def check(delta, scan, source, graphs, allow):
         body = source.body(d.file, d.line) if d.kw in ("func", "init", "var", "let", "subscript") or \
             d.kind in ("swift.func", "swift.method", "swift.type.method", "swift.init", "swift.property",
                        "swift.type.property", "swift.subscript", "swift.func.op") else ""
-        funcs, consts = reach.reach(body) if body else (set(), set())
+        funcs, consts = reach.reach(body, d.file) if body else (set(), set())
         accessor = bool(d.scan and d.scan["scopes"] and d.scan["scopes"][0].startswith("CInterop.")
                         and d.scan["kw"] in ("var", "let"))
         if not said and (funcs or consts or accessor):
