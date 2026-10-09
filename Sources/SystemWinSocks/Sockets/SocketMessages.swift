@@ -65,7 +65,7 @@ internal enum _ControlMessageLayout {
     (length + alignment - 1) & ~(alignment - 1)
   }
 
-  /// `sizeof(struct cmsghdr)`.
+  /// `sizeof(WSACMSGHDR)`.
   @inlinable
   internal static var headerSize: Int { MemoryLayout<CInterop.CMsgHdr>.size }
 
@@ -551,7 +551,6 @@ extension SocketDescriptor.AncillaryMessageBuffer.Message {
         rebasing: buffer[payloadStart ..< _offset + length]))
     }
   }
-
 }
 
 // MARK: - Messages in memory you manage
@@ -644,7 +643,6 @@ extension SocketDescriptor {
         self.type = type
         self.payload = payload
       }
-
     }
 
     /// The position of the first message,
