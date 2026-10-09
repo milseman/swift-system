@@ -6,9 +6,10 @@ builds or runs real Windows: the Windows-only code is compiled on macOS against 
 (`Prototype/Win32/check-windows.sh`, `check-winsock.sh`), and the Windows host's manifest was checked by loading and
 building a copy of the package whose manifest has `os(Windows)` replaced by `true`.
 
-**Resume here:** items 1 to 4 are committed: the manifest (`dda94d2`), the tools (`5bbb2ea`), `mapping.ini`'s
-coverage (`300a8da`), `Win32.Error`'s Winsock names (`2239b61`) and the first-run script (the commit after it). Next:
-item 5 if time remains; then the Linux, Musl and WASI checks, the last `swift test`, and STATUS.md, regenerated once.
+**Resume here:** items 1 to 5 are committed: the manifest (`dda94d2`), the tools (`5bbb2ea`), `mapping.ini`'s
+coverage (`300a8da`), `Win32.Error`'s Winsock names (`2239b61`), the first-run script (`6b5f5b2`), and SystemSockets'
+poll and warnings (the commit after it). Next: lint and the harnesses on the last code commit, the Linux, Musl and
+WASI checks, the last `swift build` and `swift test`, and STATUS.md, regenerated once.
 
 ## 1. What
 
@@ -51,6 +52,12 @@ item 5 if time remains; then the Linux, Musl and WASI checks, the last `swift te
   to read in the log: winsock-1's section 4 and coverage-9's per-section checks, each with the suite that shows it,
   and this lane's. Two Winsock tests serve the run: `winsockErrorIsTheThreadsLastError` (section 3) and a log line
   from `typeOfService` naming the message type Winsock used.
+- **SystemSockets' polling, with SystemWinSocks' names** (item 5): on POSIX, `SocketDescriptor.PollEvents` and
+  `PollEntry` are `FileDescriptor`'s, an entry gains `init(_ socket:events:)` and `socket`, and
+  `SocketDescriptor.poll(_:timeout:retryOnInterrupt:)` (over a `MutableSpan`) and `poll(for:timeout:retryOnInterrupt:)`
+  forward to `FileDescriptor`'s, over POSIX `poll`; code that polls sockets now spells it once. And SystemSockets'
+  `_value` and `_setValue` pass the option through `withUnsafeMutableBytes(of:)` and `withUnsafeBytes(of:)`, as
+  SystemWinSocks does, which ends their two "forming 'UnsafeMutableRawPointer' to a variable of type 'T'" warnings.
 
 ## 2. Design calls, with the alternatives rejected
 
@@ -122,6 +129,14 @@ item 5 if time remains; then the Linux, Musl and WASI checks, the last `swift te
   first condition is `#if os(Windows)` counts, and its XCTest classes and `@Suite` types become filters ending in
   `/`, so `Win32PipesTests/` doesn't also select a `Win32PipesTestsExtra`. *Rejected*: one filter per module, which
   a crash in one suite would end for all.
+- **On POSIX, a socket's poll types are `FileDescriptor`'s, by typealias**, not types of SystemSockets' own: POSIX
+  polls a socket as any file descriptor, so one `MutableSpan` can hold sockets and the pipe or eventfd that wakes a
+  poll (NIO's selectors do), entries convert for free, and the `poll` wrapper, its mocks and its tests stay
+  SystemPackage's. What differs from SystemWinSocks: the POSIX events also have `priority` (and `readHangUp` on Linux
+  and Android), which Winsock lacks, and an entry also has `fileDescriptor`; shared code uses the common names.
+  *Rejected*: a `SocketDescriptor.PollEntry` struct of its own, with a second `system_poll`, which would keep sockets
+  and other descriptors out of one poll; and leaving POSIX code to spell `FileDescriptor.poll`, which makes code
+  shared with Windows spell polling twice.
 - **[getaddrinfo]'s Windows row stays missing**: its three Windows sites (`GetaddrinfoResolver.swift` 215, 216 and
   228) read members through NIO's `CAddrInfo`, which is `addrinfo` in the macOS index but `ADDRINFOW` on Windows,
   where [Windows name resolution] covers it. An artifact of extracting from a macOS index, left to the coverage
@@ -149,6 +164,10 @@ item 5 if time remains; then the Linux, Musl and WASI checks, the last `swift te
     restores it. No socket, file, process or network.
   - `SocketMessagesTests.typeOfService` (changed): prints the message types its own loopback datagram's type of service
     came as; what it sends and receives is unchanged.
+  - `SystemSocketsTests.SocketPollTests` (new, four tests, POSIX): the types are `FileDescriptor`'s; an entry's socket;
+    a connected socket writable, then readable once its peer writes a byte; a socket and a pipe in one poll. Each
+    test makes its own `socketpair` (`.local`, no address or file) and pipe, and closes each once; every wait has
+    the hang guard's time-out. Run on macOS: 4 passed; SystemSocketsTests: 149 tests in 24 suites passed.
 - `Prototype/Win32/check-winsock.sh` failed at the base (5d0b151: "redefinition of '_GUID'", the two models' `GUID`s);
   after the fix it passes: 108 of the model's 185 constants checked against Rust's bindings, 135 SystemWinSocks
   constants against the model, SystemWinSocks (30 files) and its tests (13 files) compile. `check-windows.sh` passes.

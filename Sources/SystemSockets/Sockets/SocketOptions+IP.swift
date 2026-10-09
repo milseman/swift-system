@@ -276,17 +276,20 @@ extension SocketDescriptor {
   internal func _value<T>(_ level: CInt, _ name: CInt, _ initial: T) -> Result<T, Errno> {
     var value = initial
     var length = CInterop.SockLen(MemoryLayout<T>.size)
-    return nothingOrErrno(retryOnInterrupt: false) {
-      system_getsockopt(self.rawValue, level, name, &value, &length)
+    return withUnsafeMutableBytes(of: &value) { bytes in
+      nothingOrErrno(retryOnInterrupt: false) {
+        system_getsockopt(self.rawValue, level, name, bytes.baseAddress, &length)
+      }
     }.map { value }
   }
 
   /// Sets an option whose value is a `T`.
   @usableFromInline
   internal func _setValue<T>(_ level: CInt, _ name: CInt, _ value: T) -> Result<Void, Errno> {
-    var value = value
-    return nothingOrErrno(retryOnInterrupt: false) {
-      system_setsockopt(self.rawValue, level, name, &value, CInterop.SockLen(MemoryLayout<T>.size))
+    withUnsafeBytes(of: value) { bytes in
+      nothingOrErrno(retryOnInterrupt: false) {
+        system_setsockopt(self.rawValue, level, name, bytes.baseAddress, CInterop.SockLen(bytes.count))
+      }
     }
   }
 
