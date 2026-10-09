@@ -138,31 +138,47 @@ let pluginTargets: [Target] = [
 ]
 #endif
 
-// SystemWinSocks: Winsock, Windows' sockets, with SystemSockets' names, in a
-// module of its own (Prototype/Winsock1/REPORT.md). Only a Windows host
-// declares it, as only a host other than Windows declares the plugin
-// targets, so other platforms build nothing of it.
+// SystemSockets wraps POSIX's sockets, and its files #error on Windows, whose
+// sockets SystemWinSocks wraps. A Windows host builds SystemSockets from
+// Sources/SystemSockets/WindowsHost alone, a file that declares nothing, so
+// that the product stays declared there: SwiftPM looks a product dependency
+// up whatever its condition, so without it an adopter that depends on
+// SystemSockets for other platforms (`condition: .when(platforms: [.macOS,
+// .linux])`) would fail to resolve on Windows. That host leaves out
+// SystemSockets' tests and the samples, whose socket samples import it, and
+// with them the samples' package dependency (Prototype/Winsock2/REPORT.md).
 #if os(Windows)
-let winsockProducts: [Product] = [
-  .library(name: "SystemWinSocks", targets: ["SystemWinSocks"]),
-]
-let winsockTargets: [Target] = [
-  .target(
-    name: "SystemWinSocks",
-    dependencies: ["SystemPackage"],
-    path: "Sources/SystemWinSocks",
-    exclude: ["CMakeLists.txt"],
-    cSettings: cSettings,
-    swiftSettings: swiftSettings,
-    linkerSettings: [.linkedLibrary("ws2_32")]),
+let socketsPath = "Sources/SystemSockets/WindowsHost"
+let socketsTestTargets: [Target] = []
+let sampleProducts: [Product] = []
+let sampleTargets: [Target] = []
+let sampleDependencies: [Package.Dependency] = []
+#else
+let socketsPath = "Sources/SystemSockets"
+let socketsTestTargets: [Target] = [
   .testTarget(
-    name: "SystemWinSocksTests",
-    dependencies: ["SystemPackage", "SystemWinSocks"],
+    name: "SystemSocketsTests",
+    dependencies: ["SystemSockets"],
+    cSettings: cSettings,
     swiftSettings: swiftSettings),
 ]
-#else
-let winsockProducts: [Product] = []
-let winsockTargets: [Target] = []
+let sampleProducts: [Product] = [
+  .executable(name: "system-samples", targets: ["Samples"]),
+]
+let sampleTargets: [Target] = [
+  .executableTarget(
+    name: "Samples",
+    dependencies: [
+      "SystemPackage",
+      "SystemSockets",
+      .product(name: "ArgumentParser", package: "swift-argument-parser"),
+    ],
+    path: "Sources/Samples",
+    swiftSettings: swiftSettings),
+]
+let sampleDependencies: [Package.Dependency] = [
+  .package(url: "https://github.com/apple/swift-argument-parser", from: "1.3.0"),
+]
 #endif
 
 let package = Package(
@@ -171,11 +187,9 @@ let package = Package(
   products: [
     .library(name: "SystemPackage", targets: ["SystemPackage"]),
     .library(name: "SystemSockets", targets: ["SystemSockets"]),
-    .executable(name: "system-samples", targets: ["Samples"]),
-  ] + pluginProducts + winsockProducts,
-  dependencies: [
-    .package(url: "https://github.com/apple/swift-argument-parser", from: "1.3.0"),
-  ],
+    .library(name: "SystemWinSocks", targets: ["SystemWinSocks"]),
+  ] + sampleProducts + pluginProducts,
+  dependencies: sampleDependencies,
   targets: [
     .target(
       name: "CSystem",
@@ -213,23 +227,27 @@ let package = Package(
     .target(
       name: "SystemSockets",
       dependencies: ["SystemPackage", "CSystem"],
-      path: "Sources/SystemSockets",
+      path: socketsPath,
       cSettings: cSettings,
       swiftSettings: swiftSettings),
+    // SystemWinSocks: Winsock, Windows' sockets, with SystemSockets' names,
+    // in a module of its own (Prototype/Winsock1/REPORT.md). Every host
+    // declares it, and its files are inside `#if os(Windows)`, so it's empty
+    // elsewhere: an adopter can depend on it with `condition: .when(platforms:
+    // [.windows])`, which also serves a build whose manifest runs on another
+    // host than the one it builds for.
+    .target(
+      name: "SystemWinSocks",
+      dependencies: ["SystemPackage"],
+      path: "Sources/SystemWinSocks",
+      exclude: ["CMakeLists.txt"],
+      cSettings: cSettings,
+      swiftSettings: swiftSettings,
+      linkerSettings: [.linkedLibrary("ws2_32", .when(platforms: [.windows]))]),
     .testTarget(
-      name: "SystemSocketsTests",
-      dependencies: ["SystemSockets"],
-      cSettings: cSettings,
+      name: "SystemWinSocksTests",
+      dependencies: ["SystemPackage", "SystemWinSocks"],
       swiftSettings: swiftSettings),
-    .executableTarget(
-      name: "Samples",
-      dependencies: [
-        "SystemPackage",
-        "SystemSockets",
-        .product(name: "ArgumentParser", package: "swift-argument-parser"),
-      ],
-      path: "Sources/Samples",
-      swiftSettings: swiftSettings),
-  ] + pluginTargets + winsockTargets,
+  ] + socketsTestTargets + sampleTargets + pluginTargets,
   swiftLanguageModes: [.v6]
 )
