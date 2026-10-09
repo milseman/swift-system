@@ -140,6 +140,24 @@ private struct WinsockErrorTests {
     #expect(Win32.Error.wouldBlock.debugDescription == "WSAEWOULDBLOCK (10035, 0x2733)")
   }
 
+  // Whether Winsock keeps a thread's last error where GetLastError reads it,
+  // so that Win32.Error.current serves a caller's own Winsock calls
+  // (mapping.ini's [Winsock errors]). Closing INVALID_SOCKET touches no
+  // socket; the thread's last error is restored.
+  @available(System 199, *)
+  @Test func winsockErrorIsTheThreadsLastError() throws {
+    try _startWinsock().get()
+    let saved = GetLastError()
+    defer { SetLastError(saved) }
+    SetLastError(0)
+    let result = WinSDK.closesocket(WinSDK.INVALID_SOCKET)
+    let winsockError = WSAGetLastError()
+    let current = Win32.Error.current
+    #expect(result == WinSDK.SOCKET_ERROR)
+    #expect(winsockError == WinSDK.WSAENOTSOCK)
+    #expect(current.rawValue == DWORD(winsockError), "\(current.debugDescription)")
+  }
+
   // FormatMessageW describes Winsock's codes, as it does the rest of the
   // system's.
   @available(System 199, *)

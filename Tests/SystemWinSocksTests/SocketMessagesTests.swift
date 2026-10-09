@@ -197,7 +197,10 @@ private struct SocketMessagesTests {
       try first.send(bytes, to: secondAddress)
     }
     let (_, ancillary) = try Self.receive(from: second)
-    #expect(ancillary.contains { $0.typeOfService != nil })
+    let types = ancillary.filter { $0.typeOfService != nil }.map(\.type.rawValue)
+    #expect(!types.isEmpty)
+    // For the first Windows run's log: IP_TOS is 3 and IP_RECVTOS is 40.
+    print("SocketMessagesTests.typeOfService: the type of service came as message type \(types)")
   }
 
   @available(System 199, *)

@@ -6,9 +6,9 @@ builds or runs real Windows: the Windows-only code is compiled on macOS against 
 (`Prototype/Win32/check-windows.sh`, `check-winsock.sh`), and the Windows host's manifest was checked by loading and
 building a copy of the package whose manifest has `os(Windows)` replaced by `true`.
 
-**Resume here:** items 1 to 3 are committed: the manifest (`dda94d2`), the tools (`5bbb2ea`), `mapping.ini`'s
-coverage (`300a8da`) and `Win32.Error`'s Winsock names (the commit after it). Next: the first-run script (item 4), and
-item 5 if time remains; STATUS.md is regenerated once, at the end.
+**Resume here:** items 1 to 4 are committed: the manifest (`dda94d2`), the tools (`5bbb2ea`), `mapping.ini`'s
+coverage (`300a8da`), `Win32.Error`'s Winsock names (`2239b61`) and the first-run script (the commit after it). Next:
+item 5 if time remains; then the Linux, Musl and WASI checks, the last `swift test`, and STATUS.md, regenerated once.
 
 ## 1. What
 
@@ -40,6 +40,17 @@ item 5 if time remains; STATUS.md is regenerated once, at the end.
   come from Rust's bindings. A test in `WinsockErrorTests` holds each name to the SDK's macro, and the model gains the
   18 codes it lacked. The harness's model also had two `GUID`s since the merge of coverage-9 (known folders, in
   WinSDK.h) and winsock-1 (mswsock.h), so `check-winsock.sh` failed at the base; mswsock.h's is gone.
+- **The first Windows run**: `Utilities/windows/first-run.ps1` and its README. From the clone, it runs `swift package
+  describe`, `swift build`, `swift build --build-tests` (and, if that fails, each test target alone), `swift test
+  --skip-build`, then each Windows-only suite alone (`--filter Module\.Type/`, 57 found by reading the test files whose
+  first condition is `#if os(Windows)`); shows the output as it comes; stops a step at its time-out with `taskkill /T`
+  on its own process tree; writes one log, `.build\windows-first-run-<date>-<time>.log`, headed by the machine's
+  details; and prints a summary with each step's status, time and test counts and the failed tests' names. SwiftPM's
+  caches and configuration go into the clone's `.build`; a Windows host's manifest has no package dependencies, so
+  nothing is fetched; nothing needs elevation. `-ListOnly` prints the steps. The README says what it touches and what
+  to read in the log: winsock-1's section 4 and coverage-9's per-section checks, each with the suite that shows it,
+  and this lane's. Two Winsock tests serve the run: `winsockErrorIsTheThreadsLastError` (section 3) and a log line
+  from `typeOfService` naming the message type Winsock used.
 
 ## 2. Design calls, with the alternatives rejected
 
@@ -100,6 +111,17 @@ item 5 if time remains; STATUS.md is regenerated once, at the end.
   value with a Win32 code (`WSA_IO_PENDING` is `ERROR_IO_PENDING`) keep the Win32 name. *Rejected*: a table in
   SystemWinSocks that SystemPackage's `debugDescription` would consult through a hook, which buys nothing if the
   sockets move into System, as Michael's note of 10-09 allows.
+- **The first-run script runs each step through `cmd.exe`, into a file it reads as it grows**, rather than through
+  PowerShell's own redirection: `2>&1` in Windows PowerShell turns a native command's standard error into error
+  records, which stop a script under `$ErrorActionPreference = 'Stop'` and print with PowerShell's decorations; cmd
+  keeps the two streams in order and as text, and a process started with `Start-Process` can be timed out. Windows
+  PowerShell 5.1 and PowerShell 7 both run it (no syntax newer than 5.1). *Rejected*: a script that only builds the
+  Windows targets (`swift build --target SystemWinSocks`), which can't run the tests; and the per-suite runs alone,
+  which skip the tests that aren't Windows-only, whose failures on Windows are as much the run's point.
+- **Its suites are found, not listed**: a list in the script would miss the next lane's Windows tests. A file whose
+  first condition is `#if os(Windows)` counts, and its XCTest classes and `@Suite` types become filters ending in
+  `/`, so `Win32PipesTests/` doesn't also select a `Win32PipesTestsExtra`. *Rejected*: one filter per module, which
+  a crash in one suite would end for all.
 - **[getaddrinfo]'s Windows row stays missing**: its three Windows sites (`GetaddrinfoResolver.swift` 215, 216 and
   228) read members through NIO's `CAddrInfo`, which is `addrinfo` in the macOS index but `ADDRINFOW` on Windows,
   where [Windows name resolution] covers it. An artifact of extracting from a macOS index, left to the coverage
@@ -120,6 +142,13 @@ item 5 if time remains; STATUS.md is regenerated once, at the end.
   `throws:AddressResolutionError` entries, and `closeAfter(_:)` by its path. So there was nothing to fix.
 - lint's unit tests (17, two new: helpers per module, a module's platforms where it declares API) and
   adopter-coverage's (32) pass.
+- Tests added or changed, each Windows only, and what each can touch (checked before compiling them; none has run):
+  - `WinsockErrorTests.codesHaveTheirSymbolicNames` (new): reads `debugDescription` for 62 codes; touches nothing.
+  - `WinsockErrorTests.winsockErrorIsTheThreadsLastError` (new): starts Winsock, calls `closesocket(INVALID_SOCKET)`,
+    which names no socket, and reads `WSAGetLastError` and `GetLastError`; it sets its own thread's last error and
+    restores it. No socket, file, process or network.
+  - `SocketMessagesTests.typeOfService` (changed): prints the message types its own loopback datagram's type of service
+    came as; what it sends and receives is unchanged.
 - `Prototype/Win32/check-winsock.sh` failed at the base (5d0b151: "redefinition of '_GUID'", the two models' `GUID`s);
   after the fix it passes: 108 of the model's 185 constants checked against Rust's bindings, 135 SystemWinSocks
   constants against the model, SystemWinSocks (30 files) and its tests (13 files) compile. `check-windows.sh` passes.
@@ -131,7 +160,15 @@ item 5 if time remains; STATUS.md is regenerated once, at the end.
 
 ## 4. What the Windows run must check
 
-(Filled in with the first-run script.)
+`Utilities/windows/README.md`, "What to look at in the log", has the list, each item with the suite that shows it:
+winsock-1's section 4, coverage-9's sections 1, 3, 4, 5 and 7, and this lane's:
+- The manifest on a Windows host: SystemSockets built from `Sources\SystemSockets\WindowsHost` alone, SystemWinSocks
+  and its tests declared, no SystemSocketsTests or samples, no package dependencies, nothing fetched.
+- The build's warnings in `Sources\SystemWinSocks` and `Sources\System\Win32`, which the model can't predict.
+- `Win32.Error`'s Winsock names against the SDK (`WinsockErrorTests.codesHaveTheirSymbolicNames`).
+- Whether Winsock's last error is the thread's last error (`WinsockErrorTests.winsockErrorIsTheThreadsLastError`):
+  if it is, `Win32.Error.current` serves a caller's own Winsock calls, and mapping.ini's `[Winsock errors]` can say so.
+- The message type of a received type of service: the log line from `SocketMessagesTests.typeOfService`.
 
 ## 5. Needs outside the lane's files
 
