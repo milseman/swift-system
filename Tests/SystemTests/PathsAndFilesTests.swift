@@ -7,7 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-#if !os(Windows) && !os(WASI)
+#if !os(Windows)
 
 import Testing
 
@@ -23,6 +23,8 @@ import Darwin
 import Glibc
 #elseif canImport(Musl)
 import Musl
+#elseif canImport(WASILibc)
+import WASILibc
 #elseif canImport(Android)
 import Android
 #endif
@@ -36,18 +38,27 @@ private struct PathsAndFilesTests {
       try FileDescriptor.open(target, .writeOnly, options: .create, permissions: .ownerReadWrite)
         .close()
       try directory.appending("sub").makeDirectory(permissions: .ownerReadWriteExecute)
-      try directory.appending("link").makeSymbolicLink(to: "sub/../target")
 
       // The temporary directory can itself be behind a link, as /var is on Darwin.
+      #if os(WASI)
+      // WasmKit's readlink fails with ENOTSUP for a file that isn't a link,
+      // where wasi-libc's realpath, which reads each component as a link,
+      // expects EINVAL, so realpath fails there for every path.
+      guard let base = try? directory.canonicalized() else { return }
+      #else
       let base = try directory.canonicalized()
+      #endif
       #expect(base.isAbsolute)
-      #expect(try directory.appending("link").canonicalized() == base.appending("target"))
       #expect(try directory.appending("sub/./../sub//").canonicalized() == base.appending("sub"))
       #expect(throws: Errno.noSuchFileOrDirectory) {
         try directory.appending("missing").canonicalized()
       }
+      #if !os(WASI)
+      try directory.appending("link").makeSymbolicLink(to: "sub/../target")
+      #expect(try directory.appending("link").canonicalized() == base.appending("target"))
       // A relative path resolves against the working directory.
       #expect(try FilePath(".").canonicalized() == (try FilePath.currentWorkingDirectory().canonicalized()))
+      #endif
     }
   }
 
@@ -57,8 +68,6 @@ private struct PathsAndFilesTests {
       let file = directory.appending("file")
       try FileDescriptor.open(file, .writeOnly, options: .create, permissions: .ownerReadWrite)
         .close()
-      let link = directory.appending("link")
-      try link.makeSymbolicLink(to: "file")
       let empty = directory.appending("empty")
       try empty.makeDirectory(permissions: .ownerReadWriteExecute)
       let full = directory.appending("full")
@@ -66,12 +75,17 @@ private struct PathsAndFilesTests {
       try FileDescriptor.open(full.appending("x"), .writeOnly, options: .create, permissions: .ownerReadWrite)
         .close()
 
+      #if !os(WASI)
       // A link goes, and its target stays.
+      let link = directory.appending("link")
+      try link.makeSymbolicLink(to: "file")
       try link.remove()
-      try file.stat()
+      _ = try file.stat()
+      #expect(throws: Errno.noSuchFileOrDirectory) { try link.stat(followTargetSymlink: false) }
+      #endif
       try file.remove()
       try empty.remove()
-      for path in [link, file, empty] {
+      for path in [file, empty] {
         #expect(throws: Errno.noSuchFileOrDirectory) { try path.stat(followTargetSymlink: false) }
       }
       #expect(throws: Errno.self) { try full.remove() }
@@ -80,6 +94,8 @@ private struct PathsAndFilesTests {
     }
   }
 
+  // WASI has no mkostemp or mkdtemp, and no AT_FDCWD descriptor.
+  #if !os(WASI)
   @available(System 199, *)
   @Test func makeUniqueFile() throws {
     try withTemporaryFilePath(basename: "makeUniqueFile") { directory in
@@ -161,6 +177,7 @@ private struct PathsAndFilesTests {
     // It isn't an open descriptor.
     #expect(throws: Errno.badFileDescriptor) { try FileDescriptor.currentWorkingDirectory.stat() }
   }
+  #endif // !os(WASI)
 }
 
-#endif // !os(Windows) && !os(WASI)
+#endif // !os(Windows)

@@ -44,11 +44,9 @@ extension ProcessID {
     @available(*, unavailable, renamed: "success")
     public static var EXIT_SUCCESS: Self { success }
 
-    #if !os(WASI)
     @_alwaysEmitIntoClient
     @available(*, unavailable, renamed: "success")
     public static var EX_OK: Self { success }
-    #endif
 
     /// Failure, for no particular reason.
     ///
@@ -62,7 +60,6 @@ extension ProcessID {
   }
 }
 
-#if !os(WASI)
 @available(System 199, *)
 extension ProcessID.ExitCode {
   /// The command was used incorrectly:
@@ -228,7 +225,6 @@ extension ProcessID.ExitCode {
   @available(*, unavailable, renamed: "configurationError")
   public static var EX_CONFIG: Self { configurationError }
 }
-#endif // !os(WASI)
 
 @available(System 199, *)
 extension ProcessID.ExitCode: CustomStringConvertible, CustomDebugStringConvertible {
@@ -240,7 +236,6 @@ extension ProcessID.ExitCode: CustomStringConvertible, CustomDebugStringConverti
     switch self {
     case .success: name = "success"
     case .failure: name = "failure"
-    #if !os(WASI)
     case .usageError: name = "usageError"
     case .dataError: name = "dataError"
     case .cannotOpenInput: name = "cannotOpenInput"
@@ -256,7 +251,6 @@ extension ProcessID.ExitCode: CustomStringConvertible, CustomDebugStringConverti
     case .protocolError: name = "protocolError"
     case .permissionDenied: name = "permissionDenied"
     case .configurationError: name = "configurationError"
-    #endif
     default: name = nil
     }
     guard let name else { return "\(rawValue)" }

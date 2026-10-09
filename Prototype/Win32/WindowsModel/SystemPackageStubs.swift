@@ -132,6 +132,8 @@ public struct Errno: RawRepresentable, Error, Hashable, Codable { // mirrors: So
   @_alwaysEmitIntoClient
   public static var outOfRange: Errno { .init(rawValue: 34) }
   @_alwaysEmitIntoClient
+  public static var directoryNotEmpty: Errno { .init(rawValue: 41) }
+  @_alwaysEmitIntoClient
   public static var noData: Errno { .init(rawValue: 120) }
   @_alwaysEmitIntoClient
   public static var notSupported: Errno { .init(rawValue: 129) }
@@ -256,6 +258,12 @@ public struct FilePermissions: OptionSet, Sendable, Hashable, Codable { // mirro
 internal func _mapWindowsErrorToErrno(_ errorCode: DWORD) -> CInt { 22 } // mirrors: Sources/System/Internals/WindowsSyscallAdapters.swift
 
 internal func system_close(_ fd: Int32) -> Int32 { 0 } // mirrors: Sources/System/Internals/Syscalls.swift
+
+internal func system_strlen(_ s: UnsafePointer<CChar>) -> Int { 0 } // mirrors: Sources/System/Internals/Exports.swift
+
+internal func system_platform_strlen(_ s: UnsafePointer<CInterop.PlatformChar>) -> Int { 0 } // mirrors: Sources/System/Internals/Exports.swift
+
+internal func system_free(_ pointer: UnsafeMutableRawPointer?) {} // mirrors: Sources/System/Internals/Exports.swift
 
 internal func valueOrErrno<I: FixedWidthInteger>( // mirrors: Sources/System/Util.swift
   retryOnInterrupt: Bool, _ f: () -> I

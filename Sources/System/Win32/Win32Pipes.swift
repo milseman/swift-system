@@ -166,7 +166,10 @@ extension Win32.FileHandle {
   /// the client's end itself, as a process does for a child's standard
   /// handles.
   ///
-  /// The corresponding C function is `CreateNamedPipeW`.
+  /// The corresponding C function is `CreateNamedPipeW`, with
+  /// `FILE_FLAG_FIRST_PIPE_INSTANCE`, `PIPE_REJECT_REMOTE_CLIENTS`,
+  /// `PIPE_WAIT`, `PIPE_READMODE_BYTE` or `PIPE_READMODE_MESSAGE`, and a
+  /// `SECURITY_ATTRIBUTES`, as the parameters say.
   @_alwaysEmitIntoClient
   public static func createNamedPipe(
     _ name: FilePath,
@@ -250,7 +253,9 @@ extension Win32.FileHandle {
   /// Needs write access, or, for an end that only reads,
   /// ``Win32/AccessMask/writeAttributes`` as well as read access.
   ///
-  /// The corresponding C function is `SetNamedPipeHandleState`.
+  /// The corresponding C function is `SetNamedPipeHandleState`, with
+  /// `PIPE_READMODE_BYTE` or `PIPE_READMODE_MESSAGE`, and `PIPE_WAIT` or
+  /// `PIPE_NOWAIT`, as the parameters say.
   @_alwaysEmitIntoClient
   public func setPipeMode(
     readMode: Win32.PipeType = .byteStream,
@@ -275,7 +280,10 @@ extension Win32.OverlappedFileHandle {
   /// can report that they finished before they have.
   ///
   /// The corresponding C function is `CreateNamedPipeW`, with
-  /// `FILE_FLAG_OVERLAPPED`.
+  /// `FILE_FLAG_OVERLAPPED`, `FILE_FLAG_FIRST_PIPE_INSTANCE`,
+  /// `PIPE_REJECT_REMOTE_CLIENTS`, `PIPE_WAIT`, `PIPE_READMODE_BYTE` or
+  /// `PIPE_READMODE_MESSAGE`, and a `SECURITY_ATTRIBUTES`, as the parameters
+  /// say.
   @_alwaysEmitIntoClient
   public static func createNamedPipe(
     _ name: FilePath,

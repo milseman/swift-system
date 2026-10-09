@@ -27,7 +27,7 @@ extension ProcessID {
   /// this method throws ``Errno/noSuchProcess``.
   ///
   /// The corresponding C function is `proc_pidpath`.
-  /// - Note: Only available on macOS.
+  /// - Note: Only available on macOS, Linux, Android, and FreeBSD.
   @_alwaysEmitIntoClient
   public func executablePath() throws(Errno) -> FilePath {
     try _executablePath().get()

@@ -32,7 +32,8 @@ extension Win32 {
   /// Throws ``Win32/Error/alreadyExists`` if a file or directory exists at
   /// `path`, and ``Win32/Error/pathNotFound`` if its parent doesn't exist.
   ///
-  /// The corresponding C function is `CreateDirectoryW`.
+  /// The corresponding C function is `CreateDirectoryW`, with a
+  /// `SECURITY_ATTRIBUTES` that holds the security descriptor.
   @_alwaysEmitIntoClient
   public static func createDirectory(
     _ path: FilePath,
@@ -253,7 +254,8 @@ extension Win32 {
   /// of its own, from its directory. A destination that's hidden or
   /// read-only isn't replaced, and throws ``Win32/Error/accessDenied``.
   ///
-  /// The corresponding C function is `CopyFile2`.
+  /// The corresponding C function is `CopyFile2`, with
+  /// `COPYFILE2_EXTENDED_PARAMETERS`.
   @_alwaysEmitIntoClient
   public static func copyFile(
     _ source: FilePath,
@@ -474,7 +476,7 @@ extension Win32.FileHandle {
   /// ``Win32/Error/invalidParameter`` or ``Win32/Error/notSupported``.
   ///
   /// The corresponding C function is `SetFileInformationByHandle`, with
-  /// `FileDispositionInfoEx`.
+  /// `FileDispositionInfoEx` and a `FILE_DISPOSITION_INFO_EX`.
   @_alwaysEmitIntoClient
   public func setDisposition(_ flags: Win32.DispositionFlags) throws(Win32.Error) {
     try Win32._setDisposition(_handle, flags.rawValue).get()
@@ -493,7 +495,7 @@ extension Win32.FileHandle {
   /// renamed file.
   ///
   /// The corresponding C function is `SetFileInformationByHandle`, with
-  /// `FileRenameInfoEx`.
+  /// `FileRenameInfoEx` and a `FILE_RENAME_INFO`.
   @_alwaysEmitIntoClient
   public func rename(
     to destination: FilePath,
@@ -511,7 +513,7 @@ extension Win32.DirectoryHandle {
   /// ``Win32/FileHandle/setDisposition(_:)``.
   ///
   /// The corresponding C function is `SetFileInformationByHandle`, with
-  /// `FileDispositionInfoEx`.
+  /// `FileDispositionInfoEx` and a `FILE_DISPOSITION_INFO_EX`.
   @_alwaysEmitIntoClient
   public func setDisposition(_ flags: Win32.DispositionFlags) throws(Win32.Error) {
     try Win32._setDisposition(_handle, flags.rawValue).get()
@@ -523,7 +525,7 @@ extension Win32.DirectoryHandle {
   /// `destination` isn't replaced.
   ///
   /// The corresponding C function is `SetFileInformationByHandle`, with
-  /// `FileRenameInfoEx`.
+  /// `FileRenameInfoEx` and a `FILE_RENAME_INFO`.
   @_alwaysEmitIntoClient
   public func rename(
     to destination: FilePath,

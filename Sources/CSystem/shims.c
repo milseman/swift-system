@@ -985,6 +985,14 @@ extern int csystem_strncasecmp_l(const char *a, const char *b, size_t count, voi
 extern char *csystem_nl_langinfo_l(int item, void *locale) {
   return nl_langinfo_l((nl_item)item, (locale_t)locale);
 }
+
+#include <sys/types.h>
+#include <sys/sysctl.h>
+
+extern int csystem_kern_proc_pathname(int pid, char *buffer, size_t *size) {
+  int mib[4] = { CTL_KERN, KERN_PROC, KERN_PROC_PATHNAME, pid };
+  return sysctl(mib, 4, buffer, size, NULL, 0);
+}
 #endif // defined(__FreeBSD__)
 
 #if defined(__wasi__)
@@ -992,6 +1000,20 @@ extern char *csystem_nl_langinfo_l(int item, void *locale) {
 
 extern size_t csystem_malloc_usable_size(const void *pointer) {
   return malloc_usable_size((void *)pointer);
+}
+
+// MAXSYMLINKS, from <sys/param.h>, which WASILibc's module doesn't include.
+#include <sys/param.h>
+int _system_get_MAXSYMLINKS(void) { return MAXSYMLINKS; }
+
+// wasi-libc's <string.h> declares memmem only with _GNU_SOURCE, which would
+// change other declarations in this file, so this declares it alone, as
+// wasi-libc defines it.
+void *memmem(const void *haystack, size_t haystackCount, const void *needle, size_t needleCount);
+
+extern void *csystem_memmem(const void *haystack, size_t haystackCount,
+                            const void *needle, size_t needleCount) {
+  return memmem(haystack, haystackCount, needle, needleCount);
 }
 #endif // defined(__wasi__)
 

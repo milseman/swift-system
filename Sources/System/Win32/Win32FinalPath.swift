@@ -77,7 +77,9 @@ extension Win32.FileHandle {
   /// ``Win32/Error/badPathName`` for a pipe, ``Win32/Error/invalidParameter``
   /// for `NUL`, and ``Win32/Error/invalidFunction`` for a console or volume.
   ///
-  /// The corresponding C function is `GetFinalPathNameByHandleW`.
+  /// The corresponding C function is `GetFinalPathNameByHandleW`, with
+  /// `FILE_NAME_NORMALIZED` or `FILE_NAME_OPENED`, as the normalized
+  /// parameter says.
   @_alwaysEmitIntoClient
   public func finalPath(
     volumeName: Win32.VolumeNameFormat = .dos,
@@ -99,7 +101,9 @@ extension Win32.DirectoryHandle {
   ///
   /// See ``Win32/FileHandle/finalPath(volumeName:normalized:)``.
   ///
-  /// The corresponding C function is `GetFinalPathNameByHandleW`.
+  /// The corresponding C function is `GetFinalPathNameByHandleW`, with
+  /// `FILE_NAME_NORMALIZED` or `FILE_NAME_OPENED`, as the normalized
+  /// parameter says.
   @_alwaysEmitIntoClient
   public func finalPath(
     volumeName: Win32.VolumeNameFormat = .dos,

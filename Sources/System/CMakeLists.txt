@@ -325,6 +325,7 @@ target_sources(SystemPackage PRIVATE
   Terminal/TerminalFlags.swift
   Terminal/TerminalJobControl.swift
   Terminal/TerminalOperations.swift
+  Terminal/TerminalWASI.swift
   Terminal/TerminalWindowSize.swift)
 target_sources(SystemPackage PRIVATE
   Internals/Constants+Threads.swift
@@ -366,13 +367,16 @@ target_sources(SystemPackage PRIVATE
   VectoredIO/VectoredIO.swift)
 target_sources(SystemPackage PRIVATE
   Win32/BrokenDownTimeWindows.swift
+  Win32/CStringWindows.swift
   Win32/DynamicLibraryWindows.swift
   Win32/FilePathResolutionWindows.swift
   Win32/FileStreamWindows.swift
+  Win32/MemoryWindows.swift
   Win32/PathsWindows.swift
   Win32/ProcessEnvironmentWindows.swift
   Win32/ProcessExitWindows.swift
   Win32/ProcessIDWindows.swift
+  Win32/SignalWindows.swift
   Win32/Win32.swift
   Win32/Win32AccessToken.swift
   Win32/Win32CommandLine.swift
@@ -390,15 +394,20 @@ target_sources(SystemPackage PRIVATE
   Win32/Win32HResult.swift
   Win32/Win32HandleOperations.swift
   Win32/Win32Jobs.swift
+  Win32/Win32KnownFolders.swift
+  Win32/Win32LocalMemory.swift
   Win32/Win32Locking.swift
   Win32/Win32LongPaths.swift
+  Win32/Win32NTStatus.swift
   Win32/Win32NetworkAdapters.swift
   Win32/Win32Open.swift
   Win32/Win32OverlappedIO.swift
+  Win32/Win32Passphrase.swift
   Win32/Win32PathOperations.swift
   Win32/Win32Pipes.swift
   Win32/Win32Process.swift
   Win32/Win32ProcessCreation.swift
+  Win32/Win32ProcessPriority.swift
   Win32/Win32ReparsePoints.swift
   Win32/Win32SecurityDescriptor.swift
   Win32/Win32SecurityIdentifier.swift

@@ -7,7 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
-#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
+#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD)
 
 import Testing
 
@@ -18,7 +18,7 @@ import Testing
 #endif
 
 // Linux requires a namespace, and user. is the one a file's owner can set;
-// Darwin takes any name.
+// Darwin takes any name, and so does FreeBSD, in its user namespace.
 private let name = "user.system-tests.origin"
 
 /// Makes a file in a scratch directory and calls `body` with its path,
@@ -63,6 +63,7 @@ private struct ExtendedAttributesTests {
     }
   }
 
+  #if !os(FreeBSD)
   @available(System 199, *)
   @Test func createAndReplace() throws {
     try withAttributedFile { file in
@@ -76,6 +77,31 @@ private struct ExtendedAttributesTests {
       try file.setExtendedAttribute(name, to: [3], options: .replace)
       #expect(try file.extendedAttribute(name) == [3])
     }
+  }
+  #else
+  @available(System 199, *)
+  @Test func freeBSDTakesNoOptions() throws {
+    try withAttributedFile { file in
+      #expect(throws: Errno.invalidArgument) {
+        try file.setExtendedAttribute(name, to: [1], options: ExtendedAttributeOptions(rawValue: 1))
+      }
+      // A set creates the attribute, or replaces it.
+      try file.setExtendedAttribute(name, to: [1])
+      try file.setExtendedAttribute(name, to: [2])
+      #expect(try file.extendedAttribute(name) == [2])
+    }
+  }
+  #endif
+
+  @available(System 199, *)
+  @Test func listsOfNames() {
+    #expect(_attributeNames(nullSeparated: Array("a\0bc\0".utf8)) == ["a", "bc"])
+    #expect(_attributeNames(nullSeparated: []) == [])
+    // FreeBSD's: a length byte, then the name.
+    #expect(_attributeNames(lengthPrefixed: [1] + Array("a".utf8) + [2] + Array("bc".utf8)) == ["a", "bc"])
+    #expect(_attributeNames(lengthPrefixed: []) == [])
+    // A list cut short keeps what it has.
+    #expect(_attributeNames(lengthPrefixed: [3] + Array("ab".utf8)) == ["ab"])
   }
 
   @available(System 199, *)
@@ -155,4 +181,4 @@ private struct ExtendedAttributesTests {
   }
 }
 
-#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
+#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD)

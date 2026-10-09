@@ -7,6 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
+// FreeBSD's extattr calls take no options, so it has none of these.
 #if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
 
 #if SYSTEM_PACKAGE_DARWIN

@@ -11,7 +11,7 @@
 // open or openat with O_EXCL). XCTest, since they set the process's
 // creation mask.
 
-#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
+#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD)
 
 import XCTest
 #if SYSTEM_PACKAGE_DARWIN
@@ -172,4 +172,4 @@ final class UniqueFilesWithPermissionsTest: XCTestCase {
   #endif
 }
 
-#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
+#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD)

@@ -195,6 +195,34 @@ typedef union _LARGE_INTEGER {
 #define ERROR_IO_PENDING 997
 #define ERROR_USER_MAPPED_FILE 1224
 #define ERROR_CANT_RESOLVE_FILENAME 1921
+#define ERROR_INVALID_BLOCK 9
+#define ERROR_INVALID_ACCESS 12
+#define ERROR_INVALID_DATA 13
+#define ERROR_INVALID_DRIVE 15
+#define ERROR_CURRENT_DIRECTORY 16
+#define ERROR_NO_MORE_FILES 18
+#define ERROR_WRITE_PROTECT 19
+#define ERROR_BAD_NETPATH 53
+#define ERROR_NETWORK_ACCESS_DENIED 65
+#define ERROR_BAD_NET_NAME 67
+#define ERROR_CANNOT_MAKE 82
+#define ERROR_FAIL_I24 83
+#define ERROR_DRIVE_LOCKED 108
+#define ERROR_BUFFER_OVERFLOW 111
+#define ERROR_INVALID_TARGET_HANDLE 114
+#define ERROR_SEEK_ON_DEVICE 132
+#define ERROR_LABEL_TOO_LONG 154
+#define ERROR_BAD_ARGUMENTS 160
+#define ERROR_MAX_THRDS_REACHED 164
+#define ERROR_LOCK_FAILED 167
+#define ERROR_INVALID_STARTING_CODESEG 188
+#define ERROR_FILENAME_EXCED_RANGE 206
+#define ERROR_DISK_RESOURCES_EXHAUSTED 314
+#define ERROR_FILE_SYSTEM_LIMITATION 665
+#define ERROR_NOT_FOUND 1168
+#define ERROR_CANCELLED 1223
+#define ERROR_TIMEOUT 1460
+#define NO_ERROR 0
 #define FACILITY_WIN32 7
 
 // minwinbase.h, fileapi.h, handleapi.h, winbase.h
@@ -318,6 +346,7 @@ typedef struct _FILE_END_OF_FILE_INFO {
 
 #define FORMAT_MESSAGE_ALLOCATE_BUFFER 0x00000100
 #define FORMAT_MESSAGE_IGNORE_INSERTS 0x00000200
+#define FORMAT_MESSAGE_FROM_HMODULE 0x00000800
 #define FORMAT_MESSAGE_FROM_SYSTEM 0x00001000
 
 DWORD GetLastError(void);
@@ -567,6 +596,70 @@ DWORD WaitForSingleObject(HANDLE hHandle, DWORD dwMilliseconds);
 
 typedef ULONG_PTR SIZE_T, *PSIZE_T;
 typedef const WCHAR *LPCWCH;
+
+// winnt.h defines RtlSecureZeroMemory inline, with volatile stores, and
+// SecureZeroMemory as a macro for it.
+PVOID RtlSecureZeroMemory(PVOID ptr, SIZE_T cnt);
+
+// winbase.h: the local heap's allocation, which LocalFree frees.
+HLOCAL LocalAlloc(UINT uFlags, SIZE_T uBytes);
+
+// handleapi.h, from Windows 10, version 1607.
+BOOL CompareObjectHandles(HANDLE hFirstObjectHandle, HANDLE hSecondObjectHandle);
+
+// consoleapi.h: console I/O. The input control is a
+// PCONSOLE_READCONSOLE_CONTROL, which System passes as NULL.
+BOOL ReadConsoleW(HANDLE hConsoleInput, LPVOID lpBuffer, DWORD nNumberOfCharsToRead,
+                  LPDWORD lpNumberOfCharsRead, PVOID pInputControl);
+BOOL WriteConsoleW(HANDLE hConsoleOutput, const void *lpBuffer, DWORD nNumberOfCharsToWrite,
+                   LPDWORD lpNumberOfCharsWritten, LPVOID lpReserved);
+
+// processthreadsapi.h: priority classes.
+#define IDLE_PRIORITY_CLASS 0x00000040
+#define BELOW_NORMAL_PRIORITY_CLASS 0x00004000
+#define NORMAL_PRIORITY_CLASS 0x00000020
+#define ABOVE_NORMAL_PRIORITY_CLASS 0x00008000
+#define HIGH_PRIORITY_CLASS 0x00000080
+#define REALTIME_PRIORITY_CLASS 0x00000100
+DWORD GetPriorityClass(HANDLE hProcess);
+BOOL SetPriorityClass(HANDLE hProcess, DWORD dwPriorityClass);
+
+// guiddef.h, knownfolders.h, shlobj_core.h and combaseapi.h: known folders.
+// Data1 is an unsigned long, 32 bits on Windows.
+typedef struct _GUID {
+  unsigned int Data1;
+  unsigned short Data2;
+  unsigned short Data3;
+  unsigned char Data4[8];
+} GUID;
+typedef GUID KNOWNFOLDERID;
+typedef const KNOWNFOLDERID *REFKNOWNFOLDERID;
+typedef enum KNOWN_FOLDER_FLAG : int {
+  KF_FLAG_DEFAULT = 0x00000000,
+  KF_FLAG_CREATE = 0x00008000,
+  KF_FLAG_DONT_VERIFY = 0x00004000,
+  KF_FLAG_NO_ALIAS = 0x00001000,
+  KF_FLAG_DEFAULT_PATH = 0x00000400,
+} KNOWN_FOLDER_FLAG;
+extern const KNOWNFOLDERID FOLDERID_ProgramFiles;
+extern const KNOWNFOLDERID FOLDERID_ProgramFilesX86;
+extern const KNOWNFOLDERID FOLDERID_UserProgramFiles;
+extern const KNOWNFOLDERID FOLDERID_ProgramData;
+extern const KNOWNFOLDERID FOLDERID_System;
+extern const KNOWNFOLDERID FOLDERID_Windows;
+extern const KNOWNFOLDERID FOLDERID_LocalAppData;
+extern const KNOWNFOLDERID FOLDERID_RoamingAppData;
+extern const KNOWNFOLDERID FOLDERID_Profile;
+extern const KNOWNFOLDERID FOLDERID_UserProfiles;
+extern const KNOWNFOLDERID FOLDERID_Desktop;
+extern const KNOWNFOLDERID FOLDERID_Documents;
+extern const KNOWNFOLDERID FOLDERID_Downloads;
+extern const KNOWNFOLDERID FOLDERID_Music;
+extern const KNOWNFOLDERID FOLDERID_Pictures;
+extern const KNOWNFOLDERID FOLDERID_Videos;
+extern const KNOWNFOLDERID FOLDERID_Public;
+HRESULT SHGetKnownFolderPath(REFKNOWNFOLDERID rfid, DWORD dwFlags, HANDLE hToken, PWSTR *ppszPath);
+void CoTaskMemFree(LPVOID pv);
 
 struct _PROC_THREAD_ATTRIBUTE_LIST;
 typedef struct _PROC_THREAD_ATTRIBUTE_LIST *PPROC_THREAD_ATTRIBUTE_LIST,

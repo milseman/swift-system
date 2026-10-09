@@ -42,6 +42,18 @@ internal func system_CloseHandle(_ hObject: HANDLE) -> Bool {
   CloseHandle(hObject)
 }
 
+internal func system_CompareObjectHandles(_ first: HANDLE, _ second: HANDLE) -> Bool {
+  CompareObjectHandles(first, second)
+}
+
+internal func system_GetPriorityClass(_ hProcess: HANDLE) -> DWORD {
+  GetPriorityClass(hProcess)
+}
+
+internal func system_SetPriorityClass(_ hProcess: HANDLE, _ dwPriorityClass: DWORD) -> Bool {
+  SetPriorityClass(hProcess, dwPriorityClass)
+}
+
 internal func system_CreateFileW(
   _ lpFileName: UnsafePointer<WCHAR>,
   _ dwDesiredAccess: DWORD,
@@ -750,6 +762,113 @@ internal func system__wchdir(_ path: UnsafePointer<WCHAR>) -> CInt {
   if mockingEnabled { return _mock(path: path) }
 #endif
   return _wchdir(path)
+}
+
+// MARK: - The C runtime's allocator and string functions
+
+// A mocked allocation records its arguments and fails if an error is
+// forced; otherwise it allocates for real, as Syscalls+Memory.swift's do.
+// free is system_free, in Exports.swift.
+internal func system_malloc(_ size: Int) -> UnsafeMutableRawPointer? {
+#if ENABLE_MOCKING
+  if mockingEnabled, _mock(size) != 0 { return nil }
+#endif
+  return malloc(size)
+}
+
+internal func system_calloc(_ count: Int, _ size: Int) -> UnsafeMutableRawPointer? {
+#if ENABLE_MOCKING
+  if mockingEnabled, _mock(count, size) != 0 { return nil }
+#endif
+  return calloc(count, size)
+}
+
+internal func system_realloc(
+  _ pointer: UnsafeMutableRawPointer?, _ size: Int
+) -> UnsafeMutableRawPointer? {
+#if ENABLE_MOCKING
+  if mockingEnabled, _mock(pointer, size) != 0 { return nil }
+#endif
+  return realloc(pointer, size)
+}
+
+internal func system_memchr(
+  _ start: UnsafeRawPointer, _ byte: CInt, _ count: Int
+) -> UnsafeMutableRawPointer? {
+  memchr(start, byte, count)
+}
+
+// Stores that the compiler can't remove: winnt.h defines it inline, with
+// volatile stores, and SecureZeroMemory as its name.
+internal func system_RtlSecureZeroMemory(_ start: UnsafeMutableRawPointer, _ count: Int) {
+  _ = RtlSecureZeroMemory(start, SIZE_T(count))
+}
+
+internal func system_strnlen(_ string: UnsafePointer<CChar>, _ maxLength: Int) -> Int {
+  strnlen(string, maxLength)
+}
+
+internal func system__strdup(_ string: UnsafePointer<CChar>) -> UnsafeMutablePointer<CChar>? {
+#if ENABLE_MOCKING
+  if mockingEnabled, _mock(path: nil, String(cString: string)) != 0 { return nil }
+#endif
+  return _strdup(string)
+}
+
+// MARK: - Known folders
+
+internal func system_SHGetKnownFolderPath(
+  _ rfid: UnsafePointer<KNOWNFOLDERID>, _ dwFlags: DWORD, _ hToken: HANDLE?,
+  _ ppszPath: UnsafeMutablePointer<PWSTR?>
+) -> HRESULT {
+  SHGetKnownFolderPath(rfid, dwFlags, hToken, ppszPath)
+}
+
+internal func system_CoTaskMemFree(_ pv: UnsafeMutableRawPointer?) {
+  CoTaskMemFree(pv)
+}
+
+// MARK: - Console I/O
+
+internal func system_ReadConsoleW(
+  _ hConsoleInput: HANDLE, _ lpBuffer: UnsafeMutableRawPointer, _ nNumberOfCharsToRead: DWORD,
+  _ lpNumberOfCharsRead: UnsafeMutablePointer<DWORD>
+) -> Bool {
+  ReadConsoleW(hConsoleInput, lpBuffer, nNumberOfCharsToRead, lpNumberOfCharsRead, nil)
+}
+
+internal func system_WriteConsoleW(
+  _ hConsoleOutput: HANDLE, _ lpBuffer: UnsafeRawPointer, _ nNumberOfCharsToWrite: DWORD,
+  _ lpNumberOfCharsWritten: UnsafeMutablePointer<DWORD>
+) -> Bool {
+  WriteConsoleW(hConsoleOutput, lpBuffer, nNumberOfCharsToWrite, lpNumberOfCharsWritten, nil)
+}
+
+// MARK: - Signals
+
+// The C runtime reports a number that names no signal to its invalid
+// parameter handler, which ends the process by default.
+internal func system_raise(_ signal: CInt) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(signal) }
+#endif
+  return _withReturningInvalidParameterHandler { raise(signal) }
+}
+
+// MARK: - Paths
+
+internal func system__wremove(_ path: UnsafePointer<WCHAR>) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(path: path) }
+#endif
+  return _wremove(path)
+}
+
+internal func system__wrmdir(_ path: UnsafePointer<WCHAR>) -> CInt {
+#if ENABLE_MOCKING
+  if mockingEnabled { return _mock(path: path) }
+#endif
+  return _wrmdir(path)
 }
 
 internal func system_GetModuleFileNameW(

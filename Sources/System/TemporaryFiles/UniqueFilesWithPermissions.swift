@@ -13,11 +13,11 @@
 // mkstemp's 0600 followed by fchmod, the permissions pass through the
 // creation mask, as open's do.
 //
-// On Linux and Android, System makes the name itself, from the standard
-// library's random numbers: glibc's linker warns at every link of a program
-// that calls mktemp. (So does OpenBSD's, which isn't here.)
+// On Linux, Android, FreeBSD and OpenBSD, System makes the name itself, from
+// the standard library's random numbers: glibc's linker warns at every link
+// of a program that calls mktemp, and so does OpenBSD's.
 
-#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
+#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD)
 
 #if SYSTEM_PACKAGE_DARWIN
 import Darwin
@@ -64,13 +64,14 @@ extension FilePath {
   /// setting them afterward, with ``FileDescriptor/setPermissions(_:retryOnInterrupt:)``,
   /// doesn't apply the creation mask.
   ///
-  /// On Linux and Android, this method makes the name itself,
-  /// with letters and digits, as `mktemp` does:
-  /// glibc's linker warns about every program that calls `mktemp`.
+  /// On Linux, Android, FreeBSD and OpenBSD, this method makes the name
+  /// itself, with letters and digits, as `mktemp` does:
+  /// glibc's and OpenBSD's linkers warn about every program that calls
+  /// `mktemp`.
   ///
   /// The corresponding C functions are `mktemp`, which makes the name,
   /// and `open`, which creates the file.
-  /// - Note: Only available on Darwin, Linux, and Android.
+  /// - Note: Only available on Darwin, Linux, Android, FreeBSD, and OpenBSD.
   @_alwaysEmitIntoClient
   public func makeUniqueFile(
     options: FileDescriptor.OpenOptions = [],
@@ -106,7 +107,7 @@ extension FilePath {
   ///
   /// The corresponding C functions are `mktemp`, which makes the name,
   /// and `openat`, which creates the file.
-  /// - Note: Only available on Darwin, Linux, and Android.
+  /// - Note: Only available on Darwin, Linux, Android, FreeBSD, and OpenBSD.
   @_alwaysEmitIntoClient
   public func makeUniqueFile(
     relativeTo directory: FileDescriptor,
@@ -208,4 +209,4 @@ extension FilePath {
   }
 }
 
-#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
+#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD)

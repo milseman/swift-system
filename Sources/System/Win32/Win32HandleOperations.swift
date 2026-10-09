@@ -27,7 +27,8 @@ extension Win32.FileHandle {
   ///
   /// - Returns: A new owned handle. The caller must close it.
   ///
-  /// The corresponding C function is `DuplicateHandle`.
+  /// The corresponding C function is `DuplicateHandle`, with
+  /// `DUPLICATE_SAME_ACCESS` for the same rights.
   @_alwaysEmitIntoClient
   public borrowing func duplicate(
     access: Win32.AccessMask? = nil,
@@ -101,7 +102,8 @@ extension Win32.DirectoryHandle {
   ///
   /// - Returns: A new owned handle. The caller must close it.
   ///
-  /// The corresponding C function is `DuplicateHandle`.
+  /// The corresponding C function is `DuplicateHandle`, with
+  /// `DUPLICATE_SAME_ACCESS` for the same rights.
   @_alwaysEmitIntoClient
   public borrowing func duplicate(
     access: Win32.AccessMask? = nil,
@@ -152,6 +154,32 @@ extension Win32.DirectoryHandle {
   @_alwaysEmitIntoClient
   public borrowing func setInheritable(_ value: Bool) throws(Win32.Error) {
     try Win32._setInheritable(_handle, value).get()
+  }
+}
+
+@available(System 199, *)
+extension Win32 {
+  /// Returns whether two handles refer to the same kernel object.
+  ///
+  /// Two handles of one object compare equal however they were made:
+  /// duplicated, inherited, or opened separately, as two opens of one
+  /// file make two objects, which don't. The pseudo-handles of
+  /// `GetCurrentProcess` and `GetCurrentThread` refer to the calling
+  /// process and thread, so a thread's handle compares equal to the
+  /// calling thread's pseudo-handle only on that thread.
+  ///
+  /// The handles are borrowed: pass an owner's ``Win32/FileHandle/unsafeRawHandle``,
+  /// which stays valid while the owner lives.
+  ///
+  /// The corresponding C function is `CompareObjectHandles`.
+  @_alwaysEmitIntoClient
+  public static func handlesReferToSameObject(_ first: HANDLE, _ second: HANDLE) -> Bool {
+    _handlesReferToSameObject(first, second)
+  }
+
+  @usableFromInline
+  internal static func _handlesReferToSameObject(_ first: HANDLE, _ second: HANDLE) -> Bool {
+    system_CompareObjectHandles(first, second)
   }
 }
 

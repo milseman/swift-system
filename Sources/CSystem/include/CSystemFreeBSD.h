@@ -30,4 +30,9 @@ extern float csystem_strtof_l(const char *string, char **end, void *locale);
 extern int csystem_strncasecmp_l(const char *a, const char *b, size_t count, void *locale);
 extern char *csystem_nl_langinfo_l(int item, void *locale);
 
+// sysctl's KERN_PROC_PATHNAME for a process, from <sys/sysctl.h>, which
+// FreeBSD's Swift module doesn't include; see shims.c. `size` is the
+// buffer's size in, and the path's, with its terminator, out.
+extern int csystem_kern_proc_pathname(int pid, char *buffer, size_t *size);
+
 #endif // defined(__FreeBSD__)

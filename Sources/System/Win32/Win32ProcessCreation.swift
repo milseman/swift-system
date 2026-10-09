@@ -193,7 +193,11 @@ extension Win32.ProcessHandle {
   /// ``Win32/Error/fileNotFound``.
   ///
   /// The corresponding C function is `CreateProcessW`, with
-  /// `PROC_THREAD_ATTRIBUTE_HANDLE_LIST`.
+  /// `PROC_THREAD_ATTRIBUTE_HANDLE_LIST`, `STARTUPINFOEXW` or `STARTUPINFOW`,
+  /// `STARTF_USESTDHANDLES`, `CREATE_UNICODE_ENVIRONMENT`,
+  /// `EXTENDED_STARTUPINFO_PRESENT`, `InitializeProcThreadAttributeList`,
+  /// `UpdateProcThreadAttribute`, `DeleteProcThreadAttributeList`, and a
+  /// `PROCESS_INFORMATION`, which this returns the parts of.
   @_alwaysEmitIntoClient
   public static func create(
     commandLine: String,

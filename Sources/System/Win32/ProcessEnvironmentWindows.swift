@@ -190,7 +190,8 @@ extension ProcessEnvironment {
   /// `=C:`, in which the command shell and the C runtime record each
   /// drive's current directory.
   ///
-  /// The corresponding C function is `GetEnvironmentStringsW`.
+  /// The corresponding C functions are `GetEnvironmentStringsW` and
+  /// `FreeEnvironmentStringsW`, which frees its block.
   @_alwaysEmitIntoClient
   public static func entries() -> [(name: String, value: String)] {
     _entries()
@@ -229,7 +230,8 @@ extension ProcessEnvironment {
   /// This method reaches the environment's code units,
   /// including those that aren't valid UTF-16.
   ///
-  /// The corresponding C function is `GetEnvironmentStringsW`.
+  /// The corresponding C functions are `GetEnvironmentStringsW` and
+  /// `FreeEnvironmentStringsW`, which frees its block.
   @_alwaysEmitIntoClient
   public static func withUnsafeEntries<R>(
     _ body: (UnsafePointer<CInterop.PlatformChar>) throws -> R

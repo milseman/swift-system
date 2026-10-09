@@ -100,12 +100,46 @@ extension Win32.HResult {
   /// The Win32 error code that a failure in `FACILITY_WIN32` carries, or
   /// `nil` for a success or a failure in another facility.
   ///
-  /// The corresponding C macro is `HRESULT_CODE`, for a failure whose
-  /// `HRESULT_FACILITY` is `FACILITY_WIN32`.
+  /// ``Win32/Error/init(hResult:)`` gives every result code a Win32 error
+  /// code, as System's Win32 API reports one.
+  ///
+  /// The corresponding C macro is `HRESULT_CODE`, for a failure in
+  /// `FACILITY_WIN32`.
   @_alwaysEmitIntoClient
   public var win32Error: Win32.Error? {
     guard isFailure, DWORD(facility) == _FACILITY_WIN32 else { return nil }
     return Win32.Error(rawValue: DWORD(code))
+  }
+}
+
+@available(System 199, *)
+extension Win32.Error {
+  /// Creates the Win32 error code that a result code carries.
+  ///
+  /// A failure in `FACILITY_WIN32` becomes the Win32 error code in its low
+  /// 16 bits, which ``Win32/HResult/win32Error`` returns. A failure in
+  /// another facility becomes its bit pattern: its severity bit is set,
+  /// and Windows reads such a code as an `HRESULT` wherever it expects a
+  /// system error code, as ``description`` does. A success, such as
+  /// ``Win32/HResult/ok`` or ``Win32/HResult/false``, becomes ``success``.
+  ///
+  /// This is how System's Win32 API reports a function it wraps that
+  /// returns an `HRESULT`, such as `PathAllocCanonicalize`, so a call to
+  /// such a function that System doesn't wrap can throw what it returns
+  /// the same way:
+  ///
+  ///     let result = Win32.HResult(PathAllocCanonicalize(path, flags, &canonical))
+  ///     guard result.isSuccess else { throw Win32.Error(hResult: result) }
+  ///
+  /// The corresponding C macro is `HRESULT_CODE`, for a failure in
+  /// `FACILITY_WIN32`.
+  @_alwaysEmitIntoClient
+  public init(hResult result: Win32.HResult) {
+    guard result.isFailure else {
+      self = .success
+      return
+    }
+    self = result.win32Error ?? Win32.Error(rawValue: DWORD(bitPattern: result.rawValue))
   }
 }
 

@@ -39,6 +39,11 @@ extension Win32 {
     /// When the path, with its terminator, reaches `CreateDirectoryW`'s
     /// limit of 248 characters, the lowest of the path functions', whether
     /// or not the process is long-path aware.
+    ///
+    /// The corresponding C constant is `PATHCCH_ALLOW_LONG_PATHS`, with
+    /// `PATHCCH_ENSURE_IS_EXTENDED_LENGTH_PATH` from that limit; the first
+    /// alone adds the prefix only past 260 characters, and only in a process
+    /// that isn't long-path aware.
     case whenNeeded
 
     /// Always, as `\\?\C:\dir` or `\\?\UNC\server\share\dir`.
@@ -51,6 +56,20 @@ extension Win32 {
 
 @available(System 199, *)
 extension Win32 {
+  /// The length of the longest path that Win32's path functions take
+  /// without the `\\?\` prefix, in UTF-16 code units, counting the
+  /// terminator: 260.
+  ///
+  /// A buffer of this many `WCHAR`s holds such a path. Windows can return
+  /// longer ones, with the prefix or to a long-path-aware process, so a
+  /// function that writes a path into a buffer needs a larger one then, as
+  /// System's own calls do: ``fullPath(of:extendedLengthPrefix:)`` takes
+  /// any length.
+  ///
+  /// The corresponding C constant is `MAX_PATH`.
+  @_alwaysEmitIntoClient
+  public static var maxPathLength: Int { 260 }
+
   /// Returns the full path of `path`, as Win32 path functions should
   /// receive it.
   ///

@@ -50,6 +50,25 @@ int _isatty(int _FileHandle);
 // spells it as WinSDK.h's WCHAR.
 unsigned short *_wgetcwd(unsigned short *_DstBuf, int _SizeInWords);
 int _wchdir(const unsigned short *_Path);
+int _wrmdir(const unsigned short *_Path);
+
+// stdio.h, with wchar_t spelled as WinSDK.h's WCHAR.
+int _wremove(const unsigned short *_FileName);
+
+// stdlib.h and string.h: the allocator, and the memory and string
+// functions, with wchar_t spelled as WinSDK.h's WCHAR.
+void *malloc(size_t _Size);
+void *calloc(size_t _Count, size_t _Size);
+void *realloc(void *_Block, size_t _Size);
+void free(void *_Block);
+int memcmp(const void *_Buf1, const void *_Buf2, size_t _Size);
+void *memchr(const void *_Buf, int _Val, size_t _MaxCount);
+size_t strlen(const char *_Str);
+size_t strnlen(const char *_String, size_t _MaxCount);
+size_t wcslen(const unsigned short *_String);
+char *_strdup(const char *_Source);
+int strcmp(const char *_Str1, const char *_Str2);
+int strncmp(const char *_Str1, const char *_Str2, size_t _MaxCount);
 
 // stdlib.h, with wchar_t spelled as WinSDK.h's WCHAR.
 typedef int errno_t;
@@ -92,9 +111,22 @@ errno_t _get_tzname(size_t *_ReturnValue, char *_Buffer, size_t _SizeInBytes, in
 size_t strftime(char *_Buffer, size_t _SizeInBytes, const char *_Format, const tm *_Tm);
 
 // errno.h
+#define EACCES 13
 #define EINVAL 22
 #define ERANGE 34
 #define EOVERFLOW 132
+
+// signal.h
+#define SIGINT 2
+#define SIGILL 4
+#define SIGFPE 8
+#define SIGSEGV 11
+#define SIGTERM 15
+#define SIGBREAK 21
+#define SIGABRT 22
+typedef void (*_crt_signal_t)(int);
+_crt_signal_t signal(int _Signal, _crt_signal_t _Function);
+int raise(int _Signal);
 
 // stdlib.h and process.h: ending the process. _exit, abort and exit don't
 // return.

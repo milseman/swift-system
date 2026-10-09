@@ -8,10 +8,10 @@
 */
 
 // Paths and files: realpath and free, remove, mkostemp, mkdtemp, and whether
-// the process is a set-user-ID one. umask's wrapper, system_umask, and
+// the process is a set-user-ID one. Windows has its own, in Win32Syscalls.swift. umask's wrapper, system_umask, and
 // confstr's, system_confstr, are in Syscalls.swift.
 
-#if !os(Windows) && !os(WASI)
+#if !os(Windows)
 
 import CSystem
 #if SYSTEM_PACKAGE_DARWIN
@@ -20,6 +20,8 @@ import Darwin
 import Glibc
 #elseif canImport(Musl)
 import Musl
+#elseif canImport(WASILibc)
+import WASILibc
 #elseif canImport(Android)
 import Android
 #else
@@ -43,6 +45,9 @@ internal func system_remove(_ path: UnsafePointer<CChar>) -> CInt {
 #endif
   return remove(path)
 }
+
+// WASI's C library has no mkostemp, mkdtemp or issetugid.
+#if !os(WASI)
 
 // Replaces the X's at the end of the template in place.
 internal func system_mkostemp(
@@ -78,4 +83,6 @@ internal func system_isSecureExecution() -> Bool {
 #endif
 }
 
-#endif // !os(Windows) && !os(WASI)
+#endif // !os(WASI)
+
+#endif // !os(Windows)

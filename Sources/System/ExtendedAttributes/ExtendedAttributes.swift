@@ -9,12 +9,17 @@
 
 // Extended attributes: named values that a file system keeps with a file,
 // beside its contents. One API over Darwin's and Linux's calls, whose
-// signatures differ; FreeBSD's and OpenBSD's extattr calls, which differ
-// more, aren't wrapped.
+// signatures differ, and FreeBSD's extattr calls, which differ more: they
+// take a namespace, which here is always the user namespace, and no
+// options. OpenBSD has no extended attributes.
 
-#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
+#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD)
 
 /// Options for setting an extended attribute.
+///
+/// FreeBSD's calls take no options: setting an attribute there creates it
+/// or replaces it, and a set with options throws
+/// ``Errno/invalidArgument``.
 @frozen
 @available(System 199, *)
 public struct ExtendedAttributeOptions: OptionSet, Hashable, Sendable {
@@ -26,6 +31,7 @@ public struct ExtendedAttributeOptions: OptionSet, Hashable, Sendable {
   @_alwaysEmitIntoClient
   public init(rawValue: CInt) { self.rawValue = rawValue }
 
+  #if !os(FreeBSD)
   /// Fails with ``Errno/fileExists`` if the file already has the attribute.
   ///
   /// The corresponding C constant is `XATTR_CREATE`.
@@ -38,6 +44,7 @@ public struct ExtendedAttributeOptions: OptionSet, Hashable, Sendable {
   /// The corresponding C constant is `XATTR_REPLACE`.
   @_alwaysEmitIntoClient
   public static var replace: Self { Self(rawValue: _XATTR_REPLACE) }
+  #endif
 }
 
 #if SYSTEM_PACKAGE_DARWIN
@@ -98,9 +105,13 @@ extension FilePath {
   /// Linux puts each name in a namespace, such as `user.` for the ones
   /// that a file's owner can set, and lists only those that the process
   /// may read; Darwin's names have no namespace.
+  /// On FreeBSD, these are the attributes of the user namespace,
+  /// whose names have no prefix.
   ///
   /// The corresponding C function is `listxattr`,
-  /// or on Linux `llistxattr` for a link itself.
+  /// or on Linux `llistxattr` for a link itself,
+  /// or on FreeBSD `extattr_list_file`, and `extattr_list_link` for a link itself,
+  /// with `EXTATTR_NAMESPACE_USER`.
   /// The corresponding C constant is `XATTR_NOFOLLOW`,
   /// which Darwin's call takes for a link itself.
   @_alwaysEmitIntoClient
@@ -123,7 +134,8 @@ extension FilePath {
   ///     if it throws ``Errno/interrupted``. The default is `true`.
   /// - Returns: The names, in no particular order.
   ///
-  /// The corresponding C function is `listxattr`.
+  /// The corresponding C function is `listxattr`,
+  /// or on FreeBSD `extattr_list_file`.
   @_alwaysEmitIntoClient
   public static func extendedAttributeNames(
     _ path: UnsafePointer<CChar>,
@@ -156,11 +168,14 @@ extension FilePath {
   ///     Pass `false` to try only once and throw an error upon interruption.
   /// - Returns: The attribute's value, or `nil` if the file doesn't have it.
   ///
-  /// A missing attribute is `ENOATTR` on Darwin and `ENODATA` on Linux,
-  /// which this method returns as `nil` on both.
+  /// A missing attribute is `ENOATTR` on Darwin and FreeBSD
+  /// and `ENODATA` on Linux, which this method returns as `nil` on each.
+  /// On FreeBSD, the attribute is in the user namespace.
   ///
   /// The corresponding C function is `getxattr`,
-  /// or on Linux `lgetxattr` for a link itself.
+  /// or on Linux `lgetxattr` for a link itself,
+  /// or on FreeBSD `extattr_get_file`, and `extattr_get_link` for a link itself,
+  /// with `EXTATTR_NAMESPACE_USER`.
   /// The corresponding C constant is `XATTR_NOFOLLOW`,
   /// which Darwin's call takes for a link itself.
   @_alwaysEmitIntoClient
@@ -184,7 +199,8 @@ extension FilePath {
   ///     if it throws ``Errno/interrupted``. The default is `true`.
   /// - Returns: The attribute's value, or `nil` if the file doesn't have it.
   ///
-  /// The corresponding C function is `getxattr`.
+  /// The corresponding C function is `getxattr`,
+  /// or on FreeBSD `extattr_get_file`.
   @_alwaysEmitIntoClient
   public static func extendedAttribute(
     _ path: UnsafePointer<CChar>, _ name: String,
@@ -227,7 +243,8 @@ extension FilePath {
   /// reads it whatever its size.
   ///
   /// The corresponding C function is `getxattr`, with no buffer,
-  /// or on Linux `lgetxattr` for a link itself.
+  /// or on Linux `lgetxattr` for a link itself,
+  /// or on FreeBSD `extattr_get_file`, and `extattr_get_link` for a link itself.
   @_alwaysEmitIntoClient
   public func extendedAttributeSize(
     _ name: String, followTargetSymlink: Bool = true, retryOnInterrupt: Bool = true
@@ -251,7 +268,8 @@ extension FilePath {
   /// - Returns: The size of the attribute's value in bytes,
   ///   or `nil` if the file doesn't have it.
   ///
-  /// The corresponding C function is `getxattr`, with no buffer.
+  /// The corresponding C function is `getxattr`, with no buffer,
+  /// or on FreeBSD `extattr_get_file`.
   @_alwaysEmitIntoClient
   public static func extendedAttributeSize(
     _ path: UnsafePointer<CChar>, _ name: String,
@@ -293,9 +311,13 @@ extension FilePath {
   ///
   /// A file system that doesn't support extended attributes throws
   /// ``Errno/notSupported``.
+  /// On FreeBSD, the attribute is in the user namespace,
+  /// and `options` must be empty.
   ///
   /// The corresponding C function is `setxattr`,
-  /// or on Linux `lsetxattr` for a link itself.
+  /// or on Linux `lsetxattr` for a link itself,
+  /// or on FreeBSD `extattr_set_file`, and `extattr_set_link` for a link itself,
+  /// with `EXTATTR_NAMESPACE_USER`.
   /// The corresponding C constant is `XATTR_NOFOLLOW`,
   /// which Darwin's call takes for a link itself.
   @_alwaysEmitIntoClient
@@ -324,7 +346,8 @@ extension FilePath {
   ///   - retryOnInterrupt: Whether to retry the operation
   ///     if it throws ``Errno/interrupted``. The default is `true`.
   ///
-  /// The corresponding C function is `setxattr`.
+  /// The corresponding C function is `setxattr`,
+  /// or on FreeBSD `extattr_set_file`.
   @_alwaysEmitIntoClient
   public static func setExtendedAttribute(
     _ path: UnsafePointer<CChar>, _ name: String, to value: some Sequence<UInt8>,
@@ -367,9 +390,12 @@ extension FilePath {
   ///
   /// If the file doesn't have the attribute,
   /// this method throws ``Errno/attributeNotFound``.
+  /// On FreeBSD, the attribute is in the user namespace.
   ///
   /// The corresponding C function is `removexattr`,
-  /// or on Linux `lremovexattr` for a link itself.
+  /// or on Linux `lremovexattr` for a link itself,
+  /// or on FreeBSD `extattr_delete_file`, and `extattr_delete_link` for a link itself,
+  /// with `EXTATTR_NAMESPACE_USER`.
   /// The corresponding C constant is `XATTR_NOFOLLOW`,
   /// which Darwin's call takes for a link itself.
   @_alwaysEmitIntoClient
@@ -392,7 +418,8 @@ extension FilePath {
   ///   - retryOnInterrupt: Whether to retry the operation
   ///     if it throws ``Errno/interrupted``. The default is `true`.
   ///
-  /// The corresponding C function is `removexattr`.
+  /// The corresponding C function is `removexattr`,
+  /// or on FreeBSD `extattr_delete_file`.
   @_alwaysEmitIntoClient
   public static func removeExtendedAttribute(
     _ path: UnsafePointer<CChar>, _ name: String,
@@ -427,7 +454,8 @@ extension FileDescriptor {
   ///   if it throws ``Errno/interrupted``. The default is `true`.
   /// - Returns: The names, in no particular order.
   ///
-  /// The corresponding C function is `flistxattr`.
+  /// The corresponding C function is `flistxattr`,
+  /// or on FreeBSD `extattr_list_fd`.
   @_alwaysEmitIntoClient
   public func extendedAttributeNames(retryOnInterrupt: Bool = true) throws(Errno) -> [String] {
     try _extendedAttributeNames(retryOnInterrupt: retryOnInterrupt).get()
@@ -449,7 +477,8 @@ extension FileDescriptor {
   ///     if it throws ``Errno/interrupted``. The default is `true`.
   /// - Returns: The attribute's value, or `nil` if the file doesn't have it.
   ///
-  /// The corresponding C function is `fgetxattr`.
+  /// The corresponding C function is `fgetxattr`,
+  /// or on FreeBSD `extattr_get_fd`.
   @_alwaysEmitIntoClient
   public func extendedAttribute(
     _ name: String, retryOnInterrupt: Bool = true
@@ -478,7 +507,8 @@ extension FileDescriptor {
   /// - Returns: The size of the attribute's value in bytes,
   ///   or `nil` if the file doesn't have it.
   ///
-  /// The corresponding C function is `fgetxattr`, with no buffer.
+  /// The corresponding C function is `fgetxattr`, with no buffer,
+  /// or on FreeBSD `extattr_get_fd`.
   @_alwaysEmitIntoClient
   public func extendedAttributeSize(
     _ name: String, retryOnInterrupt: Bool = true
@@ -508,7 +538,8 @@ extension FileDescriptor {
   ///   - retryOnInterrupt: Whether to retry the operation
   ///     if it throws ``Errno/interrupted``. The default is `true`.
   ///
-  /// The corresponding C function is `fsetxattr`.
+  /// The corresponding C function is `fsetxattr`,
+  /// or on FreeBSD `extattr_set_fd`.
   @_alwaysEmitIntoClient
   public func setExtendedAttribute(
     _ name: String, to value: some Sequence<UInt8>,
@@ -543,7 +574,8 @@ extension FileDescriptor {
   /// If the file doesn't have the attribute,
   /// this method throws ``Errno/attributeNotFound``.
   ///
-  /// The corresponding C function is `fremovexattr`.
+  /// The corresponding C function is `fremovexattr`,
+  /// or on FreeBSD `extattr_delete_fd`.
   @_alwaysEmitIntoClient
   public func removeExtendedAttribute(_ name: String, retryOnInterrupt: Bool = true) throws(Errno) {
     try _removeExtendedAttribute(name, retryOnInterrupt: retryOnInterrupt).get()
@@ -565,7 +597,9 @@ extension FileDescriptor {
 
 /// Reads an attribute's value with `read`, which returns its size when
 /// given no buffer, and fills a buffer otherwise. A value that grows between
-/// the two calls fails with ERANGE, which reads it again.
+/// the two calls fails with ERANGE, which reads it again. FreeBSD's calls
+/// truncate the value instead, so there the buffer has a byte to spare, and
+/// a read that fills it reads again.
 @available(System 199, *)
 internal func _readAttributeValue(
   retryOnInterrupt: Bool, _ read: (UnsafeMutableRawPointer?, Int) -> Int
@@ -577,12 +611,13 @@ internal func _readAttributeValue(
     case .failure(let error):
       return error == .attributeNotFound ? .success(nil) : .failure(error)
     }
-    var value = [UInt8](repeating: 0, count: size)
+    var value = [UInt8](repeating: 0, count: size + _attributeSpareByteCount)
     let result = value.withUnsafeMutableBytes { buffer in
       valueOrErrno(retryOnInterrupt: retryOnInterrupt) { read(buffer.baseAddress, buffer.count) }
     }
     switch result {
     case .success(let count):
+      if _attributeSpareByteCount > 0 && count == value.count { continue }
       value.removeLast(value.count - min(count, value.count))
       return .success(value)
     case .failure(.outOfRange):
@@ -606,8 +641,18 @@ internal func _readAttributeSize(
   }
 }
 
-/// Reads the null-separated attribute names that `list` writes,
-/// as `_readAttributeValue` reads a value.
+/// The bytes that `_readAttributeValue` and `_readAttributeNames` ask for
+/// beyond the size, which FreeBSD's calls truncate a growing value to.
+internal var _attributeSpareByteCount: Int {
+  #if os(FreeBSD)
+  return 1
+  #else
+  return 0
+  #endif
+}
+
+/// Reads the attribute names that `list` writes, as `_readAttributeValue`
+/// reads a value: null-separated, or on FreeBSD each after a length byte.
 @available(System 199, *)
 internal func _readAttributeNames(
   retryOnInterrupt: Bool, _ list: (UnsafeMutablePointer<CChar>?, Int) -> Int
@@ -618,15 +663,19 @@ internal func _readAttributeNames(
     case .success(let count): size = count
     case .failure(let error): return .failure(error)
     }
-    var names = [CChar](repeating: 0, count: size)
+    var names = [CChar](repeating: 0, count: size + _attributeSpareByteCount)
     let result = names.withUnsafeMutableBufferPointer { buffer in
       valueOrErrno(retryOnInterrupt: retryOnInterrupt) { list(buffer.baseAddress, buffer.count) }
     }
     switch result {
     case .success(let count):
-      return .success(names.prefix(count).split(separator: 0).map {
-        String(decoding: $0.map { UInt8(bitPattern: $0) }, as: UTF8.self)
-      })
+      if _attributeSpareByteCount > 0 && count == names.count { continue }
+      let bytes = names.prefix(count).map { UInt8(bitPattern: $0) }
+      #if os(FreeBSD)
+      return .success(_attributeNames(lengthPrefixed: bytes))
+      #else
+      return .success(_attributeNames(nullSeparated: bytes))
+      #endif
     case .failure(.outOfRange):
       continue
     case .failure(let error):
@@ -635,4 +684,23 @@ internal func _readAttributeNames(
   }
 }
 
-#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android)
+/// The names in a list that listxattr wrote, null-separated.
+internal func _attributeNames(nullSeparated bytes: [UInt8]) -> [String] {
+  bytes.split(separator: 0).map { String(decoding: $0, as: UTF8.self) }
+}
+
+/// The names in a list that FreeBSD's extattr_list wrote: each after a byte
+/// that gives its length, without a terminator. Built everywhere, so that
+/// the tests can check it.
+internal func _attributeNames(lengthPrefixed bytes: [UInt8]) -> [String] {
+  var names: [String] = []
+  var index = 0
+  while index < bytes.count {
+    let end = min(index + 1 + Int(bytes[index]), bytes.count)
+    names.append(String(decoding: bytes[(index + 1)..<end], as: UTF8.self))
+    index = end
+  }
+  return names
+}
+
+#endif // SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(FreeBSD)
