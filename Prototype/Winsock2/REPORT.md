@@ -6,9 +6,9 @@ builds or runs real Windows: the Windows-only code is compiled on macOS against 
 (`Prototype/Win32/check-windows.sh`, `check-winsock.sh`), and the Windows host's manifest was checked by loading and
 building a copy of the package whose manifest has `os(Windows)` replaced by `true`.
 
-**Resume here:** items 1 and 2's tool changes are committed (`dda94d2`, and the tools commit after it); next is
-`mapping.ini`'s coverage (item 2), then `Win32.Error`'s Winsock names (item 3), the first-run script (item 4), and
-item 5 if time remains; STATUS.md is regenerated once, at the end.
+**Resume here:** items 1 and 2 are committed: the manifest (`dda94d2`), the tools (`5bbb2ea`) and `mapping.ini`'s
+coverage (the commit after it). Next: `Win32.Error`'s Winsock names (item 3), the first-run script (item 4), and item 5
+if time remains; STATUS.md is regenerated once, at the end.
 
 ## 1. What
 
@@ -26,6 +26,15 @@ item 5 if time remains; STATUS.md is regenerated once, at the end.
   - lint: the cmake check's `MODULES` (SystemWinSocks' CMake list); the api check's `SYSTEM_DIRS`, with helpers looked
     up in the declaration's own module; the markers check, which places a module where it declares API; the
     conditionals check's System names.
+- **`mapping.ini`'s coverage** for Windows sockets, from the derivation now that it reads SystemWinSocks: the eight
+  interim notes ("which these scripts don't read yet") are replaced by what each entry's coverage is and lacks;
+  `same.` keys read WinSDK's struct tags as the typedefs SystemWinSocks names (`sockaddr_in` as `SOCKADDR_IN`,
+  `pollfd` as `WSAPOLLFD`, `linger`, `ip_mreq`, `ipv6_mreq`, `in_pktinfo`, `in6_pktinfo`, `LPWSAMSG` as `WSAMSG`)
+  and `gai_strerrorA` as `FormatMessageW`; hand statuses where the derivation can't see the truth: [Winsock startup]
+  covered (System starts Winsock itself) and [Winsock errors] partial (the codes are thrown and named, but nothing
+  public reads `WSAGetLastError`); [inet_ntop and inet_pton] cites SystemWinSocks' `description(into:)` too. Also a
+  stale citation in [UDP segmentation offload] (`throws`, where SystemSockets' `setOption` now throws `Errno`),
+  which made every `check.sh` run report a problem.
 
 ## 2. Design calls, with the alternatives rejected
 
@@ -70,6 +79,21 @@ item 5 if time remains; STATUS.md is regenerated once, at the end.
   helper index, which would leave its own declarations' wrappers unread.
 - **A module counts, in the markers check, where it builds and declares API**: SystemWinSocks builds everywhere but
   is empty outside Windows, so a marker naming it is covered only on Windows.
+- **Windows' C names for the shared socket structures read as SystemWinSocks' names through `same.` keys**, not hand
+  statuses: on Windows, `sockaddr_in`, `pollfd`, `linger`, `ip_mreq` and the rest are WinSDK's struct tags of the
+  typedefs SystemWinSocks' doc comments and CInterop aliases name (NIO's Windows code imports `struct
+  WinSDK.sockaddr_in` and `WinSDK.pollfd`), and a `same.` key is tried before the name itself, on every platform,
+  so the POSIX rows stay as they were (checked: no status off Windows changed). *Rejected*: hand `covered` statuses,
+  which would need every platform's declarations cited and stop the derivation from deciding.
+- **[Winsock startup] covered and [Winsock errors] partial, by hand.** The derivation sees `WSAStartup` and
+  `WSAGetLastError` only in System's implementation, so it calls both missing; but a caller of System's sockets
+  needs neither, since System starts Winsock and throws the codes. What [Winsock errors] lacks is a public reader of
+  `WSAGetLastError` for a caller's own Winsock calls. *Rejected*: `wrap = no` for startup, which says System
+  shouldn't have it, where System does it.
+- **[getaddrinfo]'s Windows row stays missing**: its three Windows sites (`GetaddrinfoResolver.swift` 215, 216 and
+  228) read members through NIO's `CAddrInfo`, which is `addrinfo` in the macOS index but `ADDRINFOW` on Windows,
+  where [Windows name resolution] covers it. An artifact of extracting from a macOS index, left to the coverage
+  tools; a `same.addrinfo` key would paper over it.
 
 ## 3. Tests and runs
 
@@ -86,6 +110,11 @@ item 5 if time remains; STATUS.md is regenerated once, at the end.
   `throws:AddressResolutionError` entries, and `closeAfter(_:)` by its path. So there was nothing to fix.
 - lint's unit tests (17, two new: helpers per module, a module's platforms where it declares API) and
   adopter-coverage's (32) pass.
+- `Utilities/adopter-coverage/check.sh nio` (NIO at `9cb66c6d`, System at `5bbb2ea`), in a results store of the lane's
+  own under `.build` seeded with a copy of the shared store's NIO index, so the shared store is untouched: NIO's
+  Windows functions go from 53 covered, 17 partial and 58 missing with SystemWinSocks unread (the tools with
+  `MODULE_DIRS` reverted for one run) to 70/43/15 with it read, and to 77/39/12 with the new `mapping.ini`, whose
+  run reports no problems (exit 0; before, the stale citation made it exit 2). The rows off Windows are unchanged.
 
 ## 4. What the Windows run must check
 
