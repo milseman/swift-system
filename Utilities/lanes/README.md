@@ -124,7 +124,9 @@ As lanes.sh: recorded paths are looked up under the root by their last component
 
 ### Speed
 
-Locally, with the machine's load average between 100 and 150 from other lanes, a run took 40 to 55 s. The long poles are the tree walk (about 650,000 entries, 480,000 of them in the main clone's `.build`) and lint (cmake and pitches about a second; then markers, which fills lint's cache of System's coverage; then conditionals in three runs at once). The walk takes directories newest first, by each directory's own time, from one queue across every lane, so a walk the deadline stops has read the most recently changed directories, which is where a running build or Close writes. A cut walk is incomplete all the same: a directory's time doesn't change when something deeper does.
+On this machine (2026-10-09, load average 60 to 150 from other lanes), a whole run took 58 to 71 s. The long poles are the tree walk and lint. The walk reads about 650,000 entries, 480,000 of them in the main clone's `.build` (mostly `api-graph-builds`); that clone alone takes 16 to 21 s, about the same with 1, 4 or 8 threads, since it's bound by the file system's stat calls. lint takes about 30 s: cmake and pitches about a second, then markers, which fills lint's cache of System's coverage, then conditionals in three runs at once.
+
+The walk takes directories newest first, by each directory's own time, from one queue across every lane, so a walk the deadline stops has read the most recently changed directories, which is where a running build or Close writes. A cut walk is incomplete all the same: a directory's time doesn't change when something deeper does, nor when a file in it is rewritten in place (an index store's `data.mdb`). On a slower file system, such as the coordinator's mounted folder, expect the walk to be cut; the index says how much was read, and `--section activity --only <lane>` reads one lane alone.
 
 ### Tests
 
