@@ -51,7 +51,7 @@ import platforms  # noqa: E402
 
 SOURCE_EXTENSIONS = (".swift", ".c", ".h", ".cpp", ".hpp", ".m", ".mm")
 # System's library modules; the samples and C shims aren't its API.
-SYSTEM_SOURCES = ("Sources/System", "Sources/SystemSockets")
+SYSTEM_SOURCES = ("Sources/System", "Sources/SystemSockets", "Sources/SystemWinSocks")
 
 
 # ---------------------------------------------------------------- git
@@ -465,8 +465,9 @@ PLATFORM_WORDS = {"Darwin", "Linux", "Musl", "Android", "Bionic", "WASI", "FreeB
 ENGLISH = set("""its their the a an this that these those zero and or of for with to in on by as is are be not no all
     any some each every other raw same own it them they its we our see also e.g i.e""".split())
 # Modules and Swift types that markers mention in their explanations.
-SWIFT_NAMES = {"System", "SystemSockets", "SystemPackage", "NIO", "NIOPosix", "NIOCore", "Foundation", "Swift",
-               "Darwin", "Glibc", "CInterop", "Errno", "XCTest", "FileDescriptor", "FilePath", "DynamicLibrary"}
+SWIFT_NAMES = {"System", "SystemSockets", "SystemWinSocks", "SystemPackage", "NIO", "NIOPosix", "NIOCore",
+               "Foundation", "Swift", "Darwin", "Glibc", "CInterop", "Errno", "XCTest", "FileDescriptor", "FilePath",
+               "DynamicLibrary"}
 # Platforms, which markers name for where a gap is (`remove on Windows and
 # WASI`), not as C interfaces.
 SWIFT_NAMES |= {"Linux", "Musl", "Android", "Bionic", "WASI", "FreeBSD", "OpenBSD", "Windows", "macOS", "iOS",
@@ -1891,9 +1892,9 @@ have changed since their last runs, and a few seconds when they haven't.
   and `time`, `free`, `sleep` and `remove` are C functions; and taking the imports as the interfaces
   everywhere, since `import struct Darwin.msghdr` is there for msghdr's fields, not for the name CInterop
   already has.
-- **Covered** means System's library modules (`Sources/System`, `Sources/SystemSockets`, not the samples) name
-  the interface in a doc comment's *The corresponding C … is* sentence, or a public typealias targets it, or, for
-  `X members`, an `extension CInterop.<alias of X>` exists. A few interfaces count as covered by the replacement
+- **Covered** means System's library modules (`Sources/System`, `Sources/SystemSockets`, `Sources/SystemWinSocks`,
+  not the samples) name the interface in a doc comment's *The corresponding C … is* sentence, or a public
+  typealias targets it, or, for `X members`, an `extension CInterop.<alias of X>` exists. A few interfaces count as covered by the replacement
   System wraps instead (`EQUIVALENTS` in `scripts/status.py`: usleep and sleep by nanosleep, localtime and gmtime
   by their `_r` forms, mkstemp and mkstemps by mkostemp(s), time and gettimeofday by clock_gettime), and the table
   says so. A family that System answers with a design of its own, rather than a wrapper, counts as covered once a

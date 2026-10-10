@@ -27,6 +27,8 @@ import WinSDK
 ///
 /// System starts Winsock (`WSAStartup`) the first time it creates a socket,
 /// and leaves it started.
+///
+/// The corresponding C type is `SOCKET`.
 @frozen
 @available(System 199, *)
 public struct SocketDescriptor: RawRepresentable, Hashable, Codable, Sendable {

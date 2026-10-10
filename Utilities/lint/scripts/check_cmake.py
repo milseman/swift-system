@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """lint's cmake check: every Swift file of SystemPackage's sources is
 listed in Sources/System/CMakeLists.txt, and every Swift file listed there
-exists; the same for SystemSockets once it has a CMakeLists.txt.
+exists; the same for SystemWinSocks (Sources/SystemWinSocks/CMakeLists.txt,
+which CMake builds only for Windows), and for SystemSockets once it has a
+CMakeLists.txt.
 
 The files are the working tree's (git's tracked files and its untracked
 ones that aren't ignored), so a new file is caught before it's committed.
@@ -23,7 +25,8 @@ RULES = [
     ("cmake/missing", "error", "a Swift file of the module's sources that its CMakeLists.txt doesn't list"),
     ("cmake/stale", "error", "a Swift file a CMakeLists.txt lists that doesn't exist"),
 ]
-MODULES = (("Sources/System", "SystemPackage"), ("Sources/SystemSockets", "SystemSockets"))
+MODULES = (("Sources/System", "SystemPackage"), ("Sources/SystemSockets", "SystemSockets"),
+           ("Sources/SystemWinSocks", "SystemWinSocks"))
 ENTRY = re.compile(r"(?<![\w/.+-])([\w+.-][\w+/.-]*\.swift)\b")
 
 

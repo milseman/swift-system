@@ -65,6 +65,99 @@ private struct WinsockErrorTests {
     }
   }
 
+  // Win32.Error's debugDescription names each of Winsock's codes as the SDK
+  // spells it.
+  @available(System 199, *)
+  @Test func codesHaveTheirSymbolicNames() {
+    let names: [(String, CInt)] = [
+      ("WSAEINTR", WinSDK.WSAEINTR),
+      ("WSAEBADF", WinSDK.WSAEBADF),
+      ("WSAEACCES", WinSDK.WSAEACCES),
+      ("WSAEFAULT", WinSDK.WSAEFAULT),
+      ("WSAEINVAL", WinSDK.WSAEINVAL),
+      ("WSAEMFILE", WinSDK.WSAEMFILE),
+      ("WSAEWOULDBLOCK", WinSDK.WSAEWOULDBLOCK),
+      ("WSAEINPROGRESS", WinSDK.WSAEINPROGRESS),
+      ("WSAEALREADY", WinSDK.WSAEALREADY),
+      ("WSAENOTSOCK", WinSDK.WSAENOTSOCK),
+      ("WSAEDESTADDRREQ", WinSDK.WSAEDESTADDRREQ),
+      ("WSAEMSGSIZE", WinSDK.WSAEMSGSIZE),
+      ("WSAEPROTOTYPE", WinSDK.WSAEPROTOTYPE),
+      ("WSAENOPROTOOPT", WinSDK.WSAENOPROTOOPT),
+      ("WSAEPROTONOSUPPORT", WinSDK.WSAEPROTONOSUPPORT),
+      ("WSAESOCKTNOSUPPORT", WinSDK.WSAESOCKTNOSUPPORT),
+      ("WSAEOPNOTSUPP", WinSDK.WSAEOPNOTSUPP),
+      ("WSAEPFNOSUPPORT", WinSDK.WSAEPFNOSUPPORT),
+      ("WSAEAFNOSUPPORT", WinSDK.WSAEAFNOSUPPORT),
+      ("WSAEADDRINUSE", WinSDK.WSAEADDRINUSE),
+      ("WSAEADDRNOTAVAIL", WinSDK.WSAEADDRNOTAVAIL),
+      ("WSAENETDOWN", WinSDK.WSAENETDOWN),
+      ("WSAENETUNREACH", WinSDK.WSAENETUNREACH),
+      ("WSAENETRESET", WinSDK.WSAENETRESET),
+      ("WSAECONNABORTED", WinSDK.WSAECONNABORTED),
+      ("WSAECONNRESET", WinSDK.WSAECONNRESET),
+      ("WSAENOBUFS", WinSDK.WSAENOBUFS),
+      ("WSAEISCONN", WinSDK.WSAEISCONN),
+      ("WSAENOTCONN", WinSDK.WSAENOTCONN),
+      ("WSAESHUTDOWN", WinSDK.WSAESHUTDOWN),
+      ("WSAETOOMANYREFS", WinSDK.WSAETOOMANYREFS),
+      ("WSAETIMEDOUT", WinSDK.WSAETIMEDOUT),
+      ("WSAECONNREFUSED", WinSDK.WSAECONNREFUSED),
+      ("WSAELOOP", WinSDK.WSAELOOP),
+      ("WSAENAMETOOLONG", WinSDK.WSAENAMETOOLONG),
+      ("WSAEHOSTDOWN", WinSDK.WSAEHOSTDOWN),
+      ("WSAEHOSTUNREACH", WinSDK.WSAEHOSTUNREACH),
+      ("WSAENOTEMPTY", WinSDK.WSAENOTEMPTY),
+      ("WSAEPROCLIM", WinSDK.WSAEPROCLIM),
+      ("WSAEUSERS", WinSDK.WSAEUSERS),
+      ("WSAEDQUOT", WinSDK.WSAEDQUOT),
+      ("WSAESTALE", WinSDK.WSAESTALE),
+      ("WSAEREMOTE", WinSDK.WSAEREMOTE),
+      ("WSASYSNOTREADY", WinSDK.WSASYSNOTREADY),
+      ("WSAVERNOTSUPPORTED", WinSDK.WSAVERNOTSUPPORTED),
+      ("WSANOTINITIALISED", WinSDK.WSANOTINITIALISED),
+      ("WSAEDISCON", WinSDK.WSAEDISCON),
+      ("WSAENOMORE", WinSDK.WSAENOMORE),
+      ("WSAECANCELLED", WinSDK.WSAECANCELLED),
+      ("WSAEINVALIDPROCTABLE", WinSDK.WSAEINVALIDPROCTABLE),
+      ("WSAEINVALIDPROVIDER", WinSDK.WSAEINVALIDPROVIDER),
+      ("WSAEPROVIDERFAILEDINIT", WinSDK.WSAEPROVIDERFAILEDINIT),
+      ("WSASYSCALLFAILURE", WinSDK.WSASYSCALLFAILURE),
+      ("WSASERVICE_NOT_FOUND", WinSDK.WSASERVICE_NOT_FOUND),
+      ("WSATYPE_NOT_FOUND", WinSDK.WSATYPE_NOT_FOUND),
+      ("WSA_E_NO_MORE", WinSDK.WSA_E_NO_MORE),
+      ("WSA_E_CANCELLED", WinSDK.WSA_E_CANCELLED),
+      ("WSAEREFUSED", WinSDK.WSAEREFUSED),
+      ("WSAHOST_NOT_FOUND", WinSDK.WSAHOST_NOT_FOUND),
+      ("WSATRY_AGAIN", WinSDK.WSATRY_AGAIN),
+      ("WSANO_RECOVERY", WinSDK.WSANO_RECOVERY),
+      ("WSANO_DATA", WinSDK.WSANO_DATA),
+    ]
+    for (name, code) in names {
+      let description = Win32.Error(rawValue: DWORD(code)).debugDescription
+      #expect(description.hasPrefix("\(name) (\(code), 0x"), "\(description)")
+    }
+    #expect(Win32.Error.wouldBlock.debugDescription == "WSAEWOULDBLOCK (10035, 0x2733)")
+  }
+
+  // Whether Winsock keeps a thread's last error where GetLastError reads it,
+  // so that Win32.Error.current serves a caller's own Winsock calls
+  // (mapping.ini's [Winsock errors]). Closing INVALID_SOCKET touches no
+  // socket; the thread's last error is restored.
+  @available(System 199, *)
+  @Test func winsockErrorIsTheThreadsLastError() throws {
+    try _startWinsock().get()
+    let saved = GetLastError()
+    defer { SetLastError(saved) }
+    SetLastError(0)
+    let result = WinSDK.closesocket(WinSDK.INVALID_SOCKET)
+    let winsockError = WSAGetLastError()
+    let current = Win32.Error.current
+    #expect(result == WinSDK.SOCKET_ERROR)
+    #expect(winsockError == WinSDK.WSAENOTSOCK)
+    #expect(current.rawValue == DWORD(winsockError), "\(current.debugDescription)")
+  }
+
   // FormatMessageW describes Winsock's codes, as it does the rest of the
   // system's.
   @available(System 199, *)

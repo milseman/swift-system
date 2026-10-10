@@ -7,7 +7,7 @@ Usage: lint.py [CHECK...] [--json] [--clone PATH...] [--branch B] [--base REF]
                [--pitches DIR] [--rules]
 
 Checks (default: all):
-  cmake         every Sources/System Swift file is in its CMakeLists.txt
+  cmake         every Sources/System and Sources/SystemWinSocks Swift file is in its CMakeLists.txt
   api           api-delta's added declarations (main..HEAD): availability, doc
                 sentences, @_alwaysEmitIntoClient constants, typed throws,
                 C-struct stored properties

@@ -14,7 +14,8 @@ import WinSDK
 
 // WSAPoll, Winsock's poll, which polls sockets alone. SystemPackage's poll,
 // on other platforms, is FileDescriptor's; this one has its names on
-// SocketDescriptor, since a Winsock socket isn't a file descriptor.
+// SocketDescriptor, since a Winsock socket isn't a file descriptor, and
+// SystemSockets gives SocketDescriptor the same names over FileDescriptor's.
 
 @available(System 199, *)
 extension CInterop {

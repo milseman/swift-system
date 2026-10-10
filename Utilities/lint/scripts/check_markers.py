@@ -101,6 +101,7 @@ class SystemNames:
         import platforms
         self.all = set(platforms.PLATFORMS)
         self.paths = {}
+        declared = {}
         for d in scan["declarations"]:
             if d.get("access") not in ("public", "open", "public (from public extension)"):
                 continue
@@ -108,7 +109,12 @@ class SystemNames:
             ps = {x for x in d["platforms"] if not x.startswith("?")}
             for key in (p, p.split("(")[0]):
                 self.paths.setdefault(key, set()).update(ps)
-        self.modules = {m: self.all - set(v) for m, v in scan.get("moduleUnsupportedPlatforms", {}).items()}
+            if d.get("module"):
+                declared.setdefault(d["module"], set()).update(ps)
+        # A module counts where it builds and declares API: SystemWinSocks
+        # builds everywhere, and is empty but on Windows.
+        self.modules = {m: (self.all - set(v)) & declared.get(m, self.all)
+                        for m, v in scan.get("moduleUnsupportedPlatforms", {}).items()}
         for m in ("SystemPackage", "SystemSockets"):
             self.modules.setdefault(m, set(self.all))
 

@@ -92,7 +92,7 @@ def blocks(code):
 
 
 def system_types(scan):
-    names = {"SystemPackage", "SystemSockets", "CInterop"}
+    names = {"SystemPackage", "SystemSockets", "SystemWinSocks", "CInterop"}
     for d in scan["declarations"]:
         if d.get("access") in ("public", "open") and not d["scopes"] and d["kw"] in (
                 "struct", "enum", "class", "protocol", "actor", "typealias"):

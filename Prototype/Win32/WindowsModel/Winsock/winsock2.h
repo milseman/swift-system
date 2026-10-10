@@ -93,12 +93,30 @@ void WSASetLastError(int iError); // mirrors: winsock2.h
 #define WSAETOOMANYREFS 10059 // mirrors: winerror.h
 #define WSAETIMEDOUT 10060 // mirrors: winerror.h
 #define WSAECONNREFUSED 10061 // mirrors: winerror.h
+#define WSAELOOP 10062 // mirrors: winerror.h
+#define WSAENAMETOOLONG 10063 // mirrors: winerror.h
 #define WSAEHOSTDOWN 10064 // mirrors: winerror.h
 #define WSAEHOSTUNREACH 10065 // mirrors: winerror.h
+#define WSAENOTEMPTY 10066 // mirrors: winerror.h
 #define WSAEPROCLIM 10067 // mirrors: winerror.h
+#define WSAEUSERS 10068 // mirrors: winerror.h
+#define WSAEDQUOT 10069 // mirrors: winerror.h
+#define WSAESTALE 10070 // mirrors: winerror.h
+#define WSAEREMOTE 10071 // mirrors: winerror.h
 #define WSASYSNOTREADY 10091 // mirrors: winerror.h
 #define WSAVERNOTSUPPORTED 10092 // mirrors: winerror.h
 #define WSANOTINITIALISED 10093 // mirrors: winerror.h
+#define WSAEDISCON 10101 // mirrors: winerror.h
+#define WSAENOMORE 10102 // mirrors: winerror.h
+#define WSAECANCELLED 10103 // mirrors: winerror.h
+#define WSAEINVALIDPROCTABLE 10104 // mirrors: winerror.h
+#define WSAEINVALIDPROVIDER 10105 // mirrors: winerror.h
+#define WSAEPROVIDERFAILEDINIT 10106 // mirrors: winerror.h
+#define WSASYSCALLFAILURE 10107 // mirrors: winerror.h
+#define WSASERVICE_NOT_FOUND 10108 // mirrors: winerror.h
+#define WSA_E_NO_MORE 10110 // mirrors: winerror.h
+#define WSA_E_CANCELLED 10111 // mirrors: winerror.h
+#define WSAEREFUSED 10112 // mirrors: winerror.h
 
 // MARK: - Families, types and protocols
 

@@ -11,7 +11,7 @@
 
 import WinSDK
 
-// Winsock constants that SystemWinSocks uses internally, spelled as their
+// Winsock constants that System uses internally, spelled as their
 // values like its public constants and SystemPackage's Win32 ones: they're
 // fixed ABI, and literals don't depend on which Windows SDK builds System.
 // WinsockConstantsTests checks each one against the SDK.

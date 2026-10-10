@@ -17,8 +17,10 @@ Two edits:
    @available attribute.
 
 2. Drop the Samples executable and its swift-argument-parser dependency, which
-   would otherwise need a network fetch. Samples is not part of the
-   SystemPackage or SystemSockets API.
+   would otherwise need a network fetch. Samples is not part of System's API.
+   The dependency's `.package(...)` call is removed wherever it is: in the
+   package's `dependencies:` list on older commits, in a variable that only a
+   host other than Windows fills on newer ones.
 """
 
 import os
@@ -51,13 +53,13 @@ text = text.replace(old, new)
 
 # 2. Samples and swift-argument-parser (system-next only).
 def remove_call(text, start_token):
-    """Remove `start_token(...)` plus a trailing comma and the line it's on."""
+    """Remove the call that starts with `start_token`, through the parenthesis
+    that closes its first one, plus a trailing comma and the line it's on."""
     i = text.find(start_token)
     if i < 0:
         return text, False
     depth = 0
-    j = i + len(start_token) - 1  # at the '('
-    assert text[j] == "("
+    j = text.index("(", i)
     while True:
         c = text[j]
         if c == "(":
@@ -80,11 +82,7 @@ def remove_call(text, start_token):
 
 text, _ = remove_call(text, ".executableTarget(")
 text = re.sub(r'\n\s*\.executable\(name: "system-samples", targets: \["Samples"\]\),', "", text)
-text = re.sub(
-    r'dependencies: \[\s*\.package\(url: "https://github.com/apple/swift-argument-parser"[^\]]*\],',
-    "dependencies: [],",
-    text,
-)
+text, _ = remove_call(text, '.package(url: "https://github.com/apple/swift-argument-parser"')
 if "swift-argument-parser" in text or '"Samples"' in text:
     sys.exit(f"patch_manifest: Samples or swift-argument-parser still referenced in {path}")
 
