@@ -15,6 +15,7 @@ import sys
 
 sys.dont_write_bytecode = True
 
+import json  # noqa: E402
 import os  # noqa: E402
 import shutil  # noqa: E402
 import subprocess  # noqa: E402
@@ -287,6 +288,43 @@ class ManifestTests(unittest.TestCase):
         self.assertIn('.testTarget(name: "SystemTests"', out)
         self.assertIn(".library(name: \"SystemPackage\"", out)
 
+    def test_traits_are_not_the_requirement(self):
+        text = """
+        dependencies: [
+            // Disable all traits to prevent linking Foundation
+            .package(url: "https://github.com/apple/swift-configuration.git", from: "1.0.0", traits: []),
+            .package(url: "https://github.com/apple/swift-x.git", "1.0.0"..<"2.0.0",
+                     traits: [.defaults, .trait(name: "A", condition: .when(traits: ["B"]))]),  // a, b
+            .package(path: "../local" /* a, b */, traits: ["T"]),
+            .package(name: "swift-collections", path: "../swift-collections"),
+        ]
+        """
+        ds = manifests.dependencies(text)
+        self.assertEqual([(d["identity"], d["requirement"], d["traits"]) for d in ds],
+                         [("swift-configuration", 'from: "1.0.0"', "[]"),
+                          ("swift-x", '"1.0.0"..<"2.0.0"', '[.defaults, .trait(name: "A", condition: .when(traits: ["B"]))]'),
+                          ("local", "", '["T"]'), ("swift-collections", "", None)])
+        self.assertTrue(manifests.allowed(ds[0]["requirement"])((1, 4, 0)))
+        # The text F8 couldn't read.
+        f = manifests.allowed('from: "1.0.0", traits: []')
+        self.assertTrue(f((1, 0, 0)) and not f((2, 0, 0)))
+        new, done = manifests.rewrite(text, {"swift-configuration": "../../deps/swift-configuration",
+                                             "swift-x": "../../deps/swift-x", "local": "../../deps/local"})
+        self.assertIn('.package(path: "../../deps/swift-configuration", traits: []),', new)
+        self.assertIn('.package(path: "../../deps/swift-x", traits: [.defaults, .trait(name: "A", '
+                      'condition: .when(traits: ["B"]))]),  // a, b', new)
+        self.assertIn('.package(path: "../../deps/local", traits: ["T"])', new)
+        self.assertIn('.package(name: "swift-collections", path: "../swift-collections")', new)
+        self.assertIn("// Disable all traits", new)
+        self.assertEqual(len(done), 3)
+
+    def test_arguments(self):
+        call = '.package(url: "https://a/b,c.git", // x, y\n  .upToNextMinor(from: "1.2.0"), traits: [.x(y: [1, 2])])'
+        self.assertEqual(manifests.arguments(call),
+                         [("url", '"https://a/b,c.git"'), (None, '.upToNextMinor(from: "1.2.0")'),
+                          ("traits", "[.x(y: [1, 2])]")])
+        self.assertEqual(manifests.arguments('.package(path: """\nx\n""")'), [("path", '"""\nx\n"""')])
+
     def test_choose_from_a_cache(self):
         tmp = tempfile.mkdtemp(prefix="import-probe-test-")
         try:
@@ -415,6 +453,112 @@ class LedgerComparisonTests(unittest.TestCase):
     def test_another_commit_is_flagged(self):
         led = dict(LEDGER, read=[{"repository": "pkg", "commit": "beef"}])
         self.assertFalse(summary.ledger_compare(result_fixture(), led)["sameCommit"])
+
+    def test_a_nested_package_takes_its_directorys_sites(self):
+        r = result_fixture()
+        r["meta"]["nested"] = "Examples/Tool"
+        led = {"read": LEDGER["read"], "sites": [dict(s, file="Examples/Tool/" + s["file"]) for s in LEDGER["sites"]]
+               + [dict(LEDGER["sites"][0], file="Sources/A/a.swift")]}
+        cmp = summary.ledger_compare(r, led)
+        self.assertEqual(cmp["matched"], 2)
+        self.assertEqual([s["file"] for s in cmp["outsideTargets"]], ["Benchmarks/x.swift"])
+        self.assertEqual(cmp["ledgerImports"], 4)
+
+
+class SummaryTests(unittest.TestCase):
+    """SUMMARY.md's sections for --own-modules and --reexport, written into
+    a temporary directory and deleted."""
+
+    def test_sections(self):
+        tmp = tempfile.mkdtemp(prefix="import-probe-test-")
+        try:
+            r = result_fixture()
+            r["meta"].update(platformName="Linux", platform="linux", branch="b", system="5ys", date="d", seconds=1,
+                             tool="t", clone="/c/pkg", nested="Examples/Tool")
+            r.update(followOns=[], others=[], outside=[], baseline=None, reexporters={}, reachesThrough={})
+            for x in r["records"]:
+                x.update(how="", unit=x["name"])
+            r["ownModules"] = {"modules": ["CShim"], "ownNames": {"Sources/A/a.swift": ["shim_answer"]},
+                               "records": [{"file": "Sources/A/b.swift", "name": "getpid", "via": ["CShim"],
+                                            "class": "covered", "how": "ProcessID.current"}] * 2,
+                               "targets": [{"name": "A", "files": ["Sources/A/b.swift"], "through": 2, "ownNames": 1,
+                                            "withoutModules": {"exit": 1, "seconds": 1},
+                                            "withLibrary": {"exit": 1, "seconds": 1}}]}
+            x = {"meta": dict(r["meta"], run="reexport"), "baseline": {"exit": 0, "errors": 0, "seconds": 2},
+                 "demoted": [{"file": "deps/dep/Sources/Re/S.swift", "line": 3, "text": "@_exported import Glibc",
+                              "active": True},
+                             {"file": "deps/dep/Sources/Re/S.swift", "line": 5, "text": "@_exported import ucrt",
+                              "active": False}],
+                 "fixups": {"module": ["deps/dep/Sources/Re/T.swift"], "own": ["src/pkg/Sources/A/a.swift"],
+                            "dependencies": []},
+                 "rounds": [{"round": 1, "exit": 1, "names": 1, "targets": ["A"], "dependencyFiles": [], "seconds": 3},
+                            {"round": 2, "exit": 0, "names": 0, "targets": [], "dependencyFiles": [], "seconds": 1}],
+                 "records": [{"file": "Sources/A/a.swift", "line": 9, "column": 3, "name": "exit", "kind": "value",
+                              "class": "covered", "how": "ProcessID.exit"}],
+                 "followOns": [], "others": [], "residual": []}
+            for name, doc in (("linux.json", r), ("linux-reexport.json", x)):
+                with open(os.path.join(tmp, name), "w") as f:
+                    json.dump(doc, f)
+            with open(summary.write(tmp)) as f:
+                text = f.read()
+            self.assertIn("# import-probe: pkg, nested package `Examples/Tool`", text)
+            self.assertIn("### Names through the package's own C modules (Linux, `--own-modules`)", text)
+            self.assertIn("| `Sources/A/b.swift` | `CShim` | `getpid` ×2 |", text)
+            self.assertIn("## Linux (linux): names only a re-export gives (`--reexport`)", text)
+            self.assertIn("`deps/dep/Sources/Re/S.swift:3` (`@_exported import Glibc`); 1 re-export Linux doesn't "
+                          "compile.", text)
+            self.assertIn("| `Sources/A/a.swift` | 9 | `exit` | value | System covers it | ProcessID.exit |", text)
+            # The flat file has the per-target probe's records only.
+            with open(os.path.join(tmp, "import-probe.json")) as f:
+                self.assertEqual(len(json.load(f)), 3)
+        finally:
+            shutil.rmtree(tmp)
+
+
+class ReexportTextTests(unittest.TestCase):
+    """reexport.py's demotion over files in a temporary directory, deleted
+    after; nothing is built."""
+
+    SOURCE = ("// @_exported import Glibc (a comment)\n"
+              "#if canImport(Glibc)\n"
+              "@_exported @preconcurrency import Glibc\n"
+              "#elseif canImport(Darwin)\n"
+              "@_exported\n"
+              "import Darwin.C\n"
+              "#elseif os(Windows)\n"
+              "@_exported import ucrt\n"
+              "#endif\n"
+              "@_exported import NIOCore\n"
+              "let s = \"@_exported import Glibc\"\n")
+
+    def test_find_demote_and_fix_up(self):
+        import reexport
+        import platforms  # adopter-coverage's, on the path once reexport has imported probe
+        tmp = tempfile.mkdtemp(prefix="import-probe-test-")
+        try:
+            path = os.path.join(tmp, "deps", "dep", "Sources", "Re", "System.swift")
+            os.makedirs(os.path.dirname(path))
+            with open(path, "w") as f:
+                f.write(self.SOURCE)
+            sites = reexport.find_reexports(tmp, lambda m: m in C_MODULES, "linux", platforms.model())
+            self.assertEqual([(s["line"], s["import"], s["active"]) for s in sites],
+                             [(3, "Glibc", True), (6, "Darwin.C", False), (8, "ucrt", False)])
+            self.assertEqual(sites[0]["attrs"], "@preconcurrency")
+            reexport.demote(tmp, sites)
+            with open(path) as f:
+                lines = f.read().split("\n")
+            self.assertEqual(len(lines), len(self.SOURCE.split("\n")))
+            self.assertEqual(lines[2], "@preconcurrency import Glibc")
+            self.assertEqual(lines[4], "")
+            self.assertEqual(lines[7], "import ucrt")
+            self.assertEqual(lines[9], "@_exported import NIOCore")
+            self.assertEqual(lines[0], "// @_exported import Glibc (a comment)")
+            self.assertEqual(reexport.fixup_block(sites),
+                             f"#if canImport(Glibc)\n@preconcurrency import Glibc {reexport.FIXUP_NOTE}\n#endif")
+            mac = reexport.find_reexports(tmp, lambda m: m in C_MODULES, "macos", platforms.model())
+            self.assertEqual(mac, [])
+        finally:
+            shutil.rmtree(tmp)
 
 
 if __name__ == "__main__":
