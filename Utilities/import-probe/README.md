@@ -146,6 +146,8 @@ On an M1 Max with Swift 6.2. These are the full runs on the three packages the t
 
 swift-nio's scratch directory reaches about 1.2 GB on Linux. It's deleted when the package is done.
 
+probe-2's runs of swift-nio-ssl and swift-nio-extras were made on a machine at a load average of 145 to 209, so they ran slower than they otherwise would. A platform's probe with `--own-modules` took 2.5 to 4 min (8 min once). A re-export run on Linux took 5.5 to 17.5 min: it builds the copy about twice, the baseline and then a first round that compiles every target again.
+
 ## Requirements
 
 - macOS with Xcode's toolchain (`swift`), git and `python3` (the system's 3.9 works; standard library only).
