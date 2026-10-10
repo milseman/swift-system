@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """Tests of import-probe's pieces over text fixtures: removing imports in
 each form (strip.py), reading diagnostics and telling follow-ons apart
-(diags.py), the manifests' dependencies and rewrites, version choice and
-System's manifest without Samples (manifests.py), and the comparison with a
-ledger (summary.py). One test makes a git repository in a temporary
-directory (no global or system git configuration, so no hooks, signing or
-credential helpers run) as a stand-in for SwiftPM's cache, and deletes it;
-nothing else is written, nothing is built, and nothing reaches the network.
+(diags.py), the manifests' dependencies and rewrites, `traits:`, version
+choice and System's manifest without Samples (manifests.py), the comparison
+with a ledger and the summary's sections (summary.py), the re-export run's
+demotion (reexport.py), and compare.py. One test makes a git repository in
+a temporary directory (no global or system git configuration, so no hooks,
+signing or credential helpers run) as a stand-in for SwiftPM's cache, and
+three write files in one; each deletes its directory. Nothing else is
+written, nothing is built, and nothing reaches the network. Fixture
+packages, built or not, are test_packages.py's.
 
   PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s Utilities/import-probe/scripts -p 'test_*.py'
 """
@@ -15,6 +18,8 @@ import sys
 
 sys.dont_write_bytecode = True
 
+import contextlib  # noqa: E402
+import io  # noqa: E402
 import json  # noqa: E402
 import os  # noqa: E402
 import shutil  # noqa: E402
@@ -511,6 +516,54 @@ class SummaryTests(unittest.TestCase):
             # The flat file has the per-target probe's records only.
             with open(os.path.join(tmp, "import-probe.json")) as f:
                 self.assertEqual(len(json.load(f)), 3)
+        finally:
+            shutil.rmtree(tmp)
+
+
+class CompareTests(unittest.TestCase):
+    """compare.py over two sets of runs written into a temporary directory,
+    deleted after."""
+
+    def test_table_and_differences(self):
+        import compare
+        tmp = tempfile.mkdtemp(prefix="import-probe-test-")
+        try:
+            def run(out, kind, records, commit="c0ffee"):
+                d = os.path.join(tmp, out, "pkg")
+                os.makedirs(d, exist_ok=True)
+                with open(os.path.join(d, f"{kind}.json"), "w") as f:
+                    json.dump({"meta": {"commit": commit, "system": "5y5"}, "records": records}, f)
+
+            def rec(name, line=1, cls="covered"):
+                return {"file": "Sources/A/a.swift", "line": line, "name": name, "class": cls}
+            run("a-before", "linux", [rec("getpid"), rec("getpid", 2), rec("TCP_INFO", 3, "gap")])
+            run("b-before", "linux", [rec("getpid"), rec("getpid", 2), rec("TCP_INFO", 3, "covered"),
+                                      rec("usleep", 4)])
+            run("a-after", "linux", [])
+            run("b-after", "linux", [], commit="beef")
+            self.assertEqual(compare.cell(compare.load(os.path.join(tmp, "a-before"), "pkg", "linux")),
+                             "3 (2): 2 covered, 1 gap")
+            self.assertEqual(compare.cell(compare.load(os.path.join(tmp, "a-after"), "pkg", "linux")), "0")
+            self.assertEqual(compare.cell(None), "-")
+            d = compare.differences(compare.load(os.path.join(tmp, "a-before"), "pkg", "linux"),
+                                    compare.load(os.path.join(tmp, "b-before"), "pkg", "linux"))
+            self.assertEqual(d, ["names only the second has: `usleep`",
+                                 "sites only the second has (1): `Sources/A/a.swift:4` `usleep`",
+                                 "classified differently: `TCP_INFO` (gap / covered)"])
+            out = os.path.join(tmp, "compared.md")
+            saved = sys.argv
+            sys.argv = ["compare.py", "--before", os.path.join(tmp, "a-before"), "--after", os.path.join(tmp, "a-after"),
+                        "--other-before", os.path.join(tmp, "b-before"), "--other-after", os.path.join(tmp, "b-after"),
+                        "--output", out]
+            try:
+                with contextlib.redirect_stdout(io.StringIO()):
+                    compare.main()
+            finally:
+                sys.argv = saved
+            with open(out) as f:
+                text = f.read()
+            self.assertIn("| pkg | - | - | 3 (2): 2 covered, 1 gap | 0 | - | - |", text)
+            self.assertIn("- **pkg, Linux after** (commits `c0ffee` / `beef`): the same.", text)
         finally:
             shutil.rmtree(tmp)
 

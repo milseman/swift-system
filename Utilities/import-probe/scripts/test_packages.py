@@ -295,6 +295,39 @@ class BuildTests(FixtureCase):
                                                            "src/user/Sources/User/User.swift"])
         self.assertEqual(result["baseline"]["exit"], 0)
 
+    def test_reexport_run_of_a_nested_package(self):
+        """F10's other half: the nested package's root package uses the
+        re-export too, and is fixed up uncounted."""
+        commit(os.path.join(self.clones, "re"), {
+            "Package.swift": TOOLS + 'let package = Package(name: "re", products: [.library(name: "Re", targets: '
+            '["Re"])], targets: [.target(name: "Re")])\n',
+            "Sources/Re/Exports.swift": "#if canImport(Darwin)\n@_exported import Darwin\n#elseif canImport(Glibc)\n"
+            "@_exported import Glibc\n#endif\n"})
+        clone = os.path.join(self.clones, "root")
+        c = commit(clone, {
+            "Package.swift": TOOLS + 'let package = Package(name: "root", products: [.library(name: "R", targets: '
+            '["R"]), .library(name: "Hub", targets: ["Hub"])], dependencies: [.package(path: "../re")], targets: '
+            '[.target(name: "R", dependencies: [.product(name: "Re", package: "re")]), .target(name: "Hub", '
+            'dependencies: [.product(name: "Re", package: "re")])])\n',
+            "Sources/R/R.swift": "import Re\npublic func r() -> Int32 { getpid() }\n",
+            # A module that re-exports the re-exporter, as NIO does NIOPosix:
+            # its module is the same after the demotion.
+            "Sources/Hub/Hub.swift": "@_exported import Re\n",
+            "Examples/T/Package.swift": TOOLS + 'let package = Package(name: "T", dependencies: [.package(path: '
+            '"../.."), .package(path: "../../../re")], targets: [.executableTarget(name: "T", dependencies: ['
+            '.product(name: "R", package: "root"), .product(name: "Re", package: "re")]), .target(name: "U", '
+            'dependencies: [.product(name: "Hub", package: "root")])])\n',
+            "Examples/T/Sources/T/main.swift": "import R\nimport Re\nprint(getppid() + r())\n",
+            # Reaches Re only through Hub, and uses nothing of either.
+            "Examples/T/Sources/U/U.swift": "import Hub\npublic func u() -> Int32 { getpid() }\n"})
+        result = reexport.run(clone, c, "macos", self.args(reexport=True), REPO, HEAD, "Examples/T")
+        self.assertEqual(result["meta"]["nested"], "Examples/T")
+        self.assertEqual(sorted((r["file"], r["name"]) for r in result["records"]),
+                         [("Sources/T/main.swift", "getppid"), ("Sources/U/U.swift", "getpid")])
+        self.assertEqual(result["fixups"]["dependencies"], ["src/root/Sources/R/R.swift"])
+        self.assertEqual(sorted(result["fixups"]["own"]), ["src/root/Examples/T/Sources/T/main.swift",
+                                                           "src/root/Examples/T/Sources/U/U.swift"])
+
 
 if __name__ == "__main__":
     unittest.main()

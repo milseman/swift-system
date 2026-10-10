@@ -11,7 +11,11 @@ In probe.py's scratch copy of the package and its dependencies:
      re-exporting target gets the import first: the module builds as
      before, and only its clients lose the C module. A re-export the
      platform doesn't compile (adopter-coverage's `#if` evaluator; a maybe
-     counts) gives nothing, and none at all means nothing is built.
+     counts) gives nothing, and none at all means nothing is built. Every
+     Swift file of every built target is touched, since an incremental
+     build wouldn't recompile a client that reaches the demoted module
+     through another module's re-export, or uses nothing of it but the C
+     library (touch_sources).
   3. The copy is built again, until no file has new errors: SwiftPM stops
      at a failed target and builds nothing that depends on one, so each
      file with errors gets the C import first and the build is repeated.
@@ -112,6 +116,27 @@ def find_reexports(work, counted, platform, model, scan=None):
                             "attrs": EXPORTED.sub("", m.group("attrs")).strip(), "target": target,
                             "active": True if st is None else plat in st})
     return out
+
+
+def touch_sources(scan, built):
+    """Touches every Swift file of every target the build has (`scan`'s,
+    [(directory, module)]), so that each module is compiled again, all of
+    it, the next time the build reaches it. Without that a client the
+    demotion breaks can build as before: a module's compile takes only its
+    direct dependencies' modules as inputs, and one that re-exports the
+    demoted module (NIO's `@_exported import NIOPosix`) comes out the same;
+    and the driver recompiles a file only for a change to a declaration it
+    uses from another module, which a re-export isn't. Returns how many
+    files."""
+    now = time.time()
+    n = 0
+    for directory, module in scan:
+        if built and module not in built:
+            continue
+        for path in swift_files(directory):
+            os.utime(path, (now, now))
+            n += 1
+    return n
 
 
 def built_modules(scratch):
@@ -318,6 +343,7 @@ def run(clone, branch, platform, args, repo, head, subdir="."):
                     add_import(os.path.join(work, f), block)
                     fixed.add(f)
                     result["fixups"]["module"].append(f)
+        result["meta"]["touched"] = touch_sources(scan, built)
         code_of = probe.code_reader(pkg)
         demoted_modules = {s["module"] for s in sites}
 
