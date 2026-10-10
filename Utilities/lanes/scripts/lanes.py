@@ -6,8 +6,9 @@ swift-system-examples, each adopter clone in ../adopters and worktree in
 A lane is whatever exists: nothing about lanes is configured here. For each
 one, from git (every call with --no-optional-locks and lazy fetching off):
 its branch, head commit and time, commits ahead of and behind its
-integration branch (system-next for swift-system, main for the examples;
-an adopter's branch has no recorded base, so its last commit time stands
+integration branch (system-next for swift-system, main for the examples,
+origin/main for a swift-system worktree on a `pitch/` branch; an
+adopter's branch has no recorded base, so its last commit time stands
 in), uncommitted files, a merge, rebase or cherry-pick in progress, and a
 trial merge's conflicts against the integration branch (`git merge-tree`,
 its objects written to a temporary directory, never the repository's).
@@ -41,9 +42,11 @@ import re  # noqa: E402
 import shutil  # noqa: E402
 import subprocess  # noqa: E402
 import tempfile  # noqa: E402
+import threading  # noqa: E402
 import time  # noqa: E402
 
 REPOS = (("swift-system", "system", "system-next"), ("swift-system-examples", "examples", "main"))
+PITCH_PREFIX = "pitch/"
 ADOPTER_DIRS = (("adopters", "adopter"), ("adopters-unix", "adopter worktree"))
 REPORT_NAMES = ("REPORT*.md", "*-REPORT.md")
 REPORT_PATHS = ("Prototype/*/REPORT.md",)
@@ -104,16 +107,26 @@ def claude_dir_name(path):
 # ---------------------------------------------------------------- git
 
 class Git:
-    def __init__(self, path, gitdir, timeout):
-        self.path, self.gitdir, self.timeout = path, gitdir, timeout
+    """git on one working tree, with its git directory given, so a worktree
+    whose `.git` file names a path that isn't here still works. Each call
+    has a timeout, cut short by `deadline` (a time.time() value) if given."""
 
-    def __call__(self, *args, ok=(0,), env=None):
+    def __init__(self, path, gitdir, timeout, deadline=None):
+        self.path, self.gitdir, self.timeout, self.deadline = path, gitdir, timeout, deadline
+
+    def __call__(self, *args, ok=(0,), env=None, input=None):
         cmd = ["git", "--no-optional-locks", "--git-dir", self.gitdir, "--work-tree", self.path, *args]
+        timeout = self.timeout
+        if self.deadline is not None:
+            left = self.deadline - time.time()
+            if left <= 0:
+                raise Slow(f"past the deadline before git {args[0]}")
+            timeout = min(timeout, left)
         try:
-            p = subprocess.run(cmd, capture_output=True, text=True, env=env or ENV, timeout=self.timeout,
-                               cwd=self.path)
+            p = subprocess.run(cmd, capture_output=True, text=True, env=env or ENV, timeout=timeout,
+                               cwd=self.path, input=input, errors="replace")
         except subprocess.TimeoutExpired:
-            raise Slow(f"git {args[0]} took over {self.timeout} s")
+            raise Slow(f"git {args[0]} took over {round(timeout, 1)} s")
         if p.returncode not in ok:
             raise RuntimeError(f"git {' '.join(args)}: {p.stderr.strip()[:300]}")
         return p
@@ -149,34 +162,111 @@ def worktrees(main, base, timeout):
     return res
 
 
-def trial_conflicts(g, common, ours, theirs):
+def trial_conflicts(g, common, ours, theirs, copies=None):
+    """(count, how): how many files trial_merge finds conflicting."""
+    files, how = trial_merge(g, common, ours, theirs, copies)
+    return len(files), how
+
+
+_MODES = {}
+_MODES_LOCK = threading.Lock()
+
+
+def merge_tree_mode(g):
+    """`write-tree` if this git's merge-tree has `--write-tree` (git 2.38 and
+    later), else `trivial`: read from the usage it prints when given no
+    commits, which writes nothing. Remembered for the PATH it ran with."""
+    key = ENV.get("PATH")
+    with _MODES_LOCK:
+        if key in _MODES:
+            return _MODES[key]
+    p = g("merge-tree", "--write-tree", ok=(0, 1, 128, 129))
+    text = p.stdout + p.stderr
+    mode = "write-tree" if "[--write-tree]" in text and not NO_WRITE_TREE.search(text) else "trivial"
+    with _MODES_LOCK:
+        _MODES[key] = mode
+    return mode
+
+
+class ObjectCopies:
+    """Copies of repositories' object stores in one temporary directory,
+    each made the first time it's asked for. A trial merge runs with one as
+    its object directory, so that what `merge-tree --write-tree` writes, and
+    the times git updates on objects it finds it already has (it
+    "freshens" them, even in an alternate), stay in the copy."""
+
+    def __init__(self):
+        self.dir, self.copies = None, {}
+        self.lock = threading.Lock()
+
+    def get(self, common):
+        key = os.path.realpath(common)
+        with self.lock:
+            if key not in self.copies:
+                if self.dir is None:
+                    self.dir = tempfile.mkdtemp(prefix="lanes-objects-")
+                dst = os.path.join(self.dir, str(len(self.copies)))
+                copy_objects(os.path.join(common, "objects"), dst)
+                self.copies[key] = dst
+            return self.copies[key]
+
+    def close(self):
+        if self.dir:
+            shutil.rmtree(self.dir, ignore_errors=True)
+            self.dir = None
+
+
+def copy_objects(src, dst):
+    """A repository's loose objects and packs, copied (not linked: a link
+    shares the file whose time git would update)."""
+    os.makedirs(os.path.join(dst, "pack"))
+    os.makedirs(os.path.join(dst, "info"))
+    for d in os.listdir(src):
+        p = os.path.join(src, d)
+        if len(d) == 2 and os.path.isdir(p):
+            os.makedirs(os.path.join(dst, d))
+            for f in os.listdir(p):
+                shutil.copyfile(os.path.join(p, f), os.path.join(dst, d, f))
+    pack = os.path.join(src, "pack")
+    if os.path.isdir(pack):
+        for f in os.listdir(pack):
+            if f.endswith((".pack", ".idx")):
+                shutil.copyfile(os.path.join(pack, f), os.path.join(dst, "pack", f))
+
+
+def trial_merge(g, common, ours, theirs, copies=None):
     """(files, how): the files `git merge-tree` finds conflicting in a merge
-    of theirs into ours, with every object it writes in a temporary
-    directory, and how they were found. `write-tree` is git's own list
-    (`--write-tree`, git 2.38 and later). A git too old for it prints its
-    usage; the three-argument form, the trivial merge, is used instead
-    (`trivial`), which writes nothing: see trivial_conflicts."""
-    tmp = tempfile.mkdtemp(prefix="lanes-merge-tree-")
-    try:
-        alternates = [os.path.join(common, "objects")]
-        info = os.path.join(common, "objects", "info", "alternates")
-        if os.path.isfile(info):
-            with open(info) as f:
-                alternates += [a.strip() for a in f if a.strip() and not a.startswith("#")]
-        env = dict(ENV, GIT_OBJECT_DIRECTORY=tmp, GIT_ALTERNATE_OBJECT_DIRECTORIES=os.pathsep.join(alternates))
-        p = g("merge-tree", "--write-tree", "--name-only", "--no-messages", ours, theirs, ok=(0, 1, 128, 129),
-              env=env)
-        if p.returncode in (0, 1):
-            lines = [x for x in p.stdout.split("\n")[1:] if x.strip()]
-            return (len(lines) if p.returncode == 1 else 0), "write-tree"
-        if not NO_WRITE_TREE.search(p.stderr):
+    of theirs into ours, sorted, and how they were found. `write-tree` is
+    git's own list (`--write-tree`, git 2.38 and later), run with a copy of
+    the repository's objects as its object directory (copies, an
+    ObjectCopies; a temporary one when it's None), so nothing it writes or
+    touches is the repository's. With a git too old for it, the
+    three-argument form, the trivial merge, is used instead (`trivial`),
+    which writes nothing: see trivial_conflict_files."""
+    if merge_tree_mode(g) == "write-tree":
+        own = copies is None
+        copies = copies or ObjectCopies()
+        try:
+            env = dict(ENV, GIT_OBJECT_DIRECTORY=copies.get(common))
+            env.pop("GIT_ALTERNATE_OBJECT_DIRECTORIES", None)
+            info = os.path.join(common, "objects", "info", "alternates")
+            if os.path.isfile(info):
+                with open(info) as f:
+                    env["GIT_ALTERNATE_OBJECT_DIRECTORIES"] = os.pathsep.join(
+                        a.strip() for a in f if a.strip() and not a.startswith("#"))
+            p = g("merge-tree", "--write-tree", "--name-only", "--no-messages", "-z", ours, theirs,
+                  ok=(0, 1, 128), env=env)
+            if p.returncode in (0, 1):
+                files = [x for x in p.stdout.split("\0")[1:] if x.strip()]
+                return (sorted(set(files)) if p.returncode == 1 else []), "write-tree"
             raise RuntimeError(f"git merge-tree --write-tree: {p.stderr.strip()[:300]}")
-        base = g.out("merge-base", ours, theirs, ok=(0, 1)).strip()
-        if not base:
-            raise RuntimeError(f"no merge base of {ours} and {theirs} for a trial merge")
-        return trivial_conflicts(g.out("merge-tree", base, ours, theirs)), "trivial"
-    finally:
-        shutil.rmtree(tmp, ignore_errors=True)
+        finally:
+            if own:
+                copies.close()
+    base = g.out("merge-base", ours, theirs, ok=(0, 1)).strip()
+    if not base:
+        raise RuntimeError(f"no merge base of {ours} and {theirs} for a trial merge")
+    return trivial_conflict_files(g.out("merge-tree", base, ours, theirs)), "trivial"
 
 
 # What a git without `merge-tree --write-tree` says: its usage, which names
@@ -188,11 +278,16 @@ TRIVIAL_ENTRY = re.compile(r"^  (base|our|their) +\d+ ([0-9a-f]+) (.+)$")
 
 
 def trivial_conflicts(text):
-    """How many files a trivial merge's output (`git merge-tree BASE OURS
-    THEIRS`) conflicts in: those whose merged text has git's conflict
-    markers (`+<<<<<<< .our`), and those one side removed and the other
-    changed. It can't follow renames, so a conflict that `--write-tree`
-    finds through one is missed."""
+    """How many files trivial_conflict_files finds."""
+    return len(trivial_conflict_files(text))
+
+
+def trivial_conflict_files(text):
+    """The files a trivial merge's output (`git merge-tree BASE OURS
+    THEIRS`) conflicts in, sorted: those whose merged text has git's
+    conflict markers (`+<<<<<<< .our`), and those one side removed and the
+    other changed. It can't follow renames, so a conflict that
+    `--write-tree` finds through one is missed."""
     files = set()
     section, entries, in_diff = None, {}, False
 
@@ -218,7 +313,7 @@ def trivial_conflicts(text):
         elif in_diff and line.rstrip() == "+<<<<<<< .our" and entries:
             files.add(next(iter(entries.values()))[1])
     close()
-    return len(files)
+    return sorted(files)
 
 
 # ---------------------------------------------------------------- reports, logs, sessions
@@ -328,7 +423,7 @@ def session(claude, host_path):
         return {"state": "none", "directory": os.path.basename(d)}
     age = time.time() - newest
     return {"state": "active" if age < 15 * 60 else "idle", "modified": stamp(newest), "minutes": int(age // 60),
-            "directory": os.path.basename(d)}
+            "directory": os.path.basename(d), "mtime": newest}
 
 
 def stamp(t):
@@ -337,6 +432,27 @@ def stamp(t):
 
 # ---------------------------------------------------------------- one lane
 
+def status_entries(text):
+    """[{"status": XY, "path": p, "from": source or absent}] from
+    `git status --porcelain=v1 -z`."""
+    entries = [e for e in text.split("\0") if e]
+    out = []
+    i = 0
+    while i < len(entries):
+        e = entries[i]
+        item = {"status": e[:2], "path": e[3:]}
+        if e[:1] in ("R", "C") and i + 1 < len(entries):
+            i += 1  # the rename's source follows
+            item["from"] = entries[i]
+        out.append(item)
+        i += 1
+    return out
+
+
+IN_PROGRESS = (("MERGE_HEAD", "merge"), ("CHERRY_PICK_HEAD", "cherry-pick"), ("REVERT_HEAD", "revert"),
+               ("rebase-merge", "rebase"), ("rebase-apply", "rebase"))
+
+
 def git_lane(lane, base, args):
     """Fills a git lane's fields; raises Slow when a call times out."""
     path = lane["path"]
@@ -344,64 +460,70 @@ def git_lane(lane, base, args):
     if not gitdir:
         lane["problem"] = (f"its .git names {recorded_gitdir}, which isn't here" if recorded_gitdir
                            else "no git directory")
+        if recorded_gitdir:
+            lane["recordedGitDir"] = recorded_gitdir
         return lane
     if recorded_gitdir and os.path.normpath(gitdir) != os.path.normpath(recorded_gitdir):
         lane["gitDir"] = gitdir
-    g = Git(path, gitdir, args.timeout)
+        lane["recordedGitDir"] = recorded_gitdir
+    lane["gitDirUsed"] = gitdir
+    g = Git(path, gitdir, args.timeout, getattr(args, "deadline_at", None))
     common = g.out("rev-parse", "--git-common-dir").strip()
     common = common if os.path.isabs(common) else os.path.normpath(os.path.join(path, common))
+    lane["commonDir"] = common
     lane["branch"] = g.out("branch", "--show-current").strip() or "(detached)"
     head = g.out("log", "-1", "--format=%H%x00%cI%x00%s", ok=(0, 128)).strip().split("\0")
     if len(head) == 3:
         lane["head"], lane["headTime"], lane["subject"] = head[0], head[1], head[2]
-    status = g.out("status", "--porcelain=v1", "-z", "--untracked-files=all")
-    entries = [e for e in status.split("\0") if e]
-    changed = []
-    i = 0
-    while i < len(entries):
-        e = entries[i]
-        changed.append(e[3:])
-        if e[:1] in ("R", "C"):
-            i += 1  # the rename's source follows
-        i += 1
-    lane["uncommitted"] = len(changed)
-    state = [name for f, name in (("MERGE_HEAD", "merge"), ("CHERRY_PICK_HEAD", "cherry-pick"),
-                                   ("REVERT_HEAD", "revert"), ("rebase-merge", "rebase"), ("rebase-apply", "rebase"))
-             if os.path.exists(os.path.join(gitdir, f))]
+    entries = status_entries(g.out("status", "--porcelain=v1", "-z", "--untracked-files=all"))
+    changed = [e["path"] for e in entries]
+    lane["uncommitted"] = len(entries)
+    lane["uncommittedFiles"] = entries
+    state = [name for f, name in IN_PROGRESS if os.path.exists(os.path.join(gitdir, f))]
     lane["inProgress"] = sorted(set(state))
     integration = lane.get("integration")
     owned = []
     if integration and lane.get("head"):
-        base_ref = g.out("rev-parse", "--verify", "--quiet", f"refs/heads/{integration}", ok=(0, 1)).strip()
+        ref = lane.get("integrationRef") or f"refs/heads/{integration}"
+        base_ref = g.out("rev-parse", "--verify", "--quiet", ref, ok=(0, 1)).strip()
         if base_ref:
+            lane["integrationHead"] = base_ref
             counts = g.out("rev-list", "--left-right", "--count", f"{base_ref}...HEAD").split()
             lane["behind"], lane["ahead"] = int(counts[0]), int(counts[1])
             if lane["ahead"] and lane["behind"] and not args.no_merge_tree:
-                lane["conflicts"], lane["conflictsBy"] = trial_conflicts(g, common, base_ref, "HEAD")
+                files, lane["conflictsBy"] = trial_merge(g, common, base_ref, "HEAD",
+                                                         getattr(args, "object_copies", None))
+                lane["conflicts"], lane["conflictFiles"] = len(files), files
             elif not args.no_merge_tree:
-                lane["conflicts"] = 0
+                lane["conflicts"], lane["conflictFiles"] = 0, []
             mb = g.out("merge-base", base_ref, "HEAD", ok=(0, 1)).strip()
             if mb:
-                owned = [x for x in g.out("diff", "--name-only", mb, "HEAD").split("\n") if x]
+                lane["mergeBase"] = mb
+                owned = [x for x in g.out("diff", "--name-only", "-z", mb, "HEAD").split("\0") if x]
         else:
-            lane["note"] = f"no local {integration} branch"
+            lane["note"] = (f"no local {integration} branch" if ref == f"refs/heads/{integration}"
+                            else f"no {ref} here")
     if integration:
         rels = [r for r in owned + changed if is_report(r)]
     else:
         rels = tree_reports(path) + [r for r in changed if is_report(r)]
+    lane["ownedReports"] = sorted(set(rels))
     lane["report"] = newest_report(path, rels)
     return lane
 
 
 def workspace_lane(lane):
     path = lane["path"]
-    lane["report"] = newest_report(path, tree_reports(path))
+    lane["ownedReports"] = sorted(set(tree_reports(path)))
+    lane["report"] = newest_report(path, lane["ownedReports"])
     return lane
 
 
-def collect(args):
-    started = time.time()
-    base = os.path.realpath(args.root)
+def discover(base, timeout):
+    """Every lane under base, before any is read: {"lanes": [...], "notes":
+    [...], "hostRoot": the path the lanes were recorded under, or None when
+    it's base}. A swift-system worktree on a `pitch/` branch is a pitch lane,
+    whose base is `origin/main`."""
     lanes, notes = [], []
     host_base = None
     for repo, kind, integration in REPOS:
@@ -410,7 +532,7 @@ def collect(args):
             notes.append(f"no clone {repo} in {base}")
             continue
         try:
-            wts = worktrees(main, base, args.timeout)
+            wts = worktrees(main, base, timeout)
         except (RuntimeError, subprocess.TimeoutExpired) as e:
             notes.append(f"{repo}: can't list worktrees: {e}")
             continue
@@ -423,6 +545,8 @@ def collect(args):
                     "name": os.path.relpath(seen, base) if seen else os.path.basename(recorded),
                     "path": seen, "recordedPath": recorded if not seen or seen != recorded else None,
                     "branch": branch, "head": head}
+            if kind == "system" and branch.startswith(PITCH_PREFIX):
+                lane.update(kind="pitch", integration="origin/main", integrationRef="refs/remotes/origin/main")
             if not seen:
                 lane["problem"] = f"recorded at {recorded}, which isn't here (git worktree prune would drop it)"
             lanes.append(lane)
@@ -435,15 +559,39 @@ def collect(args):
             if os.path.exists(os.path.join(p, ".git")):
                 lanes.append({"kind": kind, "name": f"{d}/{name}", "path": p, "package": name})
         lanes.append({"kind": "workspace", "name": d, "path": top})
-    host_base = host_base or base
+    hosted = host_base or base
     for lane in lanes:
         if lane.get("path"):
-            lane["hostPath"] = os.path.join(host_base, os.path.relpath(lane["path"], base))
-    claude = args.claude
-    if claude is None:
-        claude = os.path.expanduser("~/.claude")
-    if not os.access(os.path.join(claude, "projects"), os.R_OK | os.X_OK):
-        claude = None
+            lane["hostPath"] = os.path.join(hosted, os.path.relpath(lane["path"], base))
+    return {"lanes": lanes, "notes": notes, "hostRoot": host_base if host_base and host_base != base else None}
+
+
+def claude_root(claude):
+    """Claude Code's directory if its projects can be read, else None."""
+    claude = claude if claude is not None else os.path.expanduser("~/.claude")
+    return claude if os.access(os.path.join(claude, "projects"), os.R_OK | os.X_OK) else None
+
+
+def log_names(lane):
+    """(names, contains) that linux_log matches a lane's logs by."""
+    if lane["kind"] in ("system", "pitch", "examples"):
+        names = [os.path.basename(lane["path"])]
+        if lane.get("branch") and lane["branch"] != "(detached)":
+            names.append(lane["branch"].replace("/", "-"))
+        return names, []
+    if lane["kind"] == "workspace":
+        rep = lane.get("report")
+        return ([rep["file"][:-len("-REPORT.md")].lower()] if rep and rep["file"].endswith("-REPORT.md") else []), []
+    return [lane["package"]], [lane["package"]]
+
+
+def collect(args):
+    started = time.time()
+    base = os.path.realpath(args.root)
+    found = discover(base, args.timeout)
+    lanes, notes = found["lanes"], found["notes"]
+    host_base = found["hostRoot"] or base
+    claude = claude_root(args.claude)
     logs = os.path.join(base, "linux-logs")
 
     def one(lane):
@@ -460,23 +608,17 @@ def collect(args):
         except RuntimeError as e:
             lane["problem"] = str(e)
         if lane.get("path"):
-            if lane["kind"] in ("system", "examples"):
-                names = [os.path.basename(lane["path"])]
-                if lane.get("branch") and lane["branch"] != "(detached)":
-                    names.append(lane["branch"].replace("/", "-"))
-                lane["linuxLog"] = linux_log(logs, names)
-            elif lane["kind"] == "workspace":
-                rep = lane.get("report")
-                names = [rep["file"][:-len("-REPORT.md")].lower()] if rep and rep["file"].endswith("-REPORT.md") \
-                    else []
-                lane["linuxLog"] = linux_log(logs, names) if names else None
-            else:
-                lane["linuxLog"] = linux_log(logs, [lane["package"]], [lane["package"]])
+            names, contains = log_names(lane)
+            lane["linuxLog"] = linux_log(logs, names, contains) if names else None
             lane["session"] = session(claude, lane["hostPath"])
         return lane
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as pool:
-        lanes = list(pool.map(one, lanes))
+    args.object_copies = ObjectCopies()
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as pool:
+            lanes = list(pool.map(one, lanes))
+    finally:
+        args.object_copies.close()
     du = shutil.disk_usage(base)
     df = subprocess.run(["df", "-h", base], capture_output=True, text=True).stdout.strip().split("\n")
     return {"generated": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "root": base,
@@ -513,7 +655,8 @@ def markdown(doc):
     for n in doc["notes"]:
         w(f"- {n}")
     w("")
-    groups = (("system", "swift-system", "system-next"), ("examples", "swift-system-examples", "main"),
+    groups = (("system", "swift-system", "system-next"), ("pitch", "Pitch worktrees (swift-system)", "origin/main"),
+              ("examples", "swift-system-examples", "main"),
               ("adopter", "Adopter clones (`adopters/`)", None),
               ("adopter worktree", "Adopter worktrees (`adopters-unix/`)", None),
               ("workspace", "Adopter workspaces", None))
