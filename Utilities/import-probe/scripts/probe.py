@@ -4,6 +4,8 @@ C modules: build an export of one branch with a target's imports of them
 removed, one target at a time, and read what the compiler can't find.
 
 Usage: probe.py [--linux] [--branch BRANCH] [--system REF] [--targets T,...]
+                [--nested | --package-dir DIR,...] [--path-dep IDENTITY=[REPO@]REF]...
+                [--own-modules | --reexport]
                 [--work DIR] [--out DIR] [--keep] [--no-skip] [--min-free-gb N]
                 CLONE...
 
@@ -11,10 +13,14 @@ For each clone (a checkout of a package: a clone or a worktree):
   1. The branch (default: its newest migration branch, migrate-all, then
      migrate-unix, then migrate-darwin) is exported with `git archive` into
      a scratch directory, WORK/<package>-<platform>/src/<package>. The
-     clone is only read.
+     clone is only read. A nested package (--nested, --package-dir: a
+     directory of the branch with its own Package.swift) is probed in place
+     in that export, and reported on its own.
   2. Its dependencies become path dependencies on exports in WORK/.../deps:
-     System at --system (default system-next, in this worktree), and remote
-     packages from SwiftPM's cache (manifests.py). Nothing is fetched.
+     System at --system (default system-next, in this worktree), remote
+     packages from SwiftPM's cache (manifests.py), and local path
+     dependencies from their checkouts' commits, followed transitively.
+     Nothing is fetched for them.
   3. `swift package describe` gives the targets and their dependencies; the
      Swift targets are probed in dependency order.
   4. For each target, its imports of modules.ini's [count] modules (and a
@@ -25,11 +31,23 @@ For each clone (a checkout of a package: a clone or a worktree):
      baseline, `--build-tests`); then each target is built alone with
      `-Xswiftc -continue-building-after-errors`, the other targets as they
      were, in one build directory, so each build is incremental; then its
-     files are restored.
+     files are restored. --own-modules adds two builds of each target that
+     imports one of the package's own C modules (below).
   5. The errors in the target's files are read (diags.py), less the
      baseline's, and each name is classified against System (classify.py).
   6. WORK/... is deleted unless --keep; OUT/<package>/<platform>.json is
      written, and summary.py's OUT/<package>/SUMMARY.md.
+
+--own-modules: the C names a file reaches through a C module of its own
+package (CNIOBoringSSL, CAsyncHTTPClient), whose module re-exports the
+system headers it includes. Each target that imports one is built twice
+more: without those imports as well as its C imports, and then with the
+platform's C library imported in each of its files instead. A name the
+first build can't find, the second can, and the ordinary probe's build
+could is one the file took from the C library through its own C module.
+
+--reexport (reexport.py) is a different run: the names a package gets only
+through an `@_exported import` of a C module, such as NIOPosix's of Glibc.
 
 --linux builds in a container through Utilities/linux/build.sh (--root the
 scratch directory, --dir the package), with the image's Swift; macOS is
@@ -41,7 +59,6 @@ import sys
 sys.dont_write_bytecode = True
 
 import argparse  # noqa: E402
-import collections  # noqa: E402
 import datetime  # noqa: E402
 import glob  # noqa: E402
 import json  # noqa: E402
@@ -68,6 +85,10 @@ BRANCHES = ("migrate-all", "migrate-unix", "migrate-darwin")
 MARKER = ".import-probe-work"
 GIT_ENV = dict(os.environ, GIT_NO_LAZY_FETCH="1", GIT_TERMINAL_PROMPT="0")
 LINUX_BUILD = os.path.join(UTILITIES, "linux", "build.sh")
+# The C library each platform's build imports in place of a package's own C
+# module (--own-modules) or a demoted re-export (--reexport).
+C_LIBRARY = {"macos": "Darwin", "linux": "Glibc"}
+OWN_C_TYPES = ("ClangTarget", "SystemLibraryTarget")
 
 
 def log(msg):
@@ -94,10 +115,25 @@ def newest_branch(clone):
 
 
 def export(repo, commit, dest):
+    """`git archive` of a commit (or `commit:subdirectory`) into dest."""
     os.makedirs(dest, exist_ok=True)
     archive = subprocess.run(["git", "--no-optional-locks", "-C", repo, "archive", commit], capture_output=True,
                              check=True, env=GIT_ENV).stdout
     subprocess.run(["tar", "-x", "-C", dest], input=archive, check=True)
+
+
+def nested_packages(clone, commit):
+    """The branch's nested packages: each directory, other than the root,
+    with its own Package.swift."""
+    files = git(clone, "ls-tree", "-r", "--name-only", commit).split("\n")
+    return sorted(os.path.dirname(f) for f in files if f.endswith("/Package.swift"))
+
+
+def display_name(name, subdir):
+    """The name a package's output goes by: the clone's directory's, and a
+    nested package's directory after it (`swift-nio-ssl-Benchmarks`)."""
+    subdir = os.path.normpath(subdir)
+    return name if subdir == "." else f"{name}-{subdir.replace(os.sep, '-')}"
 
 
 def refuse_tracked(path, repo):
@@ -140,28 +176,81 @@ def free_gb(path):
 
 # ---------------------------------------------------------------- configuration
 
-def package_config(name):
+def package_config(name, subdir="."):
     """packages.ini's settings for a package: shims (modules whose imports
-    are removed like a C module's) and a note."""
+    are removed like a C module's) and a note. A nested package takes its
+    own section, `[<package>/<directory>]`, if there is one, else its
+    clone's."""
     import configparser
     cp = configparser.ConfigParser(interpolation=None)
     cp.optionxform = str
     cp.read(os.path.join(TOOL, "packages.ini"), encoding="utf-8")
-    if not cp.has_section(name):
+    section = f"{name}/{os.path.normpath(subdir)}"
+    if not cp.has_section(section):
+        section = name
+    if not cp.has_section(section):
         return {"shims": [], "note": ""}
-    sec = dict(cp.items(name))
+    sec = dict(cp.items(section))
     return {"shims": sec.get("shims", "").split(), "note": " ".join(sec.get("note", "").split())}
+
+
+def path_dep_refs(specs):
+    """{identity: (checkout or None, ref)} from --path-dep IDENTITY=REF or
+    IDENTITY=REPO@REF."""
+    out = {}
+    for spec in specs or ():
+        ident, _, value = spec.partition("=")
+        repo, at, ref = value.rpartition("@")
+        if not (ident and ref):
+            sys.exit(f"import-probe: --path-dep {spec}: want IDENTITY=REF or IDENTITY=REPO@REF")
+        out[ident.lower()] = (os.path.abspath(os.path.expanduser(repo)) if at else None, ref)
+    return out
 
 
 # ---------------------------------------------------------------- the copy
 
-def prepare(clone, commit, name, work, repo, system_commit):
-    """Exports the package and its dependencies, rewrites the manifests;
-    returns what was done, for the record."""
-    pkg = os.path.join(work, "src", name)
-    export(clone, commit, pkg)
+def inside(path, directory):
+    path, directory = os.path.realpath(path), os.path.realpath(directory)
+    return path == directory or path.startswith(directory + os.sep)
+
+
+def checkout_of(path):
+    """(the git checkout's top directory, the path's directory in it) for a
+    directory on disk."""
+    if not os.path.isdir(path):
+        raise RuntimeError(f"no directory {path}")
+    p = subprocess.run(["git", "--no-optional-locks", "-C", path, "rev-parse", "--show-toplevel"],
+                       capture_output=True, text=True, env=GIT_ENV)
+    if p.returncode != 0:
+        raise RuntimeError(f"{path} isn't in a git checkout; the probe exports commits only")
+    top = p.stdout.strip()
+    return top, os.path.relpath(os.path.realpath(path), os.path.realpath(top))
+
+
+def prepare(clone, commit, name, work, repo, system_commit, subdir=".", path_refs=None, swiftpm=()):
+    """Exports the package, System and the dependencies, and rewrites the
+    local packages' manifests; returns (the package's directory in the
+    export, what was done, for the record).
+
+    The local packages are the probed one, the packages of its own branch
+    it takes by path (a nested package's `../..`), and the local path
+    dependencies, transitively: each has its remote dependencies exported
+    from SwiftPM's cache and its path dependencies followed, as SwiftPM's
+    `dump-package` reads its manifest, and its manifests rewritten to point
+    at the exports. A path dependency outside the branch is exported from
+    its checkout's HEAD, or --path-dep's ref. A remote package keeps its
+    manifest: SwiftPM resolves its own remote dependencies, from its cache
+    on macOS and from the network in a container, and gives an identity
+    the export has to the export, as it does for a root's."""
+    root = os.path.join(work, "src", name)
+    export(clone, commit, root)
+    pkg = os.path.normpath(os.path.join(root, subdir))
+    if not inside(pkg, root) or not os.path.isfile(os.path.join(pkg, "Package.swift")):
+        raise RuntimeError(f"{subdir} has no Package.swift at {commit[:10]}")
     deps = os.path.join(work, "deps")
-    record = {"system": system_commit, "dependencies": []}
+    scratch = os.path.join(work, "scratch-macos")
+    path_refs = path_refs or {}
+    record = {"system": system_commit, "dependencies": [], "local": [], "conflicts": [], "rewrites": {}}
     sysdir = os.path.join(deps, "swift-system")
     export(repo, system_commit, sysdir)
     sm = os.path.join(sysdir, "Package.swift")
@@ -169,35 +258,98 @@ def prepare(clone, commit, name, work, repo, system_commit):
         text = f.read()
     with open(sm, "w", encoding="utf-8") as f:
         f.write(manifests.drop_samples(text))
-    paths = {"swift-system": "../../deps/swift-system"}
+    exports = {"swift-system": sysdir}
+    origins = {root: clone}
     pins = manifests.resolved_pins(pkg)
-    for m in manifests.manifests(pkg):
-        with open(os.path.join(pkg, m), encoding="utf-8") as f:
-            text = f.read()
-        for d in manifests.dependencies(text):
-            ident = d["identity"]
-            if d["kind"] != "url" or ident in paths:
+
+    def origin_of(p):
+        for d, o in origins.items():
+            if inside(p, d):
+                return os.path.normpath(os.path.join(o, os.path.relpath(os.path.realpath(p), os.path.realpath(d))))
+        raise RuntimeError(f"no origin for {p}")
+
+    queue, done = [pkg], []
+    while queue:
+        p = queue.pop(0)
+        if any(os.path.realpath(p) == os.path.realpath(q) for q in done):
+            continue
+        done.append(p)
+        if p != pkg:
+            record["local"].append(os.path.relpath(p, work))
+        for m in manifests.manifests(p):
+            with open(os.path.join(p, m), encoding="utf-8") as f:
+                text = f.read()
+            for d in manifests.dependencies(text):
+                ident = d["identity"]
+                if d["kind"] != "url" or ident in exports:
+                    continue
+                clone_dir, rev, version = manifests.choose(d["location"], d["requirement"], pins.get(ident))
+                exports[ident] = os.path.join(deps, ident)
+                export(clone_dir, rev, exports[ident])
+                record["dependencies"].append({"identity": ident, "url": d["location"], "requirement": d["requirement"],
+                                               "version": version, "revision": rev})
+        for d in manifests.active_dependencies(p, scratch, swiftpm):
+            if d["kind"] != "path":
                 continue
-            clone_dir, rev, version = manifests.choose(d["location"], d["requirement"], pins.get(ident))
-            export(clone_dir, rev, os.path.join(deps, ident))
-            paths[ident] = f"../../deps/{ident}"
-            record["dependencies"].append({"identity": ident, "url": d["location"], "requirement": d["requirement"],
-                                           "version": version, "revision": rev})
-    for m in manifests.manifests(pkg):
-        p = os.path.join(pkg, m)
-        with open(p, encoding="utf-8") as f:
-            text = f.read()
-        new, done = manifests.rewrite(text, paths)
-        if new != text:
-            with open(p, "w", encoding="utf-8") as f:
-                f.write(new)
-        record.setdefault("rewrites", {})[m] = done
+            # SwiftPM's path is resolved (/private/var for /var); the
+            # scratch directory's, the work's, may not be.
+            ident, target = d["identity"], os.path.realpath(d["location"])
+            literal = os.path.relpath(target, os.path.realpath(p))
+            if inside(target, work):
+                target = os.path.join(work, os.path.relpath(target, os.path.realpath(work)))
+            if inside(target, root):
+                if not os.path.isfile(os.path.join(target, "Package.swift")):
+                    raise RuntimeError(f"{os.path.relpath(p, work)} takes the path dependency {literal}, which "
+                                       f"has no Package.swift at {commit[:10]}")
+                queue.append(os.path.normpath(target))
+                continue
+            original = os.path.normpath(os.path.join(origin_of(p), literal))
+            if ident in exports:
+                if ident != "swift-system" and not any(inside(original, o) and inside(o, original)
+                                                       for e, o in origins.items() if e == exports[ident]):
+                    record["conflicts"].append({"identity": ident, "from": os.path.relpath(p, work),
+                                                "location": original, "used": os.path.relpath(exports[ident], work)})
+                continue
+            repo_dir, ref = path_refs.get(ident, (None, "HEAD"))
+            if repo_dir:
+                top, sub = repo_dir, "."
+            else:
+                try:
+                    top, sub = checkout_of(original)
+                except RuntimeError as e:
+                    raise RuntimeError(f"{os.path.relpath(p, work)}'s path dependency {literal}: {e}")
+            rev = commit_of(top, ref)
+            if not rev:
+                raise RuntimeError(f"path dependency {ident}: no commit {ref} in {top}")
+            dest = os.path.join(deps, ident)
+            exports[ident] = dest
+            export(top, rev if sub == "." else f"{rev}:{sub}", dest)
+            origins[dest] = os.path.normpath(os.path.join(top, sub))
+            dirty = git(top, "status", "--porcelain", "--untracked-files=no").strip()
+            on = git(top, "symbolic-ref", "--short", "-q", "HEAD", ok=(0, 1)).strip() if ref == "HEAD" else ""
+            entry = {"identity": ident, "url": origins[dest], "requirement": f"path: {literal}",
+                     "version": f"{ref} ({on + ', ' if on else ''}local)", "revision": rev}
+            if dirty and ref == "HEAD":
+                entry["uncommitted"] = len(dirty.split("\n"))
+                log(f"{ident}: {top} has uncommitted changes; the export is its HEAD, {rev[:10]}")
+            record["dependencies"].append(entry)
+            queue.append(dest)
+    for p in done:
+        for m in manifests.manifests(p):
+            path = os.path.join(p, m)
+            with open(path, encoding="utf-8") as f:
+                text = f.read()
+            new, rewrites = manifests.rewrite(text, {i: os.path.relpath(d, p) for i, d in exports.items()})
+            if new != text:
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write(new)
+            record["rewrites"][os.path.relpath(path, pkg)] = rewrites
     return pkg, record
 
 
-def describe(pkg, scratch, logs):
-    p = subprocess.run(["swift", "package", "--disable-sandbox", "--package-path", pkg, "--scratch-path", scratch,
-                        "describe", "--type", "json"], capture_output=True, text=True)
+def describe(pkg, scratch, logs, swiftpm=()):
+    p = subprocess.run(["swift", "package", "--disable-sandbox", *swiftpm, "--package-path", pkg,
+                        "--scratch-path", scratch, "describe", "--type", "json"], capture_output=True, text=True)
     with open(os.path.join(logs, "describe.log"), "w") as f:
         f.write(p.stderr)
     if p.returncode != 0:
@@ -257,12 +409,22 @@ def imports_of(text, module):
     return any(m == module for _, m, _, _ in strip.imports(text))
 
 
+def with_import_first(text, line):
+    """(text, the 1-based line inserted) with an import line first, after
+    a `#!` line if there is one."""
+    lines = text.split("\n")
+    at = 1 if lines and lines[0].startswith("#!") else 0
+    return "\n".join(lines[:at] + [line] + lines[at:]), at + 1
+
+
 # ---------------------------------------------------------------- builds
 
 class Builder:
-    def __init__(self, platform, work, name, args):
+    def __init__(self, platform, work, name, args, pkg=None, swiftpm=()):
         self.platform, self.work, self.name, self.args = platform, work, name, args
-        self.pkg = os.path.join(work, "src", name)
+        self.pkg = pkg or os.path.join(work, "src", name)
+        self.rel = os.path.relpath(self.pkg, work)
+        self.swiftpm = list(swiftpm)
         self.logs = os.path.join(work, "logs")
         os.makedirs(self.logs, exist_ok=True)
         self.scratch = os.path.join(work, f"scratch-{platform}")
@@ -271,11 +433,11 @@ class Builder:
     @property
     def roots(self):
         if self.platform == "linux":
-            return [f"/code/src/{self.name}"]
+            return [f"/code/{self.rel}"]
         return [self.pkg, os.path.realpath(self.pkg)]
 
     def build(self, label, target=None):
-        """(exit status, log text, seconds) of one build."""
+        """(exit status, log text, seconds, log path) of one build."""
         self.count += 1
         log_path = os.path.join(self.logs, f"{self.count:03d}-{label}.log")
         extra = ["-Xswiftc", "-continue-building-after-errors"]
@@ -283,17 +445,18 @@ class Builder:
             extra = ["--target", target] + extra
         start = time.time()
         if self.platform == "linux":
-            cmd = [LINUX_BUILD, "--quiet", "--root", self.work, "--dir", f"src/{self.name}",
-                   "--scratch", "../../scratch-linux", "--log", log_path]
+            cmd = [LINUX_BUILD, "--quiet", "--root", self.work, "--dir", self.rel,
+                   "--scratch", os.path.relpath(self.scratch, self.pkg), "--log", log_path]
             if self.args.swift:
                 cmd += ["--swift", self.args.swift]
-            cmd += ["build" if target else "build-tests", "--"] + extra
+            cmd += ["build" if target else "build-tests", "--"] + self.swiftpm + extra
             p = subprocess.run(cmd, capture_output=True, text=True)
             with open(log_path, encoding="utf-8", errors="replace") as f:
                 text = f.read()
             text += "\n" + p.stdout + p.stderr
         else:
-            cmd = ["swift", "build", "--disable-sandbox", "--package-path", self.pkg, "--scratch-path", self.scratch]
+            cmd = ["swift", "build", "--disable-sandbox", *self.swiftpm, "--package-path", self.pkg,
+                   "--scratch-path", self.scratch]
             if not target:
                 cmd.append("--build-tests")
             cmd += extra
@@ -304,11 +467,76 @@ class Builder:
         return p.returncode, text, round(time.time() - start, 1), log_path
 
 
+def build_target(b, pkg, t, texts, label, base_keys):
+    """Builds target t alone with some of its files' texts replaced
+    ({file: text}), every file of it recompiled (an import one file
+    re-exports serves the whole module, and an incremental build recompiles
+    only the files it thinks changed), then restores them. Returns (exit,
+    errors in the target's files, errors elsewhere, seconds, log path),
+    less the baseline's."""
+    originals = {}
+    for rel, new in texts.items():
+        path = os.path.join(pkg, rel)
+        with open(path, encoding="utf-8") as f:
+            originals[rel] = f.read()
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(new)
+    now = time.time()
+    for rel in target_files(pkg, t):
+        try:
+            os.utime(os.path.join(pkg, rel), (now, now))
+        except OSError:
+            pass
+    try:
+        code, text, secs, lp = b.build(label, t["name"])
+    finally:
+        for rel, orig in originals.items():
+            with open(os.path.join(pkg, rel), "w", encoding="utf-8") as f:
+                f.write(orig)
+    found = [d for d in diags.parse(text, b.roots) if (d["file"], d["line"], d["message"]) not in base_keys]
+    mine = set(texts) | set(target_files(pkg, t))
+    return (code, [d for d in found if d["file"] in mine], [d for d in found if d["file"] not in mine], secs, lp)
+
+
+def code_reader(pkg):
+    """code_of(file) for diags.split: a file's lines with comments and
+    strings blanked, or None."""
+    cache = {}
+
+    def code_of(rel):
+        if rel not in cache:
+            try:
+                with open(os.path.join(pkg, rel), encoding="utf-8") as f:
+                    cache[rel] = strip_comments_and_strings(f.read())[0].split("\n")
+            except (OSError, UnicodeDecodeError):
+                cache[rel] = None
+        return cache[rel]
+    return code_of
+
+
+def name_records(prim, pkg, removed_modules, classify_name):
+    """[(diagnostic, kind, name, module, (class, unit, how))] for a build's
+    primary diagnostics: `cannot find 'Glibc'` for a removed module is a
+    qualified use, read from the source."""
+    out = []
+    for d, kind, nm, details in prim:
+        module = details.get("module")
+        if kind == "value" and nm in removed_modules:
+            with open(os.path.join(pkg, d["file"]), encoding="utf-8") as f:
+                line = f.read().split("\n")[d["line"] - 1]
+            q = diags.qualified_name(line, d["col"], nm)
+            if q:
+                kind, module, nm = "qualified", nm, q
+        out.append((d, kind, nm, module, classify_name(nm, kind)))
+    return out
+
+
 # ---------------------------------------------------------------- one package
 
-def probe(clone, branch, platform, args, repo, head):
+def probe(clone, branch, platform, args, repo, head, subdir="."):
     clone = os.path.abspath(clone)
     name = os.path.basename(clone.rstrip("/"))
+    shown = display_name(name, subdir)
     branch = branch or newest_branch(clone)
     if not branch:
         raise RuntimeError(f"{clone} has none of the branches {', '.join(BRANCHES)}; give --branch")
@@ -318,25 +546,29 @@ def probe(clone, branch, platform, args, repo, head):
     system_commit = commit_of(repo, args.system)
     if not system_commit:
         raise RuntimeError(f"no System commit {args.system} in {repo}")
-    work = os.path.join(args.work, f"{name}-{platform}")
+    work = os.path.join(args.work, f"{shown}-{platform}")
     gb = free_gb(args.work)
     if gb < args.min_free_gb:
-        raise RuntimeError(f"only {gb:.1f} GiB free (less than {args.min_free_gb}); not starting {name}")
-    log(f"{name} {branch} @ {commit[:10]} on {platform}, against System {system_commit[:10]}; scratch {work}")
+        raise RuntimeError(f"only {gb:.1f} GiB free (less than {args.min_free_gb}); not starting {shown}")
+    log(f"{shown} {branch} @ {commit[:10]} on {platform}, against System {system_commit[:10]}; scratch {work}")
     fresh_work(work)
     plat = classify.PLATFORM[platform]
-    cfg = package_config(name)
+    cfg = package_config(name, subdir)
+    swiftpm = getattr(args, "swiftpm", ())
     started = time.time()
     result = {"meta": {"package": name, "clone": clone, "branch": branch, "commit": commit, "platform": platform,
                        "platformName": plat, "system": system_commit, "tool": head,
                        "date": datetime.date.today().isoformat(), "shims": cfg["shims"], "note": cfg["note"]},
               "targets": [], "records": [], "followOns": [], "others": [], "outside": [], "baseline": None,
               "foundationFiles": [], "reexporters": {}, "reachesThrough": {}}
+    if os.path.normpath(subdir) != ".":
+        result["meta"].update(nested=os.path.normpath(subdir), name=shown)
     try:
-        pkg, rec = prepare(clone, commit, name, work, repo, system_commit)
+        pkg, rec = prepare(clone, commit, name, work, repo, system_commit, subdir, path_dep_refs(args.path_dep),
+                           swiftpm)
         result["meta"]["preparation"] = rec
-        b = Builder(platform, work, name, args)
-        desc = describe(pkg, os.path.join(work, "scratch-macos"), b.logs)
+        b = Builder(platform, work, name, args, pkg, swiftpm)
+        desc = describe(pkg, os.path.join(work, "scratch-macos"), b.logs, swiftpm)
         mods = classify.modules(repo, head)
         should_remove = strip.module_matcher(mods, cfg["shims"])
         own_modules = {t["c99name"] for t in desc["targets"]} | {"SystemPackage", "SystemSockets", "CSystem"}
@@ -348,7 +580,8 @@ def probe(clone, branch, platform, args, repo, head):
             wanted = set(args.targets.split(","))
             targets = [t for t in targets if t["name"] in wanted]
         clang = {t["c99name"] for t in desc["targets"] if t.get("module_type") == "ClangTarget"}
-        plan = []
+        own_c = {t["c99name"] for t in desc["targets"] if t.get("module_type") in OWN_C_TYPES} - set(cfg["shims"])
+        plan, own_plan = [], {}
         result["files"] = {f: t["name"] for t in desc["targets"] for f in target_files(pkg, t)}
         for t in targets:
             entry = {"name": t["name"], "type": t.get("type"), "moduleType": t.get("module_type"),
@@ -364,7 +597,8 @@ def probe(clone, branch, platform, args, repo, head):
                 result["reexporters"][t["c99name"]] = sorted({r["module"] for r in active if r["exported"]})
             for rel in target_files(pkg, t):
                 try:
-                    text = open(os.path.join(pkg, rel), encoding="utf-8").read()
+                    with open(os.path.join(pkg, rel), encoding="utf-8") as f:
+                        text = f.read()
                 except (OSError, UnicodeDecodeError):
                     continue
                 if imports_of(text, "Foundation"):
@@ -380,6 +614,10 @@ def probe(clone, branch, platform, args, repo, head):
             else:
                 entry["status"] = "to probe"
                 plan.append((t, entry, rem))
+            if args.own_modules and own_c:
+                both = removals(pkg, t, lambda m: should_remove(m) or m in own_c, plat, model)
+                if any(r["active"] and r["module"] in own_c for _, _, rs in both.values() for r in rs):
+                    own_plan[t["name"]] = both
         # Targets that reach C through another target's re-export.
         by_name = {t["name"]: t for t in desc["targets"]}
         c99 = {t["name"]: t["c99name"] for t in desc["targets"]}
@@ -395,73 +633,53 @@ def probe(clone, branch, platform, args, repo, head):
             via = sorted(c99[d] for d in deps_of(t["name"]) if c99.get(d) in result["reexporters"])
             if via:
                 result["reachesThrough"][t["name"]] = via
-        if plan:
-            log(f"{name}: {len(plan)} of {len(targets)} targets to probe; baseline build")
+        if args.own_modules:
+            result["ownModules"] = {"modules": sorted(own_c), "targets": [], "records": [], "ownNames": {}}
+        if plan or own_plan:
+            log(f"{shown}: {len(plan)} of {len(targets)} targets to probe"
+                + (f", {len(own_plan)} with the package's own C modules" if args.own_modules else "")
+                + "; baseline build")
             code, text, secs, lp = b.build("baseline")
             base = diags.parse(text, b.roots)
             result["baseline"] = {"exit": code, "seconds": secs, "errors": len(base), "log": os.path.relpath(lp, work)}
             base_keys = {(d["file"], d["line"], d["message"]) for d in base}
             if code != 0:
-                log(f"{name}: the baseline build failed ({len(base)} errors); probe errors that match them are "
+                log(f"{shown}: the baseline build failed ({len(base)} errors); probe errors that match them are "
                     "dropped")
-            for t, entry, rem in plan:
-                for rel, (_, new, _) in rem.items():
-                    with open(os.path.join(pkg, rel), "w", encoding="utf-8") as f:
-                        f.write(new)
-                # Every file of the target is compiled again: an import one
-                # file re-exports (`@_exported`) serves the whole module, and
-                # an incremental build recompiles only the files it thinks
-                # changed.
-                now = time.time()
-                for rel in target_files(pkg, t):
-                    try:
-                        os.utime(os.path.join(pkg, rel), (now, now))
-                    except OSError:
-                        pass
-                try:
-                    code, text, secs, lp = b.build(t["name"].replace("/", "_"), t["name"])
-                finally:
-                    for rel, (orig, _, _) in rem.items():
-                        with open(os.path.join(pkg, rel), "w", encoding="utf-8") as f:
-                            f.write(orig)
-                found = [d for d in diags.parse(text, b.roots) if (d["file"], d["line"], d["message"]) not in base_keys]
-                mine = set(rem) | set(target_files(pkg, t))
-                inside = [d for d in found if d["file"] in mine]
-                result["outside"] += [dict(d, target=t["name"]) for d in found if d["file"] not in mine]
-                code_cache = {}
 
-                def code_of(rel):
-                    if rel not in code_cache:
-                        try:
-                            code_cache[rel] = strip_comments_and_strings(
-                                open(os.path.join(pkg, rel), encoding="utf-8").read())[0].split("\n")
-                        except (OSError, UnicodeDecodeError):
-                            code_cache[rel] = None
-                    return code_cache[rel]
-                prim, follow, other = diags.split(inside, code_of)
-                removed_modules = {r["module"] for r in entry["removed"]}
-                for d, kind, nm, details in prim:
-                    module = details.get("module")
-                    if kind == "value" and nm in removed_modules:
-                        line = (open(os.path.join(pkg, d["file"]), encoding="utf-8").read().split("\n")
-                                [d["line"] - 1])
-                        q = diags.qualified_name(line, d["col"], nm)
-                        if q:
-                            kind, module, nm = "qualified", nm, q
-                    cls, unit, how = result_class(b, nm, plat, kind, cfg, pkg, desc)
-                    result["records"].append({
-                        "package": name, "branch": branch, "commit": commit, "platform": platform,
-                        "target": t["name"], "file": d["file"], "line": d["line"], "column": d["col"],
-                        "name": nm, "kind": kind, "module": module, "class": cls, "unit": unit, "how": how,
-                        "message": d["message"]})
-                result["followOns"] += [dict(d, target=t["name"]) for d in follow]
-                result["others"] += [dict(d, target=t["name"]) for d in other]
-                entry.update({"status": "probed", "exit": code, "seconds": secs, "log": os.path.relpath(lp, work),
-                              "names": len(prim), "followOns": len(follow), "others": len(other)})
-                log(f"{name}: {t['name']}: {len(prim)} names, {len(follow)} follow-ons, {len(other)} other errors "
-                    f"({secs} s)")
+            def classify_name(nm, kind):
+                return result_class(nm, plat, kind, cfg, pkg, desc)
+            planned = {t["name"]: (t, entry, rem) for t, entry, rem in plan}
+            for t in targets:
+                ordinary = []
+                if t["name"] in planned:
+                    _, entry, rem = planned[t["name"]]
+                    code, inside_t, outside_t, secs, lp = build_target(
+                        b, pkg, t, {rel: new for rel, (_, new, _) in rem.items()}, t["name"].replace("/", "_"),
+                        base_keys)
+                    result["outside"] += [dict(d, target=t["name"]) for d in outside_t]
+                    prim, follow, other = diags.split(inside_t, code_reader(pkg))
+                    removed_modules = {r["module"] for r in entry["removed"]}
+                    for d, kind, nm, module, (cls, unit, how) in name_records(prim, pkg, removed_modules,
+                                                                               classify_name):
+                        ordinary.append((d["file"], nm))
+                        result["records"].append({
+                            "package": name, "branch": branch, "commit": commit, "platform": platform,
+                            "target": t["name"], "file": d["file"], "line": d["line"], "column": d["col"],
+                            "name": nm, "kind": kind, "module": module, "class": cls, "unit": unit, "how": how,
+                            "message": d["message"], **({"nested": result["meta"]["nested"]}
+                                                        if "nested" in result["meta"] else {})})
+                    result["followOns"] += [dict(d, target=t["name"]) for d in follow]
+                    result["others"] += [dict(d, target=t["name"]) for d in other]
+                    entry.update({"status": "probed", "exit": code, "seconds": secs, "log": os.path.relpath(lp, work),
+                                  "names": len(prim), "followOns": len(follow), "others": len(other)})
+                    log(f"{shown}: {t['name']}: {len(prim)} names, {len(follow)} follow-ons, {len(other)} other "
+                        f"errors ({secs} s)")
+                if t["name"] in own_plan:
+                    own_pass(b, pkg, t, own_plan[t["name"]], own_c, ordinary, base_keys, platform, classify_name,
+                             result, work, shown)
         else:
-            log(f"{name}: no target has a removed import compiled on {plat}; nothing to build")
+            log(f"{shown}: no target has a removed import compiled on {plat}; nothing to build")
     finally:
         result["meta"]["seconds"] = round(time.time() - started, 1)
         if args.keep:
@@ -471,10 +689,72 @@ def probe(clone, branch, platform, args, repo, head):
     return result
 
 
+def own_pass(b, pkg, t, both, own_c, ordinary, base_keys, platform, classify_name, result, work, shown):
+    """--own-modules for one target: built without its imports of the
+    package's own C modules as well as its C imports (X1), then with the
+    platform's C library imported first in each of its files (X2). A name
+    X1 can't find in a file, X2 can and the ordinary probe's build could
+    (`ordinary`, [(file, name)]) is one the file took from the C library
+    through its own C module."""
+    x1 = {rel: new for rel, (_, new, _) in both.items()}
+    label = t["name"].replace("/", "_")
+    code1, in1, out1, secs1, lp1 = build_target(b, pkg, t, x1, f"{label}-own", base_keys)
+    library = f"@preconcurrency import {C_LIBRARY[platform]} // import-probe: the C library, for --own-modules"
+    x2, inserted = {}, {}
+    for rel in target_files(pkg, t):
+        try:
+            if rel in x1:
+                text = x1[rel]
+            else:
+                with open(os.path.join(pkg, rel), encoding="utf-8") as f:
+                    text = f.read()
+        except (OSError, UnicodeDecodeError):
+            continue
+        x2[rel], inserted[rel] = with_import_first(text, library)
+    code2, in2, _, secs2, lp2 = build_target(b, pkg, t, x2, f"{label}-own-library", set())
+    # X2's lines are one more than the file's after the inserted import.
+    for d in in2:
+        if d["file"] in inserted and d["line"] > inserted[d["file"]]:
+            d["line"] -= 1
+    in2 = [d for d in in2 if (d["file"], d["line"], d["message"]) not in base_keys]
+    removed = {r["module"] for _, _, rs in both.values() for r in rs}
+    prim1, _, other1 = diags.split(in1, code_reader(pkg))
+    prim2, _, _ = diags.split(in2, code_reader(pkg))
+    recs1 = name_records(prim1, pkg, removed, classify_name)
+    missing2 = {(d["file"], nm) for d, kind, nm, module, _ in name_records(prim2, pkg, removed, lambda n, k: None)}
+    plain = set(ordinary)
+    via_of = {rel: sorted({r["module"] for r in rs if r["module"] in own_c and r["active"]})
+              for rel, (_, _, rs) in both.items()}
+    through, own_names = [], {}
+    for d, kind, nm, module, (cls, unit, how) in recs1:
+        key = (d["file"], nm)
+        if key in missing2:
+            own_names.setdefault(d["file"], set()).add(nm)
+        elif key not in plain:
+            through.append({"package": result["meta"]["package"], "commit": result["meta"]["commit"],
+                            "platform": result["meta"]["platform"], "target": t["name"], "file": d["file"],
+                            "line": d["line"], "column": d["col"], "name": nm, "kind": kind, "module": module,
+                            "via": via_of.get(d["file"]) or ["(another file's re-export)"], "class": cls,
+                            "unit": unit, "how": how, "message": d["message"]})
+    om = result["ownModules"]
+    om["records"] += through
+    for f, ns in own_names.items():
+        om["ownNames"][f] = sorted(ns)
+    om["targets"].append({"name": t["name"], "files": sorted(f for f, v in via_of.items() if v),
+                          "withoutModules": {"exit": code1, "seconds": secs1, "log": os.path.relpath(lp1, work),
+                                             "names": len(prim1), "others": len(other1)},
+                          "withLibrary": {"exit": code2, "seconds": secs2, "log": os.path.relpath(lp2, work),
+                                          "names": len(prim2)},
+                          "through": len(through), "ownNames": sum(len(v) for v in own_names.values()),
+                          "outside": len(out1)})
+    log(f"{shown}: {t['name']}: {len(through)} names through the package's own C modules, "
+        f"{sum(len(v) for v in own_names.values())} of the modules' own ({secs1} s + {secs2} s)")
+
+
 CLASSIFIER = {}
 
 
-def result_class(builder, name, plat, kind, cfg, pkg, desc):
+def result_class(name, plat, kind, cfg, pkg, desc):
     """(class, unit, how), with a configured shim's own declarations as
     `shim's own`."""
     for shim in cfg["shims"]:
@@ -509,6 +789,20 @@ def declares(pkg, t, name):
     return False
 
 
+def package_dirs(clone, branch, args):
+    """The clone's package directories to probe: --package-dir's, else the
+    root and, with --nested, every nested package."""
+    if args.package_dir:
+        return [os.path.normpath(d) for part in args.package_dir for d in part.split(",") if d]
+    dirs = ["."]
+    if args.nested:
+        branch = branch or newest_branch(os.path.abspath(clone))
+        commit = branch and commit_of(os.path.abspath(clone), branch)
+        if commit:
+            dirs += nested_packages(os.path.abspath(clone), commit)
+    return dirs
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("clones", nargs="+")
@@ -523,7 +817,20 @@ def main():
     ap.add_argument("--keep", action="store_true")
     ap.add_argument("--no-skip", action="store_true")
     ap.add_argument("--min-free-gb", type=float, default=15)
+    ap.add_argument("--nested", action="store_true",
+                    help="also probe each nested package of the branch (a directory with its own Package.swift)")
+    ap.add_argument("--package-dir", action="append",
+                    help="probe these package directories of the clone instead (`.` is the root); repeatable")
+    ap.add_argument("--path-dep", action="append", default=[],
+                    help="IDENTITY=REF or IDENTITY=REPO@REF: export that local path dependency at REF")
+    mode = ap.add_mutually_exclusive_group()
+    mode.add_argument("--own-modules", action="store_true",
+                      help="also find the C names files reach through the package's own C modules")
+    mode.add_argument("--reexport", action="store_true",
+                      help="the re-export run instead: names a package gets only through an `@_exported import` "
+                           "of a C module (reexport.py)")
     args = ap.parse_args()
+    path_dep_refs(args.path_dep)
     repo = git(HERE, "rev-parse", "--show-toplevel").strip()
     head = commit_of(repo, "HEAD")
     # The tool's own state, for the record: uncommitted changes to it make
@@ -537,27 +844,35 @@ def main():
     platform = "linux" if args.linux else "macos"
     if platform == "linux" and not shutil.which("container"):
         sys.exit("import-probe: --linux needs Apple's `container` tool (Utilities/linux/README.md)")
+    if args.reexport:
+        # reexport.py imports this module by name; this run's is __main__.
+        sys.modules.setdefault("probe", sys.modules[__name__])
+        import reexport
     status = 0
     for clone in args.clones:
-        try:
-            system_commit = commit_of(repo, args.system)
-            if "c" not in CLASSIFIER or CLASSIFIER["c"].system_commit != system_commit:
-                CLASSIFIER["c"] = classify.Classifier(repo, head, system_commit,
-                                                      os.path.join(os.path.dirname(args.work), "system-cache"))
-            result = probe(clone, args.branch, platform, args, repo, head)
-            result["meta"]["tool"] = tool_id
-        except (RuntimeError, LookupError, ValueError, subprocess.CalledProcessError) as e:
-            log(f"{clone}: {e}")
-            status = 1
-            continue
-        out = os.path.join(args.out, result["meta"]["package"])
-        os.makedirs(out, exist_ok=True)
-        path = os.path.join(out, f"{platform}.json")
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(result, f, indent=1)
-        ledger_path = args.ledger or os.path.join(repo, ".build", "status", "ledger.json")
-        md = summary.write(out, ledger_path if os.path.isfile(ledger_path) else None)
-        log(f"wrote {path} and {md}")
+        for subdir in package_dirs(clone, args.branch, args):
+            try:
+                system_commit = commit_of(repo, args.system)
+                if "c" not in CLASSIFIER or CLASSIFIER["c"].system_commit != system_commit:
+                    CLASSIFIER["c"] = classify.Classifier(repo, head, system_commit,
+                                                          os.path.join(os.path.dirname(args.work), "system-cache"))
+                if args.reexport:
+                    result = reexport.run(clone, args.branch, platform, args, repo, head, subdir)
+                else:
+                    result = probe(clone, args.branch, platform, args, repo, head, subdir)
+                result["meta"]["tool"] = tool_id
+            except (RuntimeError, LookupError, ValueError, subprocess.CalledProcessError) as e:
+                log(f"{clone}{'' if subdir == '.' else ' ' + subdir}: {e}")
+                status = 1
+                continue
+            out = os.path.join(args.out, display_name(result["meta"]["package"], subdir))
+            os.makedirs(out, exist_ok=True)
+            path = os.path.join(out, f"{platform}{'-reexport' if args.reexport else ''}.json")
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(result, f, indent=1)
+            ledger_path = args.ledger or os.path.join(repo, ".build", "status", "ledger.json")
+            md = summary.write(out, ledger_path if os.path.isfile(ledger_path) else None)
+            log(f"wrote {path} and {md}")
     combined = []
     for p in sorted(glob.glob(os.path.join(args.out, "*", "import-probe.json"))):
         with open(p, encoding="utf-8") as f:

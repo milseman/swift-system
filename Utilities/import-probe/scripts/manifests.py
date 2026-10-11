@@ -16,6 +16,15 @@ System's own manifest loses its Samples executable and swift-argument-parser,
 as api-delta's patch_manifest.py does for its exports (that script has no
 function to import: it patches on import).
 
+A dependency's `traits:` argument (SwiftPM 6.1) isn't part of its version
+requirement, and it stays on the path dependency that replaces the call,
+since `traits: []` turns a package's default traits off.
+
+Which path dependencies a manifest takes is SwiftPM's answer, `swift
+package dump-package` (`active_dependencies`): a manifest's text also has
+the ones in branches it doesn't take, such as swift-nio's
+`SWIFTCI_USE_LOCAL_DEPS`.
+
 Only text is edited, and only in the scratch copy.
 """
 
@@ -80,27 +89,93 @@ def identity_of(location):
     return last.lower()
 
 
+def arguments(call):
+    """[(label or None, value text)] of a call's top-level arguments, from
+    the text of the whole call (`.package(url: "x", from: "1.0.0")`):
+    commas inside brackets, parentheses, braces, string literals and
+    comments don't split, and comments are left out."""
+    i = call.find("(")
+    if i < 0:
+        return []
+    out, depth, piece, j = [], 0, [], i
+    while j < len(call):
+        c = call[j]
+        if call.startswith('"""', j) or c == '"':
+            if call.startswith('"""', j):
+                k = call.find('"""', j + 3)
+                k = len(call) if k < 0 else k + 3
+            else:
+                k = j + 1
+                while k < len(call) and call[k] != '"':
+                    k += 2 if call[k] == "\\" else 1
+                k += 1
+            piece.append(call[j:k])
+            j = k
+            continue
+        if call.startswith("//", j):
+            k = call.find("\n", j)
+            j = len(call) if k < 0 else k
+            continue
+        if call.startswith("/*", j):
+            k = call.find("*/", j + 2)
+            j = len(call) if k < 0 else k + 2
+            continue
+        if c in "([{":
+            depth += 1
+            if depth == 1:
+                j += 1
+                continue
+        elif c in ")]}":
+            depth -= 1
+            if depth == 0:
+                out.append("".join(piece))
+                break
+        elif c == "," and depth == 1:
+            out.append("".join(piece))
+            piece = []
+            j += 1
+            continue
+        if depth >= 1:
+            piece.append(c)
+        j += 1
+    args = []
+    for a in out:
+        a = a.strip()
+        if not a:
+            continue
+        m = re.match(r"^([A-Za-z_]\w*)\s*:(?!:)\s*(.*)$", a, re.S)
+        args.append((m.group(1), m.group(2).strip()) if m else (None, a))
+    return args
+
+
 def dependencies(text):
-    """[{kind: url|path, location, requirement, identity, span}] for each
-    `.package(...)` call in a manifest."""
+    """[{kind: url|path, location, requirement, traits, identity, span}] for
+    each `.package(...)` call in a manifest. The requirement is the call's
+    text after its URL, less `traits:`; `traits` is that argument's text,
+    or None."""
     out = []
     for start, end in calls(text):
         call = text[start:end]
-        m = re.search(r'\b(url|path)\s*:\s*"([^"]+)"', call)
+        args = arguments(call)
+        kind = next((label for label, _ in args if label in ("url", "path")), None)
+        if kind is None:
+            continue
+        value = dict((label, v) for label, v in args if label)[kind]
+        m = re.match(r'^"([^"]+)"$', value)
         if not m:
             continue
-        rest = call[m.end():].strip().lstrip(",").strip()
-        if rest.endswith(")"):
-            rest = rest[:-1].strip()
-        out.append({"kind": m.group(1), "location": m.group(2), "requirement": rest,
-                    "identity": identity_of(m.group(2)), "span": (start, end)})
+        rest = [f"{label}: {v}" if label else v for label, v in args if label not in ("name", "url", "path", "traits")]
+        traits = next((v for label, v in args if label == "traits"), None)
+        out.append({"kind": kind, "location": m.group(1), "requirement": ", ".join(rest), "traits": traits,
+                    "identity": identity_of(m.group(1)), "span": (start, end)})
     return out
 
 
 def rewrite(text, paths):
     """The manifest with each dependency whose identity is in `paths`
-    ({identity: relative path}) made `.package(path: ...)` there, and the
-    rewrites as [(old location, new path)]."""
+    ({identity: relative path}) made `.package(path: ...)` there, with its
+    `traits:` if it had one, and the rewrites as [(old location, new
+    path)]."""
     done = []
     pieces, last = [], 0
     for d in dependencies(text):
@@ -109,11 +184,34 @@ def rewrite(text, paths):
             continue
         start, end = d["span"]
         pieces.append(text[last:start])
-        pieces.append(f".package(path: {json.dumps(new)})")
+        traits = f", traits: {d['traits']}" if d.get("traits") is not None else ""
+        pieces.append(f".package(path: {json.dumps(new)}{traits})")
         last = end
         done.append((d["location"], new))
     pieces.append(text[last:])
     return "".join(pieces), done
+
+
+def active_dependencies(package_dir, scratch, flags=()):
+    """The dependencies a package's manifest takes, as SwiftPM evaluates it
+    on this host (`swift package dump-package`, which resolves nothing):
+    [{kind: path|url|registry, identity, location}], a path absolute, as
+    SwiftPM resolved it from the package's directory."""
+    p = subprocess.run(["swift", "package", "--disable-sandbox", *flags, "--package-path", package_dir,
+                        "--scratch-path", scratch, "dump-package"], capture_output=True, text=True)
+    if p.returncode != 0:
+        raise RuntimeError(f"swift package dump-package failed in {package_dir}:\n{p.stderr[-2000:]}")
+    out = []
+    for d in json.loads(p.stdout).get("dependencies", []):
+        for kind, key in (("fileSystem", "path"), ("sourceControl", "url"), ("registry", "registry")):
+            for e in d.get(kind) or []:
+                location = e.get("path")
+                if kind == "sourceControl":
+                    loc = e.get("location") or {}
+                    location = ((loc.get("remote") or [{}])[0].get("urlString") if "remote" in loc
+                                else (loc.get("local") or [None])[0])
+                out.append({"kind": key, "identity": e.get("identity"), "location": location})
+    return out
 
 
 # ---------------------------------------------------------------- versions
@@ -130,7 +228,11 @@ def parse_version(tag):
 
 def allowed(requirement):
     """A predicate on version tuples for a requirement's text, or a string
-    naming a branch or revision, or None when it can't be read."""
+    naming a branch or revision, or None when it can't be read. A `traits:`
+    argument in the text is passed over."""
+    args = arguments(f"({requirement})")
+    if any(label == "traits" for label, _ in args):
+        requirement = ", ".join(f"{label}: {v}" if label else v for label, v in args if label != "traits")
     r = requirement.replace(" ", "")
     m = re.match(r'^(?:from:|\.upToNextMajor\(from:)"([^"]+)"\)?$', r)
     if m:

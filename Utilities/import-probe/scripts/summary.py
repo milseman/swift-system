@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """A package's probe results as Markdown, SUMMARY.md beside its JSON files,
 with the comparison against status.sh's ledger of sites left when there's a
-ledger.json to read.
+ledger.json to read: a section for each platform's probe (<platform>.json,
+with --own-modules' names in it), then one for each re-export run
+(<platform>-reexport.json).
 
 The comparison, per platform, is between two readings of one commit:
 
@@ -77,7 +79,8 @@ def attribution(result):
 
 def ledger_compare(result, led):
     """The comparison for one platform's result, as a dict (see the module
-    docstring)."""
+    docstring). A nested package's comparison has the ledger's sites in
+    its directory, their paths made relative to it."""
     meta = result["meta"]
     repo = LEDGER_NAMES.get(meta["package"], meta["package"])
     plat = meta["platformName"]
@@ -85,6 +88,9 @@ def ledger_compare(result, led):
     out = {"repository": repo, "ledgerCommit": read["commit"] if read else None,
            "sameCommit": bool(read and read["commit"] == meta["commit"])}
     sites = [s for s in led.get("sites", []) if s["repository"] == repo and plat in (s.get("platforms") or {})]
+    if meta.get("nested"):
+        prefix = meta["nested"].rstrip("/") + "/"
+        sites = [dict(s, file=s["file"][len(prefix):]) for s in sites if s["file"].startswith(prefix)]
     imports = [s for s in sites if s["type"] == "import"]
     out["ledgerMarkers"] = len(sites) - len(imports)
     files = result.get("files", {})
@@ -214,7 +220,9 @@ def platform_section(w, result, led):
         mods = sorted({m for f in ci for m in f["modules"]})
         w(f"- **Files importing the package's C targets** ({', '.join(code(m) for m in mods)}): "
           f"{plural(len(ci), 'file')}. A C target's module re-exports the system headers it includes, so names "
-          "these files take through it aren't seen.")
+          "these files take through it aren't seen"
+          + (" by the ordinary builds; the section below has them." if result.get("ownModules") is not None
+             else " (`--own-modules` finds them)."))
     w("")
     if recs:
         names_table(w, recs)
@@ -236,10 +244,133 @@ def platform_section(w, result, led):
         if len(result["others"]) > 10:
             w(f"- … {len(result['others']) - 10} more in the JSON")
         w("")
+    if result.get("ownModules") is not None:
+        own_modules_section(w, result, result["ownModules"])
     if led is not None:
         cmp = ledger_compare(result, led)
         result["comparison"] = cmp
         ledger_section(w, result, cmp)
+
+
+def names_by_file(w, records, via=False):
+    """A table of each file's names, a name's sites counted."""
+    by = collections.defaultdict(collections.Counter)
+    vias = collections.defaultdict(set)
+    for r in records:
+        by[r["file"]][r["name"]] += 1
+        vias[r["file"]] |= set(r.get("via") or [])
+    w("| File | " + ("Through | " if via else "") + "Names |")
+    w("|---|" + ("---|" if via else "") + "---|")
+    for f in sorted(by):
+        names = ", ".join(code(n) + (f" ×{c}" if c > 1 else "") for n, c in sorted(by[f].items()))
+        w(f"| {code(f)} | " + (", ".join(code(v) for v in sorted(vias[f])) + " | " if via else "") + f"{names} |")
+
+
+def own_modules_section(w, result, om):
+    plat = result["meta"]["platformName"]
+    w(f"### Names through the package's own C modules ({plat}, `--own-modules`)")
+    w("")
+    if not om["modules"]:
+        w("The package has no C module of its own (shims aside).")
+        w("")
+        return
+    recs = om["records"]
+    cls = collections.Counter(r["class"] for r in recs)
+    own = sum(len(v) for v in om["ownNames"].values())
+    n = len(om["targets"])
+    w(f"Modules: {', '.join(code(m) for m in om['modules'])}. {plural(n, 'target')} that "
+      f"{'imports one was' if n == 1 else 'import one were'} built twice more: without those imports as well as the C "
+      f"imports, then with `{plat}`'s C library imported first in each file. A name the first build couldn't find, "
+      "the second could, and the ordinary build could is one the file took from the C library through its own C "
+      f"module: {plural(len(recs), 'site')}, {plural(len({r['name'] for r in recs}), 'distinct name')}"
+      + (": " + ", ".join(f"{CLASS_TEXT.get(k, k)} {v}" for k, v in sorted(
+          cls.items(), key=lambda kv: CLASS_ORDER.index(kv[0]) if kv[0] in CLASS_ORDER else 99)) if recs else "")
+      + f". The modules' own names (not found with the C library either): {own}, in the JSON.")
+    w("")
+    if recs:
+        names_by_file(w, recs, via=True)
+        w("")
+        names_table(w, recs)
+        w("")
+    if om["targets"]:
+        w("| Target | Files importing them | Through | Modules' own | Builds |")
+        w("|---|---|---|---|---|")
+        for x in om["targets"]:
+            a, b = x["withoutModules"], x["withLibrary"]
+            w(f"| {code(x['name'])} | {len(x['files'])} | {x['through']} | {x['ownNames']} | "
+              f"{a['seconds']} s, exit {a['exit']}; {b['seconds']} s, exit {b['exit']} |")
+        w("")
+
+
+def reexport_section(w, result):
+    meta = result["meta"]
+    plat = meta["platformName"]
+    w(f"## {plat} ({meta['platform']}): names only a re-export gives (`--reexport`)")
+    w("")
+    w(f"`{meta['branch']}` @ `{short(meta['commit'])}`, against System `{short(meta['system'])}`, "
+      f"{meta['date']}, {meta['seconds']} s. Tool commit `{short(meta['tool'])}`.")
+    w("")
+    active = [s for s in result["demoted"] if s["active"] and s.get("built", True)]
+    other = len([s for s in result["demoted"] if not s["active"]])
+    unbuilt = len([s for s in result["demoted"] if s["active"] and not s.get("built", True)])
+    rest = "".join([f"; {plural(other, 're-export')} {plat} doesn't compile" if other else "",
+                    f"; {plural(unbuilt, 're-export')} in modules the build doesn't have" if unbuilt else ""])
+    if not active:
+        w(f"No `@_exported import` of a counted module that {plat} compiles and the build has, in the package or "
+          f"its dependencies{' (' + rest[2:] + ')' if rest else ''}: nothing was "
+          + ("demoted." if result.get("baseline") else "built."))
+        w("")
+        return
+    w("- **Demoted** to plain imports: " + ", ".join(f"`{s['file']}:{s['line']}` ({code(s['text'])})" for s in active)
+      + rest + ".")
+    b = result.get("baseline") or {}
+    w(f"- **Baseline** (before demoting, `--build-tests`): exit {b.get('exit')}, {plural(b.get('errors', 0), 'error')}, "
+      f"{b.get('seconds')} s.")
+    w("- **Rounds**: " + "; ".join(f"{r['round']}: exit {r['exit']}, {plural(r['names'], 'name')}"
+                                    + (f" in {', '.join(code(x) for x in r['targets'])}" if r["targets"] else "")
+                                    + (f", {plural(len(r['dependencyFiles']), 'dependency file')} with errors"
+                                       if r["dependencyFiles"] else "") + f", {r['seconds']} s"
+                                    for r in result["rounds"]) + ".")
+
+    def dirs(files):
+        c = collections.Counter("/".join(f.split("/")[:4 if f.startswith("deps/") else 5]) for f in files)
+        return ", ".join(f"`{d}` ({n})" for d, n in sorted(c.items()))
+    fx = result["fixups"]
+    w(f"- **Given the C import first**: {plural(len(fx['module']), 'file')} of the re-exporting modules"
+      + (f" ({dirs(fx['module'])})" if fx["module"] else "")
+      + f"; {plural(len(fx['own']), 'file')} of the package's, after their names were read"
+      + f"; {plural(len(fx['dependencies']), 'file')} of its dependencies', uncounted"
+      + (f" ({dirs(fx['dependencies'])})" if fx["dependencies"] else "") + ".")
+    recs = result["records"]
+    cls = collections.Counter(r["class"] for r in recs)
+    w(f"- **Names only a re-export gives**: {plural(len(recs), 'site')}, "
+      f"{plural(len({r['name'] for r in recs}), 'distinct name')}"
+      + (": " + ", ".join(f"{CLASS_TEXT.get(k, k)} {v}" for k, v in sorted(
+          cls.items(), key=lambda kv: CLASS_ORDER.index(kv[0]) if kv[0] in CLASS_ORDER else 99)) if recs else "")
+      + f". Follow-on errors: {len(result['followOns'])}; other errors: {len(result['others'])}"
+      + (f"; errors left in files given the import: {len(result['residual'])}" if result.get("residual") else "")
+      + ".")
+    if meta.get("stopped"):
+        w(f"- **Stopped after {meta['stopped']} rounds**, with files still failing.")
+    if result.get("outsideErrors"):
+        w("- **The build failed outside every file**: " + "; ".join(code(e) for e in result["outsideErrors"][:5]))
+    w("")
+    if recs:
+        w("| File | Line | Name | Kind | Class | System's answer |")
+        w("|---|---|---|---|---|---|")
+        for r in sorted(recs, key=lambda r: (r["file"], r["line"], r["column"]))[:60]:
+            how = (r.get("how") or "").replace("|", "/")
+            w(f"| `{r['file']}` | {r['line']} | {code(r['name'])} | {r['kind']} | {CLASS_TEXT.get(r['class'], r['class'])} "
+              f"| {how[:77] + '...' if len(how) > 80 else how} |")
+        if len(recs) > 60:
+            w(f"| … {len(recs) - 60} more in the JSON | | | | | |")
+        w("")
+    if result["others"]:
+        w("Other errors:")
+        w("")
+        for d in result["others"][:10]:
+            w(f"- `{d['file']}:{d['line']}`: {d['message']}")
+        w("")
 
 
 def ledger_section(w, result, cmp):
@@ -322,27 +453,32 @@ def ledger_section(w, result, cmp):
 
 def write(out_dir, ledger_path=None):
     """Writes OUT/<package>/SUMMARY.md from its platforms' JSON files (and
-    the comparison back into each); returns the path."""
+    the comparison back into each), the re-export runs' after them;
+    returns the path."""
     led = None
     if ledger_path:
         with open(ledger_path, encoding="utf-8") as f:
             led = json.load(f)
-    results = []
+    results, reexports = [], []
     for platform in PLATFORM_ORDER:
-        p = os.path.join(out_dir, f"{platform}.json")
-        if os.path.isfile(p):
-            with open(p, encoding="utf-8") as f:
-                results.append((p, json.load(f)))
+        for suffix, into in (("", results), ("-reexport", reexports)):
+            p = os.path.join(out_dir, f"{platform}{suffix}.json")
+            if os.path.isfile(p):
+                with open(p, encoding="utf-8") as f:
+                    into.append((p, json.load(f)))
     lines = []
     w = lines.append
-    if not results:
+    if not results and not reexports:
         return None
-    meta = results[0][1]["meta"]
-    w(f"# import-probe: {meta['package']}")
+    meta = (results or reexports)[0][1]["meta"]
+    w(f"# import-probe: {meta['package']}" + (f", nested package `{meta['nested']}`" if meta.get("nested") else ""))
     w("")
-    w(f"`{meta['clone']}`. Each section is one platform's probe: the package's branch exported, each Swift target "
+    w(f"`{meta['clone']}`" + (f", its directory `{meta['nested']}`" if meta.get("nested") else "")
+      + ". Each section is one platform's probe: the package's branch exported, each Swift target "
       "built alone without its imports of modules.ini's counted modules, and the names the compiler then couldn't "
       "find, each with System's answer. `import-probe.json` beside this has every site. "
+      + ("A re-export run's section has the names the package gets only through an `@_exported import` of a C "
+         "module. " if reexports else "")
       + (f"Compared with the ledger in `{ledger_path}`." if led else "No ledger.json was given, so there's no "
                                                                         "comparison."))
     if meta.get("note"):
@@ -355,6 +491,8 @@ def write(out_dir, ledger_path=None):
         with open(path, "w", encoding="utf-8") as f:
             json.dump(result, f, indent=1)
         flat += result["records"]
+    for path, result in reexports:
+        reexport_section(w, result)
     with open(os.path.join(out_dir, "import-probe.json"), "w", encoding="utf-8") as f:
         json.dump(flat, f, indent=1)
     path = os.path.join(out_dir, "SUMMARY.md")
